@@ -1,0 +1,958 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:capstone_project/responsive/user_constant.dart';
+
+typedef OnFAQSelected = void Function(String question);
+
+/// FAQSection Widget - Category cards with dropdown expansion
+class FAQSection extends StatefulWidget {
+  final OnFAQSelected onFAQSelected;
+  final bool isLoading;
+
+  const FAQSection({
+    Key? key,
+    required this.onFAQSelected,
+    this.isLoading = false,
+  }) : super(key: key);
+
+  @override
+  _FAQSectionState createState() => _FAQSectionState();
+}
+
+class _FAQSectionState extends State<FAQSection>
+    with SingleTickerProviderStateMixin {
+  Map<String, List<Map<String, String>>> faqCategories = {};
+  bool _isLoadingFAQs = true;
+  String? _expandedCategory;
+  late AnimationController _expandController;
+
+  final List<String> categoryOrder = [
+    'General',
+    'Admission',
+    'Scholarship',
+    'Placement',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _expandController = AnimationController(
+      duration: Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fetchFAQs();
+  }
+
+  @override
+  void dispose() {
+    _expandController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchFAQs() async {
+    try {
+      // Use cached FAQs from UserConstant
+      final groupedFAQs = await UserConstant.getCachedFAQs();
+
+      print('Successfully loaded FAQs: ${groupedFAQs.length} categories');
+
+      if (mounted) {
+        setState(() {
+          faqCategories = groupedFAQs;
+          _isLoadingFAQs = false;
+        });
+      }
+    } on TimeoutException catch (e) {
+      print("FAQ fetch timeout: $e");
+      if (mounted) {
+        setState(() {
+          _isLoadingFAQs = false;
+          faqCategories = {};
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not load FAQs. Please try again.'),
+            duration: Duration(seconds: 3),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      print("Error fetching FAQs: $e");
+      if (mounted) {
+        setState(() {
+          _isLoadingFAQs = false;
+          faqCategories = {};
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading FAQs: ${e.toString()}'),
+            duration: Duration(seconds: 3),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Determines if the current view is desktop
+  bool _isDesktop(BuildContext context) {
+    return MediaQuery.of(context).size.width >= 1100;
+  }
+
+  /// Determines if the current view is tablet
+  bool _isTablet(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    return width >= 600 && width < 1100;
+  }
+
+  /// Gets responsive padding based on screen size
+  EdgeInsets _getResponsivePadding(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    if (width < 600) return EdgeInsets.all(16); // Mobile
+    if (width < 1100) return EdgeInsets.all(24); // Tablet
+    return EdgeInsets.all(40); // Desktop
+  }
+
+  /// Gets responsive spacing between grid items
+  double _getGridSpacing(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    if (width < 600) return 12; // Mobile
+    if (width < 1100) return 16; // Tablet
+    return 20; // Desktop
+  }
+
+  /// Gets appropriate icon for category
+  IconData _getIconForCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'admission':
+        return Icons.school_outlined;
+      case 'scholarship':
+        return Icons.attach_money_outlined;
+      case 'placement':
+        return Icons.work_outline_rounded;
+      case 'general':
+        return Icons.help_outline_rounded;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  /// Builds loading state
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
+            strokeWidth: 3,
+          ),
+          SizedBox(height: 20),
+          Text(
+            'Loading FAQs...',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Builds desktop category card (always expanded with scrollable list)
+  Widget _buildDesktopCategoryCard(String category) {
+    final faqItems = faqCategories[category] ?? [];
+    final icon = _getIconForCategory(category);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Color(0xFF2E7D32).withOpacity(0.2),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0xFF2E7D32).withOpacity(0.08),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Category header
+          Container(
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF2E7D32).withOpacity(0.1),
+                  Color(0xFF388E3C).withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Color(0xFF2E7D32).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Icon(icon, color: Color(0xFF2E7D32), size: 24),
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        '${faqItems.length} question${faqItems.length != 1 ? 's' : ''}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Scrollable FAQ list - Only scroll here
+          Expanded(
+            child:
+                faqItems.isEmpty
+                    ? Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text(
+                          'No questions available',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    )
+                    : ListView.builder(
+                      padding: EdgeInsets.zero,
+                      itemCount: faqItems.length,
+                      itemBuilder: (context, index) {
+                        final question = faqItems[index]['question']!;
+                        final isLast = index == faqItems.length - 1;
+                        return _buildFAQItem(question, isLast);
+                      },
+                    ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Builds mobile/tablet category card (collapsible with dropdown)
+  Widget _buildMobileTabletCategoryCard(String category) {
+    final isExpanded = _expandedCategory == category;
+    final faqItems = faqCategories[category] ?? [];
+    final icon = _getIconForCategory(category);
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color:
+              isExpanded
+                  ? Color(0xFF2E7D32).withOpacity(0.3)
+                  : Colors.grey.shade200,
+          width: isExpanded ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color:
+                isExpanded
+                    ? Color(0xFF2E7D32).withOpacity(0.1)
+                    : Colors.black.withOpacity(0.05),
+            blurRadius: isExpanded ? 12 : 6,
+            offset: Offset(0, isExpanded ? 4 : 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Category header (always visible)
+          InkWell(
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              setState(() {
+                if (isExpanded) {
+                  _expandedCategory = null;
+                  _expandController.reverse();
+                } else {
+                  _expandedCategory = category;
+                  _expandController.forward();
+                }
+              });
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Row(
+                children: [
+                  // Icon
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color:
+                          isExpanded
+                              ? Color(0xFF2E7D32).withOpacity(0.15)
+                              : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        icon,
+                        color:
+                            isExpanded
+                                ? Color(0xFF2E7D32)
+                                : Colors.grey.shade600,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  // Category name
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          category,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color:
+                                isExpanded
+                                    ? Color(0xFF2E7D32)
+                                    : Colors.grey.shade800,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          '${faqItems.length} question${faqItems.length != 1 ? 's' : ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Expand/collapse arrow
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0,
+                    duration: Duration(milliseconds: 300),
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color:
+                          isExpanded ? Color(0xFF2E7D32) : Colors.grey.shade400,
+                      size: 24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Expanded content with scrollable list
+          if (isExpanded)
+            AnimatedContainer(
+              duration: Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              height: faqItems.length > 4 ? 280 : faqItems.length * 70.0,
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Colors.grey.shade100, width: 1),
+                ),
+              ),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                itemCount: faqItems.length,
+                itemBuilder: (context, index) {
+                  final question = faqItems[index]['question']!;
+                  final isLast = index == faqItems.length - 1;
+                  return _buildFAQItem(question, isLast);
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Builds individual FAQ item
+  Widget _buildFAQItem(String question, [bool isLast = false]) {
+    final ValueNotifier<bool> isHovered = ValueNotifier<bool>(false);
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: isHovered,
+      builder: (context, hovered, child) {
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => isHovered.value = true,
+          onExit: (_) => isHovered.value = false,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              // Automatically send the FAQ question
+              widget.onFAQSelected(question);
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 200),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color:
+                    hovered
+                        ? Color(0xFF2E7D32).withOpacity(0.08)
+                        : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                border:
+                    isLast
+                        ? null
+                        : Border(
+                          bottom: BorderSide(
+                            color: Colors.grey.shade100,
+                            width: 1,
+                          ),
+                        ),
+              ),
+              child: Row(
+                children: [
+                  AnimatedContainer(
+                    duration: Duration(milliseconds: 200),
+                    width: hovered ? 6 : 4,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color:
+                          hovered
+                              ? Color(0xFF2E7D32)
+                              : Color(0xFF2E7D32).withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      question,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color:
+                            hovered ? Color(0xFF2E7D32) : Colors.grey.shade700,
+                        fontWeight: hovered ? FontWeight.w600 : FontWeight.w500,
+                        height: 1.4,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  AnimatedContainer(
+                    duration: Duration(milliseconds: 200),
+                    transform: Matrix4.translationValues(hovered ? 4 : 0, 0, 0),
+                    child: Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: hovered ? Color(0xFF2E7D32) : Colors.grey.shade400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Builds the desktop view (4 columns grid, NO outer scrolling)
+  Widget _buildDesktopView() {
+    final spacing = _getGridSpacing(context);
+    final padding = _getResponsivePadding(context);
+
+    // Filter to only show available categories, in order
+    final availableCategories =
+        categoryOrder.where((cat) => faqCategories.containsKey(cat)).toList();
+
+    // Add any categories not in the predefined order
+    for (var cat in faqCategories.keys) {
+      if (!availableCategories.contains(cat)) {
+        availableCategories.add(cat);
+      }
+    }
+
+    if (availableCategories.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return Padding(
+      padding: padding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _buildHeader(),
+          SizedBox(height: 40),
+          // Desktop Grid - 4 columns with equal height, NO scrolling on main view
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 1400),
+                child: GridView.builder(
+                  shrinkWrap: false,
+                  physics:
+                      NeverScrollableScrollPhysics(), // Disable outer scroll
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: spacing,
+                    crossAxisSpacing: spacing,
+                    childAspectRatio: 0.75,
+                  ),
+                  itemCount: availableCategories.length,
+                  itemBuilder: (context, index) {
+                    return _buildDesktopCategoryCard(
+                      availableCategories[index],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  /// Builds the mobile/tablet view (single column, collapsible)
+  Widget _buildMobileTabletView() {
+    final padding = _getResponsivePadding(context);
+
+    // Filter to only show available categories, in order
+    final availableCategories =
+        categoryOrder.where((cat) => faqCategories.containsKey(cat)).toList();
+
+    // Add any categories not in the predefined order
+    for (var cat in faqCategories.keys) {
+      if (!availableCategories.contains(cat)) {
+        availableCategories.add(cat);
+      }
+    }
+
+    if (availableCategories.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: padding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _buildHeader(),
+            SizedBox(height: 32),
+            // Single column list of categories
+            ...availableCategories.map(
+              (category) => _buildMobileTabletCategoryCard(category),
+            ),
+            SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Builds the header section
+  Widget _buildHeader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Logo
+        Center(
+          child: Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Image.asset('lib/images/oasp.png', fit: BoxFit.contain),
+            ),
+          ),
+        ),
+        SizedBox(height: 28),
+        // Title
+        Text(
+          'Welcome to OASP Assist',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: Colors.grey.shade900,
+            letterSpacing: -0.5,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: 12),
+        // Subtitle
+        Container(
+          constraints: BoxConstraints(maxWidth: 500),
+          child: Text(
+            _isDesktop(context)
+                ? 'Browse frequently asked questions by category'
+                : 'Select a category below to explore frequently asked questions',
+            style: TextStyle(
+              fontSize: 15,
+              color: Colors.grey.shade600,
+              height: 1.5,
+              fontWeight: FontWeight.w400,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Builds empty state
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.help_outline, color: Colors.grey[300], size: 64),
+          SizedBox(height: 20),
+          Text(
+            'No FAQs Available',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoadingFAQs) {
+      return _buildLoadingState();
+    }
+
+    // Choose layout based on screen size
+    if (_isDesktop(context)) {
+      return _buildDesktopView();
+    } else {
+      return _buildMobileTabletView();
+    }
+  }
+}
+
+/// FAQToggleButton Widget
+class FAQToggleButton extends StatelessWidget {
+  final bool showFAQs;
+  final VoidCallback? onToggle;
+
+  const FAQToggleButton({Key? key, required this.showFAQs, this.onToggle})
+    : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: Icon(
+          showFAQs ? Icons.chat_rounded : Icons.help_outline_rounded,
+          key: ValueKey(showFAQs),
+          color: showFAQs ? Color(0xFF2E7D32) : Colors.grey.shade600,
+          size: 24,
+        ),
+      ),
+      onPressed:
+          onToggle != null
+              ? () {
+                HapticFeedback.lightImpact();
+                onToggle!();
+              }
+              : null,
+      tooltip: showFAQs ? 'View Chat' : 'View FAQs',
+    );
+  }
+}
+
+/// FAQInputSection Widget
+/// FAQInputSection Widget - Professional Design
+class FAQInputSection extends StatelessWidget {
+  final TextEditingController controller;
+  final bool showFAQs;
+  final bool isLoading;
+  final VoidCallback onFAQToggle;
+  final VoidCallback onSendMessage;
+
+  const FAQInputSection({
+    Key? key,
+    required this.controller,
+    required this.showFAQs,
+    required this.isLoading,
+    required this.onFAQToggle,
+    required this.onSendMessage,
+  }) : super(key: key);
+
+  Map<String, double> _getResponsiveSizes(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    if (width < 600) {
+      // Mobile
+      return {
+        'buttonSize': 40.0,
+        'horizontalPadding': 16.0,
+        'verticalPadding': 12.0,
+        'borderRadius': 12.0,
+        'iconSize': 22.0,
+        'fontSize': 15.0,
+      };
+    } else if (width < 1100) {
+      // Tablet
+      return {
+        'buttonSize': 42.0,
+        'horizontalPadding': 24.0,
+        'verticalPadding': 14.0,
+        'borderRadius': 14.0,
+        'iconSize': 23.0,
+        'fontSize': 16.0,
+      };
+    } else {
+      // Desktop
+      return {
+        'buttonSize': 44.0,
+        'horizontalPadding': 32.0,
+        'verticalPadding': 16.0,
+        'borderRadius': 16.0,
+        'iconSize': 24.0,
+        'fontSize': 16.0,
+      };
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sizes = _getResponsiveSizes(context);
+    final buttonSize = sizes['buttonSize']!;
+    final horizontalPadding = sizes['horizontalPadding']!;
+    final verticalPadding = sizes['verticalPadding']!;
+    final borderRadius = sizes['borderRadius']!;
+    final iconSize = sizes['iconSize']!;
+    final fontSize = sizes['fontSize']!;
+
+    const primaryColor = Color(0xFF2E7D32); // Green primary for send button
+    final surfaceColor = Colors.grey.shade50;
+    final borderColor = Colors.grey.shade300;
+    final faqButtonColor = Colors.grey.shade700; // Dark gray for FAQ button
+    final faqIconColor = Colors.white; // White icon
+
+    return Container(
+      decoration: BoxDecoration(color: surfaceColor),
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: horizontalPadding,
+            right: horizontalPadding,
+            top: verticalPadding,
+            bottom: verticalPadding + 12,
+          ),
+          child: Container(
+            constraints: BoxConstraints(maxWidth: 900),
+            child: Row(
+              children: [
+                // FAQ Toggle Button - Simple Light Border Style
+                Tooltip(
+                  message: showFAQs ? 'Hide FAQs' : 'Show FAQs',
+                  preferBelow: true,
+                  verticalOffset: 12,
+                  textStyle: TextStyle(
+                    color: Colors.white,
+                    fontSize: fontSize - 2,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade800,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Container(
+                    width: buttonSize,
+                    height: buttonSize,
+                    decoration: BoxDecoration(
+                      color: Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Color(0xFFE0E0E0), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          onFAQToggle();
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        splashColor: Colors.grey.withOpacity(0.1),
+                        highlightColor: Colors.grey.withOpacity(0.05),
+                        child: Center(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              showFAQs
+                                  ? Icons.chat_bubble_outline_rounded
+                                  : Icons.help_outline_rounded,
+                              key: ValueKey(showFAQs),
+                              color: Color(0xFF666666),
+                              size: iconSize,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                // Text Input Field - Enhanced Visibility
+                Expanded(
+                  child: Container(
+                    constraints: BoxConstraints(
+                      minHeight: buttonSize,
+                      maxHeight: 120,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(borderRadius),
+                      border: Border.all(color: borderColor, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: controller,
+                      enabled: !isLoading,
+                      maxLines: null,
+                      minLines: 1,
+                      textAlignVertical: TextAlignVertical.center,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade900,
+                        height: 1.4,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Ask something...',
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 14,
+                        ),
+                        isDense: true,
+                      ),
+                      onSubmitted: (_) => onSendMessage(),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                // Send Button
+                Container(
+                  width: buttonSize,
+                  height: buttonSize,
+                  decoration: BoxDecoration(
+                    color: isLoading ? Colors.grey.shade400 : primaryColor,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow:
+                        isLoading
+                            ? []
+                            : [
+                              BoxShadow(
+                                color: primaryColor.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: isLoading ? null : onSendMessage,
+                      borderRadius: BorderRadius.circular(10),
+                      splashColor: Colors.white.withOpacity(0.2),
+                      highlightColor: Colors.white.withOpacity(0.1),
+                      child: Center(
+                        child: Icon(
+                          isLoading
+                              ? Icons.hourglass_empty_rounded
+                              : Icons.arrow_forward_rounded,
+                          color: Colors.white,
+                          size: iconSize,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "1008880584715",
+    "project_id": "capstone-project-1703b",
+    "storage_bucket": "capstone-project-1703b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1008880584715:android:586d0981fcdb06057f5f0e",
+        "android_client_info": {
+          "package_name": "com.example.capstone_project"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1008880584715-mfnr2jv6b499g2e1uuuam9hgsv764vua.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAlQvaLh8nosnyr7O3yTM1aCSE1xf93bQY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1008880584715-a4p6n6fj6mlpfhno5olhrfslknuarjns.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1008880584715-f8hdr43259v2mfjev6ub4ue2og5im5u8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.oaspCapstoneProject"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1008880584715:android:c5e346f06fe8b10f7f5f0e",
+        "android_client_info": {
+          "package_name": "com.example.oasp_capstone_project"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1008880584715-5t9ueo6uip9ge1dgf3he4vn6calb6jne.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.oasp_capstone_project",
+            "certificate_hash": "0ce6da7b575ea0636fd9774a4e428e474065cb0d"
+          }
+        },
+        {
+          "client_id": "1008880584715-mfnr2jv6b499g2e1uuuam9hgsv764vua.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAlQvaLh8nosnyr7O3yTM1aCSE1xf93bQY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1008880584715-a4p6n6fj6mlpfhno5olhrfslknuarjns.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1008880584715-f8hdr43259v2mfjev6ub4ue2og5im5u8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.oaspCapstoneProject"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
