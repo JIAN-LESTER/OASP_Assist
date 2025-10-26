@@ -10,7 +10,6 @@ import 'package:capstone_project/pages/admin_pages/scholarship_management.dart';
 import 'package:capstone_project/pages/admin_pages/system_logs_page.dart';
 import 'package:capstone_project/pages/admin_pages/user_management_page.dart';
 
-// Import the new universal UI components
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
@@ -28,7 +27,7 @@ class _AdminMainPageState extends State<AdminMainPage> {
   bool _isSidebarExpanded = true;
 
   final List<Widget> _pages = [
-    const DashboardPage(),        // 0
+    const DashboardPage(),        
     const ReportsPage(),          // 1
     const InformationBankPage(),  // 2
     const FaqManagementPage(),    // 3

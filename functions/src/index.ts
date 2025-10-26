@@ -1,16 +1,60 @@
 import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
+import {onSchedule} from "firebase-functions/v2/scheduler";
+import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import {Pinecone} from "@pinecone-database/pinecone";
 import axios from "axios";
 
-
 // Define secrets
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
+const FB_APP_ID = defineSecret("FB_APP_ID");
+const FB_APP_SECRET = defineSecret("FB_APP_SECRET");
 
 if (!admin.apps.length) {
   admin.initializeApp();
+}
+
+const db = admin.firestore();
+const storage = admin.storage();
+
+const FB_API_VERSION = "v24.0";
+
+// Configuration
+const PAGE_ID = "730995450096065";
+const ACCESS_TOKEN = "EAAYTTmxaZBDIBP1NfCeIFWEz17RQThPCZC887PJBSLSvBShTCnagouG39eFK6FrbChlFOYwjPlTCA9KAwSlsLzVVBUDICrOdyZBO7XjE379AlGDc16lCLvQhpp5lTVnJVRtJ9pxJrDNbQjUWMjKB7EttkYXbaYEqx2hlx3zZBMBQi3ZCB0CRJ1IfsGmF0m7CRJCf95KCZAhRl1QJR5uMFI2vZC7iIc8MRftZAEdF";
+
+// ============================================================================
+// INTERFACES
+// ============================================================================
+
+interface FacebookPost {
+  id: string;
+  message?: string;
+  created_time: string;
+  full_picture?: string;
+  permalink_url?: string;
+  attachments?: any;
+}
+
+interface CohereResult {
+  category: string;
+  deadline: string | null;
+}
+
+interface AnnouncementData {
+  message: string;
+  created_time: string;
+  full_picture: string;
+  original_image_url: string;
+  permalink_url: string;
+  category: string;
+  deadline: string | null;
+  deleted: boolean;
+  fetched_at: admin.firestore.FieldValue;
+  processed_by_cohere: boolean;
+  stored_in_storage: boolean;
 }
 
 // ============================================================================
@@ -51,12 +95,6 @@ async function generateCohereEmbedding(
   }
 }
 
-/**
- * Generate response using Cohere Chat API
- * @param {string} prompt - Input prompt
- * @param {string} apiKey - Cohere API key
- * @return {Promise<string>} Generated response
- */
 async function generateCohereResponse(
   prompt: string,
   apiKey: string
@@ -95,252 +133,12 @@ async function generateCohereResponse(
 // HELPER FUNCTIONS
 // ============================================================================
 
-
-// Add this debug function to your Cloud Function before generateAnswer
-
-async function debugPineconeState(
-  pineconeIndex: any,
-  queryEmbedding: number[]
-): Promise<void> {
-  try {
-    console.log("🔍 ===== PINECONE DEBUG INFO =====");
-
-    // 1. Check index stats
-    console.log("📊 Fetching index statistics...");
-    try {
-      const stats = await pineconeIndex.describeIndexStats();
-      console.log("📊 Index Stats:", JSON.stringify(stats, null, 2));
-      console.log(`📊 Total vectors in index: ${stats.totalVectorCount || "unknown"}`);
-      console.log(`📊 Namespaces: ${JSON.stringify(stats.namespaces || {})}`);
-    } catch (statsError) {
-      console.log("⚠️ Could not fetch stats:", statsError);
-    }
-
-    // 2. Try a simple query with very low threshold
-    console.log("\n🔍 Testing query with low similarity threshold...");
-    try {
-      const testQuery = await pineconeIndex.query({
-        vector: queryEmbedding,
-        topK: 10,
-        includeMetadata: true,
-      });
-
-      console.log(`📊 Query returned ${testQuery.matches?.length || 0} results`);
-
-      if (testQuery.matches && testQuery.matches.length > 0) {
-        console.log("✅ Query IS working - found matches!");
-
-        // Log first few results
-        for (let i = 0; i < Math.min(3, testQuery.matches.length); i++) {
-          const match = testQuery.matches[i];
-          console.log(`\n  Result ${i + 1}:`);
-          console.log(`    ID: ${match.id}`);
-          console.log(`    Score: ${match.score}`);
-          console.log(`    Metadata keys: ${Object.keys(match.metadata || {}).join(", ")}`);
-
-          // Log actual metadata values for debugging
-          if (match.metadata) {
-            console.log("    Metadata sample:", {
-              docId: match.metadata.docId,
-              title: match.metadata.title,
-              text_preview: match.metadata.text ? match.metadata.text.substring(0, 100) + "..." : "MISSING",
-              source: match.metadata.source,
-            });
-          }
-        }
-      } else {
-        console.log("❌ Query returned NO results - documents not indexed or embedding incompatible");
-      }
-    } catch (queryError) {
-      console.log("❌ Query failed:", queryError);
-    }
-
-    // 3. Check if index is completely empty
-    console.log("\n🔍 Attempting to fetch any vector from index...");
-    try {
-      const stats = await pineconeIndex.describeIndexStats();
-      if (stats.totalVectorCount === 0) {
-        console.log("🚨 INDEX IS EMPTY - No vectors uploaded!");
-        console.log("   Action items:");
-        console.log("   1. Check if document upload completed successfully");
-        console.log("   2. Verify Pinecone credentials are correct");
-        console.log("   3. Check Pinecone dashboard - are documents visible there?");
-      } else {
-        console.log(`✅ Index has ${stats.totalVectorCount} vectors (data exists)`);
-      }
-    } catch (e) {
-      console.log("⚠️ Could not verify index emptiness");
-    }
-
-    console.log("\n🔍 ===== END DEBUG INFO =====\n");
-  } catch (error) {
-    console.error("Error in debug function:", error);
-  }
-}
-
-// In your generateAnswer function, add this right after initializing Pinecone:
-
-export const generateAnswer = onRequest(
-  {
-    secrets: [PINECONE_API_KEY, COHERE_API_KEY],
-    cors: true,
-    invoker: "public",
-    timeoutSeconds: 60,
-    memory: "1GiB",
-  },
-  async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "POST");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
-
-    if (req.method === "OPTIONS") {
-      res.status(204).send("");
-      return;
-    }
-
-    try {
-      const {
-        query,
-        conversationHistory = [],
-        topK = 5,
-        minSimilarityScore = 0.3,
-      } = req.body;
-
-      if (!query || typeof query !== "string" || query.trim().length === 0) {
-        res.status(400).json({
-          answer: "Please provide a valid question.",
-          source: "error",
-        });
-        return;
-      }
-
-      console.log(`🤖 Generating answer for: "${query}"`);
-
-      const pineconeKey = PINECONE_API_KEY.value();
-      const cohereKey = COHERE_API_KEY.value();
-
-      const pineconeClient = new Pinecone({apiKey: pineconeKey});
-      const pineconeIndex = pineconeClient.Index("oasp-assist");
-
-      // 🔥 ADD DEBUG HERE
-      console.log("🔥 STARTING DEBUG - First request only");
-      await debugPineconeState(pineconeIndex, []);
-
-      // Step 1: Build conversation context
-      const contextHistory = buildConversationContext(conversationHistory);
-
-      // Step 2: Generate query embedding
-      const queryEmbedding = await generateCohereEmbedding(
-        query,
-        cohereKey,
-        "search_query"
-      );
-
-      console.log(`✅ Generated embedding with ${queryEmbedding.length} dimensions`);
-
-      // Step 3: Check FAQ first
-      const faqMatch = await findMatchingFAQ(query, queryEmbedding, cohereKey, 0.90);
-
-      if (faqMatch) {
-        console.log("✅ Using FAQ answer");
-        res.json({
-          answer: faqMatch.answer,
-          source: "faq",
-          similarity: faqMatch.similarity,
-        });
-        return;
-      }
-
-      // Step 4: Enhance query with context
-      const contextualQuery = await enhanceQueryWithContext(
-        query,
-        contextHistory,
-        cohereKey
-      );
-
-      console.log(`🔍 Contextual query: "${contextualQuery}"`);
-
-      // Step 5: Retrieve relevant documents
-      const results = await retrieveRelevantDocuments(
-        contextualQuery,
-        queryEmbedding,
-        pineconeIndex,
-        topK,
-        minSimilarityScore
-      );
-
-      if (results.length === 0) {
-        console.log("❌ No relevant documents found");
-        res.json({
-          answer:
-            "Sorry, I couldn't find relevant information about that topic. Please contact OASP staff for assistance.",
-          source: "no_documents",
-          debug: {
-            message: "Pinecone query returned no results - check Cloud Function logs for details",
-            embeddingDimensions: queryEmbedding.length,
-            minSimilarityScore: minSimilarityScore,
-          },
-        });
-        return;
-      }
-
-      console.log(`📚 Using ${results.length} documents for context`);
-
-      // Step 6: Build document context
-      const documentContext = buildDocumentContext(results);
-
-      // Step 7: Create context-aware prompt
-      const prompt = buildContextAwarePrompt(
-        query,
-        documentContext,
-        contextHistory
-      );
-
-      // Step 8: Generate response
-      const answer = await generateCohereResponse(prompt, cohereKey);
-
-      if (!answer || answer.trim().length === 0) {
-        console.log("❌ Cohere returned empty response");
-        res.json({
-          answer:
-            "I'm having trouble processing your question right now. Please try again or contact OASP staff for assistance.",
-          source: "empty_response",
-        });
-        return;
-      }
-
-      console.log("✅ Generated contextual answer");
-      res.json({
-        answer: answer.trim(),
-        source: "knowledge_base",
-        documentsUsed: results.length,
-        documentTitles: results.map((r) => r.ib_title),
-      });
-    } catch (error) {
-      console.error("❌ Error in generateAnswer:", error);
-
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      console.error("Detailed error:", errorMessage);
-
-      res.status(500).json({
-        answer:
-          "I encountered an error while processing your question. Please try again or contact OASP staff for assistance.",
-        source: "error",
-        error: errorMessage,
-      });
-    }
-  }
-);
-
 function getContextualContent(chunks: any[], bestChunk: any): string {
   try {
-    // Log chunk structure for debugging
     console.log(`📝 Processing ${chunks.length} chunk(s)`);
     console.log("📝 Best chunk metadata keys:", Object.keys(bestChunk.metadata || {}));
 
     if (chunks.length === 1) {
-      // Try multiple field names for the text content
       const text =
         bestChunk.metadata?.text ||
         bestChunk.metadata?.content ||
@@ -358,7 +156,6 @@ function getContextualContent(chunks: any[], bestChunk: any): string {
       return cleanText;
     }
 
-    // Multiple chunks - need to combine them intelligently
     const sortedChunks = chunks
       .slice()
       .sort(
@@ -370,7 +167,6 @@ function getContextualContent(chunks: any[], bestChunk: any): string {
     const bestChunkIndex = bestChunk.metadata?.chunkIndex ??
                           bestChunk.metadata?.chunk_index ?? 0;
 
-    // Get context chunks (previous, current, and next)
     const contextChunks = sortedChunks.filter((chunk) => {
       const chunkIndex = chunk.metadata?.chunkIndex ?? chunk.metadata?.chunk_index ?? 0;
       return Math.abs(chunkIndex - bestChunkIndex) <= 1;
@@ -409,7 +205,6 @@ function getContextualContent(chunks: any[], bestChunk: any): string {
     return result;
   } catch (error) {
     console.error("Error getting contextual content:", error);
-    // Fallback: try to extract any text we can find
     const fallback = bestChunk.metadata?.text ||
                      bestChunk.metadata?.content ||
                      "";
@@ -546,8 +341,7 @@ async function findMatchingFAQ(
   similarityThreshold = 0.90
 ): Promise<{ question: string; answer: string; similarity: number } | null> {
   try {
-    const faqSnapshot = await admin
-      .firestore()
+    const faqSnapshot = await db
       .collection("faqs")
       .where("answer", "!=", "")
       .get();
@@ -656,7 +450,6 @@ async function retrieveRelevantDocuments(
 
     console.log(`📊 Found ${similarChunks.matches.length} similar chunks`);
 
-    // Log first chunk details for debugging
     if (similarChunks.matches.length > 0) {
       const firstMatch = similarChunks.matches[0];
       console.log(`📝 First match score: ${firstMatch.score}`);
@@ -672,7 +465,6 @@ async function retrieveRelevantDocuments(
     if (filteredChunks.length === 0) {
       console.log(`❌ No chunks meet minimum similarity threshold of ${minSimilarityScore}`);
       console.log(`⚠️ Best score found: ${similarChunks.matches[0]?.score || 0}`);
-      console.log("💡 Consider lowering minSimilarityScore or check if documents are properly indexed");
       return [];
     }
 
@@ -681,13 +473,12 @@ async function retrieveRelevantDocuments(
     for (const chunk of filteredChunks) {
       const metadata = chunk.metadata || {};
 
-      // Try multiple ways to extract document ID (flexible matching)
       const originalDocId =
         metadata.docId ||
         metadata.originalDocId ||
         metadata.documentId ||
         metadata.id ||
-        chunk.id?.split("_chunk_")[0]; // Extract from chunk ID pattern
+        chunk.id?.split("_chunk_")[0];
 
       console.log(`📝 Chunk ${chunk.id}: docId = ${originalDocId}, score = ${chunk.score}`);
 
@@ -779,12 +570,10 @@ async function retrieveRelevantDocuments(
   }
 }
 
-
 async function getDocumentMetadata(docId: string): Promise<any> {
   try {
     const safeDocId = docId.replace(/[/\\]/g, "-");
-    const doc = await admin
-      .firestore()
+    const doc = await db
       .collection("information_bank")
       .doc(safeDocId)
       .get();
@@ -800,13 +589,11 @@ async function getDocumentMetadata(docId: string): Promise<any> {
   }
 }
 
-
-
 async function isAdmin(uid: string): Promise<boolean> {
   try {
     console.log(`🔍 Checking admin status for UID: ${uid}`);
     
-    const userDoc = await admin.firestore().collection("users").doc(uid).get();
+    const userDoc = await db.collection("users").doc(uid).get();
     
     if (userDoc.exists) {
       const userData = userDoc.data();
@@ -819,7 +606,6 @@ async function isAdmin(uid: string): Promise<boolean> {
       }
     }
     
-    // Fallback: Check custom claims
     try {
       const userRecord = await admin.auth().getUser(uid);
       const customClaims = userRecord.customClaims;
@@ -840,13 +626,156 @@ async function isAdmin(uid: string): Promise<boolean> {
   }
 }
 
-/**
- * ➕ Create a new user with auto-verified email (Admin-only)
- * FIXED: Proper error handling for Functions v2
- */
+// ============================================================================
+// CHATBOT FUNCTIONS
+// ============================================================================
+
+export const generateAnswer = onRequest(
+  {
+    secrets: [PINECONE_API_KEY, COHERE_API_KEY],
+    cors: true,
+    timeoutSeconds: 60,
+    memory: "1GiB",
+  },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    try {
+      const {
+        query,
+        conversationHistory = [],
+        topK = 5,
+        minSimilarityScore = 0.3,
+      } = req.body;
+
+      if (!query || typeof query !== "string" || query.trim().length === 0) {
+        res.status(400).json({
+          answer: "Please provide a valid question.",
+          source: "error",
+        });
+        return;
+      }
+
+      console.log(`🤖 Generating answer for: "${query}"`);
+
+      const pineconeKey = PINECONE_API_KEY.value();
+      const cohereKey = COHERE_API_KEY.value();
+
+      const pineconeClient = new Pinecone({apiKey: pineconeKey});
+      const pineconeIndex = pineconeClient.Index("oasp-assist");
+
+      const contextHistory = buildConversationContext(conversationHistory);
+
+      const queryEmbedding = await generateCohereEmbedding(
+        query,
+        cohereKey,
+        "search_query"
+      );
+
+      console.log(`✅ Generated embedding with ${queryEmbedding.length} dimensions`);
+
+      const faqMatch = await findMatchingFAQ(query, queryEmbedding, cohereKey, 0.90);
+
+      if (faqMatch) {
+        console.log("✅ Using FAQ answer");
+        res.json({
+          answer: faqMatch.answer,
+          source: "faq",
+          similarity: faqMatch.similarity,
+        });
+        return;
+      }
+
+      const contextualQuery = await enhanceQueryWithContext(
+        query,
+        contextHistory,
+        cohereKey
+      );
+
+      console.log(`🔍 Contextual query: "${contextualQuery}"`);
+
+      const results = await retrieveRelevantDocuments(
+        contextualQuery,
+        queryEmbedding,
+        pineconeIndex,
+        topK,
+        minSimilarityScore
+      );
+
+      if (results.length === 0) {
+        console.log("❌ No relevant documents found");
+        res.json({
+          answer:
+            "Sorry, I couldn't find relevant information about that topic. Please contact OASP staff for assistance.",
+          source: "no_documents",
+          debug: {
+            message: "Pinecone query returned no results",
+            embeddingDimensions: queryEmbedding.length,
+            minSimilarityScore: minSimilarityScore,
+          },
+        });
+        return;
+      }
+
+      console.log(`📚 Using ${results.length} documents for context`);
+
+      const documentContext = buildDocumentContext(results);
+
+      const prompt = buildContextAwarePrompt(
+        query,
+        documentContext,
+        contextHistory
+      );
+
+      const answer = await generateCohereResponse(prompt, cohereKey);
+
+      if (!answer || answer.trim().length === 0) {
+        console.log("❌ Cohere returned empty response");
+        res.json({
+          answer:
+            "I'm having trouble processing your question right now. Please try again or contact OASP staff for assistance.",
+          source: "empty_response",
+        });
+        return;
+      }
+
+      console.log("✅ Generated contextual answer");
+      res.json({
+        answer: answer.trim(),
+        source: "knowledge_base",
+        documentsUsed: results.length,
+        documentTitles: results.map((r) => r.ib_title),
+      });
+    } catch (error) {
+      console.error("❌ Error in generateAnswer:", error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      console.error("Detailed error:", errorMessage);
+
+      res.status(500).json({
+        answer:
+          "I encountered an error while processing your question. Please try again or contact OASP staff for assistance.",
+        source: "error",
+        error: errorMessage,
+      });
+    }
+  }
+);
+
+// ============================================================================
+// ADMIN USER MANAGEMENT FUNCTIONS
+// ============================================================================
+
 export const createUser = onCall(
   {
-    // Add CORS configuration
     cors: true,
   },
   async (request) => {
@@ -857,7 +786,6 @@ export const createUser = onCall(
     console.log("========================================");
 
     try {
-      // Check 1: Is user authenticated?
       if (!request.auth) {
         console.error("❌ No auth context - user not authenticated");
         throw new HttpsError(
@@ -867,10 +795,9 @@ export const createUser = onCall(
       }
 
       const callerUid = request.auth.uid;
-      console.log("✅ User is authenticated: ${callerUid}");
-      console.log("📧 User email: ${request.auth.token.email || 'unknown'}");
+      console.log(`✅ User is authenticated: ${callerUid}`);
+      console.log(`📧 User email: ${request.auth.token.email || "unknown"}`);
 
-      // Check 2: Is user an admin?
       const callerIsAdmin = await isAdmin(callerUid);
       
       if (!callerIsAdmin) {
@@ -883,7 +810,6 @@ export const createUser = onCall(
 
       console.log(`✅ User ${callerUid} is confirmed admin`);
 
-      // Validate input
       const email = request.data.email as string;
       const password = request.data.password as string;
       const displayName = request.data.displayName as string | undefined;
@@ -899,18 +825,16 @@ export const createUser = onCall(
 
       console.log(`🔄 Creating user with email: ${email}`);
       
-      // Step 1: Create user in Firebase Authentication with verified email
       const userRecord = await admin.auth().createUser({
         email: email,
         password: password,
         displayName: displayName || "",
-        emailVerified: true, // Auto-verify email for admin-created users
+        emailVerified: true,
       });
 
       console.log(`✅ User created in Auth with UID: ${userRecord.uid}`);
 
-      // Step 2: Create user document in Firestore
-      await admin.firestore().collection("users").doc(userRecord.uid).set({
+      await db.collection("users").doc(userRecord.uid).set({
         uid: userRecord.uid,
         email: email,
         displayName: displayName || "",
@@ -923,25 +847,23 @@ export const createUser = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         createdBy: callerUid,
         isActive: true,
-        // Since admin created this, mark as verified (no email verification needed)
         isVerified: true,
         emailVerified: true,
         verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-        verificationEmailSent: false, // Admin-created users don't need verification emails
+        verificationEmailSent: false,
       });
 
       console.log(`✅ User document created in Firestore for UID: ${userRecord.uid}`);
 
-      // Step 3: Log the action
-      await admin.firestore().collection("logs").add({
+      await db.collection("logs").add({
         user: displayName || email,
-        action: `Admin created user account (auto-verified, no email sent)`,
+        action: "Admin created user account (auto-verified, no email sent)",
         time: admin.firestore.FieldValue.serverTimestamp(),
         userId: userRecord.uid,
         createdBy: callerUid,
       });
 
-      console.log(`✅ User creation complete - No verification email sent (admin-created)`);
+      console.log("✅ User creation complete - No verification email sent (admin-created)");
 
       return {
         success: true,
@@ -952,12 +874,10 @@ export const createUser = onCall(
     } catch (error: any) {
       console.error("❌ Error creating user:", error);
       
-      // If it's already an HttpsError, rethrow it
       if (error instanceof HttpsError) {
         throw error;
       }
       
-      // Handle specific Firebase Auth errors
       if (error.code === "auth/email-already-exists") {
         throw new HttpsError(
           "already-exists",
@@ -979,7 +899,6 @@ export const createUser = onCall(
         );
       }
       
-      // Generic error
       console.error("❌ Unhandled error:", error);
       throw new HttpsError(
         "internal",
@@ -989,10 +908,6 @@ export const createUser = onCall(
   }
 );
 
-/**
- * 🗑️ Delete a user from Authentication and Firestore (Admin-only)
- * FIXED: Proper error handling for Functions v2
- */
 export const deleteUser = onCall(
   {
     cors: true,
@@ -1036,7 +951,7 @@ export const deleteUser = onCall(
       console.log(`✅ User ${uid} deleted from Authentication`);
 
       try {
-        await admin.firestore().collection("users").doc(uid).delete();
+        await db.collection("users").doc(uid).delete();
         console.log(`✅ User ${uid} deleted from Firestore`);
       } catch (firestoreError) {
         console.warn("⚠️ Could not delete user from Firestore:", firestoreError);
@@ -1058,9 +973,6 @@ export const deleteUser = onCall(
   }
 );
 
-/**
- * ✏️ Update a user's email, password, and display name (Admin-only)
- */
 export const updateUser = onCall(
   {
     cors: true,
@@ -1101,7 +1013,7 @@ export const updateUser = onCall(
       const updateData: admin.auth.UpdateRequest = {};
       if (email) {
         updateData.email = email;
-        updateData.emailVerified = true; // Keep email verified when admin updates
+        updateData.emailVerified = true;
       }
       if (password) updateData.password = password;
       if (displayName) updateData.displayName = displayName;
@@ -1125,9 +1037,6 @@ export const updateUser = onCall(
   }
 );
 
-/**
- * 👑 Set or remove admin privileges for a user
- */
 export const setAdminRole = onCall(
   {
     cors: true,
@@ -1163,13 +1072,11 @@ export const setAdminRole = onCall(
         );
       }
 
-      // Update Firestore role
-      await admin.firestore().collection("users").doc(uid).update({
+      await db.collection("users").doc(uid).update({
         role: makeAdmin ? "admin" : "user",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // Set custom claims
       await admin.auth().setCustomUserClaims(uid, { 
         admin: makeAdmin 
       });
@@ -1189,5 +1096,759 @@ export const setAdminRole = onCall(
       
       throw new HttpsError("internal", error.message || "Failed to set admin role");
     }
+  }
+);
+
+// ============================================================================
+// FACEBOOK SYNC FUNCTIONS
+// ============================================================================
+
+export const syncFacebookPosts = onSchedule(
+  {
+    schedule: "every 1 hours",
+    timeZone: "Asia/Manila",
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [COHERE_API_KEY],
+  },
+  async (event) => {
+    try {
+      console.log("Starting Facebook posts sync...");
+      
+      const posts = await fetchFacebookPosts();
+      console.log(`Fetched ${posts.length} posts from Facebook`);
+      
+      for (const post of posts) {
+        await processPost(post, COHERE_API_KEY.value());
+      }
+      
+      console.log("Facebook sync completed successfully");
+    } catch (error) {
+      console.error("Error syncing Facebook posts:", error);
+      throw error;
+    }
+  }
+);
+
+export const manualSyncFacebookPosts = onCall(
+  {
+    cors: true,
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [COHERE_API_KEY],
+  },
+  async (request) => {
+    console.log("========================================");
+    console.log("🔥 manualSyncFacebookPosts called");
+    console.log("Request auth:", request.auth ? "Authenticated" : "Not authenticated");
+    console.log("Request data:", JSON.stringify(request.data));
+    console.log("========================================");
+
+    try {
+      console.log("📡 Fetching Facebook posts...");
+      console.log("📡 Using PAGE_ID:", PAGE_ID);
+      console.log("📡 Using API version:", FB_API_VERSION);
+      
+      const posts = await fetchFacebookPosts();
+      console.log(`✅ Fetched ${posts.length} posts from Facebook`);
+      
+      let processed = 0;
+      let failed = 0;
+      
+      for (const post of posts) {
+        try {
+          console.log(`📝 Processing post: ${post.id}`);
+          await processPost(post, COHERE_API_KEY.value());
+          processed++;
+        } catch (postError: any) {
+          console.error(`❌ Error processing post ${post.id}:`, postError);
+          failed++;
+        }
+      }
+      
+      console.log(`✅ Sync complete: ${processed} processed, ${failed} failed`);
+      
+      return {
+        success: true,
+        message: `Successfully synced ${processed} posts (${failed} failed)`,
+        count: processed,
+        failed: failed,
+        total: posts.length,
+      };
+    } catch (error: any) {
+      console.error("========================================");
+      console.error("❌ CRITICAL ERROR in manual sync:");
+      console.error("Error type:", error.constructor.name);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+      
+      // Check if it's an Axios error with response data
+      if (error.response) {
+        console.error("📡 Facebook API Response Status:", error.response.status);
+        console.error("📡 Facebook API Response Data:", JSON.stringify(error.response.data, null, 2));
+      }
+      console.error("========================================");
+      
+      return {
+        success: false,
+        error: error.message || "Unknown error occurred",
+        errorType: error.constructor.name,
+        errorDetails: error.response?.data || null,
+        message: "Sync failed. Check function logs for details.",
+      };
+    }
+  }
+);
+
+async function fetchFacebookPosts(): Promise<FacebookPost[]> {
+  try {
+    console.log("🔍 Fetching Facebook posts...");
+    console.log("📍 Page ID:", PAGE_ID);
+    console.log("📍 API Version:", FB_API_VERSION);
+    console.log("📍 Access Token (first 20 chars):", ACCESS_TOKEN.substring(0, 20) + "...");
+    
+    const url = `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}/posts`;
+    const params = {
+      fields: "message,created_time,full_picture,permalink_url,attachments",
+      limit: 20,
+      access_token: ACCESS_TOKEN,
+    };
+    
+    console.log("📡 Making request to:", url);
+    
+    const response = await axios.get<{ data: FacebookPost[] }>(url, { params });
+    
+    console.log("✅ Facebook API response status:", response.status);
+    console.log("✅ Posts received:", response.data.data?.length || 0);
+    
+    return response.data.data || [];
+  } catch (error: any) {
+    console.error("❌ Error fetching Facebook posts:");
+    console.error("Error message:", error.message);
+    
+    if (error.response) {
+      console.error("Response status:", error.response.status);
+      console.error("Response data:", JSON.stringify(error.response.data, null, 2));
+      
+      // Provide helpful error messages
+      if (error.response.status === 400) {
+        const errorData = error.response.data;
+        if (errorData?.error?.message) {
+          throw new Error(`Facebook API Error: ${errorData.error.message}`);
+        }
+        throw new Error("Invalid request to Facebook API. Check your PAGE_ID and ACCESS_TOKEN.");
+      }
+      
+      if (error.response.status === 190) {
+        throw new Error("Facebook Access Token is invalid or expired. Please refresh your token.");
+      }
+    }
+    
+    throw error;
+  }
+}
+
+async function processPost(post: FacebookPost, cohereKey: string): Promise<void> {
+  const postId = post.id;
+  const message = post.message || "";
+  
+  if (!message) {
+    console.log(`Skipping post ${postId} - no message`);
+    return;
+  }
+  
+  const postRef = db.collection("announcements").doc(postId);
+  const doc = await postRef.get();
+  
+  let imageUrl = "";
+  if (post.full_picture) {
+    imageUrl = await downloadAndUploadImage(post.full_picture, postId);
+  }
+  
+  if (!doc.exists) {
+    console.log(`Creating new post: ${postId}`);
+    
+    const cohereResult = await analyzeAnnouncement(message, cohereKey);
+    
+    const newData: AnnouncementData = {
+      message: message,
+      created_time: post.created_time,
+      full_picture: imageUrl || post.full_picture || "",
+      original_image_url: post.full_picture || "",
+      permalink_url: post.permalink_url || "",
+      category: cohereResult.category || "General",
+      deadline: cohereResult.deadline || null,
+      deleted: false,
+      fetched_at: admin.firestore.FieldValue.serverTimestamp(),
+      processed_by_cohere: true,
+      stored_in_storage: !!imageUrl,
+    };
+    
+    await postRef.set(newData);
+  } else {
+    const docData = doc.data();
+    if (docData?.deleted) {
+      console.log(`Skipping deleted post: ${postId}`);
+      return;
+    }
+    
+    console.log(`Updating existing post: ${postId}`);
+    await postRef.update({
+      message: message,
+      full_picture: imageUrl || docData?.full_picture || post.full_picture || "",
+      permalink_url: post.permalink_url || "",
+      last_synced_at: admin.firestore.FieldValue.serverTimestamp(),
+      stored_in_storage: !!imageUrl || docData?.stored_in_storage || false,
+    });
+  }
+}
+
+async function downloadAndUploadImage(
+  imageUrl: string,
+  postId: string
+): Promise<string> {
+  try {
+    console.log(`Downloading image for post ${postId}`);
+    
+    const response = await axios.get(imageUrl, {
+      responseType: "arraybuffer",
+      timeout: 30000,
+    });
+    
+    const buffer = Buffer.from(response.data as Buffer);
+    const contentType = response.headers["content-type"] || "image/jpeg";
+    
+    const ext = contentType.split("/")[1] || "jpg";
+    const fileName = `announcements/${postId}.${ext}`;
+    
+    const bucket = storage.bucket();
+    const file = bucket.file(fileName);
+    
+    await file.save(buffer, {
+      metadata: {
+        contentType: contentType,
+        metadata: {
+          postId: postId,
+          uploadedAt: new Date().toISOString(),
+        },
+      },
+    });
+    
+    await file.makePublic();
+    
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+    
+    console.log(`Image uploaded successfully: ${publicUrl}`);
+    return publicUrl;
+    
+  } catch (error: any) {
+    console.error(`Error uploading image for post ${postId}:`, error.message);
+    return "";
+  }
+}
+
+async function analyzeAnnouncement(message: string, cohereKey: string): Promise<CohereResult> {
+  try {
+    const prompt = `Analyze this announcement and categorize it. Also extract any deadlines mentioned.
+
+Announcement: "${message}"
+
+Categories:
+- Admission: enrollment, registration, application, requirements, class schedule, semester, subjects, programs, exams, clearance
+- Scholarship: scholarship, stipend, allowance, grantee, renewal, eligibility, screening, shortlisted, beneficiary, grant
+- Placement: placement, hiring, job, employment, employer, resume, cv, interview, company, opportunity, deployment
+- General: everything else
+
+Respond in JSON format:
+{
+  "category": "category_name",
+  "deadline": "extracted_date_or_null"
+}
+
+For deadlines, extract specific dates and times. Format them clearly. If no deadline found, use null.`;
+
+    const response = await axios.post<{ text?: string }>(
+      "https://api.cohere.ai/v1/chat",
+      {
+        model: "command-r-08-2024",
+        message: prompt,
+        max_tokens: 200,
+        temperature: 0.3,
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${cohereKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    
+    if (response.status === 200) {
+      const generatedText = String(response.data?.text ?? "").trim();
+      
+      try {
+        const cleanedResponse = extractJsonFromResponse(generatedText);
+        const result = JSON.parse(cleanedResponse);
+        
+        let category = result.category?.toString() || "General";
+        let deadline = result.deadline?.toString() || null;
+        
+        category = cleanCategory(category);
+        
+        if (deadline && 
+            (deadline.toLowerCase() === "null" || deadline.trim() === "")) {
+          deadline = null;
+        }
+        
+        return {category, deadline};
+      } catch (e) {
+        console.log("JSON parse error, using fallback analysis");
+        return fallbackAnalysis(message);
+      }
+    } else {
+      throw new Error(`Cohere API error: ${response.status}`);
+    }
+    
+  } catch (error: any) {
+    console.error("Cohere analysis error:", error.message);
+    return fallbackAnalysis(message);
+  }
+}
+
+function extractJsonFromResponse(text: string): string {
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return jsonMatch[0];
+  }
+  
+  const categoryMatch = text.match(/"category"\s*:\s*"([^"]+)"/i);
+  const deadlineMatch = text.match(/"deadline"\s*:\s*"([^"]+)"/i) || 
+                        text.match(/"deadline"\s*:\s*null/i);
+  
+  if (categoryMatch) {
+    const category = categoryMatch[1];
+    const deadline = deadlineMatch ? 
+      (deadlineMatch[1] || null) : null;
+    return JSON.stringify({category, deadline});
+  }
+  
+  throw new Error("Could not extract JSON from response");
+}
+
+function cleanCategory(category: string): string {
+  const cleaned = category.toLowerCase().trim();
+  
+  if (cleaned.includes("admission") || cleaned.includes("enroll")) {
+    return "Admission";
+  } else if (cleaned.includes("scholarship") || 
+             cleaned.includes("financial aid")) {
+    return "Scholarship";
+  } else if (cleaned.includes("placement") || 
+             cleaned.includes("job") || 
+             cleaned.includes("career")) {
+    return "Placement";
+  }
+  
+  return "General";
+}
+
+function fallbackAnalysis(message: string): CohereResult {
+  const messageLower = message.toLowerCase();
+  let category = "General";
+  let deadline: string | null = null;
+  
+  if (messageLower.includes("enrollment") ||
+      messageLower.includes("registration") ||
+      messageLower.includes("application") ||
+      messageLower.includes("requirements") ||
+      messageLower.includes("class schedule") ||
+      messageLower.includes("semester") ||
+      messageLower.includes("subject") ||
+      messageLower.includes("program") ||
+      messageLower.includes("exam schedule") ||
+      messageLower.includes("clearance") ||
+      messageLower.includes("admission")) {
+    category = "Admission";
+  } else if (messageLower.includes("scholarship") ||
+             messageLower.includes("stipend") ||
+             messageLower.includes("allowance") ||
+             messageLower.includes("grantee") ||
+             messageLower.includes("renewal") ||
+             messageLower.includes("eligibility") ||
+             messageLower.includes("screening") ||
+             messageLower.includes("shortlisted") ||
+             messageLower.includes("beneficiary") ||
+             messageLower.includes("grant")) {
+    category = "Scholarship";
+  } else if (messageLower.includes("placement") ||
+             messageLower.includes("hiring") ||
+             messageLower.includes("job") ||
+             messageLower.includes("employment") ||
+             messageLower.includes("employer") ||
+             messageLower.includes("resume") ||
+             messageLower.includes("cv") ||
+             messageLower.includes("interview") ||
+             messageLower.includes("company") ||
+             messageLower.includes("opportunity") ||
+             messageLower.includes("deployment")) {
+    category = "Placement";
+  }
+  
+  deadline = extractDeadlines(message);
+  
+  return {category, deadline};
+}
+
+function extractDeadlines(message: string): string | null {
+  const deadlinePatterns = [
+    /(?<date>(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}(?:,?\s+at\s+\d{1,2}:\d{2}\s?(?:AM|PM|am|pm))?)/gi,
+    /(?<date>\d{1,2}:\d{2}\s?(?:AM|PM|am|pm))/gi,
+    /by\s+(?<date>(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})/gi,
+  ];
+  
+  const extractedDates: string[] = [];
+  
+  for (const pattern of deadlinePatterns) {
+    const matches = message.matchAll(pattern);
+    for (const match of matches) {
+      const found = match.groups?.date?.trim();
+      if (found && found.length > 0) {
+        extractedDates.push(found);
+      }
+    }
+  }
+  
+  if (extractedDates.length === 0) {
+    return null;
+  }
+  
+  return extractedDates.length === 1 ? 
+    extractedDates[0] : 
+    extractedDates.join(" & ");
+}
+
+export const reprocessExistingAnnouncements = onCall(
+  {
+    cors: true,
+    timeoutSeconds: 540,
+    secrets: [COHERE_API_KEY],
+  },
+  async (request) => {
+    try {
+      console.log("Starting reprocessing of existing announcements...");
+      
+      const snapshot = await db.collection("announcements")
+        .where("processed_by_cohere", "==", false)
+        .get();
+      
+      let processed = 0;
+      let failed = 0;
+      
+      for (const doc of snapshot.docs) {
+        const docData = doc.data();
+        const message = docData.message || "";
+        
+        if (message) {
+          try {
+            const cohereResult = await analyzeAnnouncement(
+              message,
+              COHERE_API_KEY.value()
+            );
+            
+            await doc.ref.update({
+              category: cohereResult.category,
+              deadline: cohereResult.deadline,
+              processed_by_cohere: true,
+              reprocessed_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            
+            processed++;
+            console.log(`Reprocessed announcement ${doc.id}`);
+          } catch (e) {
+            failed++;
+            console.error(`Error reprocessing announcement ${doc.id}:`, e);
+          }
+        }
+      }
+      
+      console.log(`Reprocessing complete: ${processed} processed, ${failed} failed`);
+      
+      return {
+        success: true,
+        message: `Reprocessed ${processed} announcements, ${failed} failed`,
+        processed,
+        failed,
+      };
+    } catch (error: any) {
+      console.error("Error reprocessing existing announcements:", error);
+      throw new HttpsError("internal", error.message);
+    }
+  }
+);
+
+export const cleanupDeletedAnnouncement = onDocumentUpdated(
+  {
+    document: "announcements/{postId}",
+    secrets: [],
+  },
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    const postId = event.params.postId;
+    
+    if (!before || !after) return;
+    
+    if (!before.deleted && after.deleted && after.stored_in_storage) {
+      try {
+        console.log(`Cleaning up image for deleted post: ${postId}`);
+        
+        const bucket = storage.bucket();
+        const [files] = await bucket.getFiles({
+          prefix: `announcements/${postId}`,
+        });
+        
+        for (const file of files) {
+          await file.delete();
+          console.log(`Deleted file: ${file.name}`);
+        }
+        
+      } catch (error) {
+        console.error(`Error cleaning up images for ${postId}:`, error);
+      }
+    }
+  }
+);
+
+export const healthCheck = onRequest(
+  {
+    cors: true,
+  },
+  (req, res) => {
+    res.status(200).json({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      service: "Firebase Cloud Functions v2",
+    });
+  }
+);
+
+export const testSync = onCall(
+  {
+    cors: true,
+  },
+  async (request) => {
+    console.log("🧪 Test function called");
+    console.log("Auth:", request.auth ? "Yes" : "No");
+    console.log("Data:", request.data);
+    
+    return {
+      success: true,
+      message: "Test function working!",
+      receivedData: request.data,
+      timestamp: new Date().toISOString(),
+      hasAuth: !!request.auth,
+    };
+  }
+);
+
+// ============================================================================
+// FACEBOOK TOKEN MANAGEMENT (v2)
+// ============================================================================
+
+async function exchangeShortForLong(shortToken: string, appId: string, appSecret: string) {
+  const url = `https://graph.facebook.com/${FB_API_VERSION}/oauth/access_token`;
+  const params = {
+    grant_type: "fb_exchange_token",
+    client_id: appId,
+    client_secret: appSecret,
+    fb_exchange_token: shortToken,
+  };
+  const resp = await axios.get(url, { params });
+  return resp.data;
+}
+
+
+
+
+
+async function getUserPages(longUserToken: string): Promise<any> {
+  const url = `https://graph.facebook.com/${FB_API_VERSION}/me/accounts`;
+  const resp = await axios.get(url, { params: { access_token: longUserToken } });
+  return resp.data as any;
+}
+
+export const exchangeToken = onRequest(
+  {
+    cors: true,
+    secrets: [FB_APP_ID, FB_APP_SECRET],
+  },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    try {
+      if (req.method !== "POST") {
+        res.status(405).json({ error: "Only POST method allowed" });
+        return;
+      }
+      
+      const { uid, short_token } = req.body;
+      if (!uid || !short_token) {
+        res.status(400).json({ error: "Missing uid or short_token" });
+        return;
+      }
+
+      const appId = FB_APP_ID.value();
+      const appSecret = FB_APP_SECRET.value();
+
+      interface FacebookTokenResponse {
+        access_token: string;
+        expires_in: number;
+      }
+      
+      const data = await exchangeShortForLong(short_token, appId, appSecret) as FacebookTokenResponse;
+      const longToken = data.access_token;
+      const expiresIn = data.expires_in;
+
+      const me = await axios.get<{ id: string; name?: string }>(
+        `https://graph.facebook.com/${FB_API_VERSION}/me`, 
+        {
+          params: { access_token: longToken, fields: "id,name" },
+        }
+      );
+
+      const fbUserId = me.data.id;
+      const now = Date.now();
+      const expiresAt = now + (expiresIn ? expiresIn * 1000 : 0);
+
+      let pagesObj: { [key: string]: any } = {};
+      try {
+        const pagesResp = await getUserPages(longToken);
+        const pages = pagesResp.data || [];
+        for (const p of pages) {
+          pagesObj[p.id] = {
+            access_token: p.access_token,
+            name: p.name,
+            expires_at: null,
+          };
+        }
+      } catch (err: any) {
+        console.warn("Could not fetch pages:", err?.response?.data || err.message);
+      }
+
+      const docRef = db.collection("fb_tokens").doc(uid);
+      await docRef.set({
+        provider: "facebook",
+        userId: fbUserId,
+        long_token: longToken,
+        short_token: short_token,
+        expires_at: expiresAt,
+        pages: pagesObj,
+        updated_at: Date.now(),
+      }, { merge: true });
+
+      res.json({ ok: true, expires_in: expiresIn, expires_at: expiresAt, fbUserId });
+    } catch (error: any) {
+      console.error("exchangeToken error:", error?.response?.data || error.message || error);
+      res.status(500).json({ 
+        error: error?.response?.data || error.message || String(error) 
+      });
+    }
+  }
+);
+
+export const refreshTokensDaily = onSchedule(
+  {
+    schedule: "every 24 hours",
+    timeZone: "Asia/Manila",
+    secrets: [FB_APP_ID, FB_APP_SECRET],
+  },
+  async (event) => {
+    const REFRESH_BEFORE_MS = 5 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const cutoff = now + REFRESH_BEFORE_MS;
+
+    const appId = FB_APP_ID.value();
+    const appSecret = FB_APP_SECRET.value();
+
+    const snapshot = await db.collection("fb_tokens")
+      .where("provider", "==", "facebook")
+      .where("expires_at", "<=", cutoff)
+      .get();
+
+    if (snapshot.empty) {
+      console.log("No tokens need refreshing.");
+      return;
+    }
+
+    const results = [];
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const uid = doc.id;
+      const currentLong = data.long_token;
+
+      if (!currentLong) {
+        console.log(`No long token for ${uid}, skipping`);
+        continue;
+      }
+
+      try {
+        const resp = await axios.get<{ access_token: string; expires_in?: number }>(
+          `https://graph.facebook.com/${FB_API_VERSION}/oauth/access_token`, 
+          {
+            params: {
+              grant_type: "fb_exchange_token",
+              client_id: appId,
+              client_secret: appSecret,
+              fb_exchange_token: currentLong,
+            },
+          }
+        );
+
+        const newToken = resp.data.access_token;
+        const newExpiresIn = resp.data.expires_in;
+        const newExpiresAt = newExpiresIn ? (Date.now() + newExpiresIn * 1000) : null;
+
+        let pagesObj = data.pages || {};
+        try {
+          const pagesResp = await getUserPages(newToken);
+          const pages = pagesResp.data || [];
+          for (const p of pages) {
+            pagesObj[p.id] = {
+              access_token: p.access_token,
+              name: p.name,
+              expires_at: null,
+            };
+          }
+        } catch (err: any) {
+          console.warn("pages refresh failed for", uid, err?.message || err);
+        }
+
+        await doc.ref.update({
+          long_token: newToken,
+          expires_at: newExpiresAt,
+          pages: pagesObj,
+          updated_at: Date.now(),
+        });
+
+        console.log(`Refreshed token for ${uid}`);
+        results.push({ uid, ok: true });
+      } catch (err: any) {
+        console.error(`Failed to refresh token for ${uid}`, err?.response?.data || err.message || err);
+        await doc.ref.update({ 
+          needs_reauth: true, 
+          reauth_reason: err?.response?.data || err.message || "" 
+        });
+        results.push({ uid, ok: false, error: err?.response?.data || err.message || "" });
+      }
+    }
+
+    console.log("Token refresh summary:", { refreshed: results.length, details: results });
   }
 );

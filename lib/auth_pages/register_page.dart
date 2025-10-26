@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import 'package:capstone_project/components/number_tile.dart';
+
 
 
 import '../components/square_tile.dart';
@@ -1148,8 +1148,7 @@ void _showVerificationDialog(User user) {
 
             // Google Sign-In Button
             const SquareTile(imagePath: 'lib/images/google.png'),
-            SizedBox(height: baseSpacing * 0.3),
-            const NumberTile(imagePath: 'lib/images/phone_number.png'),
+           
 
             SizedBox(height: sectionSpacing),
 

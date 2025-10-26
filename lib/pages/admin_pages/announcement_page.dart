@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:capstone_project/colors.dart';
@@ -56,24 +57,283 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
   }
 
-  Future<void> _refreshFromFacebook() async {
-    setState(() {
-      isRefreshing = true;
-    });
+// Replace your _refreshFromFacebook method with this EXACT code:
 
-    try {
-      await fetchAndProcessPosts();
+Future<void> _refreshFromFacebook() async {
+  setState(() {
+    isRefreshing = true;
+  });
+
+  try {
+    print('🔄 Starting Facebook sync...');
+    
+    // Call Cloud Function
+    final HttpsCallable callable = FirebaseFunctions.instance
+        .httpsCallable('manualSyncFacebookPosts');
+    
+    print('📞 Calling manualSyncFacebookPosts...');
+    
+    // Call with empty map
+    final result = await callable.call(<String, dynamic>{});
+    
+    print('📦 Received response: ${result.data}');
+    
+    // CRITICAL FIX: Check if result.data is null first
+    if (result.data == null) {
+      throw Exception('No response data from server');
+    }
+    
+    // Check success field
+    final success = result.data['success'] == true;
+    
+    if (success) {
+      // Success path
       await loadAnnouncements();
-    } catch (e) {
+      
+      final count = result.data['count'] ?? 0;
+      final failed = result.data['failed'] ?? 0;
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text('Synced $count posts' + (failed > 0 ? ' ($failed failed)' : '')),
+              ],
+            ),
+            backgroundColor: Colors.green[600],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
+    } else {
+      // Function returned success: false
+      final errorMsg = result.data['error'] ?? 
+                       result.data['message'] ?? 
+                       'Unknown error occurred';
+      final errorType = result.data['errorType'] ?? 'Unknown';
+      
+      // Log detailed error info
+      print('═══════════════════════════════════');
+      print('Function Error Details:');
+      print('Success: false');
+      print('Error Type: $errorType');
+      print('Error Message: $errorMsg');
+      print('Full Response: ${result.data}');
+      print('═══════════════════════════════════');
+      
+      throw Exception('Sync failed: $errorMsg');
+    }
+  } on FirebaseFunctionsException catch (e) {
+    // Firebase-specific errors (network, timeout, etc.)
+    print('═══════════════════════════════════');
+    print('Firebase Functions Error Details:');
+    print('Code: ${e.code}');
+    print('Message: ${e.message}');
+    print('Details: ${e.details}');
+    print('Stack: ${e.stackTrace}');
+    print('═══════════════════════════════════');
+    
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error syncing with Facebook: $e')),
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.error, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Connection Error',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Code: ${e.code}\n${e.message ?? "Failed to connect to server"}',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
       );
-    } finally {
+    }
+  } catch (e) {
+    // General errors (from our throw statements)
+    print('═══════════════════════════════════');
+    print('General Error:');
+    print(e.toString());
+    print('═══════════════════════════════════');
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  e.toString().replaceFirst('Exception: ', ''),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      );
+    }
+  } finally {
+    if (mounted) {
       setState(() {
         isRefreshing = false;
       });
     }
   }
+}
+
+Future<void> _exchangeAndStoreFacebookToken() async {
+  // PASTE YOUR SHORT-LIVED TOKEN HERE
+  const String shortLivedToken = 'PASTE_YOUR_TOKEN_FROM_GRAPH_API_EXPLORER_HERE';
+  
+  // Show loading dialog
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => Center(
+      child: Container(
+        padding: EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Exchanging Facebook token...'),
+          ],
+        ),
+      ),
+    ),
+  );
+  
+  try {
+    print('🔄 Exchanging short-lived token for long-lived token...');
+    
+    // TODO: Replace with your actual Cloud Function URL
+    // Format: https://REGION-PROJECT_ID.cloudfunctions.net/exchangeToken
+    // Example: https://us-central1-myproject-12345.cloudfunctions.net/exchangeToken
+    final response = await http.post(
+      Uri.parse('https://YOUR_REGION-YOUR_PROJECT_ID.cloudfunctions.net/exchangeToken'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'uid': 'facebook_admin',
+        'short_token': shortLivedToken,
+      }),
+    );
+    
+    // Close loading dialog
+    Navigator.pop(context);
+    
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      print('✅ Token exchanged successfully!');
+      print('📅 Expires at: ${DateTime.fromMillisecondsSinceEpoch(data['expires_at'])}');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Facebook token configured! Valid for ~${(data['expires_in'] / 86400).round()} days',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green[600],
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } else {
+      throw Exception('Server returned ${response.statusCode}: ${response.body}');
+    }
+  } catch (e) {
+    // Close loading dialog if still open
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+    
+    print('❌ Error exchanging token: $e');
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(child: Text('Failed to exchange token: $e')),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+}
+
+Future<void> testCloudFunctions() async {
+  print('🧪 Testing Cloud Functions...');
+  
+  try {
+    // Test 1: Simple test function
+    print('Test 1: Calling testSync...');
+    final testCallable = FirebaseFunctions.instance.httpsCallable('testSync');
+    final testResult = await testCallable.call(<String, dynamic>{
+      'test': 'data',
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+    print('✅ testSync response: ${testResult.data}');
+    
+    // Test 2: Actual sync function
+    print('Test 2: Calling manualSyncFacebookPosts...');
+    final syncCallable = FirebaseFunctions.instance
+        .httpsCallable('manualSyncFacebookPosts');
+    final syncResult = await syncCallable.call(<String, dynamic>{});
+    print('✅ manualSyncFacebookPosts response: ${syncResult.data}');
+    
+  } catch (e) {
+    print('❌ Test failed: $e');
+  }
+}
 
   List<DocumentSnapshot> get filteredAnnouncements {
     var filtered =
@@ -1843,79 +2103,3 @@ Color getCategoryColor(String category) {
 }
 
 // FACEBOOK API FUNCTION
-Future<List<dynamic>> fetchAndProcessPosts() async {
-  const pageId = '730995450096065';
-  const accessToken =
-      'EAAYTTmxaZBDIBPMA3YuTdB4VM1VoR1qTqeVsZC6zJqYOBZBbQxFkrtZCVM1YXE1o3hoXDWjlgAgnrtQQubu7L9WV6JIGrs5KrZCjcqCtjdqu4DVZAVcykRDBontQftcb7cfNQ85lMmUXQbQJD3PCWV2l4iG6An39i2ZBMUiIzP4Mu45tibI75ZBaxL9RiKEOwltJD6A9xEzx';
-
-  final response = await http.get(
-    Uri.parse(
-      'https://graph.facebook.com/v19.0/$pageId/posts?fields=message,created_time,full_picture,permalink_url&limit=10&access_token=$accessToken',
-    ),
-  );
-
-  if (response.statusCode == 200) {
-    final data = json.decode(response.body);
-    final List<dynamic> posts = data['data'];
-    final cohere = CohereService();
-
-    for (var post in posts) {
-      final postId = post['id'];
-      final message = post['message'] ?? '';
-
-      final postRef = FirebaseFirestore.instance
-          .collection('announcements')
-          .doc(postId);
-
-      final doc = await postRef.get();
-
-      if (!doc.exists && message.isNotEmpty) {
-        try {
-          final cohereResult = await cohere.analyzeAnnouncement(message);
-
-          await postRef.set({
-            'message': message,
-            'created_time': post['created_time'],
-            'full_picture': post['full_picture'] ?? '',
-            'permalink_url': post['permalink_url'] ?? '',
-            'category': cohereResult['category'] ?? 'General',
-            'deadline': cohereResult['deadline'],
-            'deleted': false,
-            'fetched_at': FieldValue.serverTimestamp(),
-            'processed_by_cohere': true,
-          });
-        } catch (e) {
-          await postRef.set({
-            'message': message,
-            'created_time': post['created_time'],
-            'full_picture': post['full_picture'] ?? '',
-            'permalink_url': post['permalink_url'] ?? '',
-            'category': 'General',
-            'deadline': null,
-            'deleted': false,
-            'fetched_at': FieldValue.serverTimestamp(),
-            'processed_by_cohere': false,
-          });
-        }
-      } else if (doc.exists) {
-        final docData = doc.data() as Map<String, dynamic>;
-        final isDeleted = docData['deleted'] ?? false;
-
-        if (isDeleted) {
-          continue;
-        }
-
-        await postRef.update({
-          'message': message,
-          'full_picture': post['full_picture'] ?? '',
-          'permalink_url': post['permalink_url'] ?? '',
-          'last_synced_at': FieldValue.serverTimestamp(),
-        });
-      }
-    }
-
-    return posts;
-  } else {
-    throw Exception('Failed to load Facebook posts: ${response.statusCode}');
-  }
-}

@@ -1,14 +1,15 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/services.dart';
 import 'package:capstone_project/notifications.dart';
-import 'package:capstone_project/profile.dart' show ProfileModal;
+import 'package:capstone_project/profile.dart';
 import 'package:capstone_project/responsive/user_constant.dart';
 import 'package:capstone_project/responsive/widgets/logout.dart';
 import 'package:capstone_project/responsive/widgets/persistent_drawer_group.dart';
 import 'package:capstone_project/responsive/widgets/persistent_drawer_item.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
+
 
 // Enums for different user roles and menu configurations
 enum UserRole { admin, user, staff }
@@ -226,13 +227,14 @@ class UniversalUIComponents {
   );
 }
 
- static Widget buildPersistentDrawer({
+ 
+static Widget buildPersistentDrawer({
   required BuildContext context,
   required UserRole userRole,
   required int selectedIndex,
   required Function(int) onItemTap,
   required bool isExpanded,
-  Function(BuildContext, String?)? onConversationSelected, // Add this parameter
+  Function(BuildContext, String?)? onConversationSelected, // Optional parameter
 }) {
   final menuConfig = _getMenuConfig(userRole);
 
@@ -264,7 +266,7 @@ class UniversalUIComponents {
                 selectedIndex,
                 onItemTap,
                 isExpanded,
-                onConversationSelected: onConversationSelected, // Pass it down
+                onConversationSelected: onConversationSelected, // Pass it down (can be null)
               ),
             ),
           ),
@@ -273,7 +275,6 @@ class UniversalUIComponents {
     ),
   );
 }
-
   // Private helper methods
   static MenuConfig _getMenuConfig(UserRole userRole) {
     switch (userRole) {
@@ -880,19 +881,22 @@ class UniversalUIComponents {
             color: Colors.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
-              onTap: () async {
-                HapticFeedback.lightImpact();
-                Navigator.of(context).pop(); // Close drawer
-                
-                // Set the selected conversation
-                await UserConstant.setSelectedConversation(conv['id']);
-                
-                // Call the parent's callback which handles navigation + FAQ toggle
-                if (onConversationSelected != null) {
-                  await Future.delayed(Duration(milliseconds: 100));
-                  onConversationSelected(context, conv['id']);
-                }
-              },
+            onTap: () async {
+  HapticFeedback.lightImpact();
+  Navigator.of(context).pop(); // Close drawer
+  
+  // Set the selected conversation
+  await UserConstant.setSelectedConversation(conv['id']);
+  
+  // SAFELY call the parent's callback - only if provided
+  if (onConversationSelected != null && context.mounted) {
+    await Future.delayed(Duration(milliseconds: 100));
+    onConversationSelected(context, conv['id']);
+  } else {
+    // Fallback: If no callback provided, just log
+    print('DEBUG: No conversation selection callback provided');
+  }
+},
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -1066,47 +1070,73 @@ static List<Widget> _buildPersistentMenuItems(
   int selectedIndex,
   Function(int) onItemTap,
   bool isExpanded, {
-  Function(BuildContext, String?)? onConversationSelected, // Add this
+  Function(BuildContext, String?)? onConversationSelected,
 }) {
   List<Widget> items = [];
 
   for (final menuItem in menuConfig.items) {
-    // ... existing code for menu items ...
+    // Handle expandable items (Services, Logs)
+    if (menuItem.isExpandable && menuItem.subItems != null) {
+      items.add(
+        buildPersistentDrawerGroup(
+          context: context,
+          icon: menuItem.icon,
+          title: menuItem.title,
+          groupIndex: menuItem.index, // -1 for Services, -2 for Logs
+          selectedIndex: selectedIndex,
+          onTap: onItemTap,
+          isExpanded: isExpanded,
+          isServicesExpanded: PersistentDrawerState.getExpansionState(menuItem.index),
+          children: menuItem.subItems!.map((subItem) {
+            return buildPersistentDrawerItem(
+              context: context,
+              icon: subItem.icon,
+              title: subItem.title,
+              index: subItem.index,
+              selectedIndex: selectedIndex,
+              onTap: onItemTap,
+              isExpanded: isExpanded,
+              isSubItem: true, // Add this to indicate it's a sub-item
+            );
+          }).toList(),
+        ),
+      );
 
-    // When building the persistent chat history section:
-    if (userRole == UserRole.user && menuItem.title == 'Services') {
-      if (isExpanded) {
-        items.add(
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Divider(color: Colors.grey[300], thickness: 1, height: 1),
-          ),
-        );
-      }
+      // Add New Chat and History section after Services for user role
+      if (userRole == UserRole.user && menuItem.title == 'Services') {
+        if (isExpanded) {
+          items.add(
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Divider(color: Colors.grey[300], thickness: 1, height: 1),
+            ),
+          );
+        }
 
-      items.add(_buildPersistentNewChatAndHistory(
-        context, 
-        isExpanded,
-        onConversationSelected: onConversationSelected, // Pass the callback
-      ));
-    
-      } else {
-        items.add(
-          buildPersistentDrawerItem(
-            context: context,
-            icon: menuItem.icon,
-            title: menuItem.title,
-            index: menuItem.index,
-            selectedIndex: selectedIndex,
-            onTap: onItemTap,
-            isExpanded: isExpanded,
-          ),
-        );
+        items.add(_buildPersistentNewChatAndHistory(
+          context,
+          isExpanded,
+          onConversationSelected: onConversationSelected, // Can be null, that's OK
+        ));
       }
+    } else {
+      // Handle regular (non-expandable) items
+      items.add(
+        buildPersistentDrawerItem(
+          context: context,
+          icon: menuItem.icon,
+          title: menuItem.title,
+          index: menuItem.index,
+          selectedIndex: selectedIndex,
+          onTap: onItemTap,
+          isExpanded: isExpanded,
+        ),
+      );
     }
-
-    return items;
   }
+
+  return items;
+}
 
   // Persistent chat menu item
   static Widget _buildPersistentChatMenuItem({
@@ -1344,8 +1374,7 @@ static List<Widget> _buildPersistentMenuItems(
   );
 }
 
-  // Persistent Chat History List Widget
- static Widget _buildPersistentChatHistoryList(
+  static Widget _buildPersistentChatHistoryList(
   BuildContext context, {
   Function(BuildContext, String?)? onConversationSelected,
 }) {
@@ -1410,10 +1439,13 @@ static List<Widget> _buildPersistentMenuItems(
                     // Update the UI to show highlight
                     setHistoryState(() {});
 
-                    // Use the callback to navigate
+                    // SAFELY use the callback - only if it's not null
                     if (onConversationSelected != null && context.mounted) {
                       await Future.delayed(Duration(milliseconds: 100));
                       onConversationSelected(context, conv['id']);
+                    } else {
+                      // Fallback behavior if no callback is provided
+                      print('DEBUG: No conversation callback provided');
                     }
                   },
                   child: Container(
