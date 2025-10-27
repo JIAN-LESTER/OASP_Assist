@@ -24,11 +24,13 @@ class _LoginPageState extends State<LoginPage> {
   String? _emailError;
   String? _passwordError;
   String? _generalError;
+  String? _verificationError;
 
   // Timers for error handling
   Timer? _emailErrorTimer;
   Timer? _passwordErrorTimer;
   Timer? _generalErrorTimer;
+  Timer? _verificationErrorTimer;
 
   // FONT CONFIGURATION
   static const String primaryFontFamily = 'Poppins';
@@ -91,15 +93,27 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
+  void _setVerificationError(String error) {
+    _verificationErrorTimer?.cancel();
+    setState(() => _verificationError = error);
+    _verificationErrorTimer = Timer(errorDuration, () {
+      if (mounted) {
+        setState(() => _verificationError = null);
+      }
+    });
+  }
+
   // Clear all errors and timers
   void _clearErrors() {
     _emailErrorTimer?.cancel();
     _passwordErrorTimer?.cancel();
     _generalErrorTimer?.cancel();
+    _verificationErrorTimer?.cancel();
     setState(() {
       _emailError = null;
       _passwordError = null;
       _generalError = null;
+      _verificationError = null;
     });
   }
 
@@ -162,6 +176,7 @@ class _LoginPageState extends State<LoginPage> {
         await FirebaseAuth.instance.signOut();
         if (mounted) {
           setState(() => _isLoading = false);
+          _setVerificationError('Please verify your email before signing in');
           _showVerificationRequiredDialog(user.email ?? '');
         }
         return;
@@ -259,6 +274,9 @@ class _LoginPageState extends State<LoginPage> {
               } else if (error == _passwordError) {
                 _passwordErrorTimer?.cancel();
                 setState(() => _passwordError = null);
+              } else if (error == _verificationError) {
+                _verificationErrorTimer?.cancel();
+                setState(() => _verificationError = null);
               }
             },
             child: Icon(
@@ -331,6 +349,7 @@ class _LoginPageState extends State<LoginPage> {
     _emailErrorTimer?.cancel();
     _passwordErrorTimer?.cancel();
     _generalErrorTimer?.cancel();
+    _verificationErrorTimer?.cancel();
 
     emailController.dispose();
     passwordController.dispose();
@@ -394,6 +413,9 @@ class _LoginPageState extends State<LoginPage> {
 
             // General error message
             _buildGeneralError(fontSizeMultiplier),
+
+            // Verification error message (above email field)
+            _buildErrorText(_verificationError, fontSizeMultiplier),
 
             // Email field
             Textfield(
