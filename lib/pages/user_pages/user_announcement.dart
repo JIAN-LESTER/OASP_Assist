@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:capstone_project/pages/admin_pages/widgets/category_dropdown_button.dart';
-import 'package:capstone_project/services/cohere_service.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -18,16 +16,13 @@ class UserAnnouncementPage extends StatefulWidget {
 class _UserAnnouncementState extends State<UserAnnouncementPage> {
   List<DocumentSnapshot> announcements = [];
   bool isLoading = true;
-  bool isRefreshing = false;
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
-  final _cohere = CohereService();
 
   @override
   void initState() {
     super.initState();
     _loadAnnouncements();
-    _refreshFromFacebook();
   }
 
   Future<void> _loadAnnouncements() async {
@@ -50,25 +45,6 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading announcements: $e')),
       );
-    }
-  }
-
-  Future<void> _refreshFromFacebook() async {
-    setState(() {
-      isRefreshing = true;
-    });
-
-    try {
-      await fetchAndProcessPosts();
-      await _loadAnnouncements();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error syncing with Facebook: $e')),
-      );
-    } finally {
-      setState(() {
-        isRefreshing = false;
-      });
     }
   }
 
@@ -128,51 +104,41 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
         children: [
           // Main content area
           Expanded(
-            child: Stack(
+            child: Column(
               children: [
-                Column(
-                  children: [
-                    // header
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
-                      child: Center(
-                        child: Container(
-                          constraints: const BoxConstraints(maxWidth: 800),
-                          child: Row(
-                            children: [
-                              // Search field
-                              Expanded(child: _buildSearchField()),
+                // header
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
+                  child: Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 800),
+                      child: Row(
+                        children: [
+                          // Search field
+                          Expanded(child: _buildSearchField()),
 
-                              const SizedBox(width: 16),
+                          const SizedBox(width: 16),
 
-                              // Category dropdown
-                              SizedBox(
-                                width: 165,
-                                child: CategoryDropdownButton(
-                                  initialValue: selectedCategory,
-                                  onChanged:
-                                      (value) => setState(
-                                        () => selectedCategory = value,
-                                      ),
-                                ),
-                              ),
-                            ],
+                          // Category dropdown
+                          SizedBox(
+                            width: 165,
+                            child: CategoryDropdownButton(
+                              initialValue: selectedCategory,
+                              onChanged:
+                                  (value) => setState(
+                                    () => selectedCategory = value,
+                                  ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
+                  ),
+                ),
 
-                    // Content area - Takes remaining space
-                    Expanded(child: _buildMainContent(isDesktop: true)),
-                  ],
-                ),
-                // Refresh button positioned at top right edge
-                Positioned(
-                  top: 24,
-                  right: 32,
-                  child: _buildRefreshButton(isDesktop: true),
-                ),
+                // Content area - Takes remaining space
+                Expanded(child: _buildMainContent(isDesktop: true)),
               ],
             ),
           ),
@@ -210,8 +176,6 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
                         (value) => setState(() => selectedCategory = value),
                   ),
                 ),
-                const SizedBox(width: 12),
-                _buildRefreshButton(isDesktop: false),
               ],
             ),
           ),
@@ -248,13 +212,7 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
             ),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(child: _buildSearchField()),
-                    const SizedBox(width: 12),
-                    _buildRefreshButton(isDesktop: false),
-                  ],
-                ),
+                _buildSearchField(),
                 const SizedBox(height: 12),
                 CategoryDropdownButton(
                   initialValue: selectedCategory,
@@ -272,45 +230,6 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildRefreshButton({required bool isDesktop}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isRefreshing ? Colors.grey[100] : Colors.green[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isRefreshing ? Colors.grey[300]! : Colors.green[200]!,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: isRefreshing ? null : _refreshFromFacebook,
-          child: Padding(
-            padding: EdgeInsets.all(isDesktop ? 12 : 10),
-            child:
-                isRefreshing
-                    ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.grey[600]!,
-                        ),
-                      ),
-                    )
-                    : Icon(
-                      Icons.sync_rounded,
-                      color: Colors.green[700],
-                      size: isDesktop ? 24 : 20,
-                    ),
-          ),
-        ),
       ),
     );
   }
@@ -428,7 +347,7 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
     }
 
     return RefreshIndicator(
-      onRefresh: _refreshFromFacebook,
+      onRefresh: _loadAnnouncements,
       color: Colors.green[600],
       child: ListView.builder(
         padding:
@@ -1154,82 +1073,4 @@ IconData getCategoryIcon(String category) {
 
 Color getCategoryColor(String category) {
   return getColorForCategory(category);
-}
-
-// FACEBOOK API FUNCTION
-Future<List<dynamic>> fetchAndProcessPosts() async {
-  const pageId = '730995450096065';
-  const accessToken =
-      'EAAYTTmxaZBDIBPMA3YuTdB4VM1VoR1qTqeVsZC6zJqYOBZBbQxFkrtZCVM1YXE1o3hoXDWjlgAgnrtQQubu7L9WV6JIGrs5KrZCjcqCtjdqu4DVZAVcykRDBontQftcb7cfNQ85lMmUXQbQJD3PCWV2l4iG6An39i2ZBMUiIzP4Mu45tibI75ZBaxL9RiKEOwltJD6A9xEzx';
-
-  final response = await http.get(
-    Uri.parse(
-      'https://graph.facebook.com/v19.0/$pageId/posts?fields=message,created_time,full_picture,permalink_url&limit=10&access_token=$accessToken',
-    ),
-  );
-
-  if (response.statusCode == 200) {
-    final data = json.decode(response.body);
-    final List<dynamic> posts = data['data'];
-    final cohere = CohereService();
-
-    for (var post in posts) {
-      final postId = post['id'];
-      final message = post['message'] ?? '';
-
-      final postRef = FirebaseFirestore.instance
-          .collection('announcements')
-          .doc(postId);
-
-      final doc = await postRef.get();
-
-      if (!doc.exists && message.isNotEmpty) {
-        try {
-          final cohereResult = await cohere.analyzeAnnouncement(message);
-
-          await postRef.set({
-            'message': message,
-            'created_time': post['created_time'],
-            'full_picture': post['full_picture'] ?? '',
-            'permalink_url': post['permalink_url'] ?? '',
-            'category': cohereResult['category'] ?? 'General',
-            'deadline': cohereResult['deadline'],
-            'deleted': false,
-            'fetched_at': FieldValue.serverTimestamp(),
-            'processed_by_cohere': true,
-          });
-        } catch (e) {
-          await postRef.set({
-            'message': message,
-            'created_time': post['created_time'],
-            'full_picture': post['full_picture'] ?? '',
-            'permalink_url': post['permalink_url'] ?? '',
-            'category': 'General',
-            'deadline': null,
-            'deleted': false,
-            'fetched_at': FieldValue.serverTimestamp(),
-            'processed_by_cohere': false,
-          });
-        }
-      } else if (doc.exists) {
-        final docData = doc.data() as Map<String, dynamic>;
-        final isDeleted = docData['deleted'] ?? false;
-
-        if (isDeleted) {
-          continue;
-        }
-
-        await postRef.update({
-          'message': message,
-          'full_picture': post['full_picture'] ?? '',
-          'permalink_url': post['permalink_url'] ?? '',
-          'last_synced_at': FieldValue.serverTimestamp(),
-        });
-      }
-    }
-
-    return posts;
-  } else {
-    throw Exception('Failed to load Facebook posts: ${response.statusCode}');
-  }
 }

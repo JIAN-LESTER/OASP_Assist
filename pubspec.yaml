@@ -59,6 +59,8 @@ dependencies:
   shared_preferences: ^2.5.3
   cached_network_image: ^3.4.1
   circle_nav_bar: ^2.2.0
+  flutter_local_notifications: ^19.5.0
+
 
 dev_dependencies:
   flutter_test:

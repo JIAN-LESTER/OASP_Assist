@@ -21,7 +21,9 @@ import 'package:capstone_project/models/message.dart';
 import 'package:capstone_project/provider/chat_provider.dart';
 
 import 'package:capstone_project/services/file_service2.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'chat_utilities.dart';
@@ -48,17 +50,23 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final ImagePicker _imagePicker = ImagePicker();
-  final FileService _fileService = FileService();
+
   String? actualConversationId;
   bool isLoading = true;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  final GlobalKey<FAQSectionState> _faqSectionKey = GlobalKey<FAQSectionState>();
+
   late AnimationController _micAnimationController;
   late AnimationController _attachmentAnimationController;
   late Animation<double> _micScaleAnimation;
   late Animation<double> _attachmentRotationAnimation;
+
+  late stt.SpeechToText _speechToText;
+bool _isListening = false;
+bool _speechAvailable = false;
+String _lastWords = '';
 
   String? _expandedCategory;
   String? _selectedConversationId;
@@ -104,6 +112,7 @@ void initState() {
   // FIXED: Initialize FAQ state from widget parameter
   _showFAQs = widget.showFAQs;
 
+ _initChatSpeechToText();
   _setupConversation();
 
   chatProvider = Provider.of<ChatProvider>(context, listen: false);
@@ -153,6 +162,98 @@ void initState() {
     }
   });
 }
+
+Future<void> _initChatSpeechToText() async {
+  _speechToText = stt.SpeechToText();
+  try {
+    _speechAvailable = await _speechToText.initialize(
+      onError: (error) {
+        print('Chat speech recognition error: $error');
+        if (mounted) {
+          setState(() {
+            _isListening = false;
+          });
+        }
+      },
+      onStatus: (status) {
+        print('Chat speech recognition status: $status');
+        if (status == 'done' || status == 'notListening') {
+          if (mounted) {
+            setState(() {
+              _isListening = false;
+            });
+          }
+        }
+      },
+    );
+    print('Chat speech recognition available: $_speechAvailable');
+  } catch (e) {
+    print('Failed to initialize chat speech recognition: $e');
+    _speechAvailable = false;
+  }
+}
+
+Future<void> _toggleListening() async {
+  if (!_speechAvailable) {
+    _showSnackBar(
+      'Speech recognition not available on this device',
+      Icons.mic_off,
+    );
+    return;
+  }
+
+  final status = await Permission.microphone.status;
+  if (!status.isGranted) {
+    final result = await Permission.microphone.request();
+    if (!result.isGranted) {
+      _showSnackBar('Microphone permission denied', Icons.mic_off);
+      return;
+    }
+  }
+
+  if (_isListening) {
+    // Stop listening
+    await _speechToText.stop();
+    setState(() {
+      _isListening = false;
+    });
+    _micAnimationController.reverse();
+  } else {
+    // Start listening
+    setState(() {
+      _isListening = true;
+      _lastWords = '';
+    });
+    _micAnimationController.repeat(reverse: true);
+
+    await _speechToText.listen(
+      onResult: (result) {
+        setState(() {
+          _lastWords = result.recognizedWords;
+          _controller.text = _lastWords;
+        });
+      },
+      listenFor: Duration(seconds: 30),
+      pauseFor: Duration(seconds: 3),
+      partialResults: true,
+      cancelOnError: true,
+      listenMode: stt.ListenMode.confirmation,
+    );
+  }
+
+  HapticFeedback.mediumImpact();
+}
+
+void _handleMicrophoneTap() {
+  if (_showFAQs) {
+    // If showing FAQs, trigger FAQ section's speech recognition
+    _faqSectionKey.currentState?.toggleSpeechRecognition();
+  } else {
+    // If showing chat, use the existing chat speech recognition
+    _toggleListening();
+  }
+}
+
 
 // Updated didUpdateWidget to handle loading state IMMEDIATELY
 @override
@@ -1072,25 +1173,29 @@ Widget _buildLoadingIndicator() {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      body: Consumer<ChatProvider>(
-        builder: (context, chatProvider, child) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!_showFAQs && !_isLoadingConversation) _scrollToBottom();
-          });
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.grey.shade50,
+    body: Consumer<ChatProvider>(
+      builder: (context, chatProvider, child) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_showFAQs && !_isLoadingConversation) _scrollToBottom();
+        });
 
-          final messages = chatProvider.messages;
+        final messages = chatProvider.messages;
 
-          return Column(
+        return Column(
           children: [
             Expanded(
               child: _isLoadingConversation
                   ? _buildLoadingIndicator()
                   : (_showFAQs
-                      ? FAQSection(onFAQSelected: _onFAQSelected)
+                      ? FAQSection(
+                          key: _faqSectionKey,
+                          onFAQSelected: _onFAQSelected,
+                          messageController: _controller,
+                        )
                       : (messages.isEmpty
                           ? _buildEmptyChatState()
                           : _buildMessagesList(messages, chatProvider))),
@@ -1101,14 +1206,18 @@ Widget _buildLoadingIndicator() {
               isLoading: chatProvider.isLoading || _isLoadingConversation,
               onFAQToggle: _toggleFAQsDisplay,
               onSendMessage: () => _sendMessage(chatProvider),
+              onMicrophoneTap: _handleMicrophoneTap,
+              // FIXED: Properly handle nullable state with ?? operator
+              isListening: _showFAQs 
+                  ? (_faqSectionKey.currentState?.isListening ?? false)
+                  : _isListening, 
             ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
+          ],
+        );
+      },
+    ),
+  );
+}
   /// Builds the empty chat state
   Widget _buildEmptyChatState() {
     return Center(
