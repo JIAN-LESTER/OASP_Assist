@@ -56,6 +56,7 @@ interface AnnouncementData {
   stored_in_storage: boolean;
 }
 
+
 // ============================================================================
 // COHERE API UTILITIES
 // ============================================================================
@@ -1549,10 +1550,46 @@ async function exchangeShortForLong(
     client_secret: appSecret,
     fb_exchange_token: shortToken,
   };
-  const resp = await axios.get<{ access_token: string; expires_in?: number }>(url, { params });
-  return resp.data;
+  
+  console.log('📡 Calling Facebook token exchange API...');
+  console.log('📡 URL:', url);
+  console.log('📡 Params:', { ...params, client_secret: '***', fb_exchange_token: '***' });
+  
+  try {
+    const resp = await axios.get<{ access_token: string; expires_in?: number; token_type?: string }>(
+      url, 
+      { 
+        params,
+        timeout: 30000,
+      }
+    );
+    
+    console.log('✅ Facebook API response received');
+    console.log('📊 Response status:', resp.status);
+    console.log('📊 Response data:', {
+      ...resp.data,
+      access_token: resp.data.access_token ? '***' + resp.data.access_token.slice(-10) : undefined,
+      expires_in: resp.data.expires_in,
+      token_type: resp.data.token_type,
+    });
+    
+    // Facebook returns expires_in in seconds
+    if (resp.data.expires_in) {
+      const days = Math.round(resp.data.expires_in / 86400);
+      console.log(`📅 Token is valid for ${resp.data.expires_in} seconds (~${days} days)`);
+    } else {
+      console.warn('⚠️ WARNING: Facebook did not return expires_in!');
+      console.warn('⚠️ This means the token might be short-lived or there was an error');
+    }
+    
+    return resp.data;
+  } catch (error: any) {
+    console.error('❌ Facebook token exchange failed');
+    console.error('❌ Status:', error.response?.status);
+    console.error('❌ Error data:', JSON.stringify(error.response?.data, null, 2));
+    throw error;
+  }
 }
-
 
 
 
@@ -1803,7 +1840,8 @@ async function exchangeTokenLogic(uid: string, shortToken: string): Promise<any>
     const longToken = data.access_token;
     const expiresIn = data.expires_in;
 
-    console.log(`✅ Token exchanged successfully, expires in ${expiresIn ?? 'unknown'} seconds`);
+    console.log(`✅ Token exchanged successfully`);
+    console.log(`📊 Expires in: ${expiresIn} seconds`);
 
     // Verify the token
     const me = await axios.get<{ id: string; name?: string }>(
@@ -1815,10 +1853,20 @@ async function exchangeTokenLogic(uid: string, shortToken: string): Promise<any>
 
     const fbUserId = me.data.id;
     const now = Date.now();
-    const expiresAt: number | null =
-      typeof expiresIn === "number" && !isNaN(expiresIn)
-        ? now + expiresIn * 1000
-        : null;
+    
+    // CRITICAL FIX: Handle expires_at properly
+    let expiresAt: number | null = null;
+    
+    if (expiresIn !== undefined && expiresIn !== null) {
+      // Facebook returns expires_in in seconds, convert to milliseconds
+      expiresAt = now + (Number(expiresIn) * 1000);
+      console.log(`📅 Token will expire at: ${new Date(expiresAt).toISOString()}`);
+      console.log(`📅 That's ${Math.round(Number(expiresIn) / 86400)} days from now`);
+    } else {
+      console.warn(`⚠️ No expires_in received from Facebook, setting to 60 days`);
+      // Default to 60 days if Facebook doesn't return expires_in
+      expiresAt = now + (60 * 24 * 60 * 60 * 1000);
+    }
 
     // Get page access tokens
     let pagesObj: { [key: string]: any } = {};
@@ -1831,7 +1879,7 @@ async function exchangeTokenLogic(uid: string, shortToken: string): Promise<any>
         pagesObj[p.id] = {
           access_token: p.access_token,
           name: p.name,
-          expires_at: null,
+          expires_at: null, // Page tokens typically don't expire
         };
       }
     } catch (err: any) {
@@ -1840,34 +1888,41 @@ async function exchangeTokenLogic(uid: string, shortToken: string): Promise<any>
 
     // Save to Firestore - use the uid as document ID
     const docRef = db.collection("fb_tokens").doc(uid);
-    await docRef.set({
+    const saveData = {
       provider: "facebook",
       userId: fbUserId,
       long_token: longToken,
       short_token: shortToken,
       expires_at: expiresAt,
+      expires_in: expiresIn || null,
       pages: pagesObj,
       updated_at: now,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    };
+    
+    console.log(`💾 Saving token data:`, {
+      ...saveData,
+      long_token: "***",
+      short_token: "***",
+      expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+    });
+    
+    await docRef.set(saveData, { merge: true });
 
     console.log(`✅ Token saved to fb_tokens/${uid}`);
 
-    const daysValid =
-      typeof expiresIn === "number" && !isNaN(expiresIn)
-        ? Math.round(expiresIn / 86400)
-        : null;
+    const daysValid = expiresIn 
+      ? Math.round(Number(expiresIn) / 86400)
+      : 60; // Default to 60 if not provided
 
     return { 
       success: true,
       ok: true, 
-      expires_in: expiresIn, 
+      expires_in: expiresIn || (60 * 86400), // Return seconds
       expires_at: expiresAt, 
       fbUserId: fbUserId,
       pagesCount: Object.keys(pagesObj).length,
-      message: daysValid !== null
-        ? `Token saved successfully. Valid for ${daysValid} days.`
-        : "Token saved successfully.",
+      message: `Token saved successfully. Valid for ~${daysValid} days.`,
     };
   } catch (error: any) {
     console.error("❌ exchangeTokenLogic error:", error);
@@ -1908,6 +1963,15 @@ async function getAccessToken(): Promise<string> {
     // Check expiration
     const expiresAt = data.expires_at || 0;
     const now = Date.now();
+    
+    console.log(`📅 Token expires at: ${expiresAt ? new Date(expiresAt).toISOString() : 'unknown'}`);
+    console.log(`📅 Current time: ${new Date(now).toISOString()}`);
+    
+    // If expiresAt is 0 or null, warn but allow (might be a never-expiring token)
+    if (!expiresAt || expiresAt === 0) {
+      console.warn('⚠️ Token has no expiration date, allowing usage');
+      return data.long_token;
+    }
     
     if (now >= expiresAt) {
       const expiredDate = new Date(expiresAt).toISOString();
