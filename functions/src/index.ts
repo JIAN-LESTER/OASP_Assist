@@ -1185,51 +1185,92 @@ async function processPost(post: FacebookPost, cohereKey: string): Promise<void>
     });
   }
 }
+// FIXED VERSION - Replace the downloadAndUploadImage function in index.ts
 
 async function downloadAndUploadImage(
   imageUrl: string,
   postId: string
 ): Promise<string> {
   try {
-    console.log(`Downloading image for post ${postId}`);
+    console.log(`📥 Downloading image for post ${postId}`);
+    console.log(`🔗 Source URL: ${imageUrl.substring(0, 100)}...`);
     
     const response = await axios.get(imageUrl, {
       responseType: "arraybuffer",
       timeout: 30000,
-    });
+      maxBodyLength: 50 * 1024 * 1024, // 50MB max
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; OASP-Bot/1.0)',
+      },
+    } as any);
     
     const buffer = Buffer.from(response.data as Buffer);
     const contentType = response.headers["content-type"] || "image/jpeg";
     
-    const ext = contentType.split("/")[1] || "jpg";
+    console.log(`📊 Image size: ${(buffer.length / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`📊 Content type: ${contentType}`);
+    
+    // Validate content type
+    if (!contentType.startsWith('image/')) {
+      throw new Error(`Invalid content type: ${contentType}`);
+    }
+    
+    const ext = contentType.split("/")[1]?.split(';')[0] || "jpg";
     const fileName = `announcements/${postId}.${ext}`;
     
     const bucket = storage.bucket();
     const file = bucket.file(fileName);
     
+    console.log(`⬆️ Uploading to: ${fileName}`);
+    
+    // Upload file with proper metadata
     await file.save(buffer, {
       metadata: {
         contentType: contentType,
+        cacheControl: 'public, max-age=31536000',
         metadata: {
           postId: postId,
           uploadedAt: new Date().toISOString(),
+          originalUrl: imageUrl.substring(0, 500),
         },
       },
+      public: true, // Make file publicly accessible
     });
     
-    await file.makePublic();
+    // ✅ FIX: Use getSignedUrl or proper public URL format
+    // Option 1: Get a signed URL (works everywhere, includes token)
+    const [signedUrl] = await file.getSignedUrl({
+      action: 'read',
+      expires: '03-01-2500', // Far future date
+    });
     
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+    console.log(`✅ Image uploaded successfully`);
+    console.log(`🔗 Signed URL: ${signedUrl.substring(0, 100)}...`);
     
-    console.log(`Image uploaded successfully: ${publicUrl}`);
-    return publicUrl;
+    return signedUrl;
+    
+    // ✅ Option 2: If you prefer token-based public URL without expiration
+    // Make file public first
+    // await file.makePublic();
+    // const publicUrl = file.publicUrl();
+    // return publicUrl;
     
   } catch (error: any) {
-    console.error(`Error uploading image for post ${postId}:`, error.message);
+    console.error(`❌ Error uploading image for post ${postId}:`, error.message);
+    
+    if (error.response) {
+      console.error(`❌ HTTP Status: ${error.response.status}`);
+      console.error(`❌ Response data:`, error.response.data);
+    }
+    
+    if (error.code === 'ECONNABORTED') {
+      console.error(`❌ Download timeout for ${postId}`);
+    }
+    
+    // Return empty string on failure (will fallback to Facebook URL)
     return "";
   }
 }
-
 async function analyzeAnnouncement(message: string, cohereKey: string): Promise<CohereResult> {
   try {
     const prompt = `Analyze this announcement and categorize it. Also extract any deadlines mentioned.

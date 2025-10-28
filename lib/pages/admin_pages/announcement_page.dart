@@ -36,7 +36,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   void initState() {
     super.initState();
     loadAnnouncements();
-    _refreshFromFacebook();
+
   }
 
   Future<void> loadAnnouncements() async {
@@ -75,6 +75,8 @@ Future<String?> _getAuthToken() async {
   return null;
 }
 
+
+// Manual refresh button (keep as is for manual sync)
 Future<void> _refreshFromFacebook() async {
   if (isRefreshing) {
     print('⚠️ Sync already in progress');
@@ -84,14 +86,13 @@ Future<void> _refreshFromFacebook() async {
   setState(() => isRefreshing = true);
 
   try {
-    print('🔄 Starting Facebook sync...');
+    print('🔄 Manual Facebook sync triggered...');
     
     final result = await FacebookSyncService.syncPosts();
     
     print('📦 Sync result: $result');
     
     if (result['success'] == true) {
-      // Wait for Firestore to update
       await Future.delayed(Duration(milliseconds: 500));
       await loadAnnouncements();
       
@@ -100,7 +101,7 @@ Future<void> _refreshFromFacebook() async {
       
       if (mounted) {
         _showSuccessSnackBar(
-          'Synced $count posts' + (failed > 0 ? ' ($failed failed)' : '')
+          '✅ Synced $count posts' + (failed > 0 ? ' ($failed failed)' : '')
         );
       }
     } else {
@@ -121,6 +122,7 @@ Future<void> _refreshFromFacebook() async {
     }
   }
 }
+
 
 Future<void> _showTokenInputModal() async {
   final TextEditingController tokenController = TextEditingController();
@@ -276,11 +278,15 @@ Future<void> _showTokenInputModal() async {
                     final expiresIn = result['expires_in'] ?? 0;
                     final daysValid = (expiresIn / 86400).round();
                     
-                    Navigator.pop(context);
+                    Navigator.pop(context); // Close dialog
                     
                     _showSuccessSnackBar(
                       'Token saved! Valid for ~$daysValid days'
                     );
+                    
+                    // 🎯 AUTO-SYNC: Automatically sync posts after token is saved
+                    print('🎯 Auto-syncing Facebook posts after token save...');
+                    await _autoSyncAfterTokenSave();
                     
                     return;
                   }
@@ -319,6 +325,153 @@ Future<void> _showTokenInputModal() async {
     ),
   );
 }
+
+// 🎯 NEW: Auto-sync after token is saved
+Future<void> _autoSyncAfterTokenSave() async {
+  // Show loading indicator
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => Center(
+      child: Container(
+        padding: EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              'Syncing Facebook posts...',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'This may take a moment',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  try {
+    print('🔄 Starting auto-sync after token save...');
+    
+    final result = await FacebookSyncService.syncPosts();
+    
+    Navigator.pop(context); // Close loading dialog
+    
+    if (result['success'] == true) {
+      final count = result['count'] ?? 0;
+      final failed = result['failed'] ?? 0;
+      
+      print('✅ Auto-sync completed: $count posts synced');
+      
+      // Reload announcements
+      await loadAnnouncements();
+      
+      // Show success message
+      _showSuccessSnackBar(
+        '✅ Successfully synced $count posts!' + 
+        (failed > 0 ? ' ($failed failed)' : '')
+      );
+    } else {
+      throw Exception(result['error'] ?? result['message'] ?? 'Sync failed');
+    }
+    
+  } catch (e) {
+    Navigator.pop(context); // Close loading dialog
+    
+    print('❌ Auto-sync failed: $e');
+    
+    final errorMessage = FacebookSyncService.parseErrorMessage(e);
+    
+    // Show error with retry option
+    _showSyncErrorDialog(errorMessage);
+  }
+}
+
+// Show error dialog with retry option
+void _showSyncErrorDialog(String errorMessage) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: Row(
+        children: [
+          Icon(Icons.error, color: Colors.red[700], size: 28),
+          SizedBox(width: 12),
+          Text('Sync Failed'),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            errorMessage,
+            style: TextStyle(fontSize: 15),
+          ),
+          SizedBox(height: 16),
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Colors.grey[700]),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'You can manually sync later using the refresh button',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancel'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () {
+            Navigator.pop(context);
+            _refreshFromFacebook(); // Trigger manual sync
+          },
+          icon: Icon(Icons.refresh),
+          label: Text('Retry Sync'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue[700],
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 
 Future<void> _testFacebookConnection() async {
   try {
@@ -846,45 +999,16 @@ Future<void> testCloudFunctions() async {
   }
 }
 
-// Add this button next to your sync button in the UI
-
-Widget _buildTestButton({required bool isDesktop}) {
-  return Container(
-    decoration: BoxDecoration(
-      color: Colors.purple[50],
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: Colors.purple[200]!),
-    ),
-    child: Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: _testFacebookConnection,
-        child: Tooltip(
-          message: 'Test Facebook Connection',
-          child: Padding(
-            padding: EdgeInsets.all(isDesktop ? 12 : 10),
-            child: Icon(
-              Icons.bug_report,
-              color: Colors.purple[700],
-              size: isDesktop ? 24 : 20,
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
 
 
 // Update your refresh button row to include the test button:
-
 Widget _buildRefreshButton({required bool isDesktop}) {
   return Row(
     children: [
       // Test button
-      _buildTestButton(isDesktop: isDesktop),
+
       SizedBox(width: 8),
+      
       // Facebook Token Config Button
       Container(
         decoration: BoxDecoration(
@@ -898,7 +1022,7 @@ Widget _buildRefreshButton({required bool isDesktop}) {
             borderRadius: BorderRadius.circular(8),
             onTap: _showTokenInputModal,
             child: Tooltip(
-              message: 'Configure Facebook Token',
+              message: 'Configure Facebook Token (Auto-syncs after save)',
               child: Padding(
                 padding: EdgeInsets.all(isDesktop ? 12 : 10),
                 child: Icon(
@@ -912,7 +1036,8 @@ Widget _buildRefreshButton({required bool isDesktop}) {
         ),
       ),
       SizedBox(width: 8),
-      // Sync Button
+      
+      // Manual Sync Button
       Container(
         decoration: BoxDecoration(
           color: isRefreshing ? Colors.grey[100] : Colors.green[50],
@@ -927,7 +1052,7 @@ Widget _buildRefreshButton({required bool isDesktop}) {
             borderRadius: BorderRadius.circular(8),
             onTap: isRefreshing ? null : _refreshFromFacebook,
             child: Tooltip(
-              message: 'Sync Facebook Posts',
+              message: 'Manual Sync Facebook Posts',
               child: Padding(
                 padding: EdgeInsets.all(isDesktop ? 12 : 10),
                 child: isRefreshing
