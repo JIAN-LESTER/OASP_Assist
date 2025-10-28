@@ -4,9 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-
-
-
 import '../components/square_tile.dart';
 import '../components/textfield.dart';
 import '../responsive/responsive_layout.dart';
@@ -190,464 +187,632 @@ class _RegisterPageState extends State<RegisterPage> {
     _fetchPrograms(); // Fetch programs when modal is initialized
   }
 
-void _fetchPrograms() async {
-  try {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('programs')
-        .get(const GetOptions(source: Source.cache)); // Try cache first
-    
-    if (snapshot.docs.isEmpty) {
-      // If cache is empty, fetch from server
-      // Note: You may need to update Firestore rules to allow public read for programs
-      final serverSnapshot = await FirebaseFirestore.instance
+  void _fetchPrograms() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
           .collection('programs')
-          .get();
-      
-      setState(() {
-        _programs.addAll(serverSnapshot.docs.map((doc) => doc['name'] as String));
-      });
-    } else {
-      setState(() {
-        _programs.addAll(snapshot.docs.map((doc) => doc['name'] as String));
-      });
+          .get(const GetOptions(source: Source.cache)); // Try cache first
+
+      if (snapshot.docs.isEmpty) {
+        // If cache is empty, fetch from server
+        // Note: You may need to update Firestore rules to allow public read for programs
+        final serverSnapshot =
+            await FirebaseFirestore.instance.collection('programs').get();
+
+        setState(() {
+          _programs.addAll(
+            serverSnapshot.docs.map((doc) => doc['name'] as String),
+          );
+        });
+      } else {
+        setState(() {
+          _programs.addAll(snapshot.docs.map((doc) => doc['name'] as String));
+        });
+      }
+    } catch (e) {
+      print('Error fetching programs: $e');
+      // Don't block registration if programs can't be fetched
+      // Programs list will just show 'N/A'
     }
-  } catch (e) {
-    print('Error fetching programs: $e');
-    // Don't block registration if programs can't be fetched
-    // Programs list will just show 'N/A'
-  }
-}
-
-void registerUser() async {
-  _clearErrors();
-  print('🟢 Starting registration process...');
-
-  // Validate fields
-  bool isEmailValid = _validateEmail(emailController.text);
-  bool isPasswordValid = _validatePassword(passwordController.text);
-  bool isConfirmPasswordValid = _validateConfirmPassword(
-    passwordController.text,
-    confirmPasswordController.text,
-  );
-
-  if (!isEmailValid || !isPasswordValid || !isConfirmPasswordValid) {
-    print('🔴 Validation failed');
-    return;
   }
 
-  setState(() => _isLoading = true);
-  print('⏳ Loading state enabled');
+  void registerUser() async {
+    _clearErrors();
+    print('🟢 Starting registration process...');
 
-  try {
-    print('👤 Step 1: Creating user account...');
-    
-    // Create the user account
-    UserCredential userCredential = await FirebaseAuth.instance
-        .createUserWithEmailAndPassword(
-          email: emailController.text.trim(),
-          password: passwordController.text,
+    // Validate fields
+    bool isEmailValid = _validateEmail(emailController.text);
+    bool isPasswordValid = _validatePassword(passwordController.text);
+    bool isConfirmPasswordValid = _validateConfirmPassword(
+      passwordController.text,
+      confirmPasswordController.text,
+    );
+
+    if (!isEmailValid || !isPasswordValid || !isConfirmPasswordValid) {
+      print('🔴 Validation failed');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    print('⏳ Loading state enabled');
+
+    try {
+      print('👤 Step 1: Creating user account...');
+
+      // Create the user account
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text,
+          );
+
+      print('✅ Firebase user created successfully');
+
+      final user = userCredential.user;
+      if (user == null) throw Exception("User creation failed");
+
+      print('🔑 User UID: ${user.uid}');
+      print('📧 User Email: ${user.email}');
+
+      final name = emailController.text.split('@').first;
+      print('📝 User name extracted: $name');
+
+      // Step 2: Save to Firestore IMMEDIATELY (while user is still authenticated)
+      print('📁 Step 2: Saving user data to Firestore...');
+
+      // First, ensure user is fully authenticated
+      await Future.delayed(const Duration(milliseconds: 500));
+      await user.reload();
+
+      final userData = {
+        'uid': user.uid,
+        'email': user.email ?? '',
+        'name': name,
+        'role': 'user',
+        'createdAt': FieldValue.serverTimestamp(),
+        'firstLogin': true,
+        'isActive': true,
+        'profileCompleted': false,
+        'onboardingCompleted': false,
+        'isVerified': false, // Set to false initially
+      };
+
+      print('📦 Data to save: $userData');
+      print('🔐 Auth token check: ${user.uid}');
+
+      try {
+        // Test Firestore connection first
+        print('🔍 Testing Firestore connection...');
+
+        final docRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid);
+
+        print('📝 Writing to Firestore...');
+
+        await docRef
+            .set(userData, SetOptions(merge: false))
+            .timeout(
+              const Duration(seconds: 20),
+              onTimeout: () {
+                throw TimeoutException(
+                  'Firestore write operation timed out after 20 seconds',
+                );
+              },
+            );
+
+        print('✅ Successfully wrote to Firestore');
+
+        // Verify the write
+        print('🔍 Verifying write...');
+        final snapshot = await docRef.get().timeout(
+          const Duration(seconds: 5),
+          onTimeout:
+              () =>
+                  throw TimeoutException(
+                    'Firestore read verification timed out',
+                  ),
         );
 
-    print('✅ Firebase user created successfully');
-    
-    final user = userCredential.user;
-    if (user == null) throw Exception("User creation failed");
+        if (snapshot.exists) {
+          print('✅ Write verified - document exists');
+        } else {
+          print('⚠️ Warning: Document write may not have completed');
+        }
+      } catch (firestoreError) {
+        print('❌ Firestore write error: $firestoreError');
+        print('❌ Error type: ${firestoreError.runtimeType}');
 
-    print('🔑 User UID: ${user.uid}');
-    print('📧 User Email: ${user.email}');
+        if (firestoreError is FirebaseException) {
+          print('❌ Firebase error code: ${firestoreError.code}');
+          print('❌ Firebase error message: ${firestoreError.message}');
+          print('❌ Firebase error plugin: ${firestoreError.plugin}');
+        }
 
-    final name = emailController.text.split('@').first;
-    print('📝 User name extracted: $name');
+        if (firestoreError is TimeoutException) {
+          print('⚠️ This is a network/connectivity timeout issue');
+          print(
+            '⚠️ Check: 1) Internet connection 2) Firestore rules 3) Firebase initialization',
+          );
+        }
 
-    // Step 2: Save to Firestore IMMEDIATELY (while user is still authenticated)
-    print('📁 Step 2: Saving user data to Firestore...');
-    
-    // First, ensure user is fully authenticated
-    await Future.delayed(const Duration(milliseconds: 500));
-    await user.reload();
-    
-    final userData = {
-      'uid': user.uid,
-      'email': user.email ?? '',
-      'name': name,
-      'role': 'user',
-      'createdAt': FieldValue.serverTimestamp(),
-      'firstLogin': true,
-      'isActive': true,
-      'profileCompleted': false,
-      'onboardingCompleted': false,
-      'isVerified': false, // Set to false initially
-    };
-
-    print('📦 Data to save: $userData');
-    print('🔐 Auth token check: ${user.uid}');
-
-    try {
-      // Test Firestore connection first
-      print('🔍 Testing Firestore connection...');
-      
-      final docRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid);
-      
-      print('📝 Writing to Firestore...');
-      
-      await docRef.set(userData, SetOptions(merge: false)).timeout(
-        const Duration(seconds: 20),
-        onTimeout: () {
-          throw TimeoutException('Firestore write operation timed out after 20 seconds');
-        },
-      );
-      
-      print('✅ Successfully wrote to Firestore');
-      
-      // Verify the write
-      print('🔍 Verifying write...');
-      final snapshot = await docRef.get().timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => throw TimeoutException('Firestore read verification timed out'),
-      );
-      
-      if (snapshot.exists) {
-        print('✅ Write verified - document exists');
-      } else {
-        print('⚠️ Warning: Document write may not have completed');
+        rethrow;
       }
-      
-    } catch (firestoreError) {
-      print('❌ Firestore write error: $firestoreError');
-      print('❌ Error type: ${firestoreError.runtimeType}');
-      
-      if (firestoreError is FirebaseException) {
-        print('❌ Firebase error code: ${firestoreError.code}');
-        print('❌ Firebase error message: ${firestoreError.message}');
-        print('❌ Firebase error plugin: ${firestoreError.plugin}');
+
+      // Step 3: Send verification email (with better error handling)
+      print('📧 Step 3: Sending verification email...');
+      bool emailSent = false;
+      try {
+        await user.sendEmailVerification().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            print('⚠️ Email send timed out after 10 seconds');
+            throw TimeoutException('Email verification timed out');
+          },
+        );
+        print('✅ Verification email sent to: ${user.email}');
+        emailSent = true;
+      } catch (emailError) {
+        print('⚠️ Email send error (continuing anyway): $emailError');
+        print('⚠️ Error type: ${emailError.runtimeType}');
+        // Continue even if email fails - user can resend later
       }
-      
-      if (firestoreError is TimeoutException) {
-        print('⚠️ This is a network/connectivity timeout issue');
-        print('⚠️ Check: 1) Internet connection 2) Firestore rules 3) Firebase initialization');
+
+      // Step 4: Log registration event
+      print('🪵 Step 4: Logging registration event...');
+      try {
+        await FirebaseFirestore.instance.collection('logs').add({
+          'user': name,
+          'action': 'Registered account (pending verification)',
+          'time': Timestamp.now(),
+          'userId': user.uid,
+        });
+        print('✅ Registration event logged');
+      } catch (logError) {
+        print('⚠️ Logging error (continuing anyway): $logError');
       }
-      
-      rethrow;
-    }
 
-    // Step 3: Send verification email (with better error handling)
-    print('📧 Step 3: Sending verification email...');
-    bool emailSent = false;
-    try {
-      await user.sendEmailVerification().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          print('⚠️ Email send timed out after 10 seconds');
-          throw TimeoutException('Email verification timed out');
-        },
-      );
-      print('✅ Verification email sent to: ${user.email}');
-      emailSent = true;
-    } catch (emailError) {
-      print('⚠️ Email send error (continuing anyway): $emailError');
-      print('⚠️ Error type: ${emailError.runtimeType}');
-      // Continue even if email fails - user can resend later
-    }
+      // Step 5: Show dialog BEFORE signing out
+      if (mounted) {
+        setState(() => _isLoading = false);
+        print('🟢 Registration complete — showing verification dialog');
+        _showVerificationDialog(user);
+      }
+    } on FirebaseAuthException catch (e) {
+      print('❌ Firebase Auth Error: ${e.code} - ${e.message}');
 
-    // Step 4: Log registration event
-    print('🪵 Step 4: Logging registration event...');
-    try {
-      await FirebaseFirestore.instance.collection('logs').add({
-        'user': name,
-        'action': 'Registered account (pending verification)',
-        'time': Timestamp.now(),
-        'userId': user.uid,
-      });
-      print('✅ Registration event logged');
-    } catch (logError) {
-      print('⚠️ Logging error (continuing anyway): $logError');
-    }
+      if (mounted) setState(() => _isLoading = false);
 
-    // Step 5: Show dialog BEFORE signing out
-    if (mounted) {
-      setState(() => _isLoading = false);
-      print('🟢 Registration complete — showing verification dialog');
-      _showVerificationDialog(user);
-    }
+      switch (e.code) {
+        case 'weak-password':
+          _setPasswordError('The password provided is too weak');
+          break;
+        case 'email-already-in-use':
+          _setEmailError('An account already exists for this email');
+          break;
+        case 'invalid-email':
+          _setEmailError('Invalid email address');
+          break;
+        case 'operation-not-allowed':
+          _setGeneralError('Email/password accounts are not enabled');
+          break;
+        case 'network-request-failed':
+          _setGeneralError('Network error. Please check your connection');
+          break;
+        default:
+          _setGeneralError(
+            e.message ?? 'Registration failed. Please try again',
+          );
+      }
+    } on FirebaseException catch (e) {
+      print('❌ Firestore Error: ${e.code} - ${e.message}');
 
-  } on FirebaseAuthException catch (e) {
-    print('❌ Firebase Auth Error: ${e.code} - ${e.message}');
-    
-    if (mounted) setState(() => _isLoading = false);
-    
-    switch (e.code) {
-      case 'weak-password':
-        _setPasswordError('The password provided is too weak');
-        break;
-      case 'email-already-in-use':
-        _setEmailError('An account already exists for this email');
-        break;
-      case 'invalid-email':
-        _setEmailError('Invalid email address');
-        break;
-      case 'operation-not-allowed':
-        _setGeneralError('Email/password accounts are not enabled');
-        break;
-      case 'network-request-failed':
-        _setGeneralError('Network error. Please check your connection');
-        break;
-      default:
-        _setGeneralError(e.message ?? 'Registration failed. Please try again');
+      if (mounted) setState(() => _isLoading = false);
+
+      _setGeneralError('Failed to save user data. Please try again');
+    } catch (e) {
+      print('💥 General Error: $e');
+
+      if (mounted) setState(() => _isLoading = false);
+
+      _setGeneralError('An unexpected error occurred. Please try again');
     }
-  } on FirebaseException catch (e) {
-    print('❌ Firestore Error: ${e.code} - ${e.message}');
-    
-    if (mounted) setState(() => _isLoading = false);
-    
-    _setGeneralError('Failed to save user data. Please try again');
-  } catch (e) {
-    print('💥 General Error: $e');
-    
-    if (mounted) setState(() => _isLoading = false);
-    
-    _setGeneralError('An unexpected error occurred. Please try again');
   }
-}
 
-void _showVerificationDialog(User user) {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => WillPopScope(
-      onWillPop: () async => false, // Prevent back button
-      child: AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.mark_email_read_rounded, color: Colors.blue[700], size: 28),
-            const SizedBox(width: 12),
-            const Text('Verify Your Email'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'A verification email has been sent to:',
-              style: TextStyle(fontSize: 15, height: 1.4),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.email_outlined, color: Colors.grey[700], size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      user.email ?? '',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[800],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Please check your inbox or spam folder and click the verification link before signing in.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.blue[900],
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton.icon(
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('Resend Email'),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.grey[700],
-            ),
-            onPressed: () async {
-              try {
-                await user.sendEmailVerification();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Row(
-                        children: [
-                          Icon(Icons.check_circle, color: Colors.white),
-                          SizedBox(width: 12),
-                          Expanded(child: Text('Verification email sent!')),
-                        ],
-                      ),
-                      backgroundColor: Colors.green,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  );
-                }
-              } catch (e) {
-                print('❌ Error resending email: $e');
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Row(
-                        children: [
-                          Icon(Icons.error_outline, color: Colors.white),
-                          SizedBox(width: 12),
-                          Expanded(child: Text('Failed to resend email.')),
-                        ],
-                      ),
-                      backgroundColor: Colors.red,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  );
-                }
-              }
-            },
-          ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.login, size: 18),
-            label: const Text('Continue to Sign In'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              foregroundColor: Colors.white,
+  void _showVerificationDialog(User user) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => WillPopScope(
+            onWillPop: () async => false,
+            child: Dialog(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(20),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 10,
-              ),
-            ),
-            onPressed: () async {
-              print('🔵 Continue to Sign In button pressed');
-              
-              try {
-                // Step 1: Close dialog first
-                Navigator.of(context).pop();
-                print('✅ Dialog closed');
-                
-                // Step 2: Sign out the user
-                await FirebaseAuth.instance.signOut();
-                print('✅ User signed out successfully');
-                
-                // Step 3: Clear form fields
-                emailController.clear();
-                passwordController.clear();
-                confirmPasswordController.clear();
-                print('✅ Form fields cleared');
-                
-                // Step 4: Small delay to let auth state settle
-                await Future.delayed(const Duration(milliseconds: 300));
-                
-                if (context.mounted) {
-                  // Step 5: Navigate back to login
-                  Navigator.of(context).pop();
-                  print('✅ Navigated back to login');
-                  
-                  // Step 6: Show success message
-                  Future.delayed(const Duration(milliseconds: 400), () {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Row(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Responsive sizing
+                  final isSmallScreen = MediaQuery.of(context).size.width < 400;
+                  final horizontalPadding = isSmallScreen ? 20.0 : 32.0;
+                  final verticalPadding = isSmallScreen ? 24.0 : 32.0;
+                  final iconSize = isSmallScreen ? 64.0 : 80.0;
+                  final titleSize = isSmallScreen ? 20.0 : 24.0;
+                  final bodySize = isSmallScreen ? 14.0 : 15.0;
+                  final buttonHeight = isSmallScreen ? 50.0 : 56.0;
+
+                  return Container(
+                    constraints: BoxConstraints(
+                      maxWidth: isSmallScreen ? 340 : 440,
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: verticalPadding,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Success Icon with green theme
+                        Container(
+                          width: iconSize,
+                          height: iconSize,
+                          decoration: BoxDecoration(
+                            color: primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(iconSize / 2),
+                          ),
+                          child: Icon(
+                            Icons.mark_email_read_rounded,
+                            color: primaryColor,
+                            size: iconSize * 0.5,
+                          ),
+                        ),
+
+                        SizedBox(height: isSmallScreen ? 20 : 24),
+
+                        // Title
+                        Text(
+                          'Verify Your Email',
+                          style: TextStyle(
+                            fontFamily: primaryFontFamily,
+                            fontSize: titleSize,
+                            fontWeight: FontWeight.w600,
+                            color: textPrimaryColor,
+                            height: 1.2,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+
+                        SizedBox(height: isSmallScreen ? 8 : 12),
+
+                        // Subtitle
+                        Text(
+                          'A verification email has been sent to:',
+                          style: TextStyle(
+                            fontFamily: primaryFontFamily,
+                            fontSize: bodySize,
+                            color: textSecondaryColor,
+                            height: 1.4,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+
+                        SizedBox(height: isSmallScreen ? 16 : 20),
+
+                        // Email display
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 14 : 16,
+                            vertical: isSmallScreen ? 12 : 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Row(
                             children: [
-                              Icon(Icons.check_circle, color: Colors.white),
-                              SizedBox(width: 12),
+                              Icon(
+                                Icons.email_outlined,
+                                color: primaryColor,
+                                size: isSmallScreen ? 18 : 20,
+                              ),
+                              SizedBox(width: isSmallScreen ? 10 : 12),
                               Expanded(
                                 child: Text(
-                                  'Account created! Please verify your email before signing in.',
+                                  user.email ?? '',
+                                  style: TextStyle(
+                                    fontFamily: primaryFontFamily,
+                                    fontSize: bodySize,
+                                    color: textPrimaryColor,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
-                          backgroundColor: Colors.green,
-                          duration: const Duration(seconds: 6),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                        ),
+
+                        SizedBox(height: isSmallScreen ? 16 : 20),
+
+                        // Info message
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(isSmallScreen ? 12 : 14),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: primaryColor.withOpacity(0.1),
+                            ),
+                          ),
+                          child: Text(
+                            'Please check your inbox or spam folder and click the verification link before signing in.',
+                            style: TextStyle(
+                              fontFamily: primaryFontFamily,
+                              fontSize: bodySize - 1,
+                              color: textSecondaryColor,
+                              height: 1.4,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                      );
-                    }
-                  });
-                }
-              } catch (e) {
-                print('❌ Error during sign out process: $e');
-                
-                // Force sign out even on error
-                try {
-                  await FirebaseAuth.instance.signOut();
-                } catch (signOutError) {
-                  print('❌ Failed to force sign out: $signOutError');
-                }
-                
-                // Still try to navigate
-                if (context.mounted) {
-                  Navigator.of(context).pop();
-                  
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Row(
-                        children: [
-                          Icon(Icons.warning, color: Colors.white),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Text('Account created but there was an issue. Please try signing in.'),
+
+                        SizedBox(height: isSmallScreen ? 24 : 32),
+
+                        // Primary button - Continue to Sign In (FIXED)
+                        SizedBox(
+                          width: double.infinity,
+                          height: buttonHeight,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            onPressed: () async {
+                              print('🔵 Continue to Sign In button pressed');
+
+                              try {
+                                // Step 1: Close the dialog first
+                                Navigator.of(context).pop();
+                                print('✅ Dialog closed');
+
+                                // Step 2: Sign out the user
+                                await FirebaseAuth.instance.signOut();
+                                print('✅ User signed out successfully');
+
+                                // Step 3: Clear form fields
+                                emailController.clear();
+                                passwordController.clear();
+                                confirmPasswordController.clear();
+                                print('✅ Form fields cleared');
+
+                                // Step 4: Small delay for smooth transition
+                                await Future.delayed(
+                                  const Duration(milliseconds: 150),
+                                );
+
+                                // Step 5: Navigate back to login page
+                                if (mounted) {
+                                  Navigator.of(context).pop();
+                                  print('✅ Navigated back to login page');
+
+                                  // Step 6: Show success message after navigation
+                                  await Future.delayed(
+                                    const Duration(milliseconds: 200),
+                                  );
+
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Row(
+                                          children: const [
+                                            Icon(
+                                              Icons.check_circle,
+                                              color: Colors.white,
+                                            ),
+                                            SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                'Account created! Please verify your email before signing in.',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        backgroundColor: Colors.green,
+                                        duration: const Duration(seconds: 5),
+                                        behavior: SnackBarBehavior.floating,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                    print('✅ Success message displayed');
+                                  }
+                                }
+                              } catch (e) {
+                                print('❌ Error during navigation: $e');
+                                print('❌ Error type: ${e.runtimeType}');
+
+                                // Force close dialog and navigate back even on error
+                                try {
+                                  await FirebaseAuth.instance.signOut();
+                                  print('✅ Force sign out successful');
+                                } catch (signOutError) {
+                                  print(
+                                    '❌ Failed to force sign out: $signOutError',
+                                  );
+                                }
+
+                                // Navigate back regardless of error
+                                if (mounted) {
+                                  // Pop dialog if still open
+                                  try {
+                                    Navigator.of(
+                                      context,
+                                      rootNavigator: true,
+                                    ).pop();
+                                  } catch (_) {}
+
+                                  // Pop to login page
+                                  try {
+                                    Navigator.of(context).pop();
+                                  } catch (_) {}
+
+                                  // Show success message
+                                  await Future.delayed(
+                                    const Duration(milliseconds: 200),
+                                  );
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Row(
+                                          children: const [
+                                            Icon(
+                                              Icons.check_circle,
+                                              color: Colors.white,
+                                            ),
+                                            SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                'Account created! Please verify your email.',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        backgroundColor: Colors.green,
+                                        duration: const Duration(seconds: 4),
+                                        behavior: SnackBarBehavior.floating,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+                            },
+                            child: Text(
+                              'Continue to Sign In',
+                              style: TextStyle(
+                                fontFamily: primaryFontFamily,
+                                fontSize: bodySize + 1,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
-                      backgroundColor: Colors.orange,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                        ),
+
+                        SizedBox(height: isSmallScreen ? 10 : 12),
+
+                        // Secondary button - Resend Email
+                        SizedBox(
+                          width: double.infinity,
+                          height: buttonHeight,
+                          child: OutlinedButton.icon(
+                            icon: Icon(
+                              Icons.refresh,
+                              size: isSmallScreen ? 18 : 20,
+                            ),
+                            label: Text(
+                              'Resend Email',
+                              style: TextStyle(
+                                fontFamily: primaryFontFamily,
+                                fontSize: bodySize + 1,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: primaryColor,
+                              side: BorderSide(
+                                color: primaryColor.withOpacity(0.3),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () async {
+                              print('🔵 Resend Email button pressed');
+                              try {
+                                await user.sendEmailVerification();
+                                print('✅ Verification email resent');
+
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Row(
+                                        children: const [
+                                          Icon(
+                                            Icons.check_circle,
+                                            color: Colors.white,
+                                          ),
+                                          SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              'Verification email sent! Check your inbox.',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      backgroundColor: Colors.green,
+                                      duration: const Duration(seconds: 4),
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                print('❌ Error resending email: $e');
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Row(
+                                        children: const [
+                                          Icon(
+                                            Icons.error_outline,
+                                            color: Colors.white,
+                                          ),
+                                          SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              'Failed to resend email. Please try again.',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      backgroundColor: Colors.red,
+                                      duration: const Duration(seconds: 4),
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   );
-                }
-              }
-            },
+                },
+              ),
+            ),
           ),
-        ],
-      ),
-    ),
-  );
-}
+    );
+  }
 
   // Email validation helper
   bool _isValidEmail(String email) {
@@ -1148,7 +1313,6 @@ void _showVerificationDialog(User user) {
 
             // Google Sign-In Button
             const SquareTile(imagePath: 'lib/images/google.png'),
-           
 
             SizedBox(height: sectionSpacing),
 
