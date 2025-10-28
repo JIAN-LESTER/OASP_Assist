@@ -1946,7 +1946,7 @@ async function getAccessToken(): Promise<string> {
   try {
     console.log("🔍 Looking for Facebook token...");
     
-    // Try to get token from 'facebook_admin' document
+    // Get token document
     const tokenDoc = await db.collection('fb_tokens').doc('facebook_admin').get();
     
     if (!tokenDoc.exists) {
@@ -1956,37 +1956,47 @@ async function getAccessToken(): Promise<string> {
     
     const data = tokenDoc.data();
     
-    if (!data?.long_token) {
+    if (!data) {
       throw new Error('Invalid token data in database');
     }
     
-    // Check expiration
-    const expiresAt = data.expires_at || 0;
-    const now = Date.now();
+    // CRITICAL FIX: Use PAGE token instead of user token
+    const pages = data.pages || {};
+    const pageIds = Object.keys(pages);
     
-    console.log(`📅 Token expires at: ${expiresAt ? new Date(expiresAt).toISOString() : 'unknown'}`);
-    console.log(`📅 Current time: ${new Date(now).toISOString()}`);
+    console.log(`📄 Found ${pageIds.length} page(s) in token data`);
+    console.log(`🎯 Target PAGE_ID: ${PAGE_ID}`);
     
-    // If expiresAt is 0 or null, warn but allow (might be a never-expiring token)
-    if (!expiresAt || expiresAt === 0) {
-      console.warn('⚠️ Token has no expiration date, allowing usage');
+    // Try to find the specific page token
+    if (pages[PAGE_ID] && pages[PAGE_ID].access_token) {
+      console.log(`✅ Using page token for ${PAGE_ID}`);
+      return pages[PAGE_ID].access_token;
+    }
+    
+    // If specific page not found, use first available page token
+    if (pageIds.length > 0) {
+      const firstPageId = pageIds[0];
+      const firstPageToken = pages[firstPageId].access_token;
+      console.warn(`⚠️ Page ${PAGE_ID} not found in saved pages`);
+      console.warn(`⚠️ Using first available page: ${firstPageId}`);
+      return firstPageToken;
+    }
+    
+    // Fallback to user token if no pages found (not recommended)
+    if (data.long_token) {
+      console.warn('⚠️⚠️⚠️ WARNING: No page tokens found!');
+      console.warn('⚠️⚠️⚠️ Falling back to user token (may not work for page posts)');
       return data.long_token;
     }
     
-    if (now >= expiresAt) {
-      const expiredDate = new Date(expiresAt).toISOString();
-      throw new Error(`Facebook token expired on ${expiredDate}. Please refresh using the key (🔑) button`);
-    }
+    throw new Error('No valid access token found. Please refresh your token.');
     
-    const daysLeft = (expiresAt - now) / (1000 * 60 * 60 * 24);
-    console.log(`✅ Using Facebook token (expires in ${daysLeft.toFixed(1)} days)`);
-    
-    return data.long_token;
   } catch (error: any) {
     console.error('❌ Error getting access token:', error.message);
     throw error;
   }
 }
+
 // ============================================================================
 // IMPROVED manualSyncFacebookPosts with better error handling
 // ============================================================================
