@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:capstone_project/auth_pages/auth_page.dart';
@@ -7,7 +6,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/auth_pages/email_verification_page.dart';
 import 'package:capstone_project/onboarding/onboarding.dart';
-
 import 'package:capstone_project/onboarding/useronboarding.dart';
 import 'package:capstone_project/pages/admin_pages/information_bank_page.dart';
 import 'package:capstone_project/pages/user_pages/admission_info.dart';
@@ -46,13 +44,20 @@ Future<void> initializeServices() async {
     );
     print('✅ Firebase initialized successfully');
     
-    // Initialize Cloud Functions IMMEDIATELY after Firebase
-    // This ensures it's ready before any widget tries to use it
-    FirebaseFunctionsService().initialize(
-      region: 'us-central1',
-      useEmulator: false,
-    );
-    print('✅ Cloud Functions service initialized');
+    // DON'T configure Cloud Functions - we'll use HTTP instead
+    // This avoids all the emulator/SDK connection issues
+    print('ℹ️ Cloud Functions SDK not configured - using HTTP endpoints');
+    
+    // Initialize Cloud Functions service (if you have one)
+    try {
+      FirebaseFunctionsService().initialize(
+        region: 'us-central1',
+        useEmulator: false, // Never use emulator
+      );
+      print('✅ Cloud Functions service initialized');
+    } catch (e) {
+      print('⚠️ Cloud Functions service initialization skipped: $e');
+    }
     
     _servicesInitialized = true;
     print('✅ All services initialized successfully');
@@ -84,7 +89,6 @@ void main() {
             update: (_, retriever, __) => ChatProvider(retriever),
           ),
           Provider<PineconeCloudService>(create: (_) => PineconeCloudService()),
-          // FirebaseFunctionsService uses singleton pattern, so this returns the already-initialized instance
           Provider<FirebaseFunctionsService>.value(value: FirebaseFunctionsService()),
         ],
         child: const MyApp(),
@@ -120,7 +124,6 @@ class MyApp extends StatelessWidget {
         '/onboarding': (context) => const OnboardingScreen(),
         '/userOnboarding': (context) => const UserOnboardingScreen(userId: '', userName: '',),
         '/auth': (context) => AuthPage(),
-     
         '/home': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
           final initialTab = args?['initialTab'] as int?;

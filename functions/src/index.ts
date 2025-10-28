@@ -23,7 +23,6 @@ const FB_API_VERSION = "v24.0";
 
 // Configuration
 const PAGE_ID = "730995450096065";
-const ACCESS_TOKEN = "EAAYTTmxaZBDIBP1NfCeIFWEz17RQThPCZC887PJBSLSvBShTCnagouG39eFK6FrbChlFOYwjPlTCA9KAwSlsLzVVBUDICrOdyZBO7XjE379AlGDc16lCLvQhpp5lTVnJVRtJ9pxJrDNbQjUWMjKB7EttkYXbaYEqx2hlx3zZBMBQi3ZCB0CRJ1IfsGmF0m7CRJCf95KCZAhRl1QJR5uMFI2vZC7iIc8MRftZAEdF";
 
 // ============================================================================
 // INTERFACES
@@ -1130,123 +1129,6 @@ export const syncFacebookPosts = onSchedule(
   }
 );
 
-export const manualSyncFacebookPosts = onCall(
-  {
-    cors: true,
-    timeoutSeconds: 540,
-    memory: "1GiB",
-    secrets: [COHERE_API_KEY],
-  },
-  async (request) => {
-    console.log("========================================");
-    console.log("🔥 manualSyncFacebookPosts called");
-    console.log("Request auth:", request.auth ? "Authenticated" : "Not authenticated");
-    console.log("Request data:", JSON.stringify(request.data));
-    console.log("========================================");
-
-    try {
-      console.log("📡 Fetching Facebook posts...");
-      console.log("📡 Using PAGE_ID:", PAGE_ID);
-      console.log("📡 Using API version:", FB_API_VERSION);
-      
-      const posts = await fetchFacebookPosts();
-      console.log(`✅ Fetched ${posts.length} posts from Facebook`);
-      
-      let processed = 0;
-      let failed = 0;
-      
-      for (const post of posts) {
-        try {
-          console.log(`📝 Processing post: ${post.id}`);
-          await processPost(post, COHERE_API_KEY.value());
-          processed++;
-        } catch (postError: any) {
-          console.error(`❌ Error processing post ${post.id}:`, postError);
-          failed++;
-        }
-      }
-      
-      console.log(`✅ Sync complete: ${processed} processed, ${failed} failed`);
-      
-      return {
-        success: true,
-        message: `Successfully synced ${processed} posts (${failed} failed)`,
-        count: processed,
-        failed: failed,
-        total: posts.length,
-      };
-    } catch (error: any) {
-      console.error("========================================");
-      console.error("❌ CRITICAL ERROR in manual sync:");
-      console.error("Error type:", error.constructor.name);
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-      
-      // Check if it's an Axios error with response data
-      if (error.response) {
-        console.error("📡 Facebook API Response Status:", error.response.status);
-        console.error("📡 Facebook API Response Data:", JSON.stringify(error.response.data, null, 2));
-      }
-      console.error("========================================");
-      
-      return {
-        success: false,
-        error: error.message || "Unknown error occurred",
-        errorType: error.constructor.name,
-        errorDetails: error.response?.data || null,
-        message: "Sync failed. Check function logs for details.",
-      };
-    }
-  }
-);
-
-async function fetchFacebookPosts(): Promise<FacebookPost[]> {
-  try {
-    console.log("🔍 Fetching Facebook posts...");
-    console.log("📍 Page ID:", PAGE_ID);
-    console.log("📍 API Version:", FB_API_VERSION);
-    console.log("📍 Access Token (first 20 chars):", ACCESS_TOKEN.substring(0, 20) + "...");
-    
-    const url = `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}/posts`;
-    const params = {
-      fields: "message,created_time,full_picture,permalink_url,attachments",
-      limit: 20,
-      access_token: ACCESS_TOKEN,
-    };
-    
-    console.log("📡 Making request to:", url);
-    
-    const response = await axios.get<{ data: FacebookPost[] }>(url, { params });
-    
-    console.log("✅ Facebook API response status:", response.status);
-    console.log("✅ Posts received:", response.data.data?.length || 0);
-    
-    return response.data.data || [];
-  } catch (error: any) {
-    console.error("❌ Error fetching Facebook posts:");
-    console.error("Error message:", error.message);
-    
-    if (error.response) {
-      console.error("Response status:", error.response.status);
-      console.error("Response data:", JSON.stringify(error.response.data, null, 2));
-      
-      // Provide helpful error messages
-      if (error.response.status === 400) {
-        const errorData = error.response.data;
-        if (errorData?.error?.message) {
-          throw new Error(`Facebook API Error: ${errorData.error.message}`);
-        }
-        throw new Error("Invalid request to Facebook API. Check your PAGE_ID and ACCESS_TOKEN.");
-      }
-      
-      if (error.response.status === 190) {
-        throw new Error("Facebook Access Token is invalid or expired. Please refresh your token.");
-      }
-    }
-    
-    throw error;
-  }
-}
 
 async function processPost(post: FacebookPost, cohereKey: string): Promise<void> {
   const postId = post.id;
@@ -1655,7 +1537,11 @@ export const testSync = onCall(
 // FACEBOOK TOKEN MANAGEMENT (v2)
 // ============================================================================
 
-async function exchangeShortForLong(shortToken: string, appId: string, appSecret: string) {
+async function exchangeShortForLong(
+  shortToken: string,
+  appId: string,
+  appSecret: string
+): Promise<{ access_token: string; expires_in?: number }> {
   const url = `https://graph.facebook.com/${FB_API_VERSION}/oauth/access_token`;
   const params = {
     grant_type: "fb_exchange_token",
@@ -1663,10 +1549,9 @@ async function exchangeShortForLong(shortToken: string, appId: string, appSecret
     client_secret: appSecret,
     fb_exchange_token: shortToken,
   };
-  const resp = await axios.get(url, { params });
+  const resp = await axios.get<{ access_token: string; expires_in?: number }>(url, { params });
   return resp.data;
 }
-
 
 
 
@@ -1677,91 +1562,6 @@ async function getUserPages(longUserToken: string): Promise<any> {
   return resp.data as any;
 }
 
-export const exchangeToken = onRequest(
-  {
-    cors: true,
-    secrets: [FB_APP_ID, FB_APP_SECRET],
-  },
-  async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "POST");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
-
-    if (req.method === "OPTIONS") {
-      res.status(204).send("");
-      return;
-    }
-
-    try {
-      if (req.method !== "POST") {
-        res.status(405).json({ error: "Only POST method allowed" });
-        return;
-      }
-      
-      const { uid, short_token } = req.body;
-      if (!uid || !short_token) {
-        res.status(400).json({ error: "Missing uid or short_token" });
-        return;
-      }
-
-      const appId = FB_APP_ID.value();
-      const appSecret = FB_APP_SECRET.value();
-
-      interface FacebookTokenResponse {
-        access_token: string;
-        expires_in: number;
-      }
-      
-      const data = await exchangeShortForLong(short_token, appId, appSecret) as FacebookTokenResponse;
-      const longToken = data.access_token;
-      const expiresIn = data.expires_in;
-
-      const me = await axios.get<{ id: string; name?: string }>(
-        `https://graph.facebook.com/${FB_API_VERSION}/me`, 
-        {
-          params: { access_token: longToken, fields: "id,name" },
-        }
-      );
-
-      const fbUserId = me.data.id;
-      const now = Date.now();
-      const expiresAt = now + (expiresIn ? expiresIn * 1000 : 0);
-
-      let pagesObj: { [key: string]: any } = {};
-      try {
-        const pagesResp = await getUserPages(longToken);
-        const pages = pagesResp.data || [];
-        for (const p of pages) {
-          pagesObj[p.id] = {
-            access_token: p.access_token,
-            name: p.name,
-            expires_at: null,
-          };
-        }
-      } catch (err: any) {
-        console.warn("Could not fetch pages:", err?.response?.data || err.message);
-      }
-
-      const docRef = db.collection("fb_tokens").doc(uid);
-      await docRef.set({
-        provider: "facebook",
-        userId: fbUserId,
-        long_token: longToken,
-        short_token: short_token,
-        expires_at: expiresAt,
-        pages: pagesObj,
-        updated_at: Date.now(),
-      }, { merge: true });
-
-      res.json({ ok: true, expires_in: expiresIn, expires_at: expiresAt, fbUserId });
-    } catch (error: any) {
-      console.error("exchangeToken error:", error?.response?.data || error.message || error);
-      res.status(500).json({ 
-        error: error?.response?.data || error.message || String(error) 
-      });
-    }
-  }
-);
 
 export const refreshTokensDaily = onSchedule(
   {
@@ -1852,3 +1652,657 @@ export const refreshTokensDaily = onSchedule(
     console.log("Token refresh summary:", { refreshed: results.length, details: results });
   }
 );
+
+
+
+export const exchangeTokenHttp = onRequest(
+  {
+    cors: true,
+    secrets: [FB_APP_ID, FB_APP_SECRET],
+  },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    try {
+      console.log("========================================");
+      console.log("🔥 exchangeToken (HTTP) called");
+      console.log("Headers:", JSON.stringify(req.headers, null, 2));
+      console.log("Body:", JSON.stringify(req.body, null, 2));
+      console.log("========================================");
+      
+      // Verify authentication
+      const authHeader = req.headers.authorization as string | undefined;
+      const userId = await verifyAuthToken(authHeader);
+      
+      if (!userId) {
+        res.status(401).json({ 
+          error: "unauthenticated",
+          message: "Please log in first"
+        });
+        return;
+      }
+      
+      console.log(`✅ Authenticated as: ${userId}`);
+      
+      // Extract data from request body
+      const { data } = req.body;
+      const { uid, short_token } = data || {};
+      
+      if (!uid || !short_token) {
+        res.status(400).json({ 
+          error: "invalid-argument",
+          message: "uid and short_token are required"
+        });
+        return;
+      }
+
+      // Execute token exchange
+      const result = await exchangeTokenLogic(uid, short_token);
+      
+      console.log("✅ Token exchange successful");
+      res.json({ result });
+      
+    } catch (error: any) {
+      console.error("❌ exchangeToken HTTP error:", error);
+      
+      // Return proper error format
+      res.status(500).json({ 
+        error: "internal",
+        message: error.message || "Internal server error",
+        details: error.toString()
+      });
+    }
+  }
+);
+
+
+async function verifyAuthToken(authHeader: string | undefined): Promise<string | null> {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  
+  const idToken = authHeader.split('Bearer ')[1];
+  
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    return decodedToken.uid;
+  } catch (error) {
+    console.error('Token verification failed:', error);
+    return null;
+  }
+}
+
+export const exchangeToken = onCall(
+  {
+    cors: true,
+    secrets: [FB_APP_ID, FB_APP_SECRET],
+  },
+  async (request) => {
+    console.log("========================================");
+    console.log("🔥 exchangeToken (callable) called");
+    console.log("Auth:", request.auth ? "Authenticated" : "Not authenticated");
+    console.log("Data:", JSON.stringify(request.data, null, 2));
+    console.log("========================================");
+
+    try {
+      // Verify authentication
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+
+      const { uid, short_token } = request.data;
+      
+      if (!uid || !short_token) {
+        throw new HttpsError("invalid-argument", "Missing uid or short_token");
+      }
+
+      // Execute token exchange
+      const result = await exchangeTokenLogic(uid, short_token);
+      
+      console.log("✅ Token exchange successful");
+      return result;
+      
+    } catch (error: any) {
+      console.error("❌ exchangeToken error:", error);
+      
+      // Return error in a format the client can handle
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      
+      // Wrap other errors
+      throw new HttpsError(
+        "internal", 
+        error.message || "Failed to exchange token"
+      );
+    }
+  }
+);
+
+async function exchangeTokenLogic(uid: string, shortToken: string): Promise<any> {
+  try {
+    console.log(`🔄 Exchanging token for uid: ${uid}`);
+
+    const appId = FB_APP_ID.value();
+    const appSecret = FB_APP_SECRET.value();
+
+    if (!appId || !appSecret) {
+      throw new Error("FB_APP_ID or FB_APP_SECRET not configured");
+    }
+
+    // Exchange short-lived token for long-lived token
+    console.log("📡 Calling Facebook API...");
+    const data = await exchangeShortForLong(shortToken, appId, appSecret);
+    const longToken = data.access_token;
+    const expiresIn = data.expires_in;
+
+    console.log(`✅ Token exchanged successfully, expires in ${expiresIn ?? 'unknown'} seconds`);
+
+    // Verify the token
+    const me = await axios.get<{ id: string; name?: string }>(
+      `https://graph.facebook.com/${FB_API_VERSION}/me`, 
+      {
+        params: { access_token: longToken, fields: "id,name" },
+      }
+    );
+
+    const fbUserId = me.data.id;
+    const now = Date.now();
+    const expiresAt: number | null =
+      typeof expiresIn === "number" && !isNaN(expiresIn)
+        ? now + expiresIn * 1000
+        : null;
+
+    // Get page access tokens
+    let pagesObj: { [key: string]: any } = {};
+    try {
+      const pagesResp = await getUserPages(longToken);
+      const pages = pagesResp.data || [];
+      console.log(`📄 Found ${pages.length} page(s)`);
+      
+      for (const p of pages) {
+        pagesObj[p.id] = {
+          access_token: p.access_token,
+          name: p.name,
+          expires_at: null,
+        };
+      }
+    } catch (err: any) {
+      console.warn("⚠️ Could not fetch pages:", err?.message);
+    }
+
+    // Save to Firestore - use the uid as document ID
+    const docRef = db.collection("fb_tokens").doc(uid);
+    await docRef.set({
+      provider: "facebook",
+      userId: fbUserId,
+      long_token: longToken,
+      short_token: shortToken,
+      expires_at: expiresAt,
+      pages: pagesObj,
+      updated_at: now,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    console.log(`✅ Token saved to fb_tokens/${uid}`);
+
+    const daysValid =
+      typeof expiresIn === "number" && !isNaN(expiresIn)
+        ? Math.round(expiresIn / 86400)
+        : null;
+
+    return { 
+      success: true,
+      ok: true, 
+      expires_in: expiresIn, 
+      expires_at: expiresAt, 
+      fbUserId: fbUserId,
+      pagesCount: Object.keys(pagesObj).length,
+      message: daysValid !== null
+        ? `Token saved successfully. Valid for ${daysValid} days.`
+        : "Token saved successfully.",
+    };
+  } catch (error: any) {
+    console.error("❌ exchangeTokenLogic error:", error);
+    
+    // Handle Facebook API errors specifically
+    if (error.response?.data?.error) {
+      const fbError = error.response.data.error;
+      throw new Error(`Facebook API Error: ${fbError.message || fbError.type}`);
+    }
+    
+    throw error;
+  }
+}
+
+
+// ============================================================================
+// IMPROVED getAccessToken with better error messages
+// ============================================================================
+
+async function getAccessToken(): Promise<string> {
+  try {
+    console.log("🔍 Looking for Facebook token...");
+    
+    // Try to get token from 'facebook_admin' document
+    const tokenDoc = await db.collection('fb_tokens').doc('facebook_admin').get();
+    
+    if (!tokenDoc.exists) {
+      console.log("❌ No token found at fb_tokens/facebook_admin");
+      throw new Error('No Facebook token configured. Please configure token using the key (🔑) button');
+    }
+    
+    const data = tokenDoc.data();
+    
+    if (!data?.long_token) {
+      throw new Error('Invalid token data in database');
+    }
+    
+    // Check expiration
+    const expiresAt = data.expires_at || 0;
+    const now = Date.now();
+    
+    if (now >= expiresAt) {
+      const expiredDate = new Date(expiresAt).toISOString();
+      throw new Error(`Facebook token expired on ${expiredDate}. Please refresh using the key (🔑) button`);
+    }
+    
+    const daysLeft = (expiresAt - now) / (1000 * 60 * 60 * 24);
+    console.log(`✅ Using Facebook token (expires in ${daysLeft.toFixed(1)} days)`);
+    
+    return data.long_token;
+  } catch (error: any) {
+    console.error('❌ Error getting access token:', error.message);
+    throw error;
+  }
+}
+// ============================================================================
+// IMPROVED manualSyncFacebookPosts with better error handling
+// ============================================================================
+
+export const manualSyncFacebookPosts = onCall(
+  {
+    cors: true,
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [COHERE_API_KEY],
+  },
+  async (request) => {
+    console.log("========================================");
+    console.log("🔥 manualSyncFacebookPosts (callable) called");
+    console.log("========================================");
+
+    try {
+      // Verify authentication
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+
+      const result = await syncFacebookPostsLogic();
+      return result;
+      
+    } catch (error: any) {
+      console.error("❌ Sync error:", error);
+      
+      // Return error in proper format
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      
+      throw new HttpsError(
+        "internal",
+        error.message || "Sync failed"
+      );
+    }
+  }
+);
+
+export const manualSyncFacebookPostsHttp = onRequest(
+  {
+    cors: true,
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [COHERE_API_KEY],
+  },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    try {
+      console.log("========================================");
+      console.log("🔥 manualSyncFacebookPosts (HTTP) called");
+      console.log("========================================");
+      
+      // Verify authentication
+      const authHeader = req.headers.authorization as string | undefined;
+      const userId = await verifyAuthToken(authHeader);
+      
+      if (!userId) {
+        res.status(401).json({ 
+          error: "unauthenticated",
+          message: "Please log in first"
+        });
+        return;
+      }
+      
+      console.log(`✅ Authenticated as: ${userId}`);
+      
+      const result = await syncFacebookPostsLogic();
+      
+      res.json({ result });
+      
+    } catch (error: any) {
+      console.error("❌ Sync HTTP error:", error);
+      res.status(500).json({ 
+        error: "internal",
+        message: error.message || "Sync failed",
+        details: error.toString()
+      });
+    }
+  }
+);
+
+async function syncFacebookPostsLogic(): Promise<any> {
+  try {
+    console.log("📡 Starting Facebook sync...");
+    
+    console.log("📡 Fetching Facebook posts...");
+    const posts = await fetchFacebookPosts();
+    console.log(`✅ Fetched ${posts.length} posts from Facebook`);
+    
+    let processed = 0;
+    let failed = 0;
+    
+    for (const post of posts) {
+      try {
+        console.log(`📝 Processing post: ${post.id}`);
+        await processPost(post, COHERE_API_KEY.value());
+        processed++;
+      } catch (postError: any) {
+        console.error(`❌ Error processing post ${post.id}:`, postError.message);
+        failed++;
+      }
+    }
+    
+    console.log(`✅ Sync complete: ${processed} processed, ${failed} failed`);
+    
+    return {
+      success: true,
+      message: `Successfully synced ${processed} posts` + (failed > 0 ? ` (${failed} failed)` : ''),
+      count: processed,
+      failed: failed,
+      total: posts.length,
+    };
+  } catch (error: any) {
+    console.error("❌ syncFacebookPostsLogic error:", error);
+    
+    // Return user-friendly error
+    return {
+      success: false,
+      error: error.message,
+      message: error.message,
+    };
+  }
+}
+
+// ============================================================================
+// IMPROVED fetchFacebookPosts with better error handling
+// ============================================================================
+
+async function fetchFacebookPosts(): Promise<FacebookPost[]> {
+  try {
+    console.log("🔍 Fetching Facebook posts...");
+    console.log("📍 Page ID:", PAGE_ID);
+    console.log("📍 API Version:", FB_API_VERSION);
+    
+    // Get token from Firestore
+    const accessToken = await getAccessToken();
+    console.log("✅ Access token retrieved");
+    
+    const url = `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}/posts`;
+    const params = {
+      fields: "message,created_time,full_picture,permalink_url,attachments",
+      limit: 20,
+      access_token: accessToken,
+    };
+    
+    console.log("📡 Making request to:", url);
+    console.log("📡 Request params:", { ...params, access_token: "***" });
+    
+    const response = await axios.get<{ data: FacebookPost[] }>(url, { 
+      params,
+      timeout: 30000,
+    });
+    
+    console.log("✅ Facebook API response status:", response.status);
+    console.log("✅ Posts received:", response.data.data?.length || 0);
+    
+    return response.data.data || [];
+    
+  } catch (error: any) {
+    console.error("❌ Error fetching Facebook posts:");
+    console.error("Error message:", error.message);
+    
+    if (error.response) {
+      console.error("Response status:", error.response.status);
+      console.error("Response data:", JSON.stringify(error.response.data, null, 2));
+      
+      const errorData = error.response.data;
+      
+      if (error.response.status === 400) {
+        if (errorData?.error?.message) {
+          throw new Error(`Facebook API Error: ${errorData.error.message}`);
+        }
+        throw new Error("Invalid request to Facebook API. Check your PAGE_ID and token.");
+      }
+      
+      if (error.response.status === 190 || errorData?.error?.code === 190) {
+        throw new Error("Facebook Access Token is invalid or expired. Please refresh your token.");
+      }
+      
+      if (error.response.status === 403) {
+        throw new Error("Access denied. Check if the token has permission to read page posts.");
+      }
+    }
+    
+    throw error;
+  }
+}
+
+export const testFacebookConnection = onCall(
+  {
+    cors: true,
+    secrets: [FB_APP_ID, FB_APP_SECRET],
+  },
+  async (request) => {
+    console.log("🧪 Testing Facebook connection...");
+    
+    try {
+      // Check if token exists
+      const tokenDoc = await db.collection('fb_tokens').doc('facebook_admin').get();
+      
+      if (!tokenDoc.exists) {
+        return {
+          success: false,
+          error: "No token configured",
+          message: "Please configure Facebook token first",
+          tokenInfo: {
+            hasToken: false,
+          }
+        };
+      }
+      
+      const tokenData = tokenDoc.data();
+      const expiresAt = tokenData?.expires_at || 0;
+      const now = Date.now();
+      const daysLeft = Math.round((expiresAt - now) / (1000 * 60 * 60 * 24));
+      
+      // Test the token by fetching page info
+      try {
+        const response = await axios.get(
+          `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}`,
+          {
+            params: {
+              access_token: tokenData?.long_token,
+              fields: "id,name,about"
+            }
+          }
+        );
+        
+        return {
+          success: true,
+          message: "Connection successful",
+          tokenInfo: {
+            hasToken: true,
+            expiresAt: expiresAt,
+            daysLeft: daysLeft,
+            pages: tokenData?.pages || {},
+            pagesCount: Object.keys(tokenData?.pages || {}).length,
+          },
+          pageInfo: response.data,
+          targetPageId: PAGE_ID,
+        };
+      } catch (apiError: any) {
+        return {
+          success: false,
+          error: apiError.response?.data?.error?.message || apiError.message,
+          errorCode: apiError.response?.data?.error?.code,
+          message: "Token exists but API call failed",
+          tokenInfo: {
+            hasToken: true,
+            daysLeft: daysLeft,
+          }
+        };
+      }
+      
+    } catch (error: any) {
+      console.error("❌ Test failed:", error);
+      return {
+        success: false,
+        error: error.message,
+        message: "Test failed"
+      };
+    }
+  }
+);
+
+// Add this function to your index.ts file
+
+export const testFacebookConnectionHttp = onRequest(
+  {
+    cors: true,
+    secrets: [FB_APP_ID, FB_APP_SECRET],
+  },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    try {
+      console.log("🧪 Testing Facebook connection (HTTP)...");
+      
+      // Verify authentication
+      const authHeader = req.headers.authorization as string | undefined;
+      const userId = await verifyAuthToken(authHeader);
+      
+      if (!userId) {
+        res.status(401).json({ 
+          error: "unauthenticated",
+          message: "Please log in first"
+        });
+        return;
+      }
+      
+      console.log(`✅ Authenticated as: ${userId}`);
+      
+      // Check if token exists
+      const tokenDoc = await db.collection('fb_tokens').doc('facebook_admin').get();
+      
+      if (!tokenDoc.exists) {
+        res.json({
+          success: false,
+          error: "No token configured",
+          message: "Please configure Facebook token first",
+          tokenInfo: {
+            hasToken: false,
+          }
+        });
+        return;
+      }
+      
+      const tokenData = tokenDoc.data();
+      const expiresAt = tokenData?.expires_at || 0;
+      const now = Date.now();
+      const daysLeft = Math.round((expiresAt - now) / (1000 * 60 * 60 * 24));
+      
+      // Test the token by fetching page info
+      try {
+        const response = await axios.get(
+          `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}`,
+          {
+            params: {
+              access_token: tokenData?.long_token,
+              fields: "id,name,about"
+            },
+            timeout: 10000,
+          }
+        );
+        
+        res.json({
+          success: true,
+          message: "Connection successful",
+          tokenInfo: {
+            hasToken: true,
+            expiresAt: expiresAt,
+            daysLeft: daysLeft,
+            pages: tokenData?.pages || {},
+            pagesCount: Object.keys(tokenData?.pages || {}).length,
+          },
+          pageInfo: response.data,
+          targetPageId: PAGE_ID,
+        });
+      } catch (apiError: any) {
+        console.error("❌ Facebook API test failed:", apiError.response?.data || apiError.message);
+        
+        res.json({
+          success: false,
+          error: apiError.response?.data?.error?.message || apiError.message,
+          errorCode: apiError.response?.data?.error?.code,
+          message: "Token exists but API call failed",
+          tokenInfo: {
+            hasToken: true,
+            daysLeft: daysLeft,
+          }
+        });
+      }
+      
+    } catch (error: any) {
+      console.error("❌ Test failed:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: "Test failed"
+      });
+    }
+  }
+);
+
+

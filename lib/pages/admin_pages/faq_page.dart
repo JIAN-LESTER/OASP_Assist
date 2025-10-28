@@ -218,7 +218,6 @@ Widget mainContent(
   BuildContext context,
   final ValueChanged<String> onCategoryChanged,
   final TextEditingController searchController,
-
   final int currentPage,
   final int itemsPerPage,
   final ValueChanged<int> onPageChanged,
@@ -227,64 +226,68 @@ Widget mainContent(
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
-    body: SingleChildScrollView(
+    body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(selectedCategory, onCategoryChanged, searchController),
           const SizedBox(height: 16),
-          Container(
-            height: MediaQuery.of(context).size.height - 200,
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                _buildTableHeader(),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream:
-                        FirebaseFirestore.instance
-                            .collection('faqs')
-                            .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
 
-                      if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      }
-
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return const Center(child: Text('No FAQs found.'));
-                      }
-
-                      return _buildFAQList(
-                        getAllFAQs: snapshot.data!.docs,
-                        selectedCategory: selectedCategory,
-                        searchQuery: searchController.text,
-                        currentPage: currentPage,
-                        itemsPerPage: itemsPerPage,
-                        onPageChanged: onPageChanged,
-                        onItemsPerPageChanged: onItemsPerPageChanged,
-                      );
-                    },
+          // Main container
+          Expanded(
+            child: Container(
+              padding: EdgeInsets.all(padding),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Column(
+                children: [
+                  _buildTableHeader(),
+                  const SizedBox(height: 10),
+
+                  // FAQ list area
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('faqs')
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+
+                        if (snapshot.hasError) {
+                          return Center(child: Text('Error: ${snapshot.error}'));
+                        }
+
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return const Center(child: Text('No FAQs found.'));
+                        }
+
+                        return _buildFAQList(
+                          getAllFAQs: snapshot.data!.docs,
+                          selectedCategory: selectedCategory,
+                          searchQuery: searchController.text,
+                          currentPage: currentPage,
+                          itemsPerPage: itemsPerPage,
+                          onPageChanged: onPageChanged,
+                          onItemsPerPageChanged: onItemsPerPageChanged,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -292,6 +295,7 @@ Widget mainContent(
     ),
   );
 }
+
 
 Widget _buildHeader(
   String selectedCategory,

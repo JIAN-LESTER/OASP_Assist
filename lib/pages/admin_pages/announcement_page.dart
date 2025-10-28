@@ -1,6 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:capstone_project/services/fb_sync.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:capstone_project/colors.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
@@ -57,258 +62,542 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
   }
 
-// Replace your _refreshFromFacebook method with this EXACT code:
+
+Future<String?> _getAuthToken() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      return await user.getIdToken();
+    }
+  } catch (e) {
+    print('Error getting auth token: $e');
+  }
+  return null;
+}
 
 Future<void> _refreshFromFacebook() async {
-  setState(() {
-    isRefreshing = true;
-  });
+  if (isRefreshing) {
+    print('⚠️ Sync already in progress');
+    return;
+  }
+
+  setState(() => isRefreshing = true);
 
   try {
     print('🔄 Starting Facebook sync...');
     
-    // Call Cloud Function
-    final HttpsCallable callable = FirebaseFunctions.instance
-        .httpsCallable('manualSyncFacebookPosts');
+    final result = await FacebookSyncService.syncPosts();
     
-    print('📞 Calling manualSyncFacebookPosts...');
+    print('📦 Sync result: $result');
     
-    // Call with empty map
-    final result = await callable.call(<String, dynamic>{});
-    
-    print('📦 Received response: ${result.data}');
-    
-    // CRITICAL FIX: Check if result.data is null first
-    if (result.data == null) {
-      throw Exception('No response data from server');
-    }
-    
-    // Check success field
-    final success = result.data['success'] == true;
-    
-    if (success) {
-      // Success path
+    if (result['success'] == true) {
+      // Wait for Firestore to update
+      await Future.delayed(Duration(milliseconds: 500));
       await loadAnnouncements();
       
-      final count = result.data['count'] ?? 0;
-      final failed = result.data['failed'] ?? 0;
+      final count = result['count'] ?? 0;
+      final failed = result['failed'] ?? 0;
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Text('Synced $count posts' + (failed > 0 ? ' ($failed failed)' : '')),
-              ],
-            ),
-            backgroundColor: Colors.green[600],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
+        _showSuccessSnackBar(
+          'Synced $count posts' + (failed > 0 ? ' ($failed failed)' : '')
         );
       }
     } else {
-      // Function returned success: false
-      final errorMsg = result.data['error'] ?? 
-                       result.data['message'] ?? 
-                       'Unknown error occurred';
-      final errorType = result.data['errorType'] ?? 'Unknown';
-      
-      // Log detailed error info
-      print('═══════════════════════════════════');
-      print('Function Error Details:');
-      print('Success: false');
-      print('Error Type: $errorType');
-      print('Error Message: $errorMsg');
-      print('Full Response: ${result.data}');
-      print('═══════════════════════════════════');
-      
-      throw Exception('Sync failed: $errorMsg');
+      final errorMsg = result['error'] ?? result['message'] ?? 'Sync failed';
+      throw Exception(errorMsg);
     }
-  } on FirebaseFunctionsException catch (e) {
-    // Firebase-specific errors (network, timeout, etc.)
-    print('═══════════════════════════════════');
-    print('Firebase Functions Error Details:');
-    print('Code: ${e.code}');
-    print('Message: ${e.message}');
-    print('Details: ${e.details}');
-    print('Stack: ${e.stackTrace}');
-    print('═══════════════════════════════════');
     
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.error, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Connection Error',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Code: ${e.code}\n${e.message ?? "Failed to connect to server"}',
-                style: const TextStyle(fontSize: 12),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-      );
-    }
   } catch (e) {
-    // General errors (from our throw statements)
-    print('═══════════════════════════════════');
-    print('General Error:');
-    print(e.toString());
-    print('═══════════════════════════════════');
+    print('❌ Sync error: $e');
     
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  e.toString().replaceFirst('Exception: ', ''),
-                  style: const TextStyle(fontSize: 13),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-      );
+      final errorMessage = FacebookSyncService.parseErrorMessage(e);
+      _showErrorSnackBar(errorMessage);
     }
   } finally {
     if (mounted) {
-      setState(() {
-        isRefreshing = false;
-      });
+      setState(() => isRefreshing = false);
     }
   }
 }
 
-Future<void> _exchangeAndStoreFacebookToken() async {
-  // PASTE YOUR SHORT-LIVED TOKEN HERE
-  const String shortLivedToken = 'PASTE_YOUR_TOKEN_FROM_GRAPH_API_EXPLORER_HERE';
-  
-  // Show loading dialog
+Future<void> _showTokenInputModal() async {
+  final TextEditingController tokenController = TextEditingController();
+  bool isExchanging = false;
+
   showDialog(
     context: context,
     barrierDismissible: false,
-    builder: (context) => Center(
-      child: Container(
-        padding: EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Exchanging Facebook token...'),
-          ],
-        ),
-      ),
-    ),
-  );
-  
-  try {
-    print('🔄 Exchanging short-lived token for long-lived token...');
-    
-    // TODO: Replace with your actual Cloud Function URL
-    // Format: https://REGION-PROJECT_ID.cloudfunctions.net/exchangeToken
-    // Example: https://us-central1-myproject-12345.cloudfunctions.net/exchangeToken
-    final response = await http.post(
-      Uri.parse('https://YOUR_REGION-YOUR_PROJECT_ID.cloudfunctions.net/exchangeToken'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'uid': 'facebook_admin',
-        'short_token': shortLivedToken,
-      }),
-    );
-    
-    // Close loading dialog
-    Navigator.pop(context);
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      print('✅ Token exchanged successfully!');
-      print('📅 Expires at: ${DateTime.fromMillisecondsSinceEpoch(data['expires_at'])}');
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.facebook, color: Colors.blue[700], size: 28),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Configure Facebook Token',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Container(
+            width: 500,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Facebook token configured! Valid for ~${(data['expires_in'] / 86400).round()} days',
+                // Instructions
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info, color: Colors.blue[700], size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'How to get token:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue[900],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        '1. Visit: developers.facebook.com/tools/explorer/\n'
+                        '2. Select your app\n'
+                        '3. Grant permissions: pages_read_engagement, pages_manage_posts\n'
+                        '4. Click "Generate Access Token"\n'
+                        '5. Copy and paste the token below',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue[800],
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                SizedBox(height: 16),
+                
+                // Token Input
+                Text(
+                  'Facebook Access Token',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                SizedBox(height: 8),
+                TextField(
+                  controller: tokenController,
+                  maxLines: 4,
+                  enabled: !isExchanging,
+                  decoration: InputDecoration(
+                    hintText: 'Paste your token here...',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    contentPadding: EdgeInsets.all(12),
+                  ),
+                ),
+                
+                SizedBox(height: 12),
+                
+                // Paste Button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: isExchanging ? null : () async {
+                      final data = await Clipboard.getData('text/plain');
+                      if (data?.text != null) {
+                        tokenController.text = data!.text!;
+                        _showSuccessSnackBar('✅ Token pasted from clipboard');
+                      }
+                    },
+                    icon: Icon(Icons.content_paste),
+                    label: Text('Paste from Clipboard'),
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                    ),
                   ),
                 ),
               ],
             ),
-            backgroundColor: Colors.green[600],
-            duration: Duration(seconds: 5),
           ),
+          actions: [
+            TextButton(
+              onPressed: isExchanging ? null : () => Navigator.pop(context),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              onPressed: isExchanging ? null : () async {
+                final token = tokenController.text.trim();
+                
+                if (token.isEmpty) {
+                  _showErrorSnackBar('Please enter a token');
+                  return;
+                }
+                
+                if (token.length < 50) {
+                  _showErrorSnackBar('Token seems too short');
+                  return;
+                }
+                
+                setDialogState(() => isExchanging = true);
+                
+                try {
+                  print('🔄 Exchanging token...');
+                  
+                  final result = await FacebookSyncService.exchangeToken(token);
+                  
+                  print('📦 Exchange result: $result');
+                  
+                  if (result['success'] == true || result['ok'] == true) {
+                    final expiresIn = result['expires_in'] ?? 0;
+                    final daysValid = (expiresIn / 86400).round();
+                    
+                    Navigator.pop(context);
+                    
+                    _showSuccessSnackBar(
+                      'Token saved! Valid for ~$daysValid days'
+                    );
+                    
+                    return;
+                  }
+                  
+                  throw Exception(result['message'] ?? result['error'] ?? 'Failed to exchange token');
+                  
+                } catch (e) {
+                  print('❌ Error: $e');
+                  
+                  setDialogState(() => isExchanging = false);
+                  
+                  final errorMessage = FacebookSyncService.parseErrorMessage(e);
+                  _showErrorSnackBar('Failed to save token: $errorMessage');
+                }
+              },
+              icon: isExchanging
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                  : Icon(Icons.save),
+              label: Text(isExchanging ? 'Saving...' : 'Save Token'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue[700],
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+            ),
+          ],
         );
-      }
-    } else {
-      throw Exception('Server returned ${response.statusCode}: ${response.body}');
-    }
-  } catch (e) {
-    // Close loading dialog if still open
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
-    
-    print('❌ Error exchanging token: $e');
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
+      },
+    ),
+  );
+}
+
+Future<void> _testFacebookConnection() async {
+  try {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          padding: EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error, color: Colors.white),
-              SizedBox(width: 8),
-              Expanded(child: Text('Failed to exchange token: $e')),
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Testing connection...'),
             ],
           ),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 5),
         ),
-      );
-    }
+      ),
+    );
+    
+    final result = await FacebookSyncService.testConnection();
+    
+    Navigator.pop(context); // Close loading dialog
+    
+    // Show detailed result dialog
+    _showConnectionTestResultDialog(result);
+    
+  } catch (e) {
+    Navigator.pop(context); // Close loading dialog
+    
+    final errorMessage = FacebookSyncService.parseErrorMessage(e);
+    _showErrorSnackBar('Test failed: $errorMessage');
   }
 }
+
+void _showConnectionTestResultDialog(Map<String, dynamic> result) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Row(
+        children: [
+          Icon(
+            result['success'] == true ? Icons.check_circle : Icons.error,
+            color: result['success'] == true ? Colors.green : Colors.red,
+          ),
+          SizedBox(width: 8),
+          Text('Connection Test'),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildTestResultItem('Status', result['success'] == true ? 'Success' : 'Failed'),
+            
+            if (result['message'] != null)
+              _buildTestResultItem('Message', result['message']),
+            
+            if (result['error'] != null)
+              _buildTestResultItem('Error', result['error'], isError: true),
+            
+            if (result['errorCode'] != null)
+              _buildTestResultItem('Error Code', result['errorCode'].toString()),
+            
+            if (result['tokenInfo'] != null) ...[
+              SizedBox(height: 16),
+              Text('Token Info:', style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              _buildTestResultItem('Has Token', result['tokenInfo']['hasToken'].toString()),
+              if (result['tokenInfo']['daysLeft'] != null)
+                _buildTestResultItem('Days Left', result['tokenInfo']['daysLeft'].toString()),
+              if (result['tokenInfo']['pagesCount'] != null)
+                _buildTestResultItem('Pages Count', result['tokenInfo']['pagesCount'].toString()),
+            ],
+            
+            if (result['pageInfo'] != null) ...[
+              SizedBox(height: 16),
+              Text('Page Info:', style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              _buildTestResultItem('Page ID', result['pageInfo']['id']),
+              _buildTestResultItem('Page Name', result['pageInfo']['name']),
+              if (result['pageInfo']['about'] != null)
+                _buildTestResultItem('About', result['pageInfo']['about']),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Close'),
+        ),
+        if (result['success'] != true)
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showTokenInputModal();
+            },
+            child: Text('Configure Token'),
+          ),
+      ],
+    ),
+  );
+}
+
+Widget _buildTestResultItem(String label, String value, {bool isError = false}) {
+  return Padding(
+    padding: EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(
+            '$label:',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: isError ? Colors.red : Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Helper methods for snackbars
+void _showSuccessSnackBar(String message) {
+  if (!mounted) return;
+  
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          Icon(Icons.check_circle, color: Colors.white, size: 20),
+          SizedBox(width: 8),
+          Expanded(child: Text(message)),
+        ],
+      ),
+      backgroundColor: Colors.green[600],
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    ),
+  );
+}
+
+void _showErrorSnackBar(String message) {
+  if (!mounted) return;
+  
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          Icon(Icons.error, color: Colors.white, size: 20),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: Colors.red,
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    ),
+  );
+}
+// Exchange token via HTTP (for Windows)
+Future<Map<String, dynamic>> _exchangeTokenViaHttp(String shortToken) async {
+  print('📡 Exchanging token via HTTP (Windows)...');
+  
+  final authToken = await _getAuthToken();
+  if (authToken == null) {
+    throw Exception('Not authenticated. Please log in first.');
+  }
+  
+  const functionUrl = 'https://exchangetokenhttp-kt3rxdstza-uc.a.run.app';
+  
+  final response = await http.post(
+    Uri.parse(functionUrl),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $authToken',
+    },
+    body: json.encode({
+      'data': {
+        'uid': 'facebook_admin',
+        'short_token': shortToken,
+      }
+    }),
+  ).timeout(Duration(seconds: 30));
+  
+  print('📦 HTTP Response: ${response.statusCode}');
+  print('📦 HTTP Body: ${response.body}');
+  
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    return data['result'] ?? data;
+  } else {
+    throw Exception('Server error: ${response.statusCode} - ${response.body}');
+  }
+}
+
+
+
+// Sync via Cloud Functions SDK (Web/Mobile)
+Future<Map<String, dynamic>> _syncViaCloudFunctions() async {
+  print('📞 Using Cloud Functions SDK...');
+  
+  final HttpsCallable callable = FirebaseFunctions.instance
+      .httpsCallable('manualSyncFacebookPosts');
+  
+  final result = await callable.call(<String, dynamic>{})
+      .timeout(Duration(seconds: 60));
+  
+  print('📦 Received response: ${result.data}');
+  
+  if (result.data == null) {
+    throw Exception('No response data from server');
+  }
+  
+  return result.data as Map<String, dynamic>;
+}
+
+// Sync via HTTP (Windows)
+Future<Map<String, dynamic>> _syncViaHttp() async {
+  print('📡 Using HTTP (Windows)...');
+  
+  final authToken = await _getAuthToken();
+  if (authToken == null) {
+    throw Exception('Not authenticated. Please log in first.');
+  }
+  
+  const functionUrl = 'https://manualsyncfacebookposts-kt3rxdstza-uc.a.run.app';
+  
+  final response = await http.post(
+    Uri.parse(functionUrl),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $authToken',
+    },
+    body: json.encode({
+      'data': {}
+    }),
+  ).timeout(Duration(seconds: 60));
+  
+  print('📦 HTTP Response: ${response.statusCode}');
+  print('📦 HTTP Body: ${response.body}');
+  
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    return data['result'] ?? data;
+  } else {
+    throw Exception('Server error: ${response.statusCode} - ${response.body}');
+  }
+}
+
 
 Future<void> testCloudFunctions() async {
   print('🧪 Testing Cloud Functions...');
@@ -539,44 +828,132 @@ Future<void> testCloudFunctions() async {
     );
   }
 
-  Widget _buildRefreshButton({required bool isDesktop}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isRefreshing ? Colors.grey[100] : Colors.green[50],
+ static Future<Map<String, dynamic>> testConnection() async {
+  print('🧪 Testing Facebook connection...');
+  
+  try {
+    final callable = FirebaseFunctions.instance
+        .httpsCallable('testFacebookConnection');
+    
+    final result = await callable.call(<String, dynamic>{})
+        .timeout(Duration(seconds: 30));
+    
+    print('📦 Test result: ${json.encode(result.data)}');
+    return result.data as Map<String, dynamic>;
+  } catch (e) {
+    print('❌ Test failed: $e');
+    rethrow;
+  }
+}
+
+// Add this button next to your sync button in the UI
+
+Widget _buildTestButton({required bool isDesktop}) {
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.purple[50],
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Colors.purple[200]!),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isRefreshing ? Colors.grey[300]! : Colors.green[200]!,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: isRefreshing ? null : _refreshFromFacebook,
+        onTap: _testFacebookConnection,
+        child: Tooltip(
+          message: 'Test Facebook Connection',
           child: Padding(
             padding: EdgeInsets.all(isDesktop ? 12 : 10),
-            child:
-                isRefreshing
-                    ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.grey[600]!,
-                        ),
-                      ),
-                    )
-                    : Icon(
-                      Icons.sync_rounded,
-                      color: Colors.green[700],
-                      size: isDesktop ? 24 : 20,
-                    ),
+            child: Icon(
+              Icons.bug_report,
+              color: Colors.purple[700],
+              size: isDesktop ? 24 : 20,
+            ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
+
+// Update your refresh button row to include the test button:
+
+Widget _buildRefreshButton({required bool isDesktop}) {
+  return Row(
+    children: [
+      // Test button
+      _buildTestButton(isDesktop: isDesktop),
+      SizedBox(width: 8),
+      // Facebook Token Config Button
+      Container(
+        decoration: BoxDecoration(
+          color: Colors.blue[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue[200]!),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: _showTokenInputModal,
+            child: Tooltip(
+              message: 'Configure Facebook Token',
+              child: Padding(
+                padding: EdgeInsets.all(isDesktop ? 12 : 10),
+                child: Icon(
+                  Icons.vpn_key,
+                  color: Colors.blue[700],
+                  size: isDesktop ? 24 : 20,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      SizedBox(width: 8),
+      // Sync Button
+      Container(
+        decoration: BoxDecoration(
+          color: isRefreshing ? Colors.grey[100] : Colors.green[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isRefreshing ? Colors.grey[300]! : Colors.green[200]!,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: isRefreshing ? null : _refreshFromFacebook,
+            child: Tooltip(
+              message: 'Sync Facebook Posts',
+              child: Padding(
+                padding: EdgeInsets.all(isDesktop ? 12 : 10),
+                child: isRefreshing
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.grey[600]!,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        Icons.sync_rounded,
+                        color: Colors.green[700],
+                        size: isDesktop ? 24 : 20,
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
 
   // SEARCH FIELD
   Widget _buildSearchField() {
