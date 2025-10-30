@@ -19,7 +19,7 @@ class _NotificationModalState extends State<NotificationModal> {
     
     try {
       await _firestore.collection('notifications').doc(notificationId).update({
-        'readBy': FieldValue.arrayUnion([currentUserId])
+        'read': true,
       });
     } catch (e) {
       if (mounted) {
@@ -56,11 +56,10 @@ class _NotificationModalState extends State<NotificationModal> {
       try {
         Query notificationsQuery = _firestore
             .collection('notifications')
-            .where('targetRole', isEqualTo: widget.role);
+            .where('userId', isEqualTo: currentUserId);
 
         final snapshot = await notificationsQuery.get();
         
-        // Delete all notifications for this role
         final batch = _firestore.batch();
         for (final doc in snapshot.docs) {
           batch.delete(doc.reference);
@@ -86,9 +85,7 @@ class _NotificationModalState extends State<NotificationModal> {
   }
 
   bool _isRead(Map<String, dynamic> data) {
-    if (currentUserId == null) return false;
-    final readBy = data['readBy'] as List<dynamic>?;
-    return readBy?.contains(currentUserId) ?? false;
+    return data['read'] == true;
   }
 
   String _formatTime(Timestamp? timestamp) {
@@ -113,6 +110,12 @@ class _NotificationModalState extends State<NotificationModal> {
 
   IconData _getNotificationIcon(String? type) {
     switch (type?.toLowerCase()) {
+      case 'announcement':
+        return Icons.campaign_outlined;
+      case 'deadline_reminder':
+        return Icons.alarm_outlined;
+      case 'escalation_reply':
+        return Icons.reply_outlined;
       case 'info':
         return Icons.info_outline;
       case 'warning':
@@ -130,6 +133,12 @@ class _NotificationModalState extends State<NotificationModal> {
 
   Color _getNotificationColor(String? type) {
     switch (type?.toLowerCase()) {
+      case 'announcement':
+        return const Color(0xFF2E7D32);
+      case 'deadline_reminder':
+        return Colors.orange;
+      case 'escalation_reply':
+        return Colors.blue;
       case 'info':
         return Colors.blue;
       case 'warning':
@@ -145,29 +154,74 @@ class _NotificationModalState extends State<NotificationModal> {
     }
   }
 
+  void _handleNotificationTap(Map<String, dynamic> data) {
+    final type = data['type'] as String?;
+    
+    if (type == 'escalation_reply') {
+      final escalationId = data['escalationId'] as String?;
+      if (escalationId != null) {
+        // Navigate to escalation details or show dialog
+        // You can implement navigation to your escalation detail page here
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Staff Response'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Question:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(data['data']?['question'] ?? 'No question'),
+                const SizedBox(height: 16),
+                Text(
+                  'Staff Reply:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(data['data']?['staffReply'] ?? 'No reply'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    Query notificationsQuery = _firestore
-        .collection('notifications')
-        .orderBy('createdAt', descending: true);
-
-    // Strict filtering based on role
-    if (widget.role == 'user') {
-      notificationsQuery = notificationsQuery.where(
-        'targetRole',
-        isEqualTo: 'user',
-      );
-    } else if (widget.role == 'staff') {
-      notificationsQuery = notificationsQuery.where(
-        'targetRole',
-        isEqualTo: 'staff',
-      );
-    } else if (widget.role == 'admin') {
-      notificationsQuery = notificationsQuery.where(
-        'targetRole',
-        isEqualTo: 'admin',
+    if (currentUserId == null) {
+      return Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: const Center(
+          child: Text('Please log in to view notifications'),
+        ),
       );
     }
+
+    Query notificationsQuery = _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: currentUserId)
+        .orderBy('createdAt', descending: true);
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.8,
@@ -319,6 +373,7 @@ class _NotificationModalState extends State<NotificationModal> {
                           if (!isRead) {
                             _markAsRead(doc.id);
                           }
+                          _handleNotificationTap(data);
                         },
                         child: Padding(
                           padding: const EdgeInsets.all(16),

@@ -2,15 +2,127 @@ import {onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firest
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 
-// Initialize if not already done
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
 const db = admin.firestore();
 
 // ============================================================================
-// SEND NOTIFICATION WHEN NEW ANNOUNCEMENT IS CREATED
+// HELPER FUNCTIONS
+// ============================================================================
+
+function parseDeadline(deadlineStr: string): Date | null {
+  if (!deadlineStr) return null;
+
+  try {
+    const monthDayYear = deadlineStr.match(/(\w+)\s+(\d{1,2}),?\s+(\d{4})/);
+    if (monthDayYear) {
+      const dateString = `${monthDayYear[1]} ${monthDayYear[2]}, ${monthDayYear[3]}`;
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+
+    const slashFormat = deadlineStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (slashFormat) {
+      const date = new Date(`${slashFormat[3]}-${slashFormat[1]}-${slashFormat[2]}`);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+
+    const date = new Date(deadlineStr);
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Error parsing deadline: ${deadlineStr}`, error);
+    return null;
+  }
+}
+
+async function sendFCMNotifications(
+  userIds: string[],
+  title: string,
+  body: string,
+  data: {[key: string]: string}
+): Promise<void> {
+  try {
+    const tokensSnapshot = await db
+      .collection("fcm_tokens")
+      .where("userId", "in", userIds.slice(0, 10))
+      .get();
+
+    if (tokensSnapshot.empty) {
+      console.log("ℹ️ No FCM tokens found for users");
+      return;
+    }
+
+    const tokens: string[] = [];
+    tokensSnapshot.forEach(doc => {
+      const tokenData = doc.data();
+      if (tokenData.token) {
+        tokens.push(tokenData.token);
+      }
+    });
+
+    if (tokens.length === 0) {
+      console.log("ℹ️ No valid FCM tokens to send to");
+      return;
+    }
+
+    console.log(`📱 Sending FCM notifications to ${tokens.length} devices`);
+
+    const message = {
+      notification: {
+        title: title,
+        body: body,
+      },
+      data: data,
+      tokens: tokens,
+    };
+
+    const response = await admin.messaging().sendEachForMulticast(message);
+
+    console.log(`✅ FCM notifications sent: ${response.successCount} successful, ${response.failureCount} failed`);
+
+    if (response.failureCount > 0) {
+      const tokensToDelete: string[] = [];
+
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success) {
+          const error = resp.error;
+          if (
+            error?.code === "messaging/invalid-registration-token" ||
+            error?.code === "messaging/registration-token-not-registered"
+          ) {
+            tokensToDelete.push(tokens[idx]);
+          }
+        }
+      });
+
+      if (tokensToDelete.length > 0) {
+        console.log(`🗑️ Deleting ${tokensToDelete.length} invalid tokens`);
+        const batch = db.batch();
+        const invalidTokensSnapshot = await db
+          .collection("fcm_tokens")
+          .where("token", "in", tokensToDelete.slice(0, 10))
+          .get();
+
+        invalidTokensSnapshot.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+
+        await batch.commit();
+      }
+    }
+  } catch (error) {
+    console.error("Error sending FCM notifications:", error);
+  }
+}
+
+// ============================================================================
+// EXPORTED FUNCTIONS
 // ============================================================================
 
 export const onAnnouncementCreated = onDocumentCreated(
@@ -28,7 +140,6 @@ export const onAnnouncementCreated = onDocumentCreated(
         return;
       }
 
-      // Skip if announcement is marked as deleted
       if (announcementData.deleted === true) {
         console.log("Announcement is deleted, skipping notification");
         return;
@@ -40,19 +151,16 @@ export const onAnnouncementCreated = onDocumentCreated(
       const category = announcementData.category || "General";
       const deadline = announcementData.deadline || null;
 
-      // Create notification title and body
       const notificationTitle = `New ${category} Announcement`;
       let notificationBody = message.substring(0, 100);
       if (message.length > 100) {
         notificationBody += "...";
       }
 
-      // Add deadline info if available
       if (deadline) {
         notificationBody += ` | Deadline: ${deadline}`;
       }
 
-      // Get all users to send notification to
       const usersSnapshot = await db
         .collection("users")
         .where("isActive", "==", true)
@@ -60,7 +168,6 @@ export const onAnnouncementCreated = onDocumentCreated(
 
       console.log(`📤 Sending notification to ${usersSnapshot.size} users`);
 
-      // Create notification documents for each user
       const batch = db.batch();
       let notificationCount = 0;
 
@@ -88,20 +195,17 @@ export const onAnnouncementCreated = onDocumentCreated(
 
         notificationCount++;
 
-        // Commit in batches of 500 (Firestore limit)
         if (notificationCount % 500 === 0) {
           await batch.commit();
         }
       }
 
-      // Commit remaining notifications
       if (notificationCount % 500 !== 0) {
         await batch.commit();
       }
 
       console.log(`✅ Created ${notificationCount} notification documents`);
 
-      // Send FCM notifications to devices
       await sendFCMNotifications(
         usersSnapshot.docs.map(doc => doc.id),
         notificationTitle,
@@ -121,13 +225,9 @@ export const onAnnouncementCreated = onDocumentCreated(
   }
 );
 
-// ============================================================================
-// CHECK FOR UPCOMING DEADLINES (Runs daily at 9 AM Manila time)
-// ============================================================================
-
 export const checkUpcomingDeadlines = onSchedule(
   {
-    schedule: "0 9 * * *", // Every day at 9:00 AM
+    schedule: "0 9 * * *",
     timeZone: "Asia/Manila",
     region: "us-central1",
   },
@@ -135,12 +235,10 @@ export const checkUpcomingDeadlines = onSchedule(
     try {
       console.log("🔍 Checking for upcoming deadlines...");
 
-      // Get current date
       const now = new Date();
       const threeDaysFromNow = new Date();
       threeDaysFromNow.setDate(now.getDate() + 3);
 
-      // Get all active announcements with deadlines
       const announcementsSnapshot = await db
         .collection("announcements")
         .where("deleted", "==", false)
@@ -158,7 +256,6 @@ export const checkUpcomingDeadlines = onSchedule(
         const message = data.message || "";
         const category = data.category || "General";
 
-        // Parse deadline
         const deadlineDate = parseDeadline(deadline);
 
         if (!deadlineDate) {
@@ -166,18 +263,15 @@ export const checkUpcomingDeadlines = onSchedule(
           continue;
         }
 
-        // Check if deadline is exactly 3 days away (within a 24-hour window)
         const daysUntilDeadline = Math.ceil(
           (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
         );
 
         console.log(`📅 Announcement ${announcementId}: ${daysUntilDeadline} days until deadline`);
 
-        // Send notification if deadline is in 3 days
         if (daysUntilDeadline === 3) {
           console.log(`⏰ Deadline approaching for announcement: ${announcementId}`);
 
-          // Check if we already sent a notification for this deadline
           const existingNotification = await db
             .collection("notifications")
             .where("announcementId", "==", announcementId)
@@ -189,11 +283,9 @@ export const checkUpcomingDeadlines = onSchedule(
             continue;
           }
 
-          // Create notification
           const notificationTitle = `⏰ Deadline Reminder: ${category}`;
           let notificationBody = `${message.substring(0, 80)}... | Deadline in 3 days: ${deadline}`;
 
-          // Get all users
           const usersSnapshot = await db
             .collection("users")
             .where("isActive", "==", true)
@@ -201,7 +293,6 @@ export const checkUpcomingDeadlines = onSchedule(
 
           console.log(`📤 Sending deadline reminder to ${usersSnapshot.size} users`);
 
-          // Create notification documents
           const batch = db.batch();
           let batchCount = 0;
 
@@ -239,7 +330,6 @@ export const checkUpcomingDeadlines = onSchedule(
             await batch.commit();
           }
 
-          // Send FCM notifications
           await sendFCMNotifications(
             usersSnapshot.docs.map(doc => doc.id),
             notificationTitle,
@@ -266,146 +356,9 @@ export const checkUpcomingDeadlines = onSchedule(
   }
 );
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * Parse deadline string into Date object
- */
-function parseDeadline(deadlineStr: string): Date | null {
-  if (!deadlineStr) return null;
-
-  try {
-    // Try to parse common date formats
-    // Format: "December 15, 2024" or "Dec 15, 2024"
-    const monthDayYear = deadlineStr.match(/(\w+)\s+(\d{1,2}),?\s+(\d{4})/);
-    if (monthDayYear) {
-      const dateString = `${monthDayYear[1]} ${monthDayYear[2]}, ${monthDayYear[3]}`;
-      const date = new Date(dateString);
-      if (!isNaN(date.getTime())) {
-        return date;
-      }
-    }
-
-    // Format: "15/12/2024" or "12/15/2024"
-    const slashFormat = deadlineStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (slashFormat) {
-      // Assume MM/DD/YYYY format (US standard)
-      const date = new Date(`${slashFormat[3]}-${slashFormat[1]}-${slashFormat[2]}`);
-      if (!isNaN(date.getTime())) {
-        return date;
-      }
-    }
-
-    // Try direct Date parsing as last resort
-    const date = new Date(deadlineStr);
-    if (!isNaN(date.getTime())) {
-      return date;
-    }
-
-    return null;
-  } catch (error) {
-    console.error(`Error parsing deadline: ${deadlineStr}`, error);
-    return null;
-  }
-}
-
-/**
- * Send FCM push notifications to user devices
- */
-async function sendFCMNotifications(
-  userIds: string[],
-  title: string,
-  body: string,
-  data: {[key: string]: string}
-): Promise<void> {
-  try {
-    // Get FCM tokens for all users
-    const tokensSnapshot = await db
-      .collection("fcm_tokens")
-      .where("userId", "in", userIds.slice(0, 10)) // Firestore 'in' limit is 10
-      .get();
-
-    if (tokensSnapshot.empty) {
-      console.log("ℹ️ No FCM tokens found for users");
-      return;
-    }
-
-    const tokens: string[] = [];
-    tokensSnapshot.forEach(doc => {
-      const tokenData = doc.data();
-      if (tokenData.token) {
-        tokens.push(tokenData.token);
-      }
-    });
-
-    if (tokens.length === 0) {
-      console.log("ℹ️ No valid FCM tokens to send to");
-      return;
-    }
-
-    console.log(`📱 Sending FCM notifications to ${tokens.length} devices`);
-
-    // Send multicast message
-    const message = {
-      notification: {
-        title: title,
-        body: body,
-      },
-      data: data,
-      tokens: tokens,
-    };
-
-    const response = await admin.messaging().sendEachForMulticast(message);
-
-    console.log(`✅ FCM notifications sent: ${response.successCount} successful, ${response.failureCount} failed`);
-
-    // Clean up invalid tokens
-    if (response.failureCount > 0) {
-      const tokensToDelete: string[] = [];
-
-      response.responses.forEach((resp, idx) => {
-        if (!resp.success) {
-          const error = resp.error;
-          // Check if the error is due to invalid token
-          if (
-            error?.code === "messaging/invalid-registration-token" ||
-            error?.code === "messaging/registration-token-not-registered"
-          ) {
-            tokensToDelete.push(tokens[idx]);
-          }
-        }
-      });
-
-      // Delete invalid tokens
-      if (tokensToDelete.length > 0) {
-        console.log(`🗑️ Deleting ${tokensToDelete.length} invalid tokens`);
-        const batch = db.batch();
-        const invalidTokensSnapshot = await db
-          .collection("fcm_tokens")
-          .where("token", "in", tokensToDelete.slice(0, 10))
-          .get();
-
-        invalidTokensSnapshot.forEach(doc => {
-          batch.delete(doc.ref);
-        });
-
-        await batch.commit();
-      }
-    }
-  } catch (error) {
-    console.error("Error sending FCM notifications:", error);
-  }
-}
-
-// ============================================================================
-// OPTIONAL: CLEAN UP OLD NOTIFICATIONS (Runs daily)
-// ============================================================================
-
 export const cleanupOldNotifications = onSchedule(
   {
-    schedule: "0 2 * * *", // Every day at 2:00 AM
+    schedule: "0 2 * * *",
     timeZone: "Asia/Manila",
     region: "us-central1",
   },
@@ -413,19 +366,18 @@ export const cleanupOldNotifications = onSchedule(
     try {
       console.log("🧹 Cleaning up old notifications...");
 
-      // Delete notifications older than 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
       const oldNotificationsSnapshot = await db
         .collection("notifications")
         .where("createdAt", "<", thirtyDaysAgo)
-        .limit(500) // Process in batches
+        .limit(500)
         .get();
 
       if (oldNotificationsSnapshot.empty) {
         console.log("ℹ️ No old notifications to delete");
-        return {success: true, deleted: 0};
+        return;
       }
 
       const batch = db.batch();
@@ -438,6 +390,89 @@ export const cleanupOldNotifications = onSchedule(
       console.log(`✅ Deleted ${oldNotificationsSnapshot.size} old notifications`);
     } catch (error) {
       console.error("Error cleaning up notifications:", error);
+    }
+  }
+);
+
+export const onEscalationReplied = onDocumentUpdated(
+  {
+    document: "escalations/{escalationId}",
+    region: "us-central1",
+  },
+  async (event) => {
+    try {
+      const beforeData = event.data?.before.data();
+      const afterData = event.data?.after.data();
+      const escalationId = event.params.escalationId;
+
+      if (!beforeData || !afterData) {
+        console.log("No escalation data found");
+        return;
+      }
+
+      // Check if staff has replied (status changed to 'resolved' or staffReply field was added)
+      const hasNewReply = 
+        (afterData.staffReply && !beforeData.staffReply) ||
+        (afterData.status === 'resolved' && beforeData.status !== 'resolved' && afterData.staffReply);
+
+      if (!hasNewReply) {
+        console.log("No new staff reply detected");
+        return;
+      }
+
+      console.log(`💬 Staff replied to escalation: ${escalationId}`);
+
+      const userId = afterData.userId;
+      const question = afterData.question || "Your question";
+      const staffReply = afterData.staffReply || "Staff has responded to your escalation";
+
+      if (!userId) {
+        console.log("No userId found in escalation");
+        return;
+      }
+
+      // Create notification title and body
+      const notificationTitle = "Staff Response to Your Escalation";
+      let notificationBody = `Re: ${question.substring(0, 60)}`;
+      if (question.length > 60) {
+        notificationBody += "...";
+      }
+
+      // Create notification document for the user
+      const notificationRef = db.collection("notifications").doc();
+      await notificationRef.set({
+        userId: userId,
+        title: notificationTitle,
+        body: notificationBody,
+        type: "escalation_reply",
+        escalationId: escalationId,
+        data: {
+          escalationId: escalationId,
+          question: question,
+          staffReply: staffReply,
+        },
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log(`✅ Created notification for user: ${userId}`);
+
+      // Send FCM notification
+      await sendFCMNotifications(
+        [userId],
+        notificationTitle,
+        notificationBody,
+        {
+          type: "escalation_reply",
+          escalationId: escalationId,
+        }
+      );
+
+      return {success: true, userId: userId};
+    } catch (error) {
+      console.error("Error creating escalation reply notification:", error);
+      return {success: false, error: error};
     }
   }
 );

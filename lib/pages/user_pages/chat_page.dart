@@ -50,6 +50,7 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+   final Map<String, String?> _localRatings = {};
 
   String? actualConversationId;
   bool isLoading = true;
@@ -613,224 +614,277 @@ Widget _buildLoadingIndicator() {
     );
   }
 
-  Widget _buildLikeDislikeButtons(Message message) {
-    return FutureBuilder<Map<String, dynamic>?>(
-      future: Provider.of<ChatProvider>(
-        context,
-        listen: false,
-      ).getMessageRating(message.id),
-      builder: (context, snapshot) {
-        final ratingData = snapshot.data;
-        final currentRating = ratingData?['rating'];
+Widget _buildLikeDislikeButtons(Message message) {
+  // ALWAYS check local state first for instant feedback
+  final localRating = _localRatings[message.id];
+  
+  // If we have local rating, use it immediately
+  if (localRating != null) {
+    return _buildRatingButtonsUI(message.id, localRating, message);
+  }
+  
+  // Check provider's cache for initial load
+  final cachedRating = Provider.of<ChatProvider>(context, listen: false)
+      .getCachedRating(message.id);
+  
+  if (cachedRating != null) {
+    // Store in local cache for future instant access
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_localRatings.containsKey(message.id)) {
+        setState(() {
+          _localRatings[message.id] = cachedRating;
+        });
+      }
+    });
+    return _buildRatingButtonsUI(message.id, cachedRating, message);
+  }
+  
+  // Check message object directly
+  if (message.rating != null && message.rating!.isNotEmpty) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_localRatings.containsKey(message.id)) {
+        setState(() {
+          _localRatings[message.id] = message.rating;
+        });
+      }
+    });
+    return _buildRatingButtonsUI(message.id, message.rating, message);
+  }
+  
+  // Default: no rating yet
+  return _buildRatingButtonsUI(message.id, null, message);
+}
 
-        return Container(
-          margin: EdgeInsets.only(top: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              InkWell(
-                onTap: () => _handleLikeDislike(message.id, true),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color:
-                        currentRating == 'like'
-                            ? Color(0xFF2E7D32).withOpacity(0.1)
-                            : Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color:
-                          currentRating == 'like'
-                              ? Color(0xFF2E7D32)
-                              : Colors.grey.shade300,
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.thumb_up_outlined,
-                        size: 16,
-                        color:
-                            currentRating == 'like'
-                                ? Color(0xFF2E7D32)
-                                : Colors.grey.shade600,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        'Helpful',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color:
-                              currentRating == 'like'
-                                  ? Color(0xFF2E7D32)
-                                  : Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+// Extract the UI building logic
+Widget _buildRatingButtonsUI(String messageId, String? currentRating, Message message) {
+  return Container(
+    margin: EdgeInsets.only(top: 8),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: () => _handleLikeDislike(messageId, true),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: currentRating == 'like'
+                  ? Color(0xFF2E7D32).withOpacity(0.1)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: currentRating == 'like'
+                    ? Color(0xFF2E7D32)
+                    : Colors.grey.shade300,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.thumb_up_outlined,
+                  size: 16,
+                  color: currentRating == 'like'
+                      ? Color(0xFF2E7D32)
+                      : Colors.grey.shade600,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  'Helpful',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: currentRating == 'like'
+                        ? Color(0xFF2E7D32)
+                        : Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(width: 8),
+        InkWell(
+          onTap: () => _handleLikeDislike(messageId, false, message),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: currentRating == 'dislike'
+                  ? Colors.red.withOpacity(0.1)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: currentRating == 'dislike'
+                    ? Colors.red
+                    : Colors.grey.shade300,
+                width: 1,
               ),
-              SizedBox(width: 8),
-              InkWell(
-                onTap: () => _handleLikeDislike(message.id, false, message),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color:
-                        currentRating == 'dislike'
-                            ? Colors.red.withOpacity(0.1)
-                            : Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color:
-                          currentRating == 'dislike'
-                              ? Colors.red
-                              : Colors.grey.shade300,
-                      width: 1,
-                    ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.thumb_down_outlined,
+                  size: 16,
+                  color: currentRating == 'dislike'
+                      ? Colors.red
+                      : Colors.grey.shade600,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  'Not helpful',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: currentRating == 'dislike'
+                        ? Colors.red
+                        : Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.thumb_down_outlined,
-                        size: 16,
-                        color:
-                            currentRating == 'dislike'
-                                ? Colors.red
-                                : Colors.grey.shade600,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        'Not helpful',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color:
-                              currentRating == 'dislike'
-                                  ? Colors.red
-                                  : Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+  Future<void> _handleLikeDislike(
+  String messageId,
+  bool isLike, [
+  Message? message,
+]) async {
+  // FIX 1: Check if widget is still mounted before any async operations
+  if (!mounted) return;
+  
+  // FIX 2: Validate conversationId exists
+  if (widget.conversationId == null || widget.conversationId!.isEmpty) {
+    print('Error: No conversation ID available');
+    if (mounted) {
+      _showSnackBar('Unable to rate message', Icons.error);
+    }
+    return;
+  }
+
+  // INSTANT UI UPDATE - Update local state immediately
+  setState(() {
+    _localRatings[messageId] = isLike ? 'like' : 'dislike';
+  });
+
+  // Then update Firestore in the background
+  try {
+    await Provider.of<ChatProvider>(
+      context,
+      listen: false,
+    ).rateMessage(messageId, isLike, widget.conversationId!); // Use conversationId from state
+  } catch (e) {
+    print('Error rating message: $e');
+    // Revert local state on error
+    if (mounted) {
+      setState(() {
+        _localRatings.remove(messageId);
+      });
+      _showSnackBar('Failed to save rating', Icons.error);
+    }
+    return; // Exit early on error
+  }
+
+  // Handle dislike escalation dialog
+  if (!isLike && message != null && mounted) {
+    final bool? escalate = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.report_problem_outlined,
+                color: Colors.orange.shade600,
+                size: 24,
+              ),
+              SizedBox(width: 12),
+              Text(
+                'Escalate to Staff?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "This response wasn't helpful. Would you like to escalate this message to staff for human assistance?",
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.grey.shade700,
+                  height: 1.4,
+                ),
+              ),
+              SizedBox(height: 12),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Text(
+                  "A staff member will review your conversation and provide personalized assistance.",
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
                   ),
                 ),
               ),
             ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                'Not Now',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF2E7D32),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'Yes, Escalate',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
         );
       },
     );
-  }
 
-  Future<void> _handleLikeDislike(
-    String messageId,
-    bool isLike, [
-    Message? message,
-  ]) async {
-    await Provider.of<ChatProvider>(
-      context,
-      listen: false,
-    ).rateMessage(messageId, isLike);
-
-    if (!isLike && message != null) {
-      final bool? escalate = await showDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: [
-                Icon(
-                  Icons.report_problem_outlined,
-                  color: Colors.orange.shade600,
-                  size: 24,
-                ),
-                SizedBox(width: 12),
-                Text(
-                  'Escalate to Staff?',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade800,
-                  ),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "This response wasn't helpful. Would you like to escalate this message to staff for human assistance?",
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.grey.shade700,
-                    height: 1.4,
-                  ),
-                ),
-                SizedBox(height: 12),
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Text(
-                    "A staff member will review your conversation and provide personalized assistance.",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(
-                  'Not Now',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF2E7D32),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  'Yes, Escalate',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          );
-        },
-      );
-
-      if (escalate == true) {
-        await _processManualEscalation(message);
-      }
+    if (escalate == true && mounted) {
+      await _processManualEscalation(message);
     }
   }
+}
 
   Future<void> _processManualEscalation(Message message) async {
     try {
@@ -1108,19 +1162,33 @@ Widget _buildLoadingIndicator() {
     );
   }
 
-  void _showSnackBar(String message, IconData icon) {
+void _showSnackBar(String message, IconData icon) {
+  // FIX 3: Only show SnackBar if widget is still mounted
+  if (!mounted) return;
+  
+  try {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
             Icon(icon, color: Colors.white, size: 20),
             SizedBox(width: 12),
-            Text(message),
+            Expanded(child: Text(message)),
           ],
         ),
+        backgroundColor: Color(0xFF2E7D32),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        duration: Duration(seconds: 2),
       ),
     );
+  } catch (e) {
+    // Silently catch errors if widget is disposed
+    print('Could not show SnackBar: $e');
   }
+}
 
   void _sendMessage(ChatProvider chatProvider) async {
     final text = _controller.text.trim();

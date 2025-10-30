@@ -875,21 +875,17 @@ class FAQSectionState extends State<FAQSection>
     }
   }
 
-  // Public method to toggle speech recognition (can be called from parent)
+
   void toggleSpeechRecognition() {
     _toggleListening();
   }
 
-  // Public getter for listening state
+
   bool get isListening => _isListening;
-  /// Public getter for speech availability
+
   bool get speechAvailable => _speechAvailable;
 
-  /// Public getter for last recognized words
   String get lastWords => _lastWords;
-
-  /// Public method to toggle speech recognition (can be called from parent)
-
 }
 
 /// FAQToggleButton Widget
@@ -923,15 +919,14 @@ class FAQToggleButton extends StatelessWidget {
   }
 }
 
-/// FAQInputSection Widget with integrated microphone button
 class FAQInputSection extends StatelessWidget {
   final TextEditingController controller;
   final bool showFAQs;
   final bool isLoading;
   final VoidCallback onFAQToggle;
   final VoidCallback onSendMessage;
-  final VoidCallback? onMicrophoneTap; // Add microphone callback
-  final bool isListening; // Add listening state
+  final VoidCallback? onMicrophoneTap; 
+  final bool isListening;
 
   const FAQInputSection({
     Key? key,
