@@ -35,13 +35,9 @@ class _AdmissionInfoState extends State<AdmissionInfo>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
     _fetchAdmissionProcesses();
   }
 
@@ -58,15 +54,19 @@ class _AdmissionInfoState extends State<AdmissionInfo>
         _error = null;
       });
 
-      final querySnapshot = await _firestore
-          .collection('admissions')
-          .orderBy('createdAt', descending: true)
-          .get();
+      final querySnapshot =
+          await _firestore
+              .collection('admissions')
+              .orderBy('createdAt', descending: true)
+              .get();
 
       if (querySnapshot.docs.isNotEmpty) {
-        final List<Admissions> admissions = querySnapshot.docs
-            .map((doc) => Admissions.fromJson({...doc.data(), 'id': doc.id}))
-            .toList();
+        final List<Admissions> admissions =
+            querySnapshot.docs
+                .map(
+                  (doc) => Admissions.fromJson({...doc.data(), 'id': doc.id}),
+                )
+                .toList();
 
         // Group by academic year and get unique years
         final Map<String, Admissions> yearMap = {};
@@ -109,43 +109,31 @@ class _AdmissionInfoState extends State<AdmissionInfo>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: CustomScrollView(
-        slivers: [
-    
-          SliverToBoxAdapter(
-            child: _buildContent(),
-          ),
-        ],
-      ),
+      backgroundColor: const Color.fromARGB(255, 245, 245, 245),
+      body: _buildContent(),
     );
   }
 
-
-
   Widget _buildContent() {
     if (_isLoading) {
-      return Container(
-        height: 500,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(
-                strokeWidth: 3,
-                valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
+              strokeWidth: 3,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Loading admission information...',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
               ),
-              const SizedBox(height: 20),
-              Text(
-                'Loading admission information...',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
@@ -154,75 +142,96 @@ class _AdmissionInfoState extends State<AdmissionInfo>
       return _buildErrorState();
     }
 
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Column(
-        children: [
-          _buildAcademicYearSelector(),
-
-       _buildStepsOverview(),
-          _buildHelpSection(),
-          const SizedBox(height: 32),
-        ],
+    return RefreshIndicator(
+      onRefresh: _fetchAdmissionProcesses,
+      color: Colors.green[600],
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
+        child: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: Column(
+                children: [
+                  _buildAcademicYearSelector(),
+                  _buildStepsOverview(),
+                  _buildHelpSection(),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildErrorState() {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.red[50],
-              shape: BoxShape.circle,
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(48),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
             ),
-            child: Icon(
-              Icons.error_outline,
-              size: 60,
-              color: Colors.red[400],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Oops! Something went wrong',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: Colors.grey[800],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _error ?? 'Unable to load admission information',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: _fetchAdmissionProcesses,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Try Again'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryGreen,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 32,
-                vertical: 16,
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                shape: BoxShape.circle,
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 64,
+                color: Colors.red[400],
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            Text(
+              'Oops! Something went wrong',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _error ?? 'Unable to load admission information',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: _fetchAdmissionProcesses,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryGreen,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -231,49 +240,74 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     if (_admissionYears.length <= 1) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Card(
-        elevation: 0,
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
         color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: primaryGreen.withOpacity(0.2)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+            spreadRadius: -4,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: Colors.grey[300]!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: primaryGreen.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.calendar_today,
-                      color: primaryGreen,
-                      size: 20,
-                    ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [primaryGreen.withOpacity(0.9), primaryGreen],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'Select Academic Year',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryGreen.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                child: Icon(
+                  Icons.calendar_today_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _admissionYears.map((admission) {
-                  final isSelected = admission.academicYear == _selectedAcademicYear;
+              const SizedBox(width: 12),
+              Text(
+                'Select Academic Year',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey[900],
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children:
+                _admissionYears.map((admission) {
+                  final isSelected =
+                      admission.academicYear == _selectedAcademicYear;
                   return InkWell(
                     onTap: () {
                       setState(() {
@@ -289,11 +323,33 @@ class _AdmissionInfoState extends State<AdmissionInfo>
                         vertical: 12,
                       ),
                       decoration: BoxDecoration(
-                        color: isSelected ? primaryGreen : Colors.grey[100],
+                        gradient:
+                            isSelected
+                                ? LinearGradient(
+                                  colors: [
+                                    Colors.green[600]!,
+                                    Colors.green[700]!,
+                                  ],
+                                )
+                                : null,
+                        color: isSelected ? null : Colors.grey[100],
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isSelected ? primaryGreen : Colors.grey[300]!,
+                          color:
+                              isSelected
+                                  ? Colors.green[700]!
+                                  : Colors.grey[300]!,
                         ),
+                        boxShadow:
+                            isSelected
+                                ? [
+                                  BoxShadow(
+                                    color: Colors.green[600]!.withOpacity(0.4),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ]
+                                : null,
                       ),
                       child: Text(
                         admission.academicYear ?? 'Unknown',
@@ -306,150 +362,170 @@ class _AdmissionInfoState extends State<AdmissionInfo>
                     ),
                   );
                 }).toList(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  
- 
-
-Widget _buildStepsOverview() {
-  final steps = _selectedAdmission?.steps ?? [];
-  if (steps.isEmpty) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            children: [
-              Icon(
-                Icons.info_outline,
-                size: 48,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No admission steps available',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Please check back later or contact the admissions office.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey[500],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  return Container(
-    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    child: Column(
-      children: steps.asMap().entries.map((entry) {
-        final index = entry.key;
-        final step = entry.value;
-
-      
-
-        return _buildStepCard(
-          index + 1,
-          step,
-   
-        );
-      }).toList(),
-    ),
-  );
-}
-Widget _buildStepCard(int stepNumber, String stepTitle) {
-  Color cardColor = Colors.grey[50]!;
-  Color iconColor = Color(0xFF2E7D32);
-  Color textColor = Colors.grey[600]!;
-
-  // Remove leading numbers like "1. ", "2. ", etc.
-// Remove prefixes like "1. ", "Step 1: ", "Step 2 - ", etc.
-final cleanedTitle = stepTitle.replaceFirst(
-  RegExp(r'^(Step\s*\d+[:.\-\s]*)|(^\d+[.:-\s]*)', caseSensitive: false),
-  '',
-);
-
-
-  return Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    child: AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.grey[200]!,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          // ✅ Circle with step number
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                stepNumber.toString(),
-                style: TextStyle(
-                  color: iconColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-
-  
-          Expanded(
-            child: Linkify(
-              text: cleanedTitle,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: textColor,
-              ),
-              linkStyle: const TextStyle(
-                color: Colors.blue,
-                decoration: TextDecoration.none,
-              ),
-              onOpen: (link) async {
-                final uri = Uri.parse(link.url);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-            ),
           ),
         ],
       ),
-    ),
-  );
-}
+    );
+  }
 
+  Widget _buildStepsOverview() {
+    final steps = _selectedAdmission?.steps ?? [];
+    if (steps.isEmpty) {
+      return Center(
+        child: Container(
+          padding: const EdgeInsets.all(48),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.info_outline_rounded,
+                  size: 64,
+                  color: Colors.grey[400],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'No admission steps available',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Please check back later or contact the admissions office',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children:
+          steps.asMap().entries.map((entry) {
+            final index = entry.key;
+            final step = entry.value;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 24),
+              child: _buildStepCard(index + 1, step),
+            );
+          }).toList(),
+    );
+  }
+
+  Widget _buildStepCard(int stepNumber, String stepTitle) {
+    // Remove leading numbers like "1. ", "2. ", etc.
+    // Remove prefixes like "1. ", "Step 1: ", "Step 2 - ", etc.
+    final cleanedTitle = stepTitle.replaceFirst(
+      RegExp(r'^(Step\s*\d+[:.\-\s]*)|(^\d+[.:-\s]*)', caseSensitive: false),
+      '',
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+            spreadRadius: -4,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: Colors.grey[300]!, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Step number circle
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [primaryGreen.withOpacity(0.9), primaryGreen],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryGreen.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  stepNumber.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 18),
+            // Step content
+            Expanded(
+              child: Linkify(
+                text: cleanedTitle,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700],
+                  height: 1.5,
+                  letterSpacing: 0.1,
+                ),
+                linkStyle: const TextStyle(
+                  color: Colors.blue,
+                  decoration: TextDecoration.underline,
+                  fontWeight: FontWeight.w600,
+                ),
+                onOpen: (link) async {
+                  final uri = Uri.parse(link.url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildHelpSection() {
     final admission = _selectedAdmission;
@@ -458,144 +534,164 @@ final cleanedTitle = stepTitle.replaceFirst(
     }
 
     return Container(
-      margin: const EdgeInsets.all(16),
-      child: Card(
-        elevation: 0,
-        color: accentGreen.withOpacity(0.1),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: accentGreen.withOpacity(0.3)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      margin: const EdgeInsets.only(top: 24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+            spreadRadius: -4,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: accentGreen.withOpacity(0.3), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: primaryGreen.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.help_outline,
-                      color: primaryGreen,
-                      size: 20,
-                    ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [primaryGreen.withOpacity(0.9), primaryGreen],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'Need Help?',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryGreen.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
-                  ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.help_outline_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Need Help?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey[900],
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  accentGreen.withOpacity(0.1),
+                  accentGreen.withOpacity(0.05),
                 ],
               ),
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: accentGreen.withOpacity(0.2),
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Contact Admissions Office',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey[900],
+                    letterSpacing: -0.2,
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Contact Admissions Office',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                const SizedBox(height: 12),
+                ...admission.contact!.map((contact) {
+                  // Detect type
+                  bool isEmail = contact.toLowerCase().contains("email:");
+                  bool isPhone = contact.toLowerCase().contains("phone:");
+
+                  // Clean prefix
+                  final cleaned =
+                      contact
+                          .replaceAll(
+                            RegExp(
+                              r'^(Email|Phone)\s*:\s*',
+                              caseSensitive: false,
+                            ),
+                            '',
+                          )
+                          .trim();
+
+                  // Choose icon
+                  final icon =
+                      isEmail
+                          ? Icons.email_rounded
+                          : isPhone
+                          ? Icons.phone_rounded
+                          : Icons.contact_page_rounded;
+
+                  // Build clickable row
+                  return InkWell(
+                    onTap: () async {
+                      if (isEmail) {
+                        final uri = Uri(scheme: 'mailto', path: cleaned);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        }
+                      } else if (isPhone) {
+                        final uri = Uri(scheme: 'tel', path: cleaned);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        }
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(icon, size: 18, color: primaryGreen),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              cleaned,
+                              style: TextStyle(
+                                fontSize: 15,
+                                height: 1.5,
+                                color: Colors.blue[700],
+                                fontWeight: FontWeight.w500,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                   ...admission.contact!.map((contact) {
-  // Detect type
-  bool isEmail = contact.toLowerCase().contains("email:");
-  bool isPhone = contact.toLowerCase().contains("phone:");
-
-  // Clean prefix
-  final cleaned = contact.replaceAll(
-    RegExp(r'^(Email|Phone)\s*:\s*', caseSensitive: false),
-    '',
-  ).trim();
-
-  // Choose icon
-  final icon = isEmail
-      ? Icons.email
-      : isPhone
-          ? Icons.phone
-          : Icons.contact_page;
-
-  // Build clickable row
-  return InkWell(
-    onTap: () async {
-      if (isEmail) {
-        final uri = Uri(scheme: 'mailto', path: cleaned);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri);
-        }
-      } else if (isPhone) {
-        final uri = Uri(scheme: 'tel', path: cleaned);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri);
-        }
-      }
-    },
-    child: Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: Colors.grey[700]),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              cleaned,
-              style: const TextStyle(
-                fontSize: 15,
-                height: 1.4,
-                color: Colors.blue, // highlight clickable
-                decoration: TextDecoration.none
-               
-              ),
+                  );
+                }),
+              ],
             ),
           ),
         ],
-      ),
-    ),
-  );
-}),
-
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              // SizedBox(
-              //   width: double.infinity,
-              //   child: ElevatedButton.icon(
-              //     onPressed: () {
-              //       // Add contact functionality here
-              //     },
-              //     icon: const Icon(Icons.contact_support),
-              //     label: const Text('Get Support'),
-              //     style: ElevatedButton.styleFrom(
-              //       backgroundColor: primaryGreen,
-              //       foregroundColor: Colors.white,
-              //       padding: const EdgeInsets.symmetric(vertical: 16),
-              //       shape: RoundedRectangleBorder(
-              //         borderRadius: BorderRadius.circular(12),
-              //       ),
-              //     ),
-              //   ),
-              // ),
-            ],
-          ),
-        ),
       ),
     );
   }
