@@ -41,6 +41,7 @@ function parseDeadline(deadlineStr: string): Date | null {
   }
 }
 
+// ✅ UPDATED: Only send FCM to devices with valid tokens (mobile only)
 async function sendFCMNotifications(
   userIds: string[],
   title: string,
@@ -48,50 +49,82 @@ async function sendFCMNotifications(
   data: {[key: string]: string}
 ): Promise<void> {
   try {
+    // ✅ Query tokens where platform is 'android' or 'ios' only
     const tokensSnapshot = await db
       .collection("fcm_tokens")
       .where("userId", "in", userIds.slice(0, 10))
+      .where("platform", "in", ["android", "ios"]) // ✅ CRITICAL: Skip web tokens
       .get();
 
     if (tokensSnapshot.empty) {
-      console.log("ℹ️ No FCM tokens found for users");
+      console.log("ℹ️ No mobile FCM tokens found (web/desktop users will see in-app notifications)");
       return;
     }
 
     const tokens: string[] = [];
     tokensSnapshot.forEach(doc => {
       const tokenData = doc.data();
-      if (tokenData.token) {
+      if (tokenData.token && !tokenData.token.startsWith('web_')) { // ✅ Double-check
         tokens.push(tokenData.token);
       }
     });
 
     if (tokens.length === 0) {
-      console.log("ℹ️ No valid FCM tokens to send to");
+      console.log("ℹ️ No valid mobile FCM tokens to send to");
       return;
     }
 
-    console.log(`📱 Sending FCM notifications to ${tokens.length} devices`);
+    console.log(`📱 Sending FCM notifications to ${tokens.length} mobile devices`);
 
     const message = {
       notification: {
         title: title,
         body: body,
       },
-      data: data,
+      data: {
+        ...data,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+      },
       tokens: tokens,
+      android: {
+        priority: 'high' as const,
+        notification: {
+          channelId: data.type === 'deadline_reminder' ? 'deadline_reminders' : 
+                     (data.type === 'escalation_reply' || data.type === 'new_escalation') ? 'escalations' : 
+                     'announcements',
+          priority: 'high' as const,
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            alert: {
+              title: title,
+              body: body,
+            },
+            sound: 'default',
+            badge: 1,
+          },
+        },
+      },
     };
 
     const response = await admin.messaging().sendEachForMulticast(message);
 
-    console.log(`✅ FCM notifications sent: ${response.successCount} successful, ${response.failureCount} failed`);
+    console.log(`✅ FCM sent: ${response.successCount} successful, ${response.failureCount} failed`);
 
+    // Clean up invalid tokens
     if (response.failureCount > 0) {
       const tokensToDelete: string[] = [];
 
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           const error = resp.error;
+          console.error(`❌ Failed to send to token ${idx}:`, error?.code, error?.message);
+          
           if (
             error?.code === "messaging/invalid-registration-token" ||
             error?.code === "messaging/registration-token-not-registered"
@@ -117,7 +150,38 @@ async function sendFCMNotifications(
       }
     }
   } catch (error) {
-    console.error("Error sending FCM notifications:", error);
+    console.error("❌ Error sending FCM notifications:", error);
+  }
+}
+
+// ✅ NEW: Create Firestore notifications (works for ALL platforms)
+async function createFirestoreNotifications(
+  targetRole: string,
+  title: string,
+  body: string,
+  type: string,
+  data: {[key: string]: any}
+): Promise<number> {
+  try {
+    console.log(`📝 Creating Firestore notification for role: ${targetRole}`);
+
+    // Create a single notification document that all users of this role will see
+    const notificationRef = db.collection("notifications").doc();
+    await notificationRef.set({
+      targetRole: targetRole,
+      title: title,
+      body: body,
+      type: type,
+      data: data,
+      readBy: [],
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    console.log(`✅ Created Firestore notification: ${notificationRef.id}`);
+    return 1;
+  } catch (error) {
+    console.error("❌ Error creating Firestore notification:", error);
+    return 0;
   }
 }
 
@@ -135,13 +199,8 @@ export const onAnnouncementCreated = onDocumentCreated(
       const announcementData = event.data?.data();
       const announcementId = event.params.announcementId;
 
-      if (!announcementData) {
-        console.log("No announcement data found");
-        return;
-      }
-
-      if (announcementData.deleted === true) {
-        console.log("Announcement is deleted, skipping notification");
+      if (!announcementData || announcementData.deleted === true) {
+        console.log("Announcement is deleted or invalid, skipping notification");
         return;
       }
 
@@ -156,58 +215,35 @@ export const onAnnouncementCreated = onDocumentCreated(
       if (message.length > 100) {
         notificationBody += "...";
       }
-
       if (deadline) {
         notificationBody += ` | Deadline: ${deadline}`;
       }
 
+      // ✅ Create Firestore notification (works for ALL platforms)
+      await createFirestoreNotifications(
+        'user',
+        notificationTitle,
+        notificationBody,
+        'announcement',
+        {
+          announcementId: announcementId,
+          category: category,
+          deadline: deadline,
+          message: message,
+        }
+      );
+
+      // ✅ Get user IDs for mobile FCM (optional, only for push notifications)
       const usersSnapshot = await db
         .collection("users")
         .where("isActive", "==", true)
         .get();
 
-      console.log(`📤 Sending notification to ${usersSnapshot.size} users`);
+      const userIds = usersSnapshot.docs.map(doc => doc.id);
 
-      const batch = db.batch();
-      let notificationCount = 0;
-
-      for (const userDoc of usersSnapshot.docs) {
-        const userId = userDoc.id;
-
-        const notificationRef = db.collection("notifications").doc();
-        batch.set(notificationRef, {
-          userId: userId,
-          title: notificationTitle,
-          body: notificationBody,
-          type: "announcement",
-          category: category,
-          announcementId: announcementId,
-          data: {
-            announcementId: announcementId,
-            category: category,
-            deadline: deadline,
-            message: message,
-          },
-          read: false,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        notificationCount++;
-
-        if (notificationCount % 500 === 0) {
-          await batch.commit();
-        }
-      }
-
-      if (notificationCount % 500 !== 0) {
-        await batch.commit();
-      }
-
-      console.log(`✅ Created ${notificationCount} notification documents`);
-
+      // ✅ Send FCM only to mobile devices
       await sendFCMNotifications(
-        usersSnapshot.docs.map(doc => doc.id),
+        userIds,
         notificationTitle,
         notificationBody,
         {
@@ -217,7 +253,7 @@ export const onAnnouncementCreated = onDocumentCreated(
         }
       );
 
-      return {success: true, notificationsSent: notificationCount};
+      return {success: true};
     } catch (error) {
       console.error("Error creating announcement notification:", error);
       return {success: false, error: error};
@@ -267,14 +303,12 @@ export const checkUpcomingDeadlines = onSchedule(
           (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
         );
 
-        console.log(`📅 Announcement ${announcementId}: ${daysUntilDeadline} days until deadline`);
-
         if (daysUntilDeadline === 3) {
           console.log(`⏰ Deadline approaching for announcement: ${announcementId}`);
 
           const existingNotification = await db
             .collection("notifications")
-            .where("announcementId", "==", announcementId)
+            .where("data.announcementId", "==", announcementId)
             .where("type", "==", "deadline_reminder")
             .get();
 
@@ -284,51 +318,28 @@ export const checkUpcomingDeadlines = onSchedule(
           }
 
           const notificationTitle = `⏰ Deadline Reminder: ${category}`;
-          let notificationBody = `${message.substring(0, 80)}... | Deadline in 3 days: ${deadline}`;
+          const notificationBody = `${message.substring(0, 80)}... | Deadline in 3 days: ${deadline}`;
 
+          // ✅ Create Firestore notification
+          await createFirestoreNotifications(
+            'user',
+            notificationTitle,
+            notificationBody,
+            'deadline_reminder',
+            {
+              announcementId: announcementId,
+              category: category,
+              deadline: deadline,
+              message: message,
+              daysUntilDeadline: 3,
+            }
+          );
+
+          // ✅ Send FCM to mobile devices
           const usersSnapshot = await db
             .collection("users")
             .where("isActive", "==", true)
             .get();
-
-          console.log(`📤 Sending deadline reminder to ${usersSnapshot.size} users`);
-
-          const batch = db.batch();
-          let batchCount = 0;
-
-          for (const userDoc of usersSnapshot.docs) {
-            const userId = userDoc.id;
-
-            const notificationRef = db.collection("notifications").doc();
-            batch.set(notificationRef, {
-              userId: userId,
-              title: notificationTitle,
-              body: notificationBody,
-              type: "deadline_reminder",
-              category: category,
-              announcementId: announcementId,
-              data: {
-                announcementId: announcementId,
-                category: category,
-                deadline: deadline,
-                message: message,
-                daysUntilDeadline: 3,
-              },
-              read: false,
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
-              timestamp: admin.firestore.FieldValue.serverTimestamp(),
-            });
-
-            batchCount++;
-
-            if (batchCount % 500 === 0) {
-              await batch.commit();
-            }
-          }
-
-          if (batchCount % 500 !== 0) {
-            await batch.commit();
-          }
 
           await sendFCMNotifications(
             usersSnapshot.docs.map(doc => doc.id),
@@ -342,8 +353,7 @@ export const checkUpcomingDeadlines = onSchedule(
             }
           );
 
-          notificationsCreated += batchCount;
-          console.log(`✅ Created ${batchCount} deadline reminder notifications for ${announcementId}`);
+          notificationsCreated++;
         }
       }
 
@@ -394,6 +404,84 @@ export const cleanupOldNotifications = onSchedule(
   }
 );
 
+// ✅ NEW: Notify staff when escalation is CREATED
+export const onEscalationCreated = onDocumentCreated(
+  {
+    document: "escalations/{escalationId}",
+    region: "us-central1",
+  },
+  async (event) => {
+    try {
+      const escalationData = event.data?.data();
+      const escalationId = event.params.escalationId;
+
+      if (!escalationData) {
+        console.log("No escalation data found");
+        return;
+      }
+
+      console.log(`🆕 New escalation created: ${escalationId}`);
+
+      const question = escalationData.question || "New question";
+      const userId = escalationData.userId;
+
+      // Get user's name
+      let userName = "A user";
+      if (userId) {
+        try {
+          const userDoc = await db.collection("users").doc(userId).get();
+          if (userDoc.exists) {
+            const userData = userDoc.data();
+            userName = userData?.name || userName;
+          }
+        } catch (e) {
+          console.log("Could not fetch user name:", e);
+        }
+      }
+
+      const notificationTitle = "New Escalated Question";
+      const notificationBody = `${userName} needs help: ${question.substring(0, 80)}${question.length > 80 ? '...' : ''}`;
+
+      // ✅ Create Firestore notification for ALL STAFF
+      await createFirestoreNotifications(
+        'staff',
+        notificationTitle,
+        notificationBody,
+        'new_escalation',
+        {
+          escalationId: escalationId,
+          question: question,
+          userId: userId,
+        }
+      );
+
+      // ✅ Send FCM to mobile staff devices
+      const staffSnapshot = await db
+        .collection("users")
+        .where("role", "==", "staff")
+        .get();
+
+      if (!staffSnapshot.empty) {
+        await sendFCMNotifications(
+          staffSnapshot.docs.map(doc => doc.id),
+          notificationTitle,
+          notificationBody,
+          {
+            type: "new_escalation",
+            escalationId: escalationId,
+          }
+        );
+      }
+
+      return {success: true};
+    } catch (error) {
+      console.error("Error creating escalation notification for staff:", error);
+      return {success: false, error: error};
+    }
+  }
+);
+
+// ✅ UPDATED: Notify user when staff REPLIES to escalation
 export const onEscalationReplied = onDocumentUpdated(
   {
     document: "escalations/{escalationId}",
@@ -410,7 +498,7 @@ export const onEscalationReplied = onDocumentUpdated(
         return;
       }
 
-      // Check if staff has replied (status changed to 'resolved' or staffReply field was added)
+      // Check if staff has replied
       const hasNewReply = 
         (afterData.staffReply && !beforeData.staffReply) ||
         (afterData.status === 'resolved' && beforeData.status !== 'resolved' && afterData.staffReply);
@@ -431,34 +519,26 @@ export const onEscalationReplied = onDocumentUpdated(
         return;
       }
 
-      // Create notification title and body
       const notificationTitle = "Staff Response to Your Escalation";
       let notificationBody = `Re: ${question.substring(0, 60)}`;
       if (question.length > 60) {
         notificationBody += "...";
       }
 
-      // Create notification document for the user
-      const notificationRef = db.collection("notifications").doc();
-      await notificationRef.set({
-        userId: userId,
-        title: notificationTitle,
-        body: notificationBody,
-        type: "escalation_reply",
-        escalationId: escalationId,
-        data: {
+      // ✅ Create Firestore notification for the USER
+      await createFirestoreNotifications(
+        'user',
+        notificationTitle,
+        notificationBody,
+        'escalation_reply',
+        {
           escalationId: escalationId,
           question: question,
           staffReply: staffReply,
-        },
-        read: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      });
+        }
+      );
 
-      console.log(`✅ Created notification for user: ${userId}`);
-
-      // Send FCM notification
+      // ✅ Send FCM to user's mobile device
       await sendFCMNotifications(
         [userId],
         notificationTitle,

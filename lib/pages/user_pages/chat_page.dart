@@ -38,7 +38,7 @@ class ChatPage extends StatefulWidget {
   const ChatPage({
     Key? key,
     required this.conversationId,
-    this.initialMessage,
+    this.initialMessage,  
     this.showFAQs = false,
     this.onFAQToggle,
   }) : super(key: key);
@@ -548,6 +548,7 @@ Widget _buildLoadingIndicator() {
                         Linkify(
                           onOpen: _onLinkTap,
                           text: message.content,
+                          textAlign: TextAlign.justify,
                           style: TextStyle(
                             color: isUser ? Colors.white : Colors.grey.shade800,
                             fontSize: 15,

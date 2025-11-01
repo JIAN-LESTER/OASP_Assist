@@ -21,10 +21,24 @@ import 'package:capstone_project/services/answer_retrieval.dart';
 import 'package:capstone_project/services/cohere_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:capstone_project/services/pinecone_service.dart';
+import 'package:capstone_project/services/notification_service.dart'; // ✅ Import notification service
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+
+// ✅ CRITICAL: Background message handler MUST be top-level function
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print('📬 ===== BACKGROUND MESSAGE =====');
+  print('📬 Message ID: ${message.messageId}');
+  print('📬 Title: ${message.notification?.title ?? message.data['title']}');
+  print('📬 Body: ${message.notification?.body ?? message.data['body']}');
+  print('📬 Data: ${message.data}');
+  print('📬 ==============================');
+}
 
 // Global initialization flag
 bool _servicesInitialized = false;
@@ -38,34 +52,23 @@ Future<void> initializeServices() async {
   try {
     print('🚀 Starting service initialization...');
     
-    // Initialize Firebase first
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
     print('✅ Firebase initialized successfully');
     
-    // DON'T configure Cloud Functions - we'll use HTTP instead
-    // This avoids all the emulator/SDK connection issues
-    print('ℹ️ Cloud Functions SDK not configured - using HTTP endpoints');
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    print('✅ Background message handler registered');
     
-    // Initialize Cloud Functions service (if you have one)
-    try {
-      FirebaseFunctionsService().initialize(
-        region: 'us-central1',
-        useEmulator: false, // Never use emulator
-      );
-      print('✅ Cloud Functions service initialized');
-    } catch (e) {
-      print('⚠️ Cloud Functions service initialization skipped: $e');
-    }
+    // ✅ THIS LINE IS CRITICAL
+    print('🔔 Initializing notification service...');
+    await NotificationService().initialize();
+    print('✅ Notification service initialized');
     
     _servicesInitialized = true;
-    print('✅ All services initialized successfully');
-    
   } catch (e, stackTrace) {
     print('❌ Service initialization error: $e');
     print('Stack trace: $stackTrace');
-    rethrow;
   }
 }
 
@@ -90,6 +93,8 @@ void main() {
           ),
           Provider<PineconeCloudService>(create: (_) => PineconeCloudService()),
           Provider<FirebaseFunctionsService>.value(value: FirebaseFunctionsService()),
+          // ✅ NEW: Provide notification service
+          Provider<NotificationService>.value(value: NotificationService()),
         ],
         child: const MyApp(),
       ),

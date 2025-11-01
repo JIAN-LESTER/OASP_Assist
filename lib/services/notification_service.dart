@@ -1,8 +1,12 @@
-import 'package:capstone_project/colors.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:async';
+import 'dart:io' show Platform;
+import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:capstone_project/colors.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -12,22 +16,59 @@ class NotificationService {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
+  
+  // ✅ NEW: Firestore listener for real-time notifications
+  StreamSubscription<QuerySnapshot>? _notificationListener;
+  Set<String> _processedNotificationIds = {};
 
   bool _initialized = false;
+  bool get isAndroidOrIOS => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
-  // Initialize notification service
   Future<void> initialize() async {
-    if (_initialized) return;
+    if (_initialized) {
+      print('⚠️ Notification service already initialized');
+      return;
+    }
 
     print('🔔 Initializing notification service...');
+    print('📱 Platform: ${kIsWeb ? "Web" : Platform.operatingSystem}');
 
+    try {
+      if (isAndroidOrIOS) {
+        // ✅ Android/iOS: Use FCM + Local Notifications
+        await _initializeMobileNotifications();
+      } else {
+        // ✅ Web/Windows: Use Firestore listeners only
+        await _initializeWebNotifications();
+      }
+
+      _initialized = true;
+      print('✅ Notification service initialized successfully');
+      
+    } catch (e, stackTrace) {
+      print('❌ Error initializing notification service: $e');
+      print('Stack trace: $stackTrace');
+    }
+  }
+
+  // ✅ Initialize for Android/iOS (FCM + Local Notifications)
+  Future<void> _initializeMobileNotifications() async {
+    print('📱 Initializing mobile notifications (FCM)...');
+    
     // Request permissions
-    await _requestPermissions();
+    final settings = await _requestPermissions();
+    
+    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+      print('❌ Notification permission denied');
+      // Still set up Firestore listener as fallback
+      await _setupFirestoreListener();
+      return;
+    }
 
     // Initialize local notifications
     await _initializeLocalNotifications();
 
-    // Get FCM token and save to Firestore
+    // Get and save FCM token
     await _saveFCMToken();
 
     // Listen for token refresh
@@ -36,147 +77,142 @@ class NotificationService {
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
-    // Handle background message tap
+    // Handle background tap
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageTap);
 
-    // Handle notification tap when app is terminated
-    _firebaseMessaging.getInitialMessage().then((message) {
-      if (message != null) {
-        _handleMessageTap(message);
-      }
+    // Handle terminated tap
+    final initialMessage = await _firebaseMessaging.getInitialMessage();
+    if (initialMessage != null) {
+      _handleMessageTap(initialMessage);
+    }
+
+    // ✅ ALSO set up Firestore listener as backup
+    await _setupFirestoreListener();
+  }
+
+  // ✅ Initialize for Web/Windows (Firestore only)
+  Future<void> _initializeWebNotifications() async {
+    print('🌐 Initializing web/desktop notifications (Firestore listener)...');
+    
+    // ✅ Save a "web token" for tracking purposes
+    await _saveWebToken();
+    
+    // ✅ Set up Firestore listener for real-time notifications
+    await _setupFirestoreListener();
+    
+    print('✅ Web notification listener active');
+  }
+
+  // ✅ NEW: Set up Firestore listener for ALL platforms
+  Future<void> _setupFirestoreListener() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('⚠️ No user logged in, skipping Firestore listener');
+      return;
+    }
+
+    // Get user role
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    
+    final role = userDoc.data()?['role'] ?? 'user';
+    print('👤 Setting up notification listener for role: $role');
+
+    // ✅ Listen to notifications for this user's role
+    _notificationListener = FirebaseFirestore.instance
+        .collection('notifications')
+        .where('targetRole', isEqualTo: role)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .listen((snapshot) {
+      _handleFirestoreNotifications(snapshot);
+    }, onError: (error) {
+      print('❌ Firestore listener error: $error');
     });
 
-    _initialized = true;
-    print('✅ Notification service initialized');
+    print('✅ Firestore notification listener active');
   }
 
-  // Request notification permissions
-  Future<void> _requestPermissions() async {
-    try {
-      final settings = await _firebaseMessaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-        announcement: true,
-        carPlay: false,
-        criticalAlert: false,
-      );
+  // ✅ NEW: Handle Firestore notifications (for ALL platforms)
+  void _handleFirestoreNotifications(QuerySnapshot snapshot) {
+    print('📬 Firestore notification update: ${snapshot.docs.length} total notifications');
+    
+    for (var change in snapshot.docChanges) {
+      if (change.type == DocumentChangeType.added) {
+        final doc = change.doc;
+        final data = doc.data() as Map<String, dynamic>;
+        final notificationId = doc.id;
 
-      print('📋 Notification permission status: ${settings.authorizationStatus}');
+        // Skip if already processed
+        if (_processedNotificationIds.contains(notificationId)) {
+          continue;
+        }
 
-      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        print('✅ User granted notification permission');
-      } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
-        print('✅ User granted provisional notification permission');
-      } else {
-        print('❌ User declined notification permission');
+        // Mark as processed
+        _processedNotificationIds.add(notificationId);
+
+        // Check if notification is unread
+        final readBy = data['readBy'] as List<dynamic>? ?? [];
+        final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+        
+        if (currentUserId != null && !readBy.contains(currentUserId)) {
+          print('🔔 New unread notification: $notificationId');
+          _showNotificationFromFirestore(data, notificationId);
+        }
       }
-    } catch (e) {
-      print('❌ Error requesting permissions: $e');
+    }
+
+    // Clean up old processed IDs (keep only last 100)
+    if (_processedNotificationIds.length > 100) {
+      final excess = _processedNotificationIds.length - 100;
+      _processedNotificationIds = _processedNotificationIds.skip(excess).toSet();
     }
   }
 
-  // Initialize local notifications for showing notifications when app is in foreground
-  Future<void> _initializeLocalNotifications() async {
-    const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+  // ✅ NEW: Show notification from Firestore data
+  Future<void> _showNotificationFromFirestore(
+    Map<String, dynamic> data,
+    String notificationId,
+  ) async {
+    final title = data['title'] ?? 'New Notification';
+    final body = data['body'] ?? 'You have a new notification';
+    final type = data['type'] ?? 'announcement';
 
-    const DarwinInitializationSettings iosSettings =
-        DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+    print('📬 Showing notification: $title');
 
-    const InitializationSettings initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-
-    await _localNotifications.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
-    );
-
-    print('✅ Local notifications initialized');
-  }
-
-  // Save FCM token to Firestore
-  Future<void> _saveFCMToken() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        print('⚠️ No user logged in, skipping token save');
-        return;
-      }
-
-      final token = await _firebaseMessaging.getToken();
-      if (token == null) {
-        print('⚠️ No FCM token available');
-        return;
-      }
-
-      print('💾 Saving FCM token: ${token.substring(0, 20)}...');
-
-      // Save to Firestore
-      await FirebaseFirestore.instance
-          .collection('fcm_tokens')
-          .doc(token)
-          .set({
-        'token': token,
-        'userId': user.uid,
-        'platform': _getPlatform(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      print('✅ FCM token saved');
-    } catch (e) {
-      print('❌ Error saving FCM token: $e');
+    if (isAndroidOrIOS) {
+      // Show local notification on mobile
+      await _showLocalNotificationFromData(title, body, type, data);
+    } else {
+      // Show web notification (browser notification API or in-app banner)
+      _showWebNotification(title, body, type, data);
     }
   }
 
-  // Handle token refresh
-  Future<void> _onTokenRefresh(String token) async {
-    print('🔄 FCM token refreshed: ${token.substring(0, 20)}...');
-    await _saveFCMToken();
-  }
-
-  // Handle foreground messages
-  Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    print('📬 Received foreground message: ${message.messageId}');
-    print('📬 Title: ${message.notification?.title}');
-    print('📬 Body: ${message.notification?.body}');
-
-    // Show local notification
-    await _showLocalNotification(message);
-
-    // Save to Firestore notifications collection
-    await _saveNotificationToFirestore(message);
-  }
-
-  // Show local notification
-  Future<void> _showLocalNotification(RemoteMessage message) async {
-    final notification = message.notification;
-    if (notification == null) return;
-
-    // Determine notification channel based on type
-    final type = message.data['type'] ?? 'announcement';
-    final channelId = type == 'deadline_reminder' ? 'deadline_reminders' : 'announcements';
-    final channelName = type == 'deadline_reminder' ? 'Deadline Reminders' : 'Announcements';
-    final importance = type == 'deadline_reminder' ? Importance.high : Importance.defaultImportance;
+  // ✅ Show local notification on Android/iOS
+  Future<void> _showLocalNotificationFromData(
+    String title,
+    String body,
+    String type,
+    Map<String, dynamic> data,
+  ) async {
+    final channelId = _getChannelId(type);
+    final importance = type == 'deadline_reminder' ? Importance.max : Importance.high;
 
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       channelId,
-      channelName,
-      channelDescription: 'Notifications for $channelName',
+      _getChannelName(channelId),
+      channelDescription: _getChannelDescription(channelId),
       importance: importance,
-      priority: type == 'deadline_reminder' ? Priority.high : Priority.defaultPriority,
+      priority: type == 'deadline_reminder' ? Priority.max : Priority.high,
       icon: '@mipmap/ic_launcher',
-      color: getCategoryColor(message.data['category']),
+      color: _getNotificationColor(data['category']),
       enableVibration: true,
       playSound: true,
+      styleInformation: BigTextStyleInformation(body),
     );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
@@ -190,222 +226,267 @@ class NotificationService {
       iOS: iosDetails,
     );
 
+    final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    
     await _localNotifications.show(
-      message.hashCode,
-      notification.title,
-      notification.body,
+      notificationId,
+      title,
+      body,
       details,
-      payload: message.data['announcementId'],
+      payload: data['announcementId'] ?? data['escalationId'],
     );
-
-    print('✅ Local notification shown');
   }
 
-  // Save notification to Firestore
-  Future<void> _saveNotificationToFirestore(RemoteMessage message) async {
+  // ✅ NEW: Show web notification (in-app banner)
+  void _showWebNotification(
+    String title,
+    String body,
+    String type,
+    Map<String, dynamic> data,
+  ) {
+    print('🌐 Web notification: $title - $body');
+    
+    // ✅ For web, we rely on the NotificationModal to show updates
+    // The StreamBuilder in NotificationModal will automatically show new notifications
+    
+    // Optionally, you could use browser notifications API here
+    // but that requires additional permissions and setup
+  }
+
+  // ✅ Save web token (for tracking)
+  Future<void> _saveWebToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      final notification = message.notification;
-      if (notification == null) return;
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      final role = userDoc.data()?['role'] ?? 'user';
 
-      await FirebaseFirestore.instance.collection('notifications').add({
+      // Create a unique "token" for web sessions
+      final webToken = 'web_${user.uid}_${DateTime.now().millisecondsSinceEpoch}';
+
+      await FirebaseFirestore.instance
+          .collection('fcm_tokens')
+          .doc(webToken)
+          .set({
+        'token': webToken,
         'userId': user.uid,
-        'title': notification.title ?? '',
-        'body': notification.body ?? '',
-        'type': message.data['type'] ?? 'announcement',
-        'category': message.data['category'] ?? 'General',
-        'announcementId': message.data['announcementId'],
-        'data': message.data,
-        'read': false,
+        'userRole': role,
+        'platform': 'web',
+        'updatedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
-        'timestamp': FieldValue.serverTimestamp(),
       });
 
-      print('✅ Notification saved to Firestore');
+      print('✅ Web session token saved');
     } catch (e) {
-      print('❌ Error saving notification to Firestore: $e');
+      print('❌ Error saving web token: $e');
     }
   }
 
-  // Handle notification tap
-  void _handleMessageTap(RemoteMessage message) {
-    print('👆 User tapped notification: ${message.messageId}');
+  // Mobile-specific methods (unchanged)
+  Future<NotificationSettings> _requestPermissions() async {
+    final settings = await _firebaseMessaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
+    return settings;
+  }
+
+  Future<void> _initializeLocalNotifications() async {
+    final androidImplementation = _localNotifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     
-    final announcementId = message.data['announcementId'];
-    if (announcementId != null) {
-      // Navigate to announcement details
-      // You'll need to implement navigation based on your app structure
-      print('🔗 Navigate to announcement: $announcementId');
-      
-      // Mark notification as read
-      _markNotificationAsRead(announcementId);
-    }
-  }
+    if (androidImplementation != null) {
+      await androidImplementation.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'announcements',
+          'Announcements',
+          description: 'General announcements and updates',
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
+        ),
+      );
 
-  // Handle local notification tap
-  void _onNotificationTapped(NotificationResponse response) {
-    print('👆 User tapped local notification');
-    
-    final announcementId = response.payload;
-    if (announcementId != null && announcementId.isNotEmpty) {
-      print('🔗 Navigate to announcement: $announcementId');
-      _markNotificationAsRead(announcementId);
-    }
-  }
+      await androidImplementation.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'deadline_reminders',
+          'Deadline Reminders',
+          description: 'Important deadline reminders',
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+        ),
+      );
 
-  // Mark notification as read
-  Future<void> _markNotificationAsRead(String announcementId) async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      final notificationsQuery = await FirebaseFirestore.instance
-          .collection('notifications')
-          .where('userId', isEqualTo: user.uid)
-          .where('announcementId', isEqualTo: announcementId)
-          .where('read', isEqualTo: false)
-          .get();
-
-      final batch = FirebaseFirestore.instance.batch();
-      for (var doc in notificationsQuery.docs) {
-        batch.update(doc.reference, {'read': true});
-      }
-      await batch.commit();
-
-      print('✅ Notifications marked as read');
-    } catch (e) {
-      print('❌ Error marking notification as read: $e');
-    }
-  }
-
-  // Get unread notification count
-  Future<int> getUnreadCount() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return 0;
-
-      final snapshot = await FirebaseFirestore.instance
-          .collection('notifications')
-          .where('userId', isEqualTo: user.uid)
-          .where('read', isEqualTo: false)
-          .get();
-
-      return snapshot.size;
-    } catch (e) {
-      print('❌ Error getting unread count: $e');
-      return 0;
-    }
-  }
-
-  // Get notification stream
-  Stream<QuerySnapshot> getNotificationsStream() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return Stream.empty();
+      await androidImplementation.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'escalations',
+          'Escalations',
+          description: 'Question escalations and responses',
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
+        ),
+      );
     }
 
-    return FirebaseFirestore.instance
-        .collection('notifications')
-        .where('userId', isEqualTo: user.uid)
-        .orderBy('createdAt', descending: true)
-        .limit(50)
-        .snapshots();
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const DarwinInitializationSettings iosSettings =
+        DarwinInitializationSettings(
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        );
+
+    const InitializationSettings initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
+
+    await _localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: _onNotificationTapped,
+    );
   }
 
-  // Mark all notifications as read
-  Future<void> markAllAsRead() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      final notificationsQuery = await FirebaseFirestore.instance
-          .collection('notifications')
-          .where('userId', isEqualTo: user.uid)
-          .where('read', isEqualTo: false)
-          .get();
-
-      final batch = FirebaseFirestore.instance.batch();
-      for (var doc in notificationsQuery.docs) {
-        batch.update(doc.reference, {'read': true});
-      }
-      await batch.commit();
-
-      print('✅ All notifications marked as read');
-    } catch (e) {
-      print('❌ Error marking all as read: $e');
-    }
-  }
-
-  // Delete notification
-  Future<void> deleteNotification(String notificationId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('notifications')
-          .doc(notificationId)
-          .delete();
-
-      print('✅ Notification deleted');
-    } catch (e) {
-      print('❌ Error deleting notification: $e');
-    }
-  }
-
-  // Helper: Get platform name
-  String _getPlatform() {
-    // You'll need to import dart:io and use Platform.isAndroid, Platform.isIOS
-    // For now, returning a placeholder
-    return 'unknown';
-  }
-
-  // Helper: Get notification color based on category
-  int? _getNotificationColor(String? category) {
-    if (category == null) return null;
-    
-    switch (category.toLowerCase()) {
-      case 'admission':
-        return 0xFF2196F3; // Blue
-      case 'scholarship':
-        return 0xFF9C27B0; // Purple
-      case 'placement':
-        return 0xFFFF9800; // Orange
-      case 'general':
-        return 0xFF4CAF50; // Green
-      default:
-        return 0xFF4CAF50; // Green
-    }
-  }
-
-  // Cleanup when user logs out
-  Future<void> cleanup() async {
+  Future<void> _saveFCMToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
       final token = await _firebaseMessaging.getToken();
-      if (token != null) {
-        // Remove token from Firestore
-        await FirebaseFirestore.instance
-            .collection('fcm_tokens')
-            .doc(token)
-            .delete();
+      if (token == null) return;
 
-        print('✅ FCM token removed on logout');
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      final role = userDoc.data()?['role'] ?? 'user';
+
+      await FirebaseFirestore.instance
+          .collection('fcm_tokens')
+          .doc(token)
+          .set({
+        'token': token,
+        'userId': user.uid,
+        'userRole': role,
+        'platform': Platform.isAndroid ? 'android' : 'ios',
+        'updatedAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      print('✅ FCM token saved');
+    } catch (e) {
+      print('❌ Error saving FCM token: $e');
+    }
+  }
+
+  Future<void> _onTokenRefresh(String token) async {
+    await _saveFCMToken();
+  }
+
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    print('📬 Foreground message received');
+    await _showLocalNotification(message);
+  }
+
+  Future<void> _showLocalNotification(RemoteMessage message) async {
+    final title = message.notification?.title ?? message.data['title'] ?? 'Notification';
+    final body = message.notification?.body ?? message.data['body'] ?? '';
+    final type = message.data['type'] ?? 'announcement';
+
+    await _showLocalNotificationFromData(title, body, type, message.data);
+  }
+
+  void _handleMessageTap(RemoteMessage message) {
+    print('👆 Notification tapped');
+    // TODO: Implement navigation
+  }
+
+  void _onNotificationTapped(NotificationResponse response) {
+    print('👆 Local notification tapped');
+    // TODO: Implement navigation
+  }
+
+  String _getChannelId(String type) {
+    switch (type) {
+      case 'deadline_reminder':
+        return 'deadline_reminders';
+      case 'escalation_reply':
+      case 'new_escalation':
+        return 'escalations';
+      default:
+        return 'announcements';
+    }
+  }
+
+  String _getChannelName(String channelId) {
+    switch (channelId) {
+      case 'deadline_reminders':
+        return 'Deadline Reminders';
+      case 'escalations':
+        return 'Escalations';
+      default:
+        return 'Announcements';
+    }
+  }
+
+  String _getChannelDescription(String channelId) {
+    switch (channelId) {
+      case 'deadline_reminders':
+        return 'Important deadline reminders';
+      case 'escalations':
+        return 'Question escalations and responses';
+      default:
+        return 'General announcements and updates';
+    }
+  }
+
+  Color _getNotificationColor(String? category) {
+    if (category == null) return getCategoryColor('general');
+    return getCategoryColor(category);
+  }
+
+  Future<void> cleanup() async {
+    try {
+      // Cancel Firestore listener
+      await _notificationListener?.cancel();
+      _notificationListener = null;
+      _processedNotificationIds.clear();
+
+      // Clean up FCM token
+      if (isAndroidOrIOS) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final token = await _firebaseMessaging.getToken();
+          if (token != null) {
+            await FirebaseFirestore.instance
+                .collection('fcm_tokens')
+                .doc(token)
+                .delete();
+          }
+        }
       }
 
       _initialized = false;
+      print('✅ Notification service cleaned up');
     } catch (e) {
       print('❌ Error during cleanup: $e');
     }
   }
 }
 
-// Background message handler (must be top-level function)
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('📬 Handling background message: ${message.messageId}');
-  print('📬 Title: ${message.notification?.title}');
-  print('📬 Body: ${message.notification?.body}');
-  // Background messages are automatically shown as system notifications
+  print('📬 Background message received');
 }

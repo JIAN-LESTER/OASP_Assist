@@ -69,22 +69,12 @@ class UniversalUIComponents {
   }) {
     List<Widget> appBarActions = [];
 
-    // Add notifications button
-    appBarActions.add(
-      IconButton(
-        icon: const Icon(
-          Icons.notifications_outlined,
-          color: Color(0xFF424242),
-          size: 22,
-        ),
-        onPressed: () => _showNotifications(context, userRole),
-      ),
-    );
+     appBarActions.add(_buildNotificationButton(context, userRole));
 
-    // Add custom actions if provided
-    if (actions != null) {
-      appBarActions.addAll(actions);
-    }
+  // Add custom actions if provided
+  if (actions != null) {
+    appBarActions.addAll(actions);
+  }
 
     // User profile dropdown
     appBarActions.add(_buildUserProfileDropdown(context));
@@ -1712,4 +1702,99 @@ static List<Widget> _buildPersistentMenuItems(
       builder: (context) => NotificationModal(role: roleToString(userRole)),
     );
   }
+
+  static Widget _buildNotificationButton(BuildContext context, UserRole userRole) {
+  final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
+  if (currentUserId == null) {
+    return IconButton(
+      icon: const Icon(
+        Icons.notifications_outlined,
+        color: Color(0xFF424242),
+        size: 22,
+      ),
+      onPressed: () => _showNotifications(context, userRole),
+    );
+  }
+
+  return StreamBuilder<QuerySnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('notifications')
+        .where('targetRole', isEqualTo: roleToString(userRole))
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots(),
+    builder: (context, snapshot) {
+      // Count unread notifications
+      int unreadCount = 0;
+      
+      if (snapshot.hasData) {
+        for (var doc in snapshot.data!.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final readBy = data['readBy'] as List<dynamic>? ?? [];
+          
+          if (!readBy.contains(currentUserId)) {
+            unreadCount++;
+          }
+        }
+      }
+
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            icon: Icon(
+              unreadCount > 0 
+                  ? Icons.notifications_active 
+                  : Icons.notifications_outlined,
+              color: unreadCount > 0 
+                  ? const Color(0xFF2E7D32) 
+                  : const Color(0xFF424242),
+              size: 22,
+            ),
+            onPressed: () => _showNotifications(context, userRole),
+          ),
+          if (unreadCount > 0)
+            Positioned(
+              right: 6,
+              top: 6,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white,
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withOpacity(0.5),
+                      blurRadius: 4,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 16,
+                  minHeight: 16,
+                ),
+                child: Center(
+                  child: Text(
+                    unreadCount > 99 ? '99+' : unreadCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+}
+
 }

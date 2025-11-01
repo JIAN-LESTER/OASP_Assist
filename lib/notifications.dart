@@ -14,14 +14,22 @@ class _NotificationModalState extends State<NotificationModal> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
+  @override
+  void initState() {
+    super.initState();
+    print('📱 NotificationModal opened for role: ${widget.role}, userId: $currentUserId');
+  }
+
   Future<void> _markAsRead(String notificationId) async {
     if (currentUserId == null) return;
     
     try {
       await _firestore.collection('notifications').doc(notificationId).update({
-        'read': true,
+        'readBy': FieldValue.arrayUnion([currentUserId])
       });
+      print('✅ Marked notification as read: $notificationId');
     } catch (e) {
+      print('❌ Error marking notification as read: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error marking as read: $e')),
@@ -56,7 +64,7 @@ class _NotificationModalState extends State<NotificationModal> {
       try {
         Query notificationsQuery = _firestore
             .collection('notifications')
-            .where('userId', isEqualTo: currentUserId);
+            .where('targetRole', isEqualTo: widget.role);
 
         final snapshot = await notificationsQuery.get();
         
@@ -85,7 +93,9 @@ class _NotificationModalState extends State<NotificationModal> {
   }
 
   bool _isRead(Map<String, dynamic> data) {
-    return data['read'] == true;
+    if (currentUserId == null) return false;
+    final readBy = data['readBy'] as List<dynamic>?;
+    return readBy?.contains(currentUserId) ?? false;
   }
 
   String _formatTime(Timestamp? timestamp) {
@@ -116,6 +126,8 @@ class _NotificationModalState extends State<NotificationModal> {
         return Icons.alarm_outlined;
       case 'escalation_reply':
         return Icons.reply_outlined;
+      case 'new_escalation':
+        return Icons.help_outline;
       case 'info':
         return Icons.info_outline;
       case 'warning':
@@ -139,6 +151,8 @@ class _NotificationModalState extends State<NotificationModal> {
         return Colors.orange;
       case 'escalation_reply':
         return Colors.blue;
+      case 'new_escalation':
+        return Colors.orange;
       case 'info':
         return Colors.blue;
       case 'warning':
@@ -157,39 +171,80 @@ class _NotificationModalState extends State<NotificationModal> {
   void _handleNotificationTap(Map<String, dynamic> data) {
     final type = data['type'] as String?;
     
+    print('🔔 Notification tapped - Type: $type');
+    
     if (type == 'escalation_reply') {
       final escalationId = data['escalationId'] as String?;
+      final dataMap = data['data'] as Map<String, dynamic>?;
+      
       if (escalationId != null) {
-        // Navigate to escalation details or show dialog
-        // You can implement navigation to your escalation detail page here
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Staff Response'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
               children: [
-                Text(
-                  'Question:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[700],
+                Icon(Icons.reply, color: Colors.blue),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Staff Response',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(data['data']?['question'] ?? 'No question'),
-                const SizedBox(height: 16),
-                Text(
-                  'Staff Reply:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[700],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(data['data']?['staffReply'] ?? 'No reply'),
               ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your Question:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[700],
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      dataMap?['question'] ?? 'No question',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Staff Reply:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue[700],
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Text(
+                      dataMap?['staffReply'] ?? 'No reply',
+                      style: TextStyle(fontSize: 14, color: Colors.blue[900]),
+                    ),
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -200,28 +255,54 @@ class _NotificationModalState extends State<NotificationModal> {
           ),
         );
       }
+    } else if (type == 'new_escalation') {
+      final escalationId = data['escalationId'] as String?;
+      
+      if (escalationId != null) {
+        // Navigate to escalation detail page
+        // You can implement navigation to HumanEscalation page here
+        Navigator.pop(context); // Close notification modal
+        // Then navigate to escalation details
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('View Escalation'),
+            content: Text('Navigate to escalation details for: $escalationId'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (currentUserId == null) {
-      return Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: const Center(
-          child: Text('Please log in to view notifications'),
-        ),
-      );
-    }
-
     Query notificationsQuery = _firestore
         .collection('notifications')
-        .where('userId', isEqualTo: currentUserId)
         .orderBy('createdAt', descending: true);
+
+    // Filter based on role
+    if (widget.role == 'user') {
+      notificationsQuery = notificationsQuery.where(
+        'targetRole',
+        isEqualTo: 'user',
+      );
+    } else if (widget.role == 'staff') {
+      notificationsQuery = notificationsQuery.where(
+        'targetRole',
+        isEqualTo: 'staff',
+      );
+    } else if (widget.role == 'admin') {
+      notificationsQuery = notificationsQuery.where(
+        'targetRole',
+        isEqualTo: 'admin',
+      );
+    }
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.8,
@@ -263,6 +344,10 @@ class _NotificationModalState extends State<NotificationModal> {
                   builder: (context, snapshot) {
                     final hasNotifications = snapshot.hasData && 
                         snapshot.data!.docs.isNotEmpty;
+                    
+                    if (snapshot.hasData) {
+                      print('📊 Total notifications for ${widget.role}: ${snapshot.data!.docs.length}');
+                    }
                     
                     return PopupMenuButton<String>(
                       enabled: hasNotifications,
@@ -306,8 +391,29 @@ class _NotificationModalState extends State<NotificationModal> {
                     ),
                   );
                 }
+
+                if (snapshot.hasError) {
+                  print('❌ Error in notifications stream: ${snapshot.error}');
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 48, color: Colors.red),
+                        SizedBox(height: 16),
+                        Text('Error loading notifications'),
+                        SizedBox(height: 8),
+                        Text(
+                          snapshot.error.toString(),
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                }
                 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  print('ℹ️ No notifications found for role: ${widget.role}');
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -340,6 +446,7 @@ class _NotificationModalState extends State<NotificationModal> {
                 }
 
                 final notifications = snapshot.data!.docs;
+                print('✅ Displaying ${notifications.length} notifications');
 
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),

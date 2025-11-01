@@ -715,11 +715,11 @@ Future<void> _processAutoEscalation(
   String question, 
   String answerText, 
   String triggerKeyword, {
-      String? userReason,
-  }
-) async {
+  String? userReason,
+}) async {
   try {
-    final escalationId = _firestore.collection('escalations').doc().id;
+    final escalationRef = _firestore.collection('escalations').doc();
+    final escalationId = escalationRef.id;
 
     final escalatedData = {
       'escalationId': escalationId,
@@ -728,48 +728,19 @@ Future<void> _processAutoEscalation(
       'question': question,
       'botAnswer': answerText,
       'status': 'pending',
-        'userReason': userReason, 
+      'userReason': userReason,
       'createdAt': Timestamp.now(),
     };
 
-
-    await _firestore.collection('escalations').add(escalatedData);
-    print('Auto-escalation logged due to AI response: $triggerKeyword');
-
-    // Notification for the user
-    final userNotification = Notifications(
-      notificationId: _firestore.collection('notifications').doc().id,
-      userId: userId,
-      title: 'Your question was escalated',
-      body: 'Your question could not be answered by AI and has been sent to staff for review.',
-      type: 'escalation',
-      relatedId: escalationId,
-      targetRole: 'user',
-      read: false,
-      createdAt: Timestamp.now(),
-    );
-
-    await _firestore.collection('notifications').add(userNotification.toMap());
-    print('Notification created for user $userId');
-
-    // Notification for staff
-    final staffNotification = Notifications(
-      notificationId: _firestore.collection('notifications').doc().id,
-      userId: null, // staff notifications don't have a specific user
-      title: 'New escalated question',
-      body: 'A user question could not be answered by AI. Please review and respond.',
-      type: 'escalation',
-      relatedId: escalationId,
-      targetRole: 'staff',
-      read: false,
-      createdAt: Timestamp.now(),
-    );
-
-    await _firestore.collection('notifications').add(staffNotification.toMap());
-    print('Notification created for staff');
+    await escalationRef.set(escalatedData);
+    
+    // The Cloud Function will handle creating notifications
+    // No need to create them manually here anymore
+    
+    print('Auto-escalation created: $escalationId');
 
   } catch (e) {
-    print('Error creating auto-escalation or notifications: $e');
+    print('Error creating auto-escalation: $e');
   }
 }
 
