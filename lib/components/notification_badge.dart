@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-// ✅ Add this widget to your AppBar
 class NotificationBadgeButton extends StatelessWidget {
-  final String role; // 'user', 'staff', or 'admin'
+  final String role;
   final VoidCallback onTap;
 
   const NotificationBadgeButton({
@@ -15,34 +14,26 @@ class NotificationBadgeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-
-    if (currentUserId == null) {
-      return IconButton(
-        icon: Icon(Icons.notifications_outlined),
-        onPressed: onTap,
-      );
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      return IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: onTap);
     }
 
+    final stream = FirebaseFirestore.instance
+        .collection('notifications')
+        .where('targetRole', isEqualTo: role)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots();
+
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('notifications')
-          .where('targetRole', isEqualTo: role)
-          .orderBy('createdAt', descending: true)
-          .limit(50)
-          .snapshots(),
+      stream: stream,
       builder: (context, snapshot) {
-        // Count unread notifications
-        int unreadCount = 0;
-        
+        int unread = 0;
         if (snapshot.hasData) {
           for (var doc in snapshot.data!.docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            final readBy = data['readBy'] as List<dynamic>? ?? [];
-            
-            if (!readBy.contains(currentUserId)) {
-              unreadCount++;
-            }
+            final readBy = (doc['readBy'] ?? []) as List<dynamic>;
+            if (!readBy.contains(uid)) unread++;
           }
         }
 
@@ -50,41 +41,33 @@ class NotificationBadgeButton extends StatelessWidget {
           children: [
             IconButton(
               icon: Icon(
-                unreadCount > 0 
-                    ? Icons.notifications_active 
-                    : Icons.notifications_outlined,
-                color: unreadCount > 0 ? Color(0xFF2E7D32) : null,
+                unread > 0 ? Icons.notifications_active : Icons.notifications_outlined,
+                color: unread > 0 ? const Color(0xFF2E7D32) : null,
               ),
               onPressed: onTap,
             ),
-            if (unreadCount > 0)
+            if (unread > 0)
               Positioned(
                 right: 8,
                 top: 8,
                 child: Container(
-                  padding: EdgeInsets.all(4),
-                  decoration: BoxDecoration(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: const BoxDecoration(
                     color: Colors.red,
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.red.withOpacity(0.5),
-                        blurRadius: 4,
-                        spreadRadius: 1,
-                      ),
-                    ],
                   ),
-                  constraints: BoxConstraints(
-                    minWidth: 18,
-                    minHeight: 18,
+                  constraints: const BoxConstraints(
+                    minWidth: 13,
+                    minHeight: 13,
                   ),
                   child: Center(
                     child: Text(
-                      unreadCount > 99 ? '99+' : unreadCount.toString(),
-                      style: TextStyle(
+                      unread > 99 ? '99+' : unread.toString(),
+                      style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 10,
+                        fontSize: 8,
                         fontWeight: FontWeight.bold,
+                        height: 1,
                       ),
                     ),
                   ),
@@ -96,21 +79,3 @@ class NotificationBadgeButton extends StatelessWidget {
     );
   }
 }
-
-// ✅ Example usage in your AppBar:
-// AppBar(
-//   title: Text('Dashboard'),
-//   actions: [
-//     NotificationBadgeButton(
-//       role: 'user', // or 'staff', 'admin'
-//       onTap: () {
-//         showModalBottomSheet(
-//           context: context,
-//           isScrollControlled: true,
-//           backgroundColor: Colors.transparent,
-//           builder: (context) => NotificationModal(role: 'user'),
-//         );
-//       },
-//     ),
-//   ],
-// )

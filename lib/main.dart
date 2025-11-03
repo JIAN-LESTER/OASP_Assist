@@ -21,24 +21,14 @@ import 'package:capstone_project/services/answer_retrieval.dart';
 import 'package:capstone_project/services/cohere_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:capstone_project/services/pinecone_service.dart';
-import 'package:capstone_project/services/notification_service.dart'; // ✅ Import notification service
+import 'package:capstone_project/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
-// ✅ CRITICAL: Background message handler MUST be top-level function
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  print('📬 ===== BACKGROUND MESSAGE =====');
-  print('📬 Message ID: ${message.messageId}');
-  print('📬 Title: ${message.notification?.title ?? message.data['title']}');
-  print('📬 Body: ${message.notification?.body ?? message.data['body']}');
-  print('📬 Data: ${message.data}');
-  print('📬 ==============================');
-}
+// ✅ REMOVED DUPLICATE - This is now in notification_service.dart
 
 // Global initialization flag
 bool _servicesInitialized = false;
@@ -57,10 +47,11 @@ Future<void> initializeServices() async {
     );
     print('✅ Firebase initialized successfully');
     
+    // ✅ CRITICAL: Register background handler from notification_service.dart
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     print('✅ Background message handler registered');
     
-    // ✅ THIS LINE IS CRITICAL
+    // ✅ Initialize notification service
     print('🔔 Initializing notification service...');
     await NotificationService().initialize();
     print('✅ Notification service initialized');
@@ -75,6 +66,13 @@ Future<void> initializeServices() async {
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    
+    // ✅ Set preferred orientations if needed
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     // Initialize all services BEFORE running the app
@@ -93,7 +91,6 @@ void main() {
           ),
           Provider<PineconeCloudService>(create: (_) => PineconeCloudService()),
           Provider<FirebaseFunctionsService>.value(value: FirebaseFunctionsService()),
-          // ✅ NEW: Provide notification service
           Provider<NotificationService>.value(value: NotificationService()),
         ],
         child: const MyApp(),
