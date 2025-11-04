@@ -596,10 +596,7 @@ Widget _buildHeader(
               ),
               Row(
                 children: [
-                  ManageAffiliationsButton(),
-                  const SizedBox(width: 8),
-                  ManageProgramsButton(),
-                  const SizedBox(width: 8),
+                
                   AddUserButton(),
                 ],
               ),

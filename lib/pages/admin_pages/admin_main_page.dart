@@ -1,10 +1,12 @@
 import 'package:capstone_project/pages/admin_pages/admission_management.dart';
+import 'package:capstone_project/pages/admin_pages/affiliation.dart';
 import 'package:capstone_project/pages/admin_pages/announcement_page.dart';
 import 'package:capstone_project/pages/admin_pages/dashboard_page.dart';
 import 'package:capstone_project/pages/admin_pages/faq_page.dart';
 import 'package:capstone_project/pages/admin_pages/information_bank_page.dart';
 import 'package:capstone_project/pages/admin_pages/message_logs.dart';
 import 'package:capstone_project/pages/admin_pages/placement_management.dart';
+import 'package:capstone_project/pages/admin_pages/programs.dart';
 import 'package:capstone_project/pages/admin_pages/reports_page.dart';
 import 'package:capstone_project/pages/admin_pages/scholarship_management.dart';
 import 'package:capstone_project/pages/admin_pages/system_logs_page.dart';
@@ -38,6 +40,8 @@ class _AdminMainPageState extends State<AdminMainPage> {
     const AdmissionManagementPage(), // 8
     const ScholarshipManagementPage(), // 9
     const PlacementManagementPage(), // 10
+    const AffiliationManagementPage(),
+    const ProgramManagementPage()
   ];
 
   final List<String> _pageTitles = [
@@ -46,12 +50,14 @@ class _AdminMainPageState extends State<AdminMainPage> {
     'Information Bank',          // 2
     'FAQs',                     // 3
     'Announcement',             // 4
-    'User Management',          // 5
+    'Users',          // 5
     'System Activity Logs',     // 6
     'Message Logs',             // 7
     'Admission',                // 8
     'Scholarship',              // 9
     'Placement',                // 10
+    'Affiliations',
+    'Programs'
   ];
 
   void _onNavigationItemTap(int index) {

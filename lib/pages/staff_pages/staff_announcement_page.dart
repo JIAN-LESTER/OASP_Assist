@@ -1,8 +1,7 @@
 import 'dart:convert';
+import 'package:capstone_project/services/fb_sync.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:capstone_project/pages/admin_pages/widgets/category_dropdown_button.dart';
-import 'package:capstone_project/services/cohere_service.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -17,18 +16,19 @@ class StaffAnnouncementPage extends StatefulWidget {
 
 class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
   List<DocumentSnapshot> announcements = [];
-  bool isLoading = true;
+   bool isLoading = true;
   bool isRefreshing = false;
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
-  final _cohere = CohereService();
 
   @override
   void initState() {
     super.initState();
     _loadAnnouncements();
-    _refreshFromFacebook();
   }
+
+  
+
 
   Future<void> _loadAnnouncements() async {
     try {
@@ -50,25 +50,6 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading announcements: $e')),
       );
-    }
-  }
-
-  Future<void> _refreshFromFacebook() async {
-    setState(() {
-      isRefreshing = true;
-    });
-
-    try {
-      await fetchAndProcessPosts();
-      await _loadAnnouncements();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error syncing with Facebook: $e')),
-      );
-    } finally {
-      setState(() {
-        isRefreshing = false;
-      });
     }
   }
 
@@ -106,6 +87,228 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
     return filtered;
   }
 
+  // Manual refresh button (keep as is for manual sync)
+Future<void> _refreshFromFacebook() async {
+  if (isRefreshing) {
+    print('⚠️ Sync already in progress');
+    return;
+  }
+
+  setState(() => isRefreshing = true);
+
+  try {
+    print('🔄 Manual Facebook sync triggered...');
+    
+    final result = await FacebookSyncService.syncPosts();
+    
+    print('📦 Sync result: $result');
+    
+    if (result['success'] == true) {
+      await Future.delayed(Duration(milliseconds: 500));
+      await _loadAnnouncements();
+      
+      final count = result['count'] ?? 0;
+      final failed = result['failed'] ?? 0;
+      
+      if (mounted) {
+        _showSuccessSnackBar(
+          '✅ Synced $count posts' + (failed > 0 ? ' ($failed failed)' : '')
+        );
+      }
+    } else {
+      final errorMsg = result['error'] ?? result['message'] ?? 'Sync failed';
+      throw Exception(errorMsg);
+    }
+    
+  } catch (e) {
+    print('❌ Sync error: $e');
+    
+    if (mounted) {
+      final errorMessage = FacebookSyncService.parseErrorMessage(e);
+      _showErrorSnackBar(errorMessage);
+    }
+  } finally {
+    if (mounted) {
+      setState(() => isRefreshing = false);
+    }
+  }
+}
+
+void _showSyncErrorDialog(String errorMessage) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: Row(
+        children: [
+          Icon(Icons.error, color: Colors.red[700], size: 28),
+          SizedBox(width: 12),
+          Text('Sync Failed'),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            errorMessage,
+            style: TextStyle(fontSize: 15),
+          ),
+          SizedBox(height: 16),
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Colors.grey[700]),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'You can manually sync later using the refresh button',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancel'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () {
+            Navigator.pop(context);
+            _refreshFromFacebook(); // Trigger manual sync
+          },
+          icon: Icon(Icons.refresh),
+          label: Text('Retry Sync'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue[700],
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+void _showSuccessSnackBar(String message) {
+  if (!mounted) return;
+  
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          Icon(Icons.check_circle, color: Colors.white, size: 20),
+          SizedBox(width: 8),
+          Expanded(child: Text(message)),
+        ],
+      ),
+      backgroundColor: Colors.green[600],
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    ),
+  );
+}
+
+void _showErrorSnackBar(String message) {
+  if (!mounted) return;
+  
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          Icon(Icons.error, color: Colors.white, size: 20),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: Colors.red,
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    ),
+  );
+}
+
+
+// Update your refresh button row to include the test button:
+Widget _buildRefreshButton({required bool isDesktop}) {
+  return Row(
+    children: [
+      // Test button
+
+      SizedBox(width: 8),
+      
+      // Facebook Token Config Button
+    
+      SizedBox(width: 8),
+      
+      // Manual Sync Button
+      Container(
+        decoration: BoxDecoration(
+          color: isRefreshing ? Colors.grey[100] : Colors.green[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isRefreshing ? Colors.grey[300]! : Colors.green[200]!,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: isRefreshing ? null : _refreshFromFacebook,
+            child: Tooltip(
+              message: 'Manual Sync Facebook Posts',
+              child: Padding(
+                padding: EdgeInsets.all(isDesktop ? 12 : 10),
+                child: isRefreshing
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.grey[600]!,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        Icons.sync_rounded,
+                        color: Colors.green[700],
+                        size: isDesktop ? 24 : 20,
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+
+
   String _sentenceCase(String input) {
     if (input.isEmpty) return input;
     return input[0].toUpperCase() + input.substring(1).toLowerCase();
@@ -128,51 +331,42 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
         children: [
           // Main content area
           Expanded(
-            child: Stack(
+            child: Column(
               children: [
-                Column(
-                  children: [
-                    // header
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
-                      child: Center(
-                        child: Container(
-                          constraints: const BoxConstraints(maxWidth: 800),
-                          child: Row(
-                            children: [
-                              // Search field
-                              Expanded(child: _buildSearchField()),
+                // header
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
+                  child: Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 800),
+                      child: Row(
+                        children: [
+                          // Search field
+                          Expanded(child: _buildSearchField()),
 
-                              const SizedBox(width: 16),
+                          const SizedBox(width: 16),
 
-                              // Category dropdown
-                              SizedBox(
-                                width: 165,
-                                child: CategoryDropdownButton(
-                                  initialValue: selectedCategory,
-                                  onChanged:
-                                      (value) => setState(
-                                        () => selectedCategory = value,
-                                      ),
-                                ),
-                              ),
-                            ],
+                          // Category dropdown
+                          SizedBox(
+                            width: 165,
+                            child: CategoryDropdownButton(
+                              initialValue: selectedCategory,
+                              onChanged:
+                                  (value) => setState(
+                                    () => selectedCategory = value,
+                                  ),
+                            ),
                           ),
-                        ),
+                          _buildRefreshButton(isDesktop: true)
+                        ],
                       ),
                     ),
+                  ),
+                ),
 
-                    // Content area - Takes remaining space
-                    Expanded(child: _buildMainContent(isDesktop: true)),
-                  ],
-                ),
-                // Refresh button positioned at top right edge
-                Positioned(
-                  top: 24,
-                  right: 32,
-                  child: _buildRefreshButton(isDesktop: true),
-                ),
+                // Content area - Takes remaining space
+                Expanded(child: _buildMainContent(isDesktop: true)),
               ],
             ),
           ),
@@ -210,8 +404,6 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
                         (value) => setState(() => selectedCategory = value),
                   ),
                 ),
-                const SizedBox(width: 12),
-                _buildRefreshButton(isDesktop: false),
               ],
             ),
           ),
@@ -227,93 +419,61 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
     );
   }
 
-  // MOBILE LAYOUT
   Widget _buildMobileLayout() {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FFFE),
-      body: Column(
-        children: [
-          // Fixed header
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: _buildSearchField()),
-                    const SizedBox(width: 12),
-                    _buildRefreshButton(isDesktop: false),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                CategoryDropdownButton(
-                  initialValue: selectedCategory,
-                  onChanged:
-                      (value) => setState(() => selectedCategory = value),
-                ),
-              ],
-            ),
+  return Scaffold(
+    backgroundColor: const Color(0xFFF8FFFE),
+    body: Column(
+      children: [
+        // Fixed header
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          // Content area
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: _buildMainContent(isDesktop: false),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRefreshButton({required bool isDesktop}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isRefreshing ? Colors.grey[100] : Colors.green[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isRefreshing ? Colors.grey[300]! : Colors.green[200]!,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: isRefreshing ? null : _refreshFromFacebook,
-          child: Padding(
-            padding: EdgeInsets.all(isDesktop ? 12 : 10),
-            child:
-                isRefreshing
-                    ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.grey[600]!,
-                        ),
-                      ),
-                    )
-                    : Icon(
-                      Icons.sync_rounded,
-                      color: Colors.green[700],
-                      size: isDesktop ? 24 : 20,
+          child: Column(
+            children: [
+              _buildSearchField(),
+              const SizedBox(height: 12),
+              
+              // ✅ Row for dropdown + refresh button
+              Row(
+                children: [
+                  // Dropdown takes most space
+                  Expanded(
+                    child: CategoryDropdownButton(
+                      initialValue: selectedCategory,
+                      onChanged: (value) => setState(() => selectedCategory = value),
                     ),
+                  ),
+                  
+                  const SizedBox(width: 8),
+                  
+                  // Refresh button fixed width
+                  _buildRefreshButton(isDesktop: false),
+                ],
+              ),
+            ],
           ),
         ),
-      ),
-    );
-  }
+
+        // Content area
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: _buildMainContent(isDesktop: false),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   // SEARCH FIELD
   Widget _buildSearchField() {
@@ -428,7 +588,7 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
     }
 
     return RefreshIndicator(
-      onRefresh: _refreshFromFacebook,
+      onRefresh: _loadAnnouncements,
       color: Colors.green[600],
       child: ListView.builder(
         padding:
@@ -446,8 +606,6 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
                 announcement: displayedAnnouncements[index],
                 index: index,
                 isDesktop: isDesktop,
-                onEdit: _editAnnouncement,
-                onDelete: _deleteAnnouncement,
               ),
             ),
           );
@@ -627,119 +785,6 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
     }
     return DateFormat('MMM d').format(dateTime);
   }
-
-  Future<void> _editAnnouncement(DocumentSnapshot announcement) async {
-    final data = announcement.data() as Map<String, dynamic>;
-    final messageController = TextEditingController(
-      text: data['message'] ?? '',
-    );
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Edit Announcement'),
-            content: SizedBox(
-              width: 400,
-              child: TextField(
-                controller: messageController,
-                maxLines: 5,
-                decoration: const InputDecoration(
-                  hintText: 'Edit announcement message...',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  try {
-                    final cohereResult = await _cohere.analyzeAnnouncement(
-                      messageController.text,
-                    );
-
-                    await FirebaseFirestore.instance
-                        .collection('announcements')
-                        .doc(announcement.id)
-                        .update({
-                          'message': messageController.text,
-                          'category': cohereResult['category'],
-                          'deadline': cohereResult['deadline'],
-                          'updated_at': FieldValue.serverTimestamp(),
-                        });
-
-                    Navigator.pop(context);
-                    _loadAnnouncements();
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Announcement updated successfully'),
-                      ),
-                    );
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error updating announcement: $e'),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  Future<void> _deleteAnnouncement(DocumentSnapshot announcement) async {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Delete Announcement'),
-            content: const Text(
-              'Are you sure you want to delete this announcement? This action cannot be undone.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  try {
-                    await FirebaseFirestore.instance
-                        .collection('announcements')
-                        .doc(announcement.id)
-                        .update({'deleted': true});
-
-                    Navigator.pop(context);
-                    _loadAnnouncements();
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Announcement deleted successfully'),
-                      ),
-                    );
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error deleting announcement: $e'),
-                      ),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-    );
-  }
 }
 
 // ANNOUNCEMENT CARD COMPONENT
@@ -747,16 +792,12 @@ class AnnouncementCard extends StatelessWidget {
   final DocumentSnapshot announcement;
   final int index;
   final bool isDesktop;
-  final Function(DocumentSnapshot) onEdit;
-  final Function(DocumentSnapshot) onDelete;
 
   const AnnouncementCard({
     super.key,
     required this.announcement,
     required this.index,
     required this.isDesktop,
-    required this.onEdit,
-    required this.onDelete,
   });
 
   @override
@@ -1103,8 +1144,8 @@ class AnnouncementCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.grey[50],
               borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(12),
-                bottomRight: Radius.circular(12),
+                bottomLeft: Radius.circular(20),
+                bottomRight: Radius.circular(20),
               ),
               border: Border(
                 top: BorderSide(color: Colors.grey[200]!, width: 1),
@@ -1119,18 +1160,6 @@ class AnnouncementCard extends StatelessWidget {
                     onTap: () => _launchUrl(data['permalink_url']),
                     isPrimary: true,
                   ),
-                ),
-                const SizedBox(width: 8),
-                _buildIconButton(
-                  icon: Icons.edit_rounded,
-                  onTap: () => onEdit(announcement),
-                  color: Colors.blue,
-                ),
-                const SizedBox(width: 8),
-                _buildIconButton(
-                  icon: Icons.delete_rounded,
-                  onTap: () => onDelete(announcement),
-                  color: Colors.red,
                 ),
               ],
             ),
@@ -1150,7 +1179,7 @@ class AnnouncementCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
           decoration: BoxDecoration(
@@ -1195,29 +1224,6 @@ class AnnouncementCard extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildIconButton({
-    required IconData icon,
-    required VoidCallback onTap,
-    required Color color,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withOpacity(0.3), width: 1.5),
-          ),
-          child: Icon(icon, size: 18, color: color),
         ),
       ),
     );
@@ -1308,82 +1314,4 @@ IconData getCategoryIcon(String category) {
 
 Color getCategoryColor(String category) {
   return getColorForCategory(category);
-}
-
-// FACEBOOK API FUNCTION
-Future<List<dynamic>> fetchAndProcessPosts() async {
-  const pageId = '730995450096065';
-  const accessToken =
-      'EAAYTTmxaZBDIBPMA3YuTdB4VM1VoR1qTqeVsZC6zJqYOBZBbQxFkrtZCVM1YXE1o3hoXDWjlgAgnrtQQubu7L9WV6JIGrs5KrZCjcqCtjdqu4DVZAVcykRDBontQftcb7cfNQ85lMmUXQbQJD3PCWV2l4iG6An39i2ZBMUiIzP4Mu45tibI75ZBaxL9RiKEOwltJD6A9xEzx';
-
-  final response = await http.get(
-    Uri.parse(
-      'https://graph.facebook.com/v19.0/$pageId/posts?fields=message,created_time,full_picture,permalink_url&limit=10&access_token=$accessToken',
-    ),
-  );
-
-  if (response.statusCode == 200) {
-    final data = json.decode(response.body);
-    final List<dynamic> posts = data['data'];
-    final cohere = CohereService();
-
-    for (var post in posts) {
-      final postId = post['id'];
-      final message = post['message'] ?? '';
-
-      final postRef = FirebaseFirestore.instance
-          .collection('announcements')
-          .doc(postId);
-
-      final doc = await postRef.get();
-
-      if (!doc.exists && message.isNotEmpty) {
-        try {
-          final cohereResult = await cohere.analyzeAnnouncement(message);
-
-          await postRef.set({
-            'message': message,
-            'created_time': post['created_time'],
-            'full_picture': post['full_picture'] ?? '',
-            'permalink_url': post['permalink_url'] ?? '',
-            'category': cohereResult['category'] ?? 'General',
-            'deadline': cohereResult['deadline'],
-            'deleted': false,
-            'fetched_at': FieldValue.serverTimestamp(),
-            'processed_by_cohere': true,
-          });
-        } catch (e) {
-          await postRef.set({
-            'message': message,
-            'created_time': post['created_time'],
-            'full_picture': post['full_picture'] ?? '',
-            'permalink_url': post['permalink_url'] ?? '',
-            'category': 'General',
-            'deadline': null,
-            'deleted': false,
-            'fetched_at': FieldValue.serverTimestamp(),
-            'processed_by_cohere': false,
-          });
-        }
-      } else if (doc.exists) {
-        final docData = doc.data() as Map<String, dynamic>;
-        final isDeleted = docData['deleted'] ?? false;
-
-        if (isDeleted) {
-          continue;
-        }
-
-        await postRef.update({
-          'message': message,
-          'full_picture': post['full_picture'] ?? '',
-          'permalink_url': post['permalink_url'] ?? '',
-          'last_synced_at': FieldValue.serverTimestamp(),
-        });
-      }
-    }
-
-    return posts;
-  } else {
-    throw Exception('Failed to load Facebook posts: ${response.statusCode}');
-  }
 }

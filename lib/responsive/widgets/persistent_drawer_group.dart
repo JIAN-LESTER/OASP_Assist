@@ -6,9 +6,11 @@ class PersistentDrawerState extends ChangeNotifier {
   static bool _isServicesExpanded =
       false; // Changed from true to false para d mag cgeg open ang services dropdown once mo login or refresh the page
   static bool _isLogsExpanded = false;
+  static bool _isUserManagementExpanded = false;
 
   static bool get isServicesExpanded => _isServicesExpanded;
   static bool get isLogsExpanded => _isLogsExpanded;
+  static bool get isUserManagementExpanded => _isUserManagementExpanded;
 
   static void setServicesExpanded(bool expanded) {
     _isServicesExpanded = expanded;
@@ -18,11 +20,17 @@ class PersistentDrawerState extends ChangeNotifier {
     _isLogsExpanded = expanded;
   }
 
+  static void setUserManagementExpanded(bool expanded) {
+    _isUserManagementExpanded = expanded;
+  }
+
   static bool getExpansionState(int groupIndex) {
     switch (groupIndex) {
       case -1: // Services
-        return _isServicesExpanded;
+        return _isUserManagementExpanded;
       case -2: // Logs
+        return _isServicesExpanded;
+      case -3:
         return _isLogsExpanded;
       default:
         return false;
@@ -31,10 +39,13 @@ class PersistentDrawerState extends ChangeNotifier {
 
   static void setExpansionState(int groupIndex, bool expanded) {
     switch (groupIndex) {
-      case -1: // Services
+      case -1:
+        _isUserManagementExpanded = expanded;
+        break;
+      case -2: // Services
         _isServicesExpanded = expanded;
         break;
-      case -2: // Logs
+      case -3: // Logs
         _isLogsExpanded = expanded;
         break;
     }
@@ -44,6 +55,7 @@ class PersistentDrawerState extends ChangeNotifier {
   static void resetExpansionStates() {
     _isServicesExpanded = false;
     _isLogsExpanded = false;
+    _isUserManagementExpanded = false;
   }
 }
 
@@ -101,9 +113,7 @@ Widget _buildExpandedGroupItem({
           collapsedIconColor: Colors.grey[600],
           textColor: Colors.grey[700],
           collapsedTextColor: Colors.grey[700],
-          expansionAnimationStyle:  AnimationStyle(
-            duration: Duration.zero,
-          ),
+          expansionAnimationStyle: AnimationStyle(duration: Duration.zero),
         ),
       ),
       child: Material(

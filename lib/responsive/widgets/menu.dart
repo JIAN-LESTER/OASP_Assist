@@ -68,12 +68,12 @@ class UniversalUIComponents {
   }) {
     List<Widget> appBarActions = [];
 
-     appBarActions.add(_buildNotificationButton(context, userRole));
+    appBarActions.add(_buildNotificationButton(context, userRole));
 
-  // Add custom actions if provided
-  if (actions != null) {
-    appBarActions.addAll(actions);
-  }
+    // Add custom actions if provided
+    if (actions != null) {
+      appBarActions.addAll(actions);
+    }
 
     // User profile dropdown
     appBarActions.add(_buildUserProfileDropdown(context));
@@ -142,23 +142,6 @@ class UniversalUIComponents {
           ),
         ),
       ),
-    );
-  }
-
-  static Widget buildFloatingNewChatButton(BuildContext context) {
-    return FloatingActionButton.extended(
-      onPressed: () async {
-        await UserConstant.startNewChat(context);
-      },
-      backgroundColor: primaryGreen,
-      foregroundColor: Colors.white,
-      elevation: 6,
-      icon: const Icon(Icons.add, size: 20),
-      label: const Text(
-        'New Chat',
-        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-      ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     );
   }
 
@@ -294,12 +277,18 @@ class UniversalUIComponents {
             MenuItem(
               icon: Icons.person_outline,
               title: 'User Management',
-              index: 5,
+              index: -1,
+              isExpandable: true,
+              subItems: [
+                MenuItem(icon: Icons.person, title: "Users", index: 5),
+                MenuItem(icon: Icons.book, title: "Affiliations", index: 11),
+                MenuItem(icon: Icons.book, title: "Programs", index: 12),
+              ],
             ),
             MenuItem(
               icon: Icons.miscellaneous_services_outlined,
               title: 'Services',
-              index: -1,
+              index: -2,
               isExpandable: true,
               subItems: [
                 MenuItem(
@@ -322,7 +311,7 @@ class UniversalUIComponents {
             MenuItem(
               icon: Icons.list_alt_outlined,
               title: 'Logs',
-              index: -2,
+              index: -3,
               isExpandable: true,
               subItems: [
                 MenuItem(
@@ -594,104 +583,95 @@ class UniversalUIComponents {
     );
   }
 
-  static Widget _buildExpandableMenuItem(
-    BuildContext context,
-    MenuItem item,
-    int selectedIndex,
-    Function(int) onItemTap,
-    StateSetter setDrawerState,
-    UserRole userRole,
-  ) {
-    final bool isAnySubItemSelected =
-        item.subItems?.any((subItem) => subItem.index == selectedIndex) ??
-        false;
+  // 🔹 Add this at the top of your drawer widget (or as static map if inside a class)
+static final Map<String, bool> _expandedState = {
+  'Services': false,
+  'Logs': false,
+  'User Management': false,
+};
 
-    bool _isServicesExpanded = false;
-    bool _isLogsExpanded = false;
 
-    bool isExpanded =
-        item.title == 'Services' ? _isServicesExpanded : _isLogsExpanded;
+ static Widget _buildExpandableMenuItem(
+  BuildContext context,
+  MenuItem item,
+  int selectedIndex,
+  Function(int) onItemTap,
+  StateSetter setDrawerState,
+  UserRole userRole,
+) {
+  final bool isAnySubItemSelected =
+      item.subItems?.any((subItem) => subItem.index == selectedIndex) ?? false;
 
-    return Theme(
-      data: ThemeData(
-        expansionTileTheme: ExpansionTileThemeData(
-          expansionAnimationStyle: AnimationStyle(duration: Duration.zero),
+  // ✅ Get expansion state from the shared map
+  bool isExpanded = _expandedState[item.title] ?? false;
+
+  return Theme(
+    data: ThemeData(
+      expansionTileTheme:  ExpansionTileThemeData(
+        expansionAnimationStyle: AnimationStyle(duration: Duration.zero),
+      ),
+    ),
+    child: ExpansionTile(
+      leading: Icon(
+        item.icon,
+        color: isAnySubItemSelected ? Colors.green[700] : Colors.grey[600],
+        size: 20,
+      ),
+      title: Text(
+        item.title,
+        style: TextStyle(
+          color: isAnySubItemSelected ? Colors.green[800] : Colors.grey[700],
+          fontSize: 14,
+          fontWeight: isAnySubItemSelected ? FontWeight.w600 : FontWeight.w400,
         ),
       ),
-      child: ExpansionTile(
-        leading: Icon(
-          item.icon,
-          color: isAnySubItemSelected ? Colors.green[700] : Colors.grey[600],
-          size: 20,
-        ),
-        title: Text(
-          item.title,
-          style: TextStyle(
-            color: isAnySubItemSelected ? Colors.green[800] : Colors.grey[700],
-            fontSize: 14,
-            fontWeight:
-                isAnySubItemSelected ? FontWeight.w600 : FontWeight.w400,
+      backgroundColor: isAnySubItemSelected ? Colors.green[50] : null,
+      collapsedBackgroundColor:
+          isAnySubItemSelected ? Colors.green[50] : null,
+      initiallyExpanded: isExpanded,
+      onExpansionChanged: (expanded) {
+        setDrawerState(() {
+          _expandedState[item.title] = expanded; // ✅ Persist state
+        });
+      },
+      children: item.subItems?.map(
+        (subItem) => Container(
+          margin: const EdgeInsets.only(left: 16),
+          child: ListTile(
+            leading: Icon(
+              subItem.icon,
+              color: selectedIndex == subItem.index
+                  ? Colors.green[700]
+                  : Colors.grey[500],
+              size: 18,
+            ),
+            title: Text(
+              subItem.title,
+              style: TextStyle(
+                color: selectedIndex == subItem.index
+                    ? Colors.green[800]
+                    : Colors.grey[600],
+                fontSize: 13,
+                fontWeight: selectedIndex == subItem.index
+                    ? FontWeight.w600
+                    : FontWeight.w400,
+              ),
+            ),
+            tileColor:
+                selectedIndex == subItem.index ? Colors.green[50] : null,
+            onTap: () {
+              if (context.mounted && Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
+              onItemTap(subItem.index);
+            },
           ),
         ),
-        backgroundColor: isAnySubItemSelected ? Colors.green[50] : null,
-        collapsedBackgroundColor:
-            isAnySubItemSelected ? Colors.green[50] : null,
-        initiallyExpanded: isExpanded,
-        onExpansionChanged: (expanded) {
-          setDrawerState(() {
-            if (item.title == 'Services') {
-              _isServicesExpanded = expanded;
-            } else if (item.title == 'Logs') {
-              _isLogsExpanded = expanded;
-            }
-          });
-        },
-        children:
-            item.subItems
-                ?.map(
-                  (subItem) => Container(
-                    margin: const EdgeInsets.only(left: 16),
-                    child: ListTile(
-                      leading: Icon(
-                        subItem.icon,
-                        color:
-                            selectedIndex == subItem.index
-                                ? Colors.green[700]
-                                : Colors.grey[500],
-                        size: 18,
-                      ),
-                      title: Text(
-                        subItem.title,
-                        style: TextStyle(
-                          color:
-                              selectedIndex == subItem.index
-                                  ? Colors.green[800]
-                                  : Colors.grey[600],
-                          fontSize: 13,
-                          fontWeight:
-                              selectedIndex == subItem.index
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                        ),
-                      ),
-                      tileColor:
-                          selectedIndex == subItem.index
-                              ? Colors.green[50]
-                              : null,
-                      onTap: () {
-                        if (context.mounted && Navigator.of(context).canPop()) {
-                          Navigator.of(context).pop();
-                        }
-                        onItemTap(subItem.index);
-                      },
-                    ),
-                  ),
-                )
-                .toList() ??
-            [],
-      ),
-    );
-  }
+      ).toList() ?? [],
+    ),
+  );
+}
+
 
   static Widget _buildNewChatAndHistorySection(
     BuildContext context,
@@ -974,55 +954,68 @@ class UniversalUIComponents {
     );
   }
 
-  static Future<void> _deleteConversation(
-    BuildContext context,
-    String conversationId,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Delete Conversation'),
-            content: const Text(
-              'Are you sure you want to delete this conversation?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-    );
+ static Future<void> _deleteConversation(
+  BuildContext context,
+  String conversationId,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Delete Conversation'),
+      content: const Text(
+        'Are you sure you want to delete this conversation and all its messages?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
 
-    if (confirmed == true) {
-      try {
-        await UserConstant.deleteConversation(conversationId);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Conversation deleted'),
-              backgroundColor: primaryGreen,
-            ),
-          );
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to delete: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+  if (confirmed == true) {
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final messagesRef = firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages');
+
+      // 🧹 Delete all messages first
+      final messagesSnapshot = await messagesRef.get();
+      for (final doc in messagesSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // 🗑️ Then delete the conversation document itself
+      await firestore.collection('conversations').doc(conversationId).delete();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Conversation and messages deleted'),
+            backgroundColor: primaryGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
+}
 
   static Widget _buildLogoutSection(BuildContext context) {
     return Container(
@@ -1144,87 +1137,87 @@ class UniversalUIComponents {
     return items;
   }
 
-  // Persistent chat menu item
-  static Widget _buildPersistentChatMenuItem({
-    required BuildContext context,
-    required MenuItem menuItem,
-    required int selectedIndex,
-    required Function(int) onItemTap,
-    required bool isExpanded,
-  }) {
-    final isSelected = selectedIndex == menuItem.index;
+  // // Persistent chat menu item
+  // static Widget _buildPersistentChatMenuItem({
+  //   required BuildContext context,
+  //   required MenuItem menuItem,
+  //   required int selectedIndex,
+  //   required Function(int) onItemTap,
+  //   required bool isExpanded,
+  // }) {
+  //   final isSelected = selectedIndex == menuItem.index;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      constraints: const BoxConstraints(minHeight: 44),
-      child: Material(
-        color: isSelected ? Colors.green[50] : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () => onItemTap(menuItem.index),
-          child: Container(
-            width: double.infinity,
-            constraints: const BoxConstraints(minHeight: 44),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Green vertical line
-                Container(
-                  width: 3,
-                  height: 20,
-                  margin: const EdgeInsets.only(left: 4, right: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.green[700] : Colors.transparent,
-                    borderRadius: BorderRadius.circular(1.5),
-                  ),
-                ),
-                // Icon
-                Container(
-                  width: 20,
-                  height: 20,
-                  margin: const EdgeInsets.only(right: 8),
-                  child: Icon(
-                    menuItem.icon,
-                    color: isSelected ? Colors.green[700] : Colors.grey[600],
-                    size: 20,
-                  ),
-                ),
-                // Text
-                if (isExpanded)
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Text(
-                        menuItem.title,
-                        style: TextStyle(
-                          color:
-                              isSelected ? Colors.green[700] : Colors.grey[700],
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.w400,
-                          fontSize: 14,
-                        ),
-                        softWrap: true,
-                        overflow: TextOverflow.visible,
-                        maxLines: null,
-                      ),
-                    ),
-                  ),
-                if (!isExpanded)
-                  Expanded(
-                    child: Tooltip(
-                      message: menuItem.title,
-                      child: Container(height: 44),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  //   return Container(
+  //     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+  //     constraints: const BoxConstraints(minHeight: 44),
+  //     child: Material(
+  //       color: isSelected ? Colors.green[50] : Colors.transparent,
+  //       borderRadius: BorderRadius.circular(8),
+  //       child: InkWell(
+  //         borderRadius: BorderRadius.circular(8),
+  //         onTap: () => onItemTap(menuItem.index),
+  //         child: Container(
+  //           width: double.infinity,
+  //           constraints: const BoxConstraints(minHeight: 44),
+  //           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+  //           child: Row(
+  //             crossAxisAlignment: CrossAxisAlignment.center,
+  //             children: [
+  //               // Green vertical line
+  //               Container(
+  //                 width: 3,
+  //                 height: 20,
+  //                 margin: const EdgeInsets.only(left: 4, right: 8),
+  //                 decoration: BoxDecoration(
+  //                   color: isSelected ? Colors.green[700] : Colors.transparent,
+  //                   borderRadius: BorderRadius.circular(1.5),
+  //                 ),
+  //               ),
+  //               // Icon
+  //               Container(
+  //                 width: 20,
+  //                 height: 20,
+  //                 margin: const EdgeInsets.only(right: 8),
+  //                 child: Icon(
+  //                   menuItem.icon,
+  //                   color: isSelected ? Colors.green[700] : Colors.grey[600],
+  //                   size: 20,
+  //                 ),
+  //               ),
+  //               // Text
+  //               if (isExpanded)
+  //                 Expanded(
+  //                   child: Container(
+  //                     padding: const EdgeInsets.only(left: 8),
+  //                     child: Text(
+  //                       menuItem.title,
+  //                       style: TextStyle(
+  //                         color:
+  //                             isSelected ? Colors.green[700] : Colors.grey[700],
+  //                         fontWeight:
+  //                             isSelected ? FontWeight.w600 : FontWeight.w400,
+  //                         fontSize: 14,
+  //                       ),
+  //                       softWrap: true,
+  //                       overflow: TextOverflow.visible,
+  //                       maxLines: null,
+  //                     ),
+  //                   ),
+  //                 ),
+  //               if (!isExpanded)
+  //                 Expanded(
+  //                   child: Tooltip(
+  //                     message: menuItem.title,
+  //                     child: Container(height: 44),
+  //                   ),
+  //                 ),
+  //             ],
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   // Persistent New Chat and Chat History Section
   static Widget _buildPersistentNewChatAndHistory(
@@ -1722,98 +1715,103 @@ class UniversalUIComponents {
     );
   }
 
-  static Widget _buildNotificationButton(BuildContext context, UserRole userRole) {
-  final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+  static Widget _buildNotificationButton(
+    BuildContext context,
+    UserRole userRole,
+  ) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
-  if (currentUserId == null) {
-    return IconButton(
-      icon: const Icon(
-        Icons.notifications_outlined,
-        color: Color(0xFF424242),
-        size: 22,
-      ),
-      onPressed: () => _showNotifications(context, userRole),
-    );
-  }
+    if (currentUserId == null) {
+      return IconButton(
+        icon: const Icon(
+          Icons.notifications_outlined,
+          color: Color(0xFF424242),
+          size: 24,
+        ),
+        onPressed: () => _showNotifications(context, userRole),
+      );
+    }
 
-  return StreamBuilder<QuerySnapshot>(
-    stream: FirebaseFirestore.instance
-        .collection('notifications')
-        .where('targetRole', isEqualTo: roleToString(userRole))
-        .orderBy('createdAt', descending: true)
-        .limit(50)
-        .snapshots(),
-    builder: (context, snapshot) {
-      // Count unread notifications
-      int unreadCount = 0;
-      
-      if (snapshot.hasData) {
-        for (var doc in snapshot.data!.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          final readBy = data['readBy'] as List<dynamic>? ?? [];
-          
-          if (!readBy.contains(currentUserId)) {
-            unreadCount++;
+    return StreamBuilder<QuerySnapshot>(
+      stream:
+          FirebaseFirestore.instance
+              .collection('notifications')
+              .where('targetRole', isEqualTo: roleToString(userRole))
+              .orderBy('createdAt', descending: true)
+              .limit(50)
+              .snapshots(),
+      builder: (context, snapshot) {
+        int unreadCount = 0;
+
+        if (snapshot.hasData) {
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final readBy = data['readBy'] as List<dynamic>? ?? [];
+            if (!readBy.contains(currentUserId)) unreadCount++;
           }
         }
-      }
 
-      return Stack(
-        clipBehavior: Clip.none,
-        children: [
-          IconButton(
-            icon: Icon(
-              unreadCount > 0 
-                  ? Icons.notifications_active 
-                  : Icons.notifications_outlined,
-              color: unreadCount > 0 
-                  ? const Color(0xFF2E7D32) 
-                  : const Color(0xFF424242),
-              size: 22,
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // 🔔 Main notification icon
+            IconButton(
+              icon: Icon(
+                unreadCount > 0
+                    ? Icons.notifications_active_rounded
+                    : Icons.notifications_none_rounded,
+                color:
+                    unreadCount > 0
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFF424242),
+                size: 26,
+              ),
+              tooltip: "Notifications",
+              onPressed: () => _showNotifications(context, userRole),
             ),
-            onPressed: () => _showNotifications(context, userRole),
-          ),
-          if (unreadCount > 0)
-            Positioned(
-              right: 6,
-              top: 6,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white,
-                    width: 1.5,
+
+            // 🔴 Small badge
+            if (unreadCount > 0)
+              Positioned(
+                right: 6,
+                top: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1.5,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.red.withOpacity(0.5),
-                      blurRadius: 4,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                constraints: const BoxConstraints(
-                  minWidth: 16,
-                  minHeight: 16,
-                ),
-                child: Center(
-                  child: Text(
-                    unreadCount > 99 ? '99+' : unreadCount.toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade600,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white, width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.4),
+                        blurRadius: 3,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 14,
+                  ),
+                  child: Center(
+                    child: Text(
+                      unreadCount > 99 ? '99+' : unreadCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        height: 1,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
-      );
-    },
-  );
-}
-
+          ],
+        );
+      },
+    );
+  }
 }

@@ -134,189 +134,280 @@ Future<void> _showTokenInputModal() async {
     builder: (context) => StatefulBuilder(
       builder: (context, setDialogState) {
         return AlertDialog(
+          backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
+          titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
           title: Row(
-            children: [
-              Icon(Icons.facebook, color: Colors.blue[700], size: 28),
-              SizedBox(width: 12),
+            children: const [
+              Icon(Icons.facebook, color: Color(0xFF2E7D32), size: 28),
+              SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Configure Facebook Token',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2E7D32),
+                  ),
                 ),
               ),
             ],
           ),
-          content: Container(
-            width: 500,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Instructions
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue[200]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.info, color: Colors.blue[700], size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'How to get token:',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue[900],
+          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 🧭 Instruction Box
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Color(0xFF2E7D32).withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline,
+                                color: Color(0xFF2E7D32), size: 20),
+                            SizedBox(width: 6),
+                            Text(
+                              'How to Get Your Facebook Access Token:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1B5E20),
+                                fontSize: 15,
+                              ),
                             ),
+                          ],
+                        ),
+                        SizedBox(height: 10),
+                        Text.rich(
+                          TextSpan(
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: Color(0xFF2E7D32),
+                              height: 1.55,
+                            ),
+                            children: [
+                              TextSpan(text: '1. Visit '),
+                              TextSpan(
+                                text: 'https://developers.facebook.com/',
+                                style: TextStyle(
+                                  color: Colors.blueAccent,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                              TextSpan(
+                                  text:
+                                      ' and log in using your Facebook account.\n'),
+                              TextSpan(
+                                  text:
+                                      '2. On the top bar, click “My Apps” → “Create App”.\n'),
+                              TextSpan(
+                                text:
+                                    '3. Choose "Manage everything on your Page" as the use case, and select "Business" as the App Type.',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(
+                                  text:
+                                      '\n4. Fill out the following details:\n   • App Display Name: OASP Assist\n   • Contact Email: your official email\n   • Business Account: Optional\n'),
+                              TextSpan(text: '5. Click “Create App”.\n\n'),
+                              TextSpan(
+                                  text:
+                                      '6. In the left sidebar, open “Use Cases” and select your created app.\n'),
+                              TextSpan(
+                                  text:
+                                      '7. Under “Manage everything on your Page”, enable:\n   '),
+                              TextSpan(
+                                text:
+                                    '✅ pages_read_engagement\n   ✅ pages_manage_posts\n   ✅ pages_show_list\n   ✅ pages_read_user_content\n   ✅ pages_manage_metadata\n',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  color: Color(0xFF1B5E20),
+                                ),
+                              ),
+                              TextSpan(
+                                  text:
+                                      '8. Go to “Tools” → “Graph API Explorer”.\n9. Select your app and check the same permissions.\n10. Click “Generate Access Token” and copy it below.'),
+                            ],
                           ),
-                        ],
+                        ),
+                        SizedBox(height: 10),
+                        Divider(color: Color(0xFFBDBDBD)),
+                        Text(
+                          '💡 Tip: Use a Business App to access Page posts and insights effectively.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF2E7D32),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // 🔑 Token Input
+                  const Text(
+                    'Facebook Access Token',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1B5E20),
+                      fontSize: 14.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: tokenController,
+                    maxLines: 3,
+                    enabled: !isExchanging,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Paste your token here...',
+                      hintStyle: const TextStyle(color: Colors.grey),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Color(0xFF2E7D32), width: 1),
                       ),
-                      SizedBox(height: 8),
-                      Text(
-                        '1. Visit: developers.facebook.com/tools/explorer/\n'
-                        '2. Select your app\n'
-                        '3. Grant permissions: pages_read_engagement, pages_manage_posts\n'
-                        '4. Click "Generate Access Token"\n'
-                        '5. Copy and paste the token below',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.blue[800],
-                          height: 1.4,
+                      focusedBorder: const OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderSide: BorderSide(
+                          color: Color(0xFF2E7D32),
+                          width: 2,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                
-                SizedBox(height: 16),
-                
-                // Token Input
-                Text(
-                  'Facebook Access Token',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
-                  ),
-                ),
-                SizedBox(height: 8),
-                TextField(
-                  controller: tokenController,
-                  maxLines: 4,
-                  enabled: !isExchanging,
-                  decoration: InputDecoration(
-                    hintText: 'Paste your token here...',
-                    hintStyle: TextStyle(color: Colors.grey[400]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    contentPadding: EdgeInsets.all(12),
-                  ),
-                ),
-                
-                SizedBox(height: 12),
-                
-                // Paste Button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: isExchanging ? null : () async {
-                      final data = await Clipboard.getData('text/plain');
-                      if (data?.text != null) {
-                        tokenController.text = data!.text!;
-                        _showSuccessSnackBar('✅ Token pasted from clipboard');
-                      }
-                    },
-                    icon: Icon(Icons.content_paste),
-                    label: Text('Paste from Clipboard'),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 12),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.all(12),
                     ),
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 12),
+
+                  // 📋 Paste Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: isExchanging
+                          ? null
+                          : () async {
+                              final data =
+                                  await Clipboard.getData('text/plain');
+                              if (data?.text != null) {
+                                tokenController.text = data!.text!;
+                                _showSuccessSnackBar(
+                                    '✅ Token pasted from clipboard');
+                              }
+                            },
+                      icon: const Icon(Icons.content_paste_rounded,
+                          color: Color(0xFF2E7D32), size: 18),
+                      label: const Text(
+                        'Paste from Clipboard',
+                        style: TextStyle(
+                          color: Color(0xFF2E7D32),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF2E7D32), width: 1.5),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
+
+          // 🟢 Action Buttons
+          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
           actions: [
             TextButton(
               onPressed: isExchanging ? null : () => Navigator.pop(context),
-              child: Text('Cancel'),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+              ),
             ),
             ElevatedButton.icon(
-              onPressed: isExchanging ? null : () async {
-                final token = tokenController.text.trim();
-                
-                if (token.isEmpty) {
-                  _showErrorSnackBar('Please enter a token');
-                  return;
-                }
-                
-                if (token.length < 50) {
-                  _showErrorSnackBar('Token seems too short');
-                  return;
-                }
-                
-                setDialogState(() => isExchanging = true);
-                
-                try {
-                  print('🔄 Exchanging token...');
-                  
-                  final result = await FacebookSyncService.exchangeToken(token);
-                  
-                  print('📦 Exchange result: $result');
-                  
-                  if (result['success'] == true || result['ok'] == true) {
-                    final expiresIn = result['expires_in'] ?? 0;
-                    final daysValid = (expiresIn / 86400).round();
-                    
-                    Navigator.pop(context); // Close dialog
-                    
-                    _showSuccessSnackBar(
-                      'Token saved! Valid for ~$daysValid days'
-                    );
-                    
-                    // 🎯 AUTO-SYNC: Automatically sync posts after token is saved
-                    print('🎯 Auto-syncing Facebook posts after token save...');
-                    await _autoSyncAfterTokenSave();
-                    
-                    return;
-                  }
-                  
-                  throw Exception(result['message'] ?? result['error'] ?? 'Failed to exchange token');
-                  
-                } catch (e) {
-                  print('❌ Error: $e');
-                  
-                  setDialogState(() => isExchanging = false);
-                  
-                  final errorMessage = FacebookSyncService.parseErrorMessage(e);
-                  _showErrorSnackBar('Failed to save token: $errorMessage');
-                }
-              },
+              onPressed: isExchanging
+                  ? null
+                  : () async {
+                      final token = tokenController.text.trim();
+
+                      if (token.isEmpty) {
+                        _showErrorSnackBar('Please enter a token');
+                        return;
+                      }
+
+                      if (token.length < 50) {
+                        _showErrorSnackBar('Token seems too short');
+                        return;
+                      }
+
+                      setDialogState(() => isExchanging = true);
+
+                      try {
+                        print('🔄 Exchanging token...');
+                        final result =
+                            await FacebookSyncService.exchangeToken(token);
+
+                        if (result['success'] == true ||
+                            result['ok'] == true) {
+                          final expiresIn = result['expires_in'] ?? 0;
+                          final daysValid = (expiresIn / 86400).round();
+
+                          Navigator.pop(context);
+                          _showSuccessSnackBar(
+                              '✅ Token saved! Valid for ~$daysValid days.');
+                          await _autoSyncAfterTokenSave();
+                          return;
+                        }
+
+                        throw Exception(result['message'] ?? result['error']);
+                      } catch (e) {
+                        print('❌ Error: $e');
+                        setDialogState(() => isExchanging = false);
+                        final errorMessage =
+                            FacebookSyncService.parseErrorMessage(e);
+                        _showErrorSnackBar(
+                            'Failed to save token: $errorMessage');
+                      }
+                    },
               icon: isExchanging
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                  : Icon(Icons.save),
+                  : const Icon(Icons.save, size: 18),
               label: Text(isExchanging ? 'Saving...' : 'Save Token'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue[700],
+                backgroundColor: const Color(0xFF2E7D32),
                 foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 2,
               ),
             ),
           ],
@@ -325,6 +416,8 @@ Future<void> _showTokenInputModal() async {
     ),
   );
 }
+
+
 
 // 🎯 NEW: Auto-sync after token is saved
 Future<void> _autoSyncAfterTokenSave() async {
@@ -661,95 +754,7 @@ void _showErrorSnackBar(String message) {
     ),
   );
 }
-// Exchange token via HTTP (for Windows)
-Future<Map<String, dynamic>> _exchangeTokenViaHttp(String shortToken) async {
-  print('📡 Exchanging token via HTTP (Windows)...');
-  
-  final authToken = await _getAuthToken();
-  if (authToken == null) {
-    throw Exception('Not authenticated. Please log in first.');
-  }
-  
-  const functionUrl = 'https://exchangetokenhttp-kt3rxdstza-uc.a.run.app';
-  
-  final response = await http.post(
-    Uri.parse(functionUrl),
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $authToken',
-    },
-    body: json.encode({
-      'data': {
-        'uid': 'facebook_admin',
-        'short_token': shortToken,
-      }
-    }),
-  ).timeout(Duration(seconds: 30));
-  
-  print('📦 HTTP Response: ${response.statusCode}');
-  print('📦 HTTP Body: ${response.body}');
-  
-  if (response.statusCode == 200) {
-    final data = json.decode(response.body);
-    return data['result'] ?? data;
-  } else {
-    throw Exception('Server error: ${response.statusCode} - ${response.body}');
-  }
-}
 
-
-
-// Sync via Cloud Functions SDK (Web/Mobile)
-Future<Map<String, dynamic>> _syncViaCloudFunctions() async {
-  print('📞 Using Cloud Functions SDK...');
-  
-  final HttpsCallable callable = FirebaseFunctions.instance
-      .httpsCallable('manualSyncFacebookPosts');
-  
-  final result = await callable.call(<String, dynamic>{})
-      .timeout(Duration(seconds: 60));
-  
-  print('📦 Received response: ${result.data}');
-  
-  if (result.data == null) {
-    throw Exception('No response data from server');
-  }
-  
-  return result.data as Map<String, dynamic>;
-}
-
-// Sync via HTTP (Windows)
-Future<Map<String, dynamic>> _syncViaHttp() async {
-  print('📡 Using HTTP (Windows)...');
-  
-  final authToken = await _getAuthToken();
-  if (authToken == null) {
-    throw Exception('Not authenticated. Please log in first.');
-  }
-  
-  const functionUrl = 'https://manualsyncfacebookposts-kt3rxdstza-uc.a.run.app';
-  
-  final response = await http.post(
-    Uri.parse(functionUrl),
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $authToken',
-    },
-    body: json.encode({
-      'data': {}
-    }),
-  ).timeout(Duration(seconds: 60));
-  
-  print('📦 HTTP Response: ${response.statusCode}');
-  print('📦 HTTP Body: ${response.body}');
-  
-  if (response.statusCode == 200) {
-    final data = json.decode(response.body);
-    return data['result'] ?? data;
-  } else {
-    throw Exception('Server error: ${response.statusCode} - ${response.body}');
-  }
-}
 
 
 Future<void> testCloudFunctions() async {

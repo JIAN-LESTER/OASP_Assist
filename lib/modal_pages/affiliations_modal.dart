@@ -16,7 +16,7 @@ class ManageAffiliationDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ResponsiveLayout(
+    return ResponsiveLayout(  
       mobileBody: _buildModal(context, true, false, false),
       tabletBody: _buildModal(context, false, true, false),
       desktopBody: _buildModal(context, false, false, true),

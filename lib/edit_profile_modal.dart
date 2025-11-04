@@ -462,7 +462,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
               ),
             ),
           ),
-          Expanded(child: child),
+          Expanded(flex: 2, child: child),
         ],
       ),
     );
@@ -521,61 +521,64 @@ class _EditProfileModalState extends State<EditProfileModal> {
     );
   }
 
-  Widget _buildDropdownField({
-    required String? value,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-    required String hint,
-    required IconData icon,
-  }) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 15),
-        prefixIcon: Container(
-          padding: const EdgeInsets.all(12),
-          margin: const EdgeInsets.only(right: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF2E7D32).withOpacity(0.12),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 18, color: const Color(0xFF2E7D32)),
+ Widget _buildDropdownField({
+  required String? value,
+  required List<String> items,
+  required ValueChanged<String?> onChanged,
+  required String hint,
+  required IconData icon,
+}) {
+  return DropdownButtonFormField<String>(
+    isExpanded: true, // ✅ ensures the dropdown and text fit within available space
+    value: value,
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+      prefixIcon: Container(
+        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2E7D32).withOpacity(0.12),
+          borderRadius: BorderRadius.circular(8),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Icon(icon, size: 18, color: const Color(0xFF2E7D32)),
       ),
-      items: items.map((item) {
-        return DropdownMenuItem<String>(
-          value: item,
-          child: Text(
-            item,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF111827),
-            ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+      ),
+      filled: true,
+      fillColor: Colors.grey.shade50,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    ),
+    items: items.map((item) {
+      return DropdownMenuItem<String>(
+        value: item,
+        child: Text(
+          item,
+          overflow: TextOverflow.ellipsis, // ✅ prevents text overflow
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF111827),
           ),
-        );
-      }).toList(),
-      onChanged: onChanged,
-      dropdownColor: Colors.white,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF6B7280)),
-    );
-  }
+        ),
+      );
+    }).toList(),
+    onChanged: onChanged,
+    dropdownColor: Colors.white,
+    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF6B7280)),
+  );
+}
+
 
   Widget _buildRadioOption({
     required String title,
