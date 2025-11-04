@@ -168,116 +168,338 @@ class _NotificationModalState extends State<NotificationModal> {
     }
   }
 
-  void _handleNotificationTap(Map<String, dynamic> data) {
+  // ✅ ENHANCED: Handle notification taps with proper navigation
+  Future<void> _handleNotificationTap(Map<String, dynamic> data) async {
     final type = data['type'] as String?;
+    final relatedId = data['relatedId'] as String?;
     
-    print('🔔 Notification tapped - Type: $type');
+    print('🔔 Notification tapped - Type: $type, RelatedId: $relatedId, Role: ${widget.role}');
     
-    if (type == 'escalation_reply') {
-      final escalationId = data['escalationId'] as String?;
-      final dataMap = data['data'] as Map<String, dynamic>?;
-      
-      if (escalationId != null) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
+    if (type == null) {
+      print('⚠️ No notification type found');
+      return;
+    }
+
+    // Close the notification modal first
+    Navigator.of(context).pop();
+
+    // Handle based on type and role
+    switch (type) {
+      case 'escalation_reply':
+        if (widget.role == 'user') {
+          await _showEscalationResponse(relatedId);
+        }
+        break;
+
+      case 'new_escalation':
+        if (widget.role == 'staff') {
+          await _navigateToEscalationDetail(relatedId);
+        }
+        break;
+
+      case 'announcement':
+        await _navigateToAnnouncement(relatedId);
+        break;
+
+      case 'deadline_reminder':
+        await _navigateToAnnouncementsList();
+        break;
+
+      default:
+        print('⚠️ Unhandled notification type: $type');
+    }
+  }
+
+  // ✅ USER: Show escalation response dialog
+  Future<void> _showEscalationResponse(String? escalationId) async {
+    if (escalationId == null || escalationId.isEmpty) {
+      _showError('No escalation ID provided');
+      return;
+    }
+
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+        ),
+      );
+
+      // Fetch escalation details
+      final escalationDoc = await _firestore
+          .collection('escalations')
+          .where('escalationId', isEqualTo: escalationId)
+          .limit(1)
+          .get();
+
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+
+      if (escalationDoc.docs.isEmpty) {
+        _showError('Escalation not found');
+        return;
+      }
+
+      final escalation = escalationDoc.docs.first.data();
+      final staffResponse = escalation['staffResponse'] ?? 'No response yet';
+      final respondedBy = escalation['respondedBy'] ?? 'Staff';
+      final respondedAt = escalation['respondedAt'] as Timestamp?;
+      final userQuestion = escalation['question'] ?? 'No question available';
+      final conversationId = escalation['conversationId'] as String?;
+
+      if (!mounted) return;
+
+      // Show response dialog
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.support_agent,
+                  color: Color(0xFF2E7D32),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Staff Response',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (respondedAt != null)
+                      Text(
+                        _formatTime(respondedAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.normal,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.reply, color: Colors.blue),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Staff Response',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                // Original question
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.question_answer,
+                            size: 16,
+                            color: Colors.grey.shade600,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Your Question',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        userQuestion,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade700,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Staff response
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFF2E7D32).withOpacity(0.1),
+                        const Color(0xFF388E3C).withOpacity(0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFF2E7D32).withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.support_agent,
+                            size: 16,
+                            color: Color(0xFF2E7D32),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Response from $respondedBy',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2E7D32),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        staffResponse,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade800,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Your Question:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[700],
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      dataMap?['question'] ?? 'No question',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Staff Reply:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue[700],
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue[200]!),
-                    ),
-                    child: Text(
-                      dataMap?['staffReply'] ?? 'No reply',
-                      style: TextStyle(fontSize: 14, color: Colors.blue[900]),
-                    ),
-                  ),
-                ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Close',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
+            if (conversationId != null && conversationId.isNotEmpty)
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // Navigate to chat with conversation
+                  Navigator.of(context).pushNamed(
+                    '/chat',
+                    arguments: {'conversationId': conversationId},
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E7D32),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'View Chat',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
-            ],
-          ),
-        );
-      }
-    } else if (type == 'new_escalation') {
-      final escalationId = data['escalationId'] as String?;
-      
-      if (escalationId != null) {
-        // Navigate to escalation detail page
-        // You can implement navigation to HumanEscalation page here
-        Navigator.pop(context); // Close notification modal
-        // Then navigate to escalation details
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('View Escalation'),
-            content: Text('Navigate to escalation details for: $escalationId'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Close'),
-              ),
-            ],
-          ),
-        );
-      }
+          ],
+        ),
+      );
+    } catch (e) {
+      print('❌ Error fetching escalation: $e');
+      _showError('Failed to load response: $e');
     }
+  }
+
+  // ✅ STAFF: Navigate to escalation detail
+  Future<void> _navigateToEscalationDetail(String? escalationId) async {
+    if (escalationId == null || escalationId.isEmpty) {
+      _showError('No escalation ID provided');
+      return;
+    }
+
+    // Navigate to Human Escalation screen with the specific escalation
+    Navigator.of(context).pushNamed(
+      '/staff/escalations',
+      arguments: {
+        'escalationId': escalationId,
+        'autoOpen': true, // Flag to auto-open the dialog
+      },
+    );
+  }
+
+  // ✅ Navigate to announcement detail
+  Future<void> _navigateToAnnouncement(String? announcementId) async {
+    if (announcementId == null || announcementId.isEmpty) {
+      _showError('No announcement ID provided');
+      return;
+    }
+
+    Navigator.of(context).pushNamed(
+      '/announcements/detail',
+      arguments: {'announcementId': announcementId},
+    );
+  }
+
+  // ✅ Navigate to announcements list
+  Future<void> _navigateToAnnouncementsList() async {
+    Navigator.of(context).pushNamed('/announcements');
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red.shade600),
+            const SizedBox(width: 12),
+            const Text('Error'),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -398,13 +620,13 @@ class _NotificationModalState extends State<NotificationModal> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error_outline, size: 48, color: Colors.red),
-                        SizedBox(height: 16),
-                        Text('Error loading notifications'),
-                        SizedBox(height: 8),
+                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                        const SizedBox(height: 16),
+                        const Text('Error loading notifications'),
+                        const SizedBox(height: 8),
                         Text(
                           snapshot.error.toString(),
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
                           textAlign: TextAlign.center,
                         ),
                       ],

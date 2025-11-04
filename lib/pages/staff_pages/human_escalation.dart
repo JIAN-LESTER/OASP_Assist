@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:capstone_project/modal_pages/escalation_info.dart';
 
 class HumanEscalation extends StatefulWidget {
-  const HumanEscalation({super.key});
+  const HumanEscalation({super.key, required bool autoOpen, String? initialEscalationId});
 
   @override
   State<HumanEscalation> createState() => _HumanEscalationState();

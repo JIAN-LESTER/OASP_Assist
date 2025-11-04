@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:capstone_project/colors.dart';
 
@@ -31,6 +32,17 @@ class NotificationService {
   bool _initialized = false;
   bool get isAndroidOrIOS => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
+  // ✅ NEW: Navigation callback
+  Function(String notificationType, Map<String, dynamic> data)? _onNotificationTap;
+
+  // ✅ NEW: Set navigation handler
+  void setNavigationHandler(
+    Function(String notificationType, Map<String, dynamic> data) handler,
+  ) {
+    _onNotificationTap = handler;
+    print('✅ Navigation handler registered');
+  }
+
   Future<void> initialize() async {
     if (_initialized) {
       print('⚠️ Notification service already initialized');
@@ -42,10 +54,8 @@ class NotificationService {
 
     try {
       if (isAndroidOrIOS) {
-        // ✅ Android/iOS: Use FCM + Local Notifications
         await _initializeMobileNotifications();
       } else {
-        // ✅ Web/Windows: Save web token only
         await _saveWebToken();
         print('✅ Web notifications initialized (in-app only)');
       }
@@ -59,11 +69,11 @@ class NotificationService {
     }
   }
 
-  // ✅ Initialize for Android/iOS (FCM + Local Notifications)
   Future<void> _initializeMobileNotifications() async {
     print('📱 Initializing mobile notifications (FCM)...');
     
-    // Request permissions FIRST
+    await _initializeLocalNotifications();
+    
     final settings = await _requestPermissions();
     
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
@@ -73,20 +83,21 @@ class NotificationService {
 
     print('✅ Notification permission granted: ${settings.authorizationStatus}');
 
-    // Initialize local notifications BEFORE setting up listeners
-    await _initializeLocalNotifications();
+    if (Platform.isIOS) {
+      await _firebaseMessaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      print('✅ iOS foreground notification presentation configured');
+    }
 
-    // Get and save FCM token
     await _saveFCMToken();
-
-    // Listen for token refresh
     _firebaseMessaging.onTokenRefresh.listen(_onTokenRefresh);
 
-    // ✅ CRITICAL: Set up message handlers
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageTap);
 
-    // Check for notification that opened the app from terminated state
     final initialMessage = await _firebaseMessaging.getInitialMessage();
     if (initialMessage != null) {
       print('📬 App opened from notification (terminated state)');
@@ -113,19 +124,16 @@ class NotificationService {
   Future<void> _initializeLocalNotifications() async {
     print('🔧 Setting up local notifications...');
 
-    // ✅ ANDROID: Create notification channels
     final androidImplementation = _localNotifications
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     
     if (androidImplementation != null) {
-
-      
       await androidImplementation.createNotificationChannel(
         const AndroidNotificationChannel(
           'announcements',
           'Announcements',
           description: 'General announcements and updates',
-          importance: Importance.high,
+          importance: Importance.max,
           playSound: true,
           enableVibration: true,
           enableLights: true,
@@ -151,7 +159,7 @@ class NotificationService {
           'escalations',
           'Escalations',
           description: 'Question escalations and responses',
-          importance: Importance.high,
+          importance: Importance.max,
           playSound: true,
           enableVibration: true,
           enableLights: true,
@@ -159,10 +167,9 @@ class NotificationService {
         ),
       );
 
-      print('✅ Android notification channels created');
+      print('✅ Android notification channels created with MAX importance');
     }
 
-    // ✅ iOS: Request permissions
     final iosImplementation = _localNotifications
         .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
     
@@ -183,6 +190,9 @@ class NotificationService {
           requestAlertPermission: true,
           requestBadgePermission: true,
           requestSoundPermission: true,
+          defaultPresentAlert: true,
+          defaultPresentBadge: true,
+          defaultPresentSound: true,
         );
 
     const InitializationSettings initSettings = InitializationSettings(
@@ -192,7 +202,7 @@ class NotificationService {
 
     await _localNotifications.initialize(
       initSettings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
+      onDidReceiveNotificationResponse: _onLocalNotificationTapped,
     );
 
     print('✅ Local notifications initialized');
@@ -206,13 +216,15 @@ class NotificationService {
         return;
       }
 
-      // ✅ CRITICAL: Get APNS token first on iOS
       if (Platform.isIOS) {
         final apnsToken = await _firebaseMessaging.getAPNSToken();
         if (apnsToken == null) {
           print('⚠️ APNS token not available yet, waiting...');
-          // Wait a bit for APNS token
-          await Future.delayed(const Duration(seconds: 2));
+          await Future.delayed(const Duration(seconds: 3));
+          final retryApnsToken = await _firebaseMessaging.getAPNSToken();
+          if (retryApnsToken == null) {
+            print('⚠️ APNS token still not available after retry');
+          }
         }
       }
 
@@ -255,7 +267,6 @@ class NotificationService {
     await _saveFCMToken();
   }
 
-  // ✅ CRITICAL: Handle foreground messages
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     print('📬 ===== FOREGROUND MESSAGE =====');
     print('📬 Message ID: ${message.messageId}');
@@ -264,7 +275,6 @@ class NotificationService {
     print('📬 Data: ${message.data}');
     print('📬 ===============================');
 
-    // ✅ Show local notification when app is in foreground
     await _showLocalNotification(message);
   }
 
@@ -276,22 +286,38 @@ class NotificationService {
     final type = message.data['type'] ?? 'announcement';
 
     final channelId = _getChannelId(type);
-    final importance = type == 'deadline_reminder' ? Importance.max : Importance.high;
+    
+    final importance = Importance.max;
+    final priority = Priority.max;
 
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       channelId,
       _getChannelName(channelId),
       channelDescription: _getChannelDescription(channelId),
       importance: importance,
-      priority: type == 'deadline_reminder' ? Priority.max : Priority.high,
+      priority: priority,
       icon: '@mipmap/ic_launcher',
       color: _getNotificationColor(message.data['category']),
       enableVibration: true,
       playSound: true,
       enableLights: true,
-      styleInformation: BigTextStyleInformation(body),
+      fullScreenIntent: true,
+      visibility: NotificationVisibility.public,
+      category: AndroidNotificationCategory.message,
+      autoCancel: true,
+      ongoing: false,
+      styleInformation: BigTextStyleInformation(
+        body,
+        contentTitle: title,
+        htmlFormatContentTitle: true,
+        htmlFormatBigText: true,
+        summaryText: _getChannelName(channelId),
+      ),
       ticker: title,
       showWhen: true,
+      when: DateTime.now().millisecondsSinceEpoch,
+      groupKey: 'com.example.capstone_project.notifications',
+      setAsGroupSummary: false,
     );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
@@ -299,6 +325,8 @@ class NotificationService {
       presentBadge: true,
       presentSound: true,
       badgeNumber: 1,
+      sound: 'default',
+      interruptionLevel: InterruptionLevel.timeSensitive,
     );
 
     final NotificationDetails details = NotificationDetails(
@@ -308,38 +336,124 @@ class NotificationService {
 
     final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     
+    // ✅ NEW: Create payload with type and data
+    final payload = _createPayload(message.data);
+    
     try {
       await _localNotifications.show(
         notificationId,
         title,
         body,
         details,
-        payload: message.data['announcementId'] ?? message.data['escalationId'] ?? '',
+        payload: payload,
       );
       print('✅ Local notification shown with ID: $notificationId');
+      print('✅ Payload: $payload');
     } catch (e) {
       print('❌ Error showing notification: $e');
     }
   }
 
+  // ✅ NEW: Create payload from message data
+  String _createPayload(Map<String, dynamic> data) {
+    final type = data['type'] ?? 'announcement';
+    final id = data['announcementId'] ?? 
+               data['escalationId'] ?? 
+               data['conversationId'] ?? 
+               '';
+    final category = data['category'] ?? '';
+    
+    // Format: type|id|category
+    return '$type|$id|$category';
+  }
+
+  // ✅ NEW: Handle FCM message tap (background/terminated)
   void _handleMessageTap(RemoteMessage message) {
-    print('👆 ===== NOTIFICATION TAPPED =====');
+    print('👆 ===== NOTIFICATION TAPPED (FCM) =====');
     print('👆 Message ID: ${message.messageId}');
     print('👆 Data: ${message.data}');
-    print('👆 ================================');
+    print('👆 ====================================');
     
-    // TODO: Implement navigation based on type
-    // You can use a global navigator key or a callback to handle navigation
+    final type = message.data['type'] ?? 'announcement';
+    _navigateBasedOnNotification(type, message.data);
   }
 
-  void _onNotificationTapped(NotificationResponse response) {
-    print('👆 Local notification tapped');
+  // ✅ NEW: Handle local notification tap
+  void _onLocalNotificationTapped(NotificationResponse response) {
+    print('👆 ===== LOCAL NOTIFICATION TAPPED =====');
     print('👆 Payload: ${response.payload}');
+    print('👆 =======================================');
     
-    // TODO: Implement navigation
+    if (response.payload == null || response.payload!.isEmpty) {
+      print('⚠️ No payload in notification');
+      return;
+    }
+
+    // Parse payload: type|id|category
+    final parts = response.payload!.split('|');
+    if (parts.isEmpty) return;
+
+    final type = parts[0];
+    final id = parts.length > 1 ? parts[1] : '';
+    final category = parts.length > 2 ? parts[2] : '';
+
+    final data = {
+      'type': type,
+      if (type == 'announcement') 'announcementId': id,
+      if (type == 'escalation_reply' || type == 'new_escalation') 'escalationId': id,
+      if (category.isNotEmpty) 'category': category,
+    };
+
+    _navigateBasedOnNotification(type, data);
   }
 
-  // ✅ Save web token (for tracking)
+  // ✅ NEW: Navigate based on notification type and user role
+  Future<void> _navigateBasedOnNotification(
+    String type,
+    Map<String, dynamic> data,
+  ) async {
+    if (_onNotificationTap == null) {
+      print('⚠️ No navigation handler registered');
+      return;
+    }
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print('⚠️ No user logged in');
+        return;
+      }
+
+      // Get user role
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      final role = userDoc.data()?['role'] ?? 'user';
+
+      print('🔔 Navigation: Type=$type, Role=$role');
+      print('🔔 Data: $data');
+
+      // Handle based on type and role
+      if (type == 'new_escalation' && role == 'staff') {
+        // Staff: Navigate to escalation detail
+        _onNotificationTap!('escalation_detail', data);
+      } else if (type == 'escalation_reply' && role == 'user') {
+        // User: Show escalation response dialog
+        _onNotificationTap!('escalation_response', data);
+      } else if (type == 'announcement') {
+        // Both: Navigate to announcement detail
+        _onNotificationTap!('announcement', data);
+      } else if (type == 'deadline_reminder') {
+        // Both: Navigate to announcements
+        _onNotificationTap!('announcements_list', data);
+      }
+    } catch (e) {
+      print('❌ Error handling notification navigation: $e');
+    }
+  }
+
   Future<void> _saveWebToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -427,6 +541,7 @@ class NotificationService {
       }
 
       _initialized = false;
+      _onNotificationTap = null;
       print('✅ Notification service cleaned up');
     } catch (e) {
       print('❌ Error during cleanup: $e');

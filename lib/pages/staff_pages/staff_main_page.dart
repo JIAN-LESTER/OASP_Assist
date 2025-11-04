@@ -26,7 +26,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
   final List<Widget> _pages = const [
     StaffDashboardPage(),
     StaffReportsPage(),
-    HumanEscalation(),
+    HumanEscalation(autoOpen: true,),
     StaffAnnouncementPage(),
 
     StaffMessageLogsPage(),

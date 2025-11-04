@@ -887,130 +887,233 @@ Widget _buildRatingButtonsUI(String messageId, String? currentRating, Message me
   }
 }
 
-  Future<void> _processManualEscalation(Message message) async {
-    try {
-      String userQuestion = '';
-      String botAnswer = '';
+ Future<void> _processManualEscalation(Message message) async {
+  final reasonController = TextEditingController();
+  String selectedReason = 'Bot response not accurate'; // default option
 
-      if (message.sender == 'bot') {
-        botAnswer = message.content;
-
-        final userMessages =
-            Provider.of<ChatProvider>(context, listen: false).messages
-                .where(
-                  (m) =>
-                      m.sender == 'user' &&
-                      m.conversationId == message.conversationId &&
-                      m.sentAt.isBefore(message.sentAt),
-                )
-                .toList();
-
-        if (userMessages.isNotEmpty) {
-          userMessages.sort((a, b) => b.sentAt.compareTo(a.sentAt));
-          userQuestion = userMessages.first.content;
-        }
-      } else {
-        userQuestion = message.content;
-        botAnswer = 'No bot response available';
-      }
-
-      final escalationId = _firestore.collection('escalations').doc().id;
-      final escalatedData = {
-        'escalationId': escalationId,
-        'userId': FirebaseAuth.instance.currentUser?.uid,
-        'conversationId': message.conversationId,
-        'question': userQuestion,
-        'botAnswer': botAnswer,
-        'status': 'pending',
-        'reason': 'User reported as not helpful',
-        'createdAt': Timestamp.now(),
-        'messageId': message.id,
-      };
-
-      await _firestore.collection('escalations').add(escalatedData);
-      print('Manual escalation logged for message ${message.id}');
-
-      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-
-      final userNotification = Notifications(
-        notificationId: _firestore.collection('notifications').doc().id,
-        userId: currentUserId,
-        title: 'Your message was escalated',
-        body:
-            'You reported a message as not helpful. Staff will review your question and respond.',
-        type: 'escalation',
-        relatedId: escalationId,
-        targetRole: 'user',
-        read: false,
-        createdAt: Timestamp.now(),
-      );
-      await _firestore
-          .collection('notifications')
-          .add(userNotification.toMap());
-
-      final staffNotification = Notifications(
-        notificationId: _firestore.collection('notifications').doc().id,
-        userId: null,
-        title: 'Manual escalation reported',
-        body:
-            'A user reported a bot message as not helpful. Please review and respond.',
-        type: 'escalation',
-        relatedId: escalationId,
-        targetRole: 'staff',
-        read: false,
-        createdAt: Timestamp.now(),
-      );
-      await _firestore
-          .collection('notifications')
-          .add(staffNotification.toMap());
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
+  try {
+    final bool? shouldEscalate = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.white, size: 20),
-                SizedBox(width: 12),
+                Icon(Icons.report_problem_outlined,
+                    color: Colors.orange.shade600, size: 24),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Your request has been escalated to staff. We\'ll get back to you soon!',
-                    style: TextStyle(fontWeight: FontWeight.w500),
+                    'Escalate to Staff?',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade800,
+                    ),
                   ),
                 ),
               ],
             ),
-            backgroundColor: Color(0xFF2E7D32),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            duration: Duration(seconds: 4),
-          ),
-        );
-      }
-    } catch (e) {
-      print('Error creating manual escalation: $e');
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "This response wasn't helpful. Would you like to escalate this message to staff for human assistance?",
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.grey.shade700,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Text(
+                      "A staff member will review your conversation and provide personalized assistance.",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Select a reason:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.white, size: 20),
-                SizedBox(width: 12),
-                Text('Failed to escalate. Please try again.'),
-              ],
+                  // ✅ Predefined radio reasons
+                  Column(
+                    children: [
+                      RadioListTile<String>(
+                        title: const Text('Bot response not accurate'),
+                        value: 'Bot response not accurate',
+                        groupValue: selectedReason,
+                        onChanged: (val) => setState(() => selectedReason = val!),
+                        dense: true,
+                      ),
+                      RadioListTile<String>(
+                        title: const Text('Bot did not understand my question'),
+                        value: 'Bot did not understand my question',
+                        groupValue: selectedReason,
+                        onChanged: (val) => setState(() => selectedReason = val!),
+                        dense: true,
+                      ),
+                      RadioListTile<String>(
+                        title: const Text('Need clarification from staff'),
+                        value: 'Need clarification from staff',
+                        groupValue: selectedReason,
+                        onChanged: (val) => setState(() => selectedReason = val!),
+                        dense: true,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+                  Text(
+                    'Additional details (optional)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  TextField(
+                    controller: reasonController,
+                    maxLines: 3,
+                    maxLength: 200,
+                    decoration: InputDecoration(
+                      hintText:
+                          'e.g., "I need more specific information about scholarship deadlines"',
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade400,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                            color: Color(0xFF2E7D32), width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.all(12),
+                      counterStyle: const TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            backgroundColor: Colors.red.shade400,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(
+                  'Not Now',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E7D32),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 12),
+                ),
+                child: const Text(
+                  'Yes, Escalate',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
           ),
         );
-      }
+      },
+    );
+
+    if (shouldEscalate != true || !mounted) return;
+
+    // 🔹 Combine predefined + optional reason
+    final userReason = reasonController.text.trim();
+    final fullReason = userReason.isNotEmpty
+        ? '$selectedReason — $userReason'
+        : selectedReason;
+
+    // 🟩 Firestore write
+    final escalationId = _firestore.collection('escalations').doc().id;
+    final escalatedData = {
+      'escalationId': escalationId,
+      'userId': FirebaseAuth.instance.currentUser?.uid,
+      'conversationId': message.conversationId,
+      'question': message.sender == 'bot' ? 'Unknown' : message.content,
+      'botAnswer':
+          message.sender == 'bot' ? message.content : 'No bot response available',
+      'status': 'pending',
+      'reason': fullReason,
+      'createdAt': Timestamp.now(),
+      'messageId': message.id,
+    };
+
+    await _firestore.collection('escalations').add(escalatedData);
+    print('Manual escalation logged for message ${message.id}');
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: const [
+              Icon(Icons.check_circle, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Your request has been escalated to staff. We\'ll get back to you soon!',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF2E7D32),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
+  } catch (e) {
+    print('Error creating manual escalation: $e');
+  } finally {
+    reasonController.dispose();
   }
+}
 
   Future<String?> _getUserAvatarUrl() async {
     try {
