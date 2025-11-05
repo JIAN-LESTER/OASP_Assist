@@ -14,7 +14,9 @@ import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 
 class UserManagementPage extends StatefulWidget {
-  const UserManagementPage({super.key});
+  final Function(int)? onNavigateToPage; // ✅ Add this parameter
+  
+  const UserManagementPage({super.key, this.onNavigateToPage});
 
   @override
   State<UserManagementPage> createState() => _UserManagementPageState();
@@ -23,11 +25,8 @@ class UserManagementPage extends StatefulWidget {
 class _UserManagementPageState extends State<UserManagementPage> {
   String selectedRole = 'All Roles';
   final TextEditingController _searchController = TextEditingController();
-
-  // Pagination variables
   int currentPage = 1;
   int itemsPerPage = 10;
-
   @override
   void initState() {
     super.initState();
@@ -78,6 +77,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+          onNavigateToPage: widget.onNavigateToPage,
       ),
       tabletBody: TabletUserManagement(
         selectedRole: selectedRole,
@@ -87,6 +87,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+          onNavigateToPage: widget.onNavigateToPage,
       ),
       desktopBody: DesktopUserManagement(
         selectedRole: selectedRole,
@@ -96,6 +97,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+          onNavigateToPage: widget.onNavigateToPage,
       ),
     );
   }
@@ -110,6 +112,7 @@ class DesktopUserManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+   final Function(int)? onNavigateToPage;
 
   const DesktopUserManagement({
     super.key,
@@ -120,6 +123,7 @@ class DesktopUserManagement extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.onNavigateToPage,
   });
 
   @override
@@ -133,7 +137,9 @@ class DesktopUserManagement extends StatelessWidget {
       itemsPerPage,
       onPageChanged,
       onItemsPerPageChanged,
+      onNavigateToPage,
       24.0,
+      
     );
   }
 }
@@ -147,6 +153,7 @@ class TabletUserManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+   final Function(int)? onNavigateToPage;
 
   const TabletUserManagement({
     super.key,
@@ -157,6 +164,7 @@ class TabletUserManagement extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.onNavigateToPage,
   });
 
   @override
@@ -170,6 +178,7 @@ class TabletUserManagement extends StatelessWidget {
       itemsPerPage,
       onPageChanged,
       onItemsPerPageChanged,
+      onNavigateToPage,
       20.0,
     );
   }
@@ -184,6 +193,7 @@ class MobileUserManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+   final Function(int)? onNavigateToPage;
 
   const MobileUserManagement({
     super.key,
@@ -194,6 +204,7 @@ class MobileUserManagement extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.onNavigateToPage,
   });
 
   @override
@@ -207,6 +218,7 @@ class MobileUserManagement extends StatelessWidget {
       itemsPerPage,
       onPageChanged,
       onItemsPerPageChanged,
+      onNavigateToPage,
       16.0,
     );
   }
@@ -221,7 +233,7 @@ Widget mainContent(
   final int itemsPerPage,
   final ValueChanged<int> onPageChanged,
   final ValueChanged<int> onItemsPerPageChanged,
-
+  final Function(int)? onNavigateToPage, // ✅ Add this parameter
   final double padding,
 ) {
   return Scaffold(
@@ -231,11 +243,16 @@ Widget mainContent(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(selectedRole, onRoleChanged, searchController),
+          _buildHeader(
+            selectedRole, 
+            onRoleChanged, 
+            searchController,
+            onNavigateToPage, // ✅ Pass it to header
+          ),
           const SizedBox(height: 16),
           Container(
             height: MediaQuery.of(context).size.height - 200,
-            padding:  EdgeInsets.all(padding),
+            padding: EdgeInsets.all(padding),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(8),
@@ -254,10 +271,9 @@ Widget mainContent(
                 const SizedBox(height: 10),
                 Expanded(
                   child: StreamBuilder<QuerySnapshot>(
-                    stream:
-                        FirebaseFirestore.instance
-                            .collection('users')
-                            .snapshots(),
+                    stream: FirebaseFirestore.instance
+                        .collection('users')
+                        .snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
@@ -279,6 +295,7 @@ Widget mainContent(
                         itemsPerPage: itemsPerPage,
                         onPageChanged: onPageChanged,
                         onItemsPerPageChanged: onItemsPerPageChanged,
+                        onNavigateToPage: onNavigateToPage, // ✅ Pass it to user list
                       );
                     },
                   ),
@@ -300,6 +317,7 @@ Widget _buildUserList({
   required int itemsPerPage,
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
+  required Function(int)? onNavigateToPage,
 }) {
   // Filtering
   final filtered =
@@ -371,6 +389,7 @@ Widget _buildUserList({
                       year: data['year']?.toString() ?? '-',
                       program: data['program'] ?? '-',
                       status: data['isActive'] == true ? 'Active' : 'Inactive',
+                      onNavigateToPage: onNavigateToPage,
                     );
                   },
                 ),
@@ -399,6 +418,7 @@ Widget _buildUserRow({
   required String year,
   required String program,
   required String status,
+    required Function(int)? onNavigateToPage,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
   bool isMobile = screenWidth < 600;
@@ -507,48 +527,48 @@ Widget _buildUserRow({
           ),
           // Actions
           SizedBox(width: isTablet ? 60 : 80),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz),
-            onSelected: (value) {
-              if (value == 'edit') {
-                showDialog(
-                  context: context,
-                  builder: (context) => EditUserModal(userDoc: doc),
-                );
-              } else if (value == 'delete') {
-                showDeleteConfirmation(
-                  context,
-                  doc,
-                  DeleteConfigs.users,
-                  'users',
-                  customDeleteHandler: handleUserDelete,
-                );
-              }
-            },
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
-          ),
+      PopupMenuButton<String>(
+  icon: const Icon(Icons.more_horiz),
+  onSelected: (value) {
+    if (value == 'edit') {
+      showEditUserModal(
+        context,
+        doc,
+        onNavigateToPage: onNavigateToPage, // Pass it through
+      );
+    } else if (value == 'delete') {
+      showDeleteConfirmation(
+        context,
+        doc,
+        DeleteConfigs.users,
+        'users',
+        customDeleteHandler: handleUserDelete,
+      );
+    }
+  },
+  itemBuilder: (context) => [
+    const PopupMenuItem(
+      value: 'edit',
+      child: Row(
+        children: [
+          Icon(Icons.edit, size: 18),
+          SizedBox(width: 8),
+          Text('Edit'),
+        ],
+      ),
+    ),
+    const PopupMenuItem(
+      value: 'delete',
+      child: Row(
+        children: [
+          Icon(Icons.delete, size: 18, color: Colors.red),
+          SizedBox(width: 8),
+          Text('Delete', style: TextStyle(color: Colors.red)),
+        ],
+      ),
+    ),
+  ],
+),
         ],
       ),
     ),
@@ -559,6 +579,7 @@ Widget _buildHeader(
   String selectedRole,
   ValueChanged<String> onRoleChanged,
   TextEditingController searchController,
+  Function(int)? onNavigateToPage
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -597,7 +618,9 @@ Widget _buildHeader(
               Row(
                 children: [
                 
-                  AddUserButton(),
+                  AddUserButton(
+                    onNavigateToPage: onNavigateToPage, // ✅ Pass it to AddUserButton
+                  ),
                 ],
               ),
             ],

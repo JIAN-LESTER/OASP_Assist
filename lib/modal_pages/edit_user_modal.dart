@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 import 'package:capstone_project/modal_pages/programs.modal.dart';
-import 'package:capstone_project/pages/admin_pages/program_management.dart';
+import 'package:capstone_project/pages/admin_pages/affiliation.dart';
+import 'package:capstone_project/pages/admin_pages/scholarship_management.dart';
 import 'package:capstone_project/modal_pages/user_info.dart';
 import 'package:capstone_project/services/admin_functions.dart';
 
@@ -12,6 +13,7 @@ void showEditUserModal(
   BuildContext context,
   DocumentSnapshot userDoc, {
   String? previousModal,
+  Function(int)? onNavigateToPage,
 }) {
   showGeneralDialog(
     context: context,
@@ -22,7 +24,11 @@ void showEditUserModal(
     pageBuilder: (context, animation, secondaryAnimation) {
       return StatefulBuilder(
         builder: (context, setState) {
-          return EditUserModal(userDoc: userDoc, previousModal: previousModal);
+          return EditUserModal(
+            userDoc: userDoc,
+            previousModal: previousModal,
+            onNavigateToPage: onNavigateToPage,
+          );
         },
       );
     },
@@ -46,17 +52,27 @@ void showEditUserModal(
 class EditUserModal extends StatefulWidget {
   final DocumentSnapshot userDoc;
   final String? previousModal;
+  final Function(int)? onNavigateToPage;
 
-  const EditUserModal({super.key, required this.userDoc, this.previousModal});
+  const EditUserModal({
+    super.key,
+    required this.userDoc,
+    this.previousModal,
+    this.onNavigateToPage,
+  });
 
   @override
   State<EditUserModal> createState() => _EditUserModalState();
 }
 
 class _EditUserModalState extends State<EditUserModal> {
-  List<String> programs = ['N/A'];
+  final List<String> programs = ['N/A'];
+  final List<String> _affiliations = ['N/A'];
+  final List<String> _scholarships = ['N/A'];
   bool isLoadingPrograms = true;
-  bool hasFetchedPrograms = false;
+  bool isLoadingAffiliations = true;
+  bool isLoadingScholarships = true;
+
   final List<String> roles = ['admin', 'user', 'staff'];
   final List<String> years = [
     'N/A',
@@ -71,12 +87,12 @@ class _EditUserModalState extends State<EditUserModal> {
   late TextEditingController firstNameController;
   late TextEditingController lastNameController;
   late TextEditingController emailController;
-  late TextEditingController affiliationController;
-  late TextEditingController scholarshipController;
 
   late String selectedRole;
   late String selectedYear;
   late String selectedProgram;
+  String _selectedAffiliation = 'N/A';
+  String _selectedScholarship = 'N/A';
   late bool isActive;
 
   bool get isYearEnabled => selectedRole == 'user';
@@ -99,19 +115,17 @@ class _EditUserModalState extends State<EditUserModal> {
       text: fullName.length > 1 ? fullName.sublist(1).join(' ') : '',
     );
     emailController = TextEditingController(text: userData['email'] ?? '');
-    affiliationController = TextEditingController(
-      text: userData['affiliation'] ?? '',
-    );
-    scholarshipController = TextEditingController(
-      text: userData['scholarship'] ?? '',
-    );
 
     selectedRole = userData['role'] ?? 'user';
     selectedYear = userData['year'] ?? '1st Year';
     selectedProgram = userData['program'] ?? 'N/A';
+    _selectedAffiliation = userData['affiliation'] ?? 'N/A';
+    _selectedScholarship = userData['scholarship'] ?? 'N/A';
     isActive = userData['isActive'] ?? true;
 
     _fetchPrograms();
+    _fetchAffiliations();
+    _fetchScholarships();
   }
 
   Future<void> _fetchPrograms() async {
@@ -125,10 +139,10 @@ class _EditUserModalState extends State<EditUserModal> {
       fetchedPrograms.addAll(snapshot.docs.map((doc) => doc['name'] as String));
 
       setState(() {
-        programs = fetchedPrograms;
+        programs.clear();
+        programs.addAll(fetchedPrograms);
         isLoadingPrograms = false;
 
-        // ✅ Ensure selectedProgram exists, otherwise default to 'N/A'
         if (!programs.contains(selectedProgram)) {
           selectedProgram = 'N/A';
         }
@@ -141,13 +155,61 @@ class _EditUserModalState extends State<EditUserModal> {
     }
   }
 
+  Future<void> _fetchAffiliations() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('affiliations')
+          .orderBy('name')
+          .get();
+
+      setState(() {
+        _affiliations.clear();
+        _affiliations.add('N/A');
+        _affiliations.addAll(snapshot.docs.map((doc) => doc['name'] as String));
+        isLoadingAffiliations = false;
+
+        if (!_affiliations.contains(_selectedAffiliation)) {
+          _selectedAffiliation = 'N/A';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        isLoadingAffiliations = false;
+      });
+      print('Error fetching affiliation: $e');
+    }
+  }
+
+  Future<void> _fetchScholarships() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('scholarships')
+          .orderBy('name')
+          .get();
+
+      setState(() {
+        _scholarships.clear();
+        _scholarships.add('N/A');
+        _scholarships.addAll(snapshot.docs.map((doc) => doc['name'] as String));
+        isLoadingScholarships = false;
+
+        if (!_scholarships.contains(_selectedScholarship)) {
+          _selectedScholarship = 'N/A';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        isLoadingScholarships = false;
+      });
+      print('Error fetching scholarships: $e');
+    }
+  }
+
   @override
   void dispose() {
     firstNameController.dispose();
     lastNameController.dispose();
     emailController.dispose();
-    affiliationController.dispose();
-    scholarshipController.dispose();
     super.dispose();
   }
 
@@ -196,7 +258,6 @@ class _EditUserModalState extends State<EditUserModal> {
                 decoration: const BoxDecoration(color: Color(0xFF2E7D32)),
                 child: Row(
                   children: [
-                    // Show back button only if previousModal is provided
                     if (widget.previousModal == 'info') ...[
                       Material(
                         color: Colors.transparent,
@@ -204,7 +265,6 @@ class _EditUserModalState extends State<EditUserModal> {
                           borderRadius: BorderRadius.circular(24),
                           onTap: () {
                             Navigator.of(context).pop();
-                            // Add delay before showing previous modal
                             Future.delayed(
                               const Duration(milliseconds: 200),
                               () {
@@ -372,13 +432,10 @@ class _EditUserModalState extends State<EditUserModal> {
                             if (selectedRole != 'user') {
                               selectedYear = 'N/A';
                               selectedProgram = 'N/A';
-                            } else {
-                              if (selectedYear == 'N/A') selectedYear = '1st Year';
-                              if (selectedProgram == 'N/A') selectedProgram = 'BSIT';
                             }
                           });
                         },
-                        icon: Icons.admin_panel_settings_outlined,
+                        icon: Icons.badge_outlined,
                         isEnabled: true,
                       ),
 
@@ -395,8 +452,6 @@ class _EditUserModalState extends State<EditUserModal> {
                                       selectedYear == 'Incoming' ||
                                       selectedYear == 'Graduate') {
                                     selectedProgram = 'N/A';
-                                  } else if (selectedProgram == 'N/A') {
-                                    selectedProgram = 'BSIT';
                                   }
                                 });
                               }
@@ -407,6 +462,7 @@ class _EditUserModalState extends State<EditUserModal> {
 
                       const SizedBox(height: 16),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Expanded(
                             child: isLoadingPrograms
@@ -424,22 +480,19 @@ class _EditUserModalState extends State<EditUserModal> {
                                               () => selectedProgram = value!,
                                             )
                                         : null,
-                                    icon: Icons.book_outlined,
+                                    icon: Icons.class_outlined,
                                     isEnabled: isProgramEnabled,
                                   ),
                           ),
                           const SizedBox(width: 12),
                           Container(
-                            padding: const EdgeInsets.only(top: 24),
+                            height: 46,
                             child: ElevatedButton.icon(
-                              onPressed: () async {
-                                await showDialog(
-                                  context: context,
-                                  builder: (context) => const ManageProgramsDialog(),
-                                );
-                                await _fetchPrograms();
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                widget.onNavigateToPage?.call(12);
                               },
-                              icon: const Icon(Icons.settings, size: 16),
+                              icon: const Icon(Icons.edit, size: 16),
                               label: const Text('Manage'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2E7D32),
@@ -467,22 +520,104 @@ class _EditUserModalState extends State<EditUserModal> {
                       ),
                       const SizedBox(height: 16),
 
-                      buildTextField(
-                        controller: affiliationController,
-                        isMobile: false,
-                        label: "Affiliation",
-                        hint: "Enter user affiliation (optional)",
-                        icon: Icons.business_outlined,
+                      // Affiliation Dropdown with Manage
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: isLoadingAffiliations
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                : _buildDropdownField(
+                                    label: 'Affiliation',
+                                    value: _affiliations.contains(_selectedAffiliation)
+                                        ? _selectedAffiliation
+                                        : 'N/A',
+                                    items: _affiliations,
+                                    icon: Icons.business_outlined,
+                                    isEnabled: true,
+                                    onChanged: (value) => setState(
+                                      () => _selectedAffiliation = value!,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            height: 46,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                widget.onNavigateToPage?.call(11);
+                              },
+                              icon: const Icon(Icons.edit, size: 16),
+                              label: const Text('Manage'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2E7D32),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
 
                       const SizedBox(height: 16),
 
-                      buildTextField(
-                        controller: scholarshipController,
-                        isMobile: false,
-                        label: "Scholarship",
-                        hint: "Enter scholarship name (optional)",
-                        icon: Icons.school_outlined,
+                      // Scholarship Dropdown with Manage
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: isLoadingScholarships
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                : _buildDropdownField(
+                                    label: 'Scholarship',
+                                    value: _scholarships.contains(_selectedScholarship)
+                                        ? _selectedScholarship
+                                        : 'N/A',
+                                    items: _scholarships,
+                                    icon: Icons.school_outlined,
+                                    isEnabled: true,
+                                    onChanged: (value) => setState(
+                                      () => _selectedScholarship = value!,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            height: 46,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                widget.onNavigateToPage?.call(9);
+                              },
+                              icon: const Icon(Icons.edit, size: 16),
+                              label: const Text('Manage'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2E7D32),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
 
                       const SizedBox(height: 24),
@@ -641,7 +776,6 @@ class _EditUserModalState extends State<EditUserModal> {
     }
 
     try {
-      // Show loading
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -656,7 +790,6 @@ class _EditUserModalState extends State<EditUserModal> {
       final newDisplayName =
           '${firstNameController.text.trim()} ${lastNameController.text.trim()}';
 
-      // Step 1: Update Firebase Authentication if email changed
       if (newEmail != originalEmail && newEmail.isNotEmpty) {
         try {
           final functionsService = FirebaseFunctionsService();
@@ -702,7 +835,6 @@ class _EditUserModalState extends State<EditUserModal> {
         }
       }
 
-      // Step 2: Update Firestore document
       await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.userDoc.id)
@@ -712,14 +844,13 @@ class _EditUserModalState extends State<EditUserModal> {
         'role': selectedRole.toLowerCase(),
         'year': selectedYear,
         'program': selectedProgram,
-        'affiliation': affiliationController.text.trim(),
-        'scholarship': scholarshipController.text.trim(),
+        'affiliation': _selectedAffiliation,
+        'scholarship': _selectedScholarship,
         'isActive': isActive,
         'updatedAt': Timestamp.now(),
       });
       print('✅ User document updated in Firestore');
 
-      // Step 3: Log the action
       final currentUser = FirebaseAuth.instance.currentUser;
       String actorName = 'Unknown';
 
@@ -801,76 +932,82 @@ class _EditUserModalState extends State<EditUserModal> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isEnabled ? const Color(0xFF2E7D32) : const Color(0xFF9CA3AF),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: isEnabled
-                    ? const Color(0xFF1E293B)
-                    : const Color(0xFF9CA3AF),
-                letterSpacing: -0.2,
-              ),
-            ),
-          ],
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: isEnabled
+                ? const Color(0xFF374151)
+                : const Color(0xFF9CA3AF),
+            letterSpacing: -0.1,
+          ),
         ),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: value,
-          onChanged: isEnabled ? onChanged : null,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: isEnabled ? const Color(0xFF334155) : const Color(0xFF9CA3AF),
+        Container(
+          constraints: const BoxConstraints(
+            maxWidth: double.infinity,
           ),
-          decoration: InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+          decoration: BoxDecoration(
+            color: isEnabled ? Colors.white : const Color(0xFFF9FAFB),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: const Color(0xFFE5E7EB),
+              width: 1.5,
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            disabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-            ),
-            filled: true,
-            fillColor: isEnabled ? const Color(0xFFF8FAFC) : const Color(0xFFF1F5F9),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
-            ),
+            boxShadow: isEnabled
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
           ),
-          items: items
-              .map(
-                (e) => DropdownMenuItem(
-                  value: e,
+          child: DropdownButtonHideUnderline(
+            child: DropdownButtonFormField<String>(
+              value: value,
+              onChanged: isEnabled ? onChanged : null,
+              isExpanded: true,
+              alignment: Alignment.centerLeft,
+              menuMaxHeight: 250,
+              items: items.map((String item) {
+                return DropdownMenuItem<String>(
+                  value: item,
                   child: Text(
-                    e,
+                    item,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 14,
                       color: isEnabled
-                          ? const Color(0xFF334155)
+                          ? const Color(0xFF1F2937)
                           : const Color(0xFF9CA3AF),
                     ),
                   ),
+                );
+              }).toList(),
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  icon,
+                  color: isEnabled
+                      ? const Color(0xFF9CA3AF)
+                      : const Color(0xFFD1D5DB),
+                  size: 20,
                 ),
-              )
-              .toList(),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+              ),
+              dropdownColor: Colors.white,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF1F2937),
+              ),
+            ),
+          ),
         ),
       ],
     );

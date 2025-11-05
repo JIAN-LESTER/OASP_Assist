@@ -28,34 +28,45 @@ class _AdminMainPageState extends State<AdminMainPage> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
 
-  final List<Widget> _pages = [
+  // Create a method to handle navigation
+  void _navigateToPage(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  // Update the _pages list to pass the callback
+  List<Widget> get _pages => [
     const DashboardPage(),        
-    const ReportsPage(),          // 1
-    const InformationBankPage(),  // 2
-    const FaqManagementPage(),    // 3
-    const AnnouncementPage(),     // 4
-    const UserManagementPage(),   // 5
-    const UserActivityLogsPage(), // 6
-    const AdminMessageLogsPage(), // 7
-    const AdmissionManagementPage(), // 8
-    const ScholarshipManagementPage(), // 9
-    const PlacementManagementPage(), // 10
+    const ReportsPage(),
+    const InformationBankPage(),
+    const FaqManagementPage(),
+    const AnnouncementPage(),
+    UserManagementPage(
+      onNavigateToPage: _navigateToPage, // ✅ Pass the callback
+    ),
+    const UserActivityLogsPage(),
+    const AdminMessageLogsPage(),
+    const AdmissionManagementPage(),
+    const ScholarshipManagementPage(),
+    const PlacementManagementPage(),
     const AffiliationManagementPage(),
     const ProgramManagementPage()
   ];
 
+  // Rest of your code remains the same...
   final List<String> _pageTitles = [
-    'Dashboard',                  // 0
-    'Reports',                   // 1
-    'Information Bank',          // 2
-    'FAQs',                     // 3
-    'Announcement',             // 4
-    'Users',          // 5
-    'System Activity Logs',     // 6
-    'Message Logs',             // 7
-    'Admission',                // 8
-    'Scholarship',              // 9
-    'Placement',                // 10
+    'Dashboard',
+    'Reports',
+    'Information Bank',
+    'FAQs',
+    'Announcement',
+    'Users',
+    'System Activity Logs',
+    'Message Logs',
+    'Admission',
+    'Scholarship',
+    'Placement',
     'Affiliations',
     'Programs'
   ];

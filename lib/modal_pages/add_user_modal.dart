@@ -1,3 +1,5 @@
+import 'package:capstone_project/pages/admin_pages/affiliation.dart';
+import 'package:capstone_project/pages/admin_pages/scholarship_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +11,7 @@ import 'package:capstone_project/services/admin_functions.dart';
 
 import 'modal_widget/top_right_alert.dart';
 
-void showAddUserModal(BuildContext context) {
+void showAddUserModal(BuildContext context, {Function(int)? onNavigateToPage}) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -17,7 +19,7 @@ void showAddUserModal(BuildContext context) {
     barrierColor: Colors.black.withOpacity(0.5),
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return const AddUserModal();
+      return AddUserModal(onNavigateToPage: onNavigateToPage);
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       return SlideTransition(
@@ -37,7 +39,9 @@ void showAddUserModal(BuildContext context) {
 }
 
 class AddUserModal extends StatelessWidget {
-  const AddUserModal({Key? key}) : super(key: key);
+  final Function(int)? onNavigateToPage;
+
+  const AddUserModal({Key? key, this.onNavigateToPage}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +111,7 @@ class AddUserModal extends StatelessWidget {
               isMobile: isMobile,
               isTablet: isTablet,
               isDesktop: isDesktop,
+              onNavigateToPage: onNavigateToPage,
             ),
           ),
         ),
@@ -119,12 +124,14 @@ class AddUserContent extends StatefulWidget {
   final bool isMobile;
   final bool isTablet;
   final bool isDesktop;
+  final Function(int)? onNavigateToPage;
 
   const AddUserContent({
     Key? key,
     required this.isMobile,
     required this.isTablet,
     required this.isDesktop,
+    this.onNavigateToPage,
   }) : super(key: key);
 
   @override
@@ -144,12 +151,18 @@ class _AddUserContentState extends State<AddUserContent> {
   String _selectedRole = 'User';
   String _selectedYear = 'N/A';
   String _selectedProgram = 'N/A';
+  String _selectedAffiliation = 'N/A';
+  String _selectedScholarship = 'N/A';
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isSubmitting = false;
 
   final List<String> _programs = ['N/A'];
+  final List<String> _affiliations = ['N/A'];
+  final List<String> _scholarships = ['N/A'];
   bool isLoadingPrograms = true;
+  bool isLoadingAffiliations = true;
+  bool isLoadingScholarships = true;
 
   final roles = ['admin', 'user', 'staff'];
   List<String> get displayRoles =>
@@ -169,6 +182,8 @@ class _AddUserContentState extends State<AddUserContent> {
   void initState() {
     super.initState();
     _fetchPrograms();
+    _fetchAffiliations();
+    _fetchScholarships();
   }
 
   @override
@@ -185,10 +200,11 @@ class _AddUserContentState extends State<AddUserContent> {
 
   Future<void> _fetchPrograms() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('programs')
-          .orderBy('name')
-          .get();
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('programs')
+              .orderBy('name')
+              .get();
 
       setState(() {
         _programs.clear();
@@ -201,6 +217,50 @@ class _AddUserContentState extends State<AddUserContent> {
         isLoadingPrograms = false;
       });
       print('Error fetching programs: $e');
+    }
+  }
+
+  Future<void> _fetchAffiliations() async {
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('affiliations')
+              .orderBy('name')
+              .get();
+
+      setState(() {
+        _affiliations.clear();
+        _affiliations.add('N/A');
+        _affiliations.addAll(snapshot.docs.map((doc) => doc['name'] as String));
+        isLoadingAffiliations = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoadingAffiliations = false;
+      });
+      print('Error fetching affiliation: $e');
+    }
+  }
+
+  Future<void> _fetchScholarships() async {
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('scholarships')
+              .orderBy('name')
+              .get();
+
+      setState(() {
+        _scholarships.clear();
+        _scholarships.add('N/A');
+        _scholarships.addAll(snapshot.docs.map((doc) => doc['name'] as String));
+        isLoadingScholarships = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoadingScholarships = false;
+      });
+      print('Error fetching scholarships: $e');
     }
   }
 
@@ -234,9 +294,21 @@ class _AddUserContentState extends State<AddUserContent> {
       return;
     }
 
+    if (!_emailController.text.trim().contains('@')) {
+      _showTopRightAlert(
+        'Please enter a valid email address',
+        AlertType.warning,
+      );
+      return;
+    }
+
     if (_passwordController.text.trim().isEmpty) {
       _showTopRightAlert('Please enter password', AlertType.warning);
       return;
+    }
+
+    if (_passwordController.text.length < 6) {
+      _showTopRightAlert('Password must be 6 characters', AlertType.warning);
     }
 
     if (_passwordController.text != _confirmPasswordController.text) {
@@ -337,10 +409,11 @@ class _AddUserContentState extends State<AddUserContent> {
       String actorName = 'Unknown';
 
       if (currentUser != null) {
-        final currentUserDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
+        final currentUserDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
         if (currentUserDoc.exists) {
           final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
           actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';
@@ -367,13 +440,14 @@ class _AddUserContentState extends State<AddUserContent> {
     late OverlayEntry overlayEntry;
 
     overlayEntry = OverlayEntry(
-      builder: (context) => TopRightAlert(
-        message: message,
-        type: type,
-        onDismiss: () => overlayEntry.remove(),
-        isMobile: widget.isMobile,
-        isTablet: widget.isTablet,
-      ),
+      builder:
+          (context) => TopRightAlert(
+            message: message,
+            type: type,
+            onDismiss: () => overlayEntry.remove(),
+            isMobile: widget.isMobile,
+            isTablet: widget.isTablet,
+          ),
     );
 
     overlay.insert(overlayEntry);
@@ -626,20 +700,20 @@ class _AddUserContentState extends State<AddUserContent> {
                             items: _programs,
                             icon: Icons.class_outlined,
                             isEnabled: isProgramEnabled,
-                            onChanged: (value) =>
-                                setState(() => _selectedProgram = value!),
+                            onChanged:
+                                (value) =>
+                                    setState(() => _selectedProgram = value!),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Container(
                           height: 46,
                           child: ElevatedButton.icon(
-                            onPressed: () async {
-                              await showDialog(
-                                context: context,
-                                builder: (context) => const ManageProgramsDialog(),
-                              );
-                              _fetchPrograms();
+                            onPressed: () {
+                              Navigator.of(context).pop(); // Close modal
+                              widget.onNavigateToPage?.call(
+                                12,
+                              ); // Navigate to Programs page
                             },
                             icon: const Icon(Icons.edit, size: 16),
                             label: const Text('Manage'),
@@ -670,22 +744,101 @@ class _AddUserContentState extends State<AddUserContent> {
                     const SizedBox(height: 16),
 
                     // Affiliation and Scholarship Fields
-                    buildTextField(
-                      controller: _affiliationController,
-                      label: 'Affiliation',
-                      hint: 'Enter user affiliation (optional)',
-                      icon: Icons.business_outlined,
-                      isMobile: false,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: _buildDropdownField(
+                            label: 'Affiliation',
+                            value: _selectedAffiliation,
+                            items:
+                                _affiliations, // list fetched via _fetchAffiliations()
+                            icon: Icons.business_outlined,
+                            isEnabled: true,
+                            onChanged:
+                                (value) => setState(
+                                  () => _selectedAffiliation = value!,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          height: 46,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).pop(); // Close modal
+                              widget.onNavigateToPage?.call(
+                                11,
+                              ); // Navigate to Affiliations page
+                            },
+                            icon: const Icon(Icons.edit, size: 16),
+                            label: const Text('Manage'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2E7D32),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 16),
 
-                    buildTextField(
-                      controller: _scholarshipController,
-                      label: 'Scholarship',
-                      hint: 'Enter scholarship name (optional)',
-                      icon: Icons.school_outlined,
-                      isMobile: false,
+                    // Scholarship Dropdown + Manage Button
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: _buildDropdownField(
+                            label: 'Scholarship',
+                            value: _selectedScholarship,
+
+                            items:
+                                _scholarships, // list fetched via _fetchScholarships()
+                            icon: Icons.school_outlined,
+                            isEnabled: true,
+
+                            onChanged:
+                                (value) => setState(
+                                  () => _selectedScholarship = value!,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          height: 46,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).pop(); // Close modal
+                              widget.onNavigateToPage?.call(
+                                9,
+                              ); // Navigate to Scholarship page
+                            },
+                            icon: const Icon(Icons.edit, size: 16),
+                            label: const Text('Manage'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2E7D32),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 24),
@@ -703,8 +856,10 @@ class _AddUserContentState extends State<AddUserContent> {
                       isPassword: true,
                       isPasswordVisible: _isPasswordVisible,
                       isMobile: false,
-                      onTogglePassword: () =>
-                          setState(() => _isPasswordVisible = !_isPasswordVisible),
+                      onTogglePassword:
+                          () => setState(
+                            () => _isPasswordVisible = !_isPasswordVisible,
+                          ),
                     ),
 
                     const SizedBox(height: 16),
@@ -717,9 +872,12 @@ class _AddUserContentState extends State<AddUserContent> {
                       icon: Icons.lock_outlined,
                       isPassword: true,
                       isPasswordVisible: _isConfirmPasswordVisible,
-                      onTogglePassword: () => setState(
-                          () => _isConfirmPasswordVisible =
-                              !_isConfirmPasswordVisible),
+                      onTogglePassword:
+                          () => setState(
+                            () =>
+                                _isConfirmPasswordVisible =
+                                    !_isConfirmPasswordVisible,
+                          ),
                       validator: (value) {
                         if (value != _passwordController.text) {
                           return 'Passwords do not match';
@@ -760,64 +918,73 @@ class _AddUserContentState extends State<AddUserContent> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: isEnabled ? const Color(0xFF374151) : const Color(0xFF9CA3AF),
+            color:
+                isEnabled ? const Color(0xFF374151) : const Color(0xFF9CA3AF),
             letterSpacing: -0.1,
           ),
         ),
         const SizedBox(height: 8),
         Container(
+          constraints: const BoxConstraints(
+            maxWidth: double.infinity, // ✅ ensures it doesn’t expand outwards
+          ),
           decoration: BoxDecoration(
             color: isEnabled ? Colors.white : const Color(0xFFF9FAFB),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isEnabled ? const Color(0xFFE5E7EB) : const Color(0xFFE5E7EB),
-              width: 1.5,
-            ),
-            boxShadow: isEnabled
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+            boxShadow:
+                isEnabled
+                    ? [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ]
+                    : null,
           ),
-          child: DropdownButtonFormField<String>(
-            value: value,
-            onChanged: isEnabled ? onChanged : null,
-            items: items.map((String item) {
-              return DropdownMenuItem<String>(
-                value: item,
-                child: Text(
-                  item,
-                  style: TextStyle(
-                    fontSize: widget.isMobile ? 14 : 16,
-                    color: isEnabled
-                        ? const Color(0xFF1F2937)
-                        : const Color(0xFF9CA3AF),
-                  ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButtonFormField<String>(
+              value: value,
+              onChanged: isEnabled ? onChanged : null,
+              isExpanded: true, // ✅ prevents horizontal text overflow
+              alignment: Alignment.centerLeft, // ✅ keeps dropdown aligned
+              menuMaxHeight: 250, // ✅ avoids vertical overflow
+              items:
+                  items.map((String item) {
+                    return DropdownMenuItem<String>(
+                      value: item,
+                      child: Text(
+                        item,
+                        overflow:
+                            TextOverflow.ellipsis, // ✅ truncate long names
+                        style: TextStyle(
+                          fontSize: 14,
+                          color:
+                              isEnabled
+                                  ? const Color(0xFF1F2937)
+                                  : const Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  icon,
+                  color:
+                      isEnabled
+                          ? const Color(0xFF9CA3AF)
+                          : const Color(0xFFD1D5DB),
+                  size: 20,
                 ),
-              );
-            }).toList(),
-            decoration: InputDecoration(
-              prefixIcon: Icon(
-                icon,
-                color: isEnabled
-                    ? const Color(0xFF9CA3AF)
-                    : const Color(0xFFD1D5DB),
-                size: 20,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
               ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-            ),
-            dropdownColor: Colors.white,
-            style: TextStyle(
-              fontSize: widget.isMobile ? 14 : 16,
-              color: const Color(0xFF1F2937),
+              dropdownColor: Colors.white,
+              style: const TextStyle(fontSize: 14, color: Color(0xFF1F2937)),
             ),
           ),
         ),
@@ -826,9 +993,10 @@ class _AddUserContentState extends State<AddUserContent> {
   }
 
   Widget _buildActionButtons() {
-    double buttonHeight = widget.isMobile
-        ? 40
-        : widget.isTablet
+    double buttonHeight =
+        widget.isMobile
+            ? 40
+            : widget.isTablet
             ? 44
             : 46;
     double fontSize = widget.isMobile ? 14 : 15;
@@ -840,7 +1008,8 @@ class _AddUserContentState extends State<AddUserContent> {
           child: SizedBox(
             height: buttonHeight,
             child: OutlinedButton(
-              onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+              onPressed:
+                  _isSubmitting ? null : () => Navigator.of(context).pop(),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF6B7280),
                 side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
@@ -879,37 +1048,38 @@ class _AddUserContentState extends State<AddUserContent> {
                   horizontal: widget.isMobile ? 16 : 20,
                 ),
               ),
-              child: _isSubmitting
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Colors.white,
+              child:
+                  _isSubmitting
+                      ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Creating...',
-                          style: TextStyle(
-                            fontSize: fontSize,
-                            fontWeight: FontWeight.w600,
+                          const SizedBox(width: 8),
+                          Text(
+                            'Creating...',
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
+                        ],
+                      )
+                      : Text(
+                        'Create User',
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.w600,
                         ),
-                      ],
-                    )
-                  : Text(
-                      'Create User',
-                      style: TextStyle(
-                        fontSize: fontSize,
-                        fontWeight: FontWeight.w600,
                       ),
-                    ),
             ),
           ),
         ),

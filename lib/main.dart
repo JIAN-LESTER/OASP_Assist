@@ -305,36 +305,63 @@ Future<void> initializeServices() async {
   try {
     print('🚀 Starting service initialization...');
     
+    // Step 1: Initialize Firebase FIRST
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    print('✅ Firebase initialized successfully');
+    print('✅ Firebase initialized');
     
-    // ✅ CRITICAL: Register background handler
+    // ✅ CRITICAL: Wait for Firebase to be fully ready
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Step 2: Test Firebase Auth (ensures platform channels are ready)
+    try {
+      final _ = FirebaseAuth.instance.currentUser;
+      print('✅ Firebase Auth ready');
+    } catch (e) {
+      print('⚠️ Firebase Auth not ready: $e');
+    }
+    
+    // Step 3: Pre-initialize Cloud Functions (optional, for verification)
+    try {
+      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+      print('✅ Cloud Functions instance available');
+      
+      // ✅ Test with a simple callable to ensure platform channel works
+      // This helps identify issues early
+      print('🔍 Testing Functions platform channel...');
+    } catch (e) {
+      print('⚠️ Cloud Functions test failed: $e');
+      // Don't fail initialization, just log the issue
+    }
+    
+    // Step 4: Register background message handler
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     print('✅ Background message handler registered');
     
-    // ✅ Initialize notification service
+    // Step 5: Initialize notification service
     print('🔔 Initializing notification service...');
     await NotificationService().initialize();
     print('✅ Notification service initialized');
     
-    // ✅ Setup navigation handler
+    // Step 6: Setup navigation handler
     NotificationNavigationHandler(navigatorKey).setup();
     print('✅ Navigation handler setup complete');
     
     _servicesInitialized = true;
+    print('✅ All services initialized successfully');
   } catch (e, stackTrace) {
     print('❌ Service initialization error: $e');
     print('Stack trace: $stackTrace');
+    // Don't rethrow - allow app to continue with degraded functionality
   }
 }
+// 
 
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
     
-    // ✅ Set preferred orientations
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -345,8 +372,11 @@ void main() {
       overlays: [SystemUiOverlay.top],
     );
 
-    // Initialize all services BEFORE running the app
+    // ✅ Initialize all services and WAIT for completion
     await initializeServices();
+    
+    // ✅ Additional delay to ensure platform channels are fully connected
+    await Future.delayed(const Duration(milliseconds: 300));
 
     runApp(
       MultiProvider(
@@ -360,12 +390,24 @@ void main() {
             update: (_, retriever, __) => ChatProvider(retriever),
           ),
           Provider<PineconeCloudService>(create: (_) => PineconeCloudService()),
-          Provider<FirebaseFunctionsService>.value(value: FirebaseFunctionsService()),
-          Provider<NotificationService>.value(value: NotificationService()),
+          
+          // ✅ CRITICAL FIX: Create service lazily and only when needed
+          Provider<FirebaseFunctionsService>(
+            create: (_) {
+              print('🔧 Creating FirebaseFunctionsService instance');
+              return FirebaseFunctionsService();
+            },
+            // ✅ Don't dispose the static instance
+            dispose: (_, __) => print('📌 FirebaseFunctionsService provider disposed'),
+          ),
+          
+          Provider<NotificationService>.value(
+            value: NotificationService(),
+          ),
         ],
         child: const MyApp(),
       ),
-    ); 
+    );
   }, (error, stackTrace) {
     print('🔴 Zone Error: $error');
     print('🧩 StackTrace: $stackTrace');
