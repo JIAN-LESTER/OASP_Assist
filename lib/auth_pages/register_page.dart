@@ -1,8 +1,9 @@
 import 'dart:async';
-
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../components/square_tile.dart';
@@ -133,25 +134,26 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
-Future<bool> _isEmailTaken(String email) async {
-  try {
-    // Query Firestore for any document with the same email
-    final querySnapshot = await _firestore
-        .collection('users')
-        .where('email', isEqualTo: email.trim())
-        .limit(1)
-        .get();
+  Future<bool> _isEmailTaken(String email) async {
+    try {
+      // Query Firestore for any document with the same email
+      final querySnapshot =
+          await _firestore
+              .collection('users')
+              .where('email', isEqualTo: email.trim())
+              .limit(1)
+              .get();
 
-    // If any document is found, the email is taken
-    return querySnapshot.docs.isNotEmpty;
-  } catch (e) {
-    print('Error checking email in Firestore: $e');
-    return false;
+      // If any document is found, the email is taken
+      return querySnapshot.docs.isNotEmpty;
+    } catch (e) {
+      print('Error checking email in Firestore: $e');
+      return false;
+    }
   }
-}
 
   // Validate email
-  Future<bool>  _validateEmail(String email) async {
+  Future<bool> _validateEmail(String email) async {
     if (email.trim().isEmpty) {
       _setEmailError('Please enter your email');
       return false;
@@ -162,11 +164,11 @@ Future<bool> _isEmailTaken(String email) async {
       return false;
     }
 
-   final isTaken = await _isEmailTaken(email.trim());
-  if (isTaken) {
-    _setEmailError('This email is already taken');
-    return false;
-  }
+    final isTaken = await _isEmailTaken(email.trim());
+    if (isTaken) {
+      _setEmailError('This email is already taken');
+      return false;
+    }
 
     _emailErrorTimer?.cancel();
     setState(() => _emailError = null);
@@ -1337,8 +1339,13 @@ Future<bool> _isEmailTaken(String email) async {
 
             SizedBox(height: baseSpacing),
 
-            // Google Sign-In Button
-            const SquareTile(imagePath: 'lib/images/google.png'),
+            if (!(!kIsWeb &&
+                (Platform.isWindows ||
+                    Platform.isLinux ||
+                    Platform.isMacOS))) ...[
+              const SquareTile(imagePath: 'lib/images/google.png'),
+              SizedBox(height: sectionSpacing),
+            ],
 
             SizedBox(height: sectionSpacing),
 

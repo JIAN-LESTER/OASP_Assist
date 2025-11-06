@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:capstone_project/components/number_tile.dart';
 import 'package:capstone_project/components/textfield.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -542,9 +545,13 @@ class _LoginPageState extends State<LoginPage> {
             ),
 
             SizedBox(height: baseSpacing),
-
-            const SquareTile(imagePath: 'lib/images/google.png'),
-            SizedBox(height: sectionSpacing),
+            if (!(!kIsWeb &&
+                (Platform.isWindows ||
+                    Platform.isLinux ||
+                    Platform.isMacOS))) ...[
+              const SquareTile(imagePath: 'lib/images/google.png'),
+              SizedBox(height: sectionSpacing),
+            ],
 
             // Sign Up Link
             Row(
