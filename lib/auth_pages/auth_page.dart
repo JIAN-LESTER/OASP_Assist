@@ -106,7 +106,6 @@ class RoleBasedRouter extends StatelessWidget {
           case 'staff':
             return StaffMainPage();
           case 'user':
-          case 'user':
             if (!userData.isProfileCompleted) {
               print('🎉 Profile incomplete - showing onboarding');
               return UserOnboardingScreen(
@@ -130,10 +129,11 @@ class RoleBasedRouter extends StatelessWidget {
       if (user == null) throw Exception('No authenticated user found');
 
       print('🔍 Fetching user data for: ${user.uid}');
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
 
       String role = 'user';
       String name = user.displayName ?? user.email?.split('@')[0] ?? 'User';
@@ -149,15 +149,10 @@ class RoleBasedRouter extends StatelessWidget {
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
-            .update({
-          'lastLoginAt': FieldValue.serverTimestamp(),
-        });
+            .update({'lastLoginAt': FieldValue.serverTimestamp()});
       } else {
         // Create a user doc if not existing
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .set({
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'email': user.email ?? '',
           'name': name,
@@ -204,7 +199,6 @@ class RoleBasedRouter extends StatelessWidget {
     }
   }
 }
-
 
 // Helper class to hold user data
 class UserData {

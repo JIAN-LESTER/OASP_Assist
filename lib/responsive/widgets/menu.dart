@@ -65,10 +65,19 @@ class UniversalUIComponents {
     bool? hasActiveConversation,
     bool isChatPage = false,
     List<Widget>? actions,
+    GlobalKey? sidebarKey, // ADD THIS
+    GlobalKey? notificationKey, // ADD THIS
+    GlobalKey? profileKey, // ADD THIS
   }) {
     List<Widget> appBarActions = [];
 
-    appBarActions.add(_buildNotificationButton(context, userRole));
+    appBarActions.add(
+      _buildNotificationButton(
+        context,
+        userRole,
+        notificationKey: notificationKey,
+      ),
+    );
 
     // Add custom actions if provided
     if (actions != null) {
@@ -76,7 +85,9 @@ class UniversalUIComponents {
     }
 
     // User profile dropdown
-    appBarActions.add(_buildUserProfileDropdown(context));
+    appBarActions.add(
+      _buildUserProfileDropdown(context, profileKey: profileKey),
+    );
     appBarActions.add(const SizedBox(width: 13));
 
     return AppBar(
@@ -97,6 +108,7 @@ class UniversalUIComponents {
           customLeading ??
           (onLeadingPressed != null
               ? IconButton(
+                key: sidebarKey,
                 icon: const Icon(Icons.menu, color: Colors.black54),
                 onPressed: onLeadingPressed,
               )
@@ -584,94 +596,103 @@ class UniversalUIComponents {
   }
 
   // 🔹 Add this at the top of your drawer widget (or as static map if inside a class)
-static final Map<String, bool> _expandedState = {
-  'Services': false,
-  'Logs': false,
-  'User Management': false,
-};
+  static final Map<String, bool> _expandedState = {
+    'Services': false,
+    'Logs': false,
+    'User Management': false,
+  };
 
+  static Widget _buildExpandableMenuItem(
+    BuildContext context,
+    MenuItem item,
+    int selectedIndex,
+    Function(int) onItemTap,
+    StateSetter setDrawerState,
+    UserRole userRole,
+  ) {
+    final bool isAnySubItemSelected =
+        item.subItems?.any((subItem) => subItem.index == selectedIndex) ??
+        false;
 
- static Widget _buildExpandableMenuItem(
-  BuildContext context,
-  MenuItem item,
-  int selectedIndex,
-  Function(int) onItemTap,
-  StateSetter setDrawerState,
-  UserRole userRole,
-) {
-  final bool isAnySubItemSelected =
-      item.subItems?.any((subItem) => subItem.index == selectedIndex) ?? false;
+    // ✅ Get expansion state from the shared map
+    bool isExpanded = _expandedState[item.title] ?? false;
 
-  // ✅ Get expansion state from the shared map
-  bool isExpanded = _expandedState[item.title] ?? false;
-
-  return Theme(
-    data: ThemeData(
-      expansionTileTheme:  ExpansionTileThemeData(
-        expansionAnimationStyle: AnimationStyle(duration: Duration.zero),
-      ),
-    ),
-    child: ExpansionTile(
-      leading: Icon(
-        item.icon,
-        color: isAnySubItemSelected ? Colors.green[700] : Colors.grey[600],
-        size: 20,
-      ),
-      title: Text(
-        item.title,
-        style: TextStyle(
-          color: isAnySubItemSelected ? Colors.green[800] : Colors.grey[700],
-          fontSize: 14,
-          fontWeight: isAnySubItemSelected ? FontWeight.w600 : FontWeight.w400,
+    return Theme(
+      data: ThemeData(
+        expansionTileTheme: ExpansionTileThemeData(
+          expansionAnimationStyle: AnimationStyle(duration: Duration.zero),
         ),
       ),
-      backgroundColor: isAnySubItemSelected ? Colors.green[50] : null,
-      collapsedBackgroundColor:
-          isAnySubItemSelected ? Colors.green[50] : null,
-      initiallyExpanded: isExpanded,
-      onExpansionChanged: (expanded) {
-        setDrawerState(() {
-          _expandedState[item.title] = expanded; // ✅ Persist state
-        });
-      },
-      children: item.subItems?.map(
-        (subItem) => Container(
-          margin: const EdgeInsets.only(left: 16),
-          child: ListTile(
-            leading: Icon(
-              subItem.icon,
-              color: selectedIndex == subItem.index
-                  ? Colors.green[700]
-                  : Colors.grey[500],
-              size: 18,
-            ),
-            title: Text(
-              subItem.title,
-              style: TextStyle(
-                color: selectedIndex == subItem.index
-                    ? Colors.green[800]
-                    : Colors.grey[600],
-                fontSize: 13,
-                fontWeight: selectedIndex == subItem.index
-                    ? FontWeight.w600
-                    : FontWeight.w400,
-              ),
-            ),
-            tileColor:
-                selectedIndex == subItem.index ? Colors.green[50] : null,
-            onTap: () {
-              if (context.mounted && Navigator.of(context).canPop()) {
-                Navigator.of(context).pop();
-              }
-              onItemTap(subItem.index);
-            },
+      child: ExpansionTile(
+        leading: Icon(
+          item.icon,
+          color: isAnySubItemSelected ? Colors.green[700] : Colors.grey[600],
+          size: 20,
+        ),
+        title: Text(
+          item.title,
+          style: TextStyle(
+            color: isAnySubItemSelected ? Colors.green[800] : Colors.grey[700],
+            fontSize: 14,
+            fontWeight:
+                isAnySubItemSelected ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
-      ).toList() ?? [],
-    ),
-  );
-}
-
+        backgroundColor: isAnySubItemSelected ? Colors.green[50] : null,
+        collapsedBackgroundColor:
+            isAnySubItemSelected ? Colors.green[50] : null,
+        initiallyExpanded: isExpanded,
+        onExpansionChanged: (expanded) {
+          setDrawerState(() {
+            _expandedState[item.title] = expanded; // ✅ Persist state
+          });
+        },
+        children:
+            item.subItems
+                ?.map(
+                  (subItem) => Container(
+                    margin: const EdgeInsets.only(left: 16),
+                    child: ListTile(
+                      leading: Icon(
+                        subItem.icon,
+                        color:
+                            selectedIndex == subItem.index
+                                ? Colors.green[700]
+                                : Colors.grey[500],
+                        size: 18,
+                      ),
+                      title: Text(
+                        subItem.title,
+                        style: TextStyle(
+                          color:
+                              selectedIndex == subItem.index
+                                  ? Colors.green[800]
+                                  : Colors.grey[600],
+                          fontSize: 13,
+                          fontWeight:
+                              selectedIndex == subItem.index
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                        ),
+                      ),
+                      tileColor:
+                          selectedIndex == subItem.index
+                              ? Colors.green[50]
+                              : null,
+                      onTap: () {
+                        if (context.mounted && Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        }
+                        onItemTap(subItem.index);
+                      },
+                    ),
+                  ),
+                )
+                .toList() ??
+            [],
+      ),
+    );
+  }
 
   static Widget _buildNewChatAndHistorySection(
     BuildContext context,
@@ -954,68 +975,72 @@ static final Map<String, bool> _expandedState = {
     );
   }
 
- static Future<void> _deleteConversation(
-  BuildContext context,
-  String conversationId,
-) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Delete Conversation'),
-      content: const Text(
-        'Are you sure you want to delete this conversation and all its messages?',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          style: TextButton.styleFrom(foregroundColor: Colors.red),
-          child: const Text('Delete'),
-        ),
-      ],
-    ),
-  );
-
-  if (confirmed == true) {
-    try {
-      final firestore = FirebaseFirestore.instance;
-      final messagesRef = firestore
-          .collection('conversations')
-          .doc(conversationId)
-          .collection('messages');
-
-      // 🧹 Delete all messages first
-      final messagesSnapshot = await messagesRef.get();
-      for (final doc in messagesSnapshot.docs) {
-        await doc.reference.delete();
-      }
-
-      // 🗑️ Then delete the conversation document itself
-      await firestore.collection('conversations').doc(conversationId).delete();
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Conversation and messages deleted'),
-            backgroundColor: primaryGreen,
+  static Future<void> _deleteConversation(
+    BuildContext context,
+    String conversationId,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Conversation'),
+            content: const Text(
+              'Are you sure you want to delete this conversation and all its messages?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
           ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to delete: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+    );
+
+    if (confirmed == true) {
+      try {
+        final firestore = FirebaseFirestore.instance;
+        final messagesRef = firestore
+            .collection('conversations')
+            .doc(conversationId)
+            .collection('messages');
+
+        // 🧹 Delete all messages first
+        final messagesSnapshot = await messagesRef.get();
+        for (final doc in messagesSnapshot.docs) {
+          await doc.reference.delete();
+        }
+
+        // 🗑️ Then delete the conversation document itself
+        await firestore
+            .collection('conversations')
+            .doc(conversationId)
+            .delete();
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Conversation and messages deleted'),
+              backgroundColor: primaryGreen,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
-}
 
   static Widget _buildLogoutSection(BuildContext context) {
     return Container(
@@ -1540,7 +1565,10 @@ static final Map<String, bool> _expandedState = {
     );
   }
 
-  static Widget _buildUserProfileDropdown(BuildContext context) {
+  static Widget _buildUserProfileDropdown(
+    BuildContext context, {
+    GlobalKey? profileKey,
+  }) {
     Future<Map<String, dynamic>?> getUserData() async {
       try {
         final user = FirebaseAuth.instance.currentUser;
@@ -1566,6 +1594,7 @@ static final Map<String, bool> _expandedState = {
         final userName = snapshot.data?['name'] ?? 'User';
 
         return Container(
+          key: profileKey,
           margin: const EdgeInsets.only(top: 8, bottom: 8, right: 8),
           child: PopupMenuButton<String>(
             tooltip: '',
@@ -1717,8 +1746,9 @@ static final Map<String, bool> _expandedState = {
 
   static Widget _buildNotificationButton(
     BuildContext context,
-    UserRole userRole,
-  ) {
+    UserRole userRole, {
+    GlobalKey? notificationKey,
+  }) {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
     if (currentUserId == null) {
@@ -1754,8 +1784,9 @@ static final Map<String, bool> _expandedState = {
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            // 🔔 Main notification icon
+            //  Main notification icon
             IconButton(
+              key: notificationKey,
               icon: Icon(
                 unreadCount > 0
                     ? Icons.notifications_active_rounded

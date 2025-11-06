@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:capstone_project/onboarding/onBoardingGuide.dart';
 import 'package:circle_nav_bar/circle_nav_bar.dart' show CircleNavBar;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -36,6 +37,12 @@ class _UserMainPageState extends State<UserMainPage> {
   bool _isChatSidebarExpanded = true;
   bool _isBottomNavExpanded = true;
 
+  // 🔑 Onboarding Keys
+  final GlobalKey _sidebarKey = GlobalKey();
+  final GlobalKey _notificationKey = GlobalKey();
+  final GlobalKey _profileKey = GlobalKey();
+  final GlobalKey _bottomNavKey = GlobalKey();
+
   final CohereService _cohere = CohereService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -65,7 +72,7 @@ class _UserMainPageState extends State<UserMainPage> {
     super.initState();
 
     _selectedIndex = widget.initialTabIndex ?? 0;
-    
+
     // CRITICAL FIX: Use the passed conversationId if available
     if (widget.conversationId != null && widget.conversationId!.isNotEmpty) {
       _conversationId = widget.conversationId;
@@ -113,25 +120,27 @@ class _UserMainPageState extends State<UserMainPage> {
   Future<void> _loadExistingConversation(String conversationId) async {
     try {
       print('DEBUG: Loading existing conversation: $conversationId');
-      
+
       // Update the global state
       await UserConstant.setSelectedConversation(conversationId);
-      
+
       // Load the conversation in the chat provider
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
       await chatProvider.setConversationId(conversationId);
-      
+
       // Wait for messages to load
       await Future.delayed(Duration(milliseconds: 300));
-      
+
       // Check if conversation has messages
       final hasMessages = chatProvider.messages.isNotEmpty;
-      
+
       setState(() {
         _showFAQs = !hasMessages; // Show FAQs only if no messages
       });
-      
-      print('DEBUG: Conversation loaded. Messages: ${chatProvider.messages.length}');
+
+      print(
+        'DEBUG: Conversation loaded. Messages: ${chatProvider.messages.length}',
+      );
     } catch (e) {
       print('DEBUG: Error loading conversation: $e');
       setState(() {
@@ -144,12 +153,13 @@ class _UserMainPageState extends State<UserMainPage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
-        final activeConversations = await _firestore
-            .collection('conversations')
-            .where('userId', isEqualTo: user.uid)
-            .where('status', isEqualTo: 'active')
-            .limit(1)
-            .get();
+        final activeConversations =
+            await _firestore
+                .collection('conversations')
+                .where('userId', isEqualTo: user.uid)
+                .where('status', isEqualTo: 'active')
+                .limit(1)
+                .get();
 
         if (activeConversations.docs.isNotEmpty) {
           _conversationId = activeConversations.docs.first.id;
@@ -315,10 +325,17 @@ class _UserMainPageState extends State<UserMainPage> {
           const PlacementInfo(),
         ];
 
-        return ResponsiveLayout(
-          mobileBody: _buildMobileLayout(_pages),
-          tabletBody: _buildTabletDesktopLayout(_pages),
-          desktopBody: _buildTabletDesktopLayout(_pages),
+        // WRAPPED WITH ONBOARDING GUIDE
+        return OnboardingGuide(
+          sidebarKey: _sidebarKey,
+          notificationKey: _notificationKey,
+          profileKey: _profileKey,
+          bottomNavKey: _bottomNavKey,
+          child: ResponsiveLayout(
+            mobileBody: _buildMobileLayout(_pages),
+            tabletBody: _buildTabletDesktopLayout(_pages),
+            desktopBody: _buildTabletDesktopLayout(_pages),
+          ),
         );
       },
     );
@@ -338,18 +355,27 @@ class _UserMainPageState extends State<UserMainPage> {
         showBackButton: false,
         onLeadingPressed:
             isChatPage ? () => Scaffold.of(context).openDrawer() : null,
-        customLeading: isChatPage
-            ? Builder(
-                builder: (context) => IconButton(
-                  icon: const Icon(Icons.menu, color: Colors.black54),
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
-              )
-            : null,
+        customLeading:
+            isChatPage
+                ? Builder(
+                  builder:
+                      (context) => IconButton(
+                        key: _sidebarKey, // 🔑 KEY FOR SIDEBAR
+                        icon: const Icon(Icons.menu, color: Colors.black54),
+                        onPressed: () => Scaffold.of(context).openDrawer(),
+                      ),
+                )
+                : null,
+        // 🔑 PASS KEYS TO APP BAR
+        notificationKey: _notificationKey,
+        profileKey: _profileKey,
       ),
       drawer: isChatPage ? _buildMobileChatDrawer() : null,
       body: pages[_selectedIndex],
-      bottomNavigationBar: _buildBottomNavigationBar(),
+      bottomNavigationBar: Container(
+        key: _bottomNavKey, // 🔑 KEY FOR BOTTOM NAV
+        child: _buildBottomNavigationBar(),
+      ),
     );
   }
 
@@ -466,24 +492,28 @@ class _UserMainPageState extends State<UserMainPage> {
           margin: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            color: isSelected
-                ? UniversalUIComponents.primaryGreen.withOpacity(0.1)
-                : Colors.transparent,
-            border: isSelected
-                ? Border.all(
-                    color:
-                        UniversalUIComponents.primaryGreen.withOpacity(0.3),
-                    width: 1,
-                  )
-                : null,
+            color:
+                isSelected
+                    ? UniversalUIComponents.primaryGreen.withOpacity(0.1)
+                    : Colors.transparent,
+            border:
+                isSelected
+                    ? Border.all(
+                      color: UniversalUIComponents.primaryGreen.withOpacity(
+                        0.3,
+                      ),
+                      width: 1,
+                    )
+                    : null,
           ),
           child: ListTile(
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? UniversalUIComponents.primaryGreen.withOpacity(0.2)
-                    : Colors.grey.shade100,
+                color:
+                    isSelected
+                        ? UniversalUIComponents.primaryGreen.withOpacity(0.2)
+                        : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -555,6 +585,10 @@ class _UserMainPageState extends State<UserMainPage> {
         onFAQToggle: _toggleFAQs,
         onLeadingPressed: _toggleSidebar,
         hasActiveConversation: _conversationId != null,
+        // 🔑 PASS KEYS TO APP BAR
+        sidebarKey: _sidebarKey,
+        notificationKey: _notificationKey,
+        profileKey: _profileKey,
       ),
       body: Row(
         children: [
@@ -624,26 +658,34 @@ class _UserMainPageState extends State<UserMainPage> {
                       Icon(Icons.apps, color: Colors.green),
                     ],
                     inactiveIcons: const [
-                      Text("Home",
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),),
-                      Text("Chat",
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),),
-                      Text("Announcements",
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                          ),),
-                      Text("Services",
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),),
+                      Text(
+                        "Home",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        "Chat",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        "Announcements",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        "Services",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ],
                     color: Colors.white,
                     circleColor: UniversalUIComponents.primaryGreen,
@@ -676,10 +718,7 @@ class _UserMainPageState extends State<UserMainPage> {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.white,
-                        Colors.grey.shade50,
-                      ],
+                      colors: [Colors.white, Colors.grey.shade50],
                     ),
                   ),
                   Positioned(
@@ -787,69 +826,70 @@ class _UserMainPageState extends State<UserMainPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
+      builder:
+          (context) => Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Services',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1B5E20),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _buildServiceTile(
+                  icon: Icons.school,
+                  title: 'Admission Information',
+                  subtitle: 'View admission requirements',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _onNavigationItemTap(3);
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildServiceTile(
+                  icon: Icons.card_giftcard,
+                  title: 'Scholarship List',
+                  subtitle: 'Browse available scholarships',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _onNavigationItemTap(4);
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildServiceTile(
+                  icon: Icons.work,
+                  title: 'Placement Information',
+                  subtitle: 'Career placement details',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _onNavigationItemTap(5);
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Services',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1B5E20),
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildServiceTile(
-              icon: Icons.school,
-              title: 'Admission Information',
-              subtitle: 'View admission requirements',
-              onTap: () {
-                Navigator.pop(context);
-                _onNavigationItemTap(3);
-              },
-            ),
-            const SizedBox(height: 12),
-            _buildServiceTile(
-              icon: Icons.card_giftcard,
-              title: 'Scholarship List',
-              subtitle: 'Browse available scholarships',
-              onTap: () {
-                Navigator.pop(context);
-                _onNavigationItemTap(4);
-              },
-            ),
-            const SizedBox(height: 12),
-            _buildServiceTile(
-              icon: Icons.work,
-              title: 'Placement Information',
-              subtitle: 'Career placement details',
-              onTap: () {
-                Navigator.pop(context);
-                _onNavigationItemTap(5);
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
     );
   }
 
@@ -901,19 +941,12 @@ class _UserMainPageState extends State<UserMainPage> {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     ),
                   ],
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: Colors.grey[400],
-              ),
+              Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
             ],
           ),
         ),
