@@ -323,8 +323,6 @@ Widget dashboardContents(
   );
 }
 
-// Updated responsive header
-// Updated responsive header
 Widget _buildHeader(
   String selectedTimeFrame,
   ValueChanged<String> onTimeFrameChanged,

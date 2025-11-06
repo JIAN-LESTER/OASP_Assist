@@ -362,16 +362,16 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
         return _nameController.text.trim().isNotEmpty;
       case UserOnboardingType.profile:
         if (_role == 'user') {
-          // Must select enrollment status first
           if (_enrollmentStatus == null) return false;
-          
-          // If enrolled, must complete year and program
+
           if (_enrollmentStatus == 'enrolled' &&
               (_selectedYear.isEmpty || _selectedCourse.isEmpty)) {
             return false;
           }
-          
-          // All enrollment questions answered, can proceed
+
+          if (_selectedAffiliation == null) return false;
+          if (_selectedScholarship == null) return false;
+
           return true;
         }
         return true;
@@ -712,7 +712,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     );
   }
 
-  Widget _buildProfilePage(
+ Widget _buildProfilePage(
     UserOnboardingPage page,
     double iconSize,
     double titleFontSize,
@@ -768,54 +768,48 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
           const SizedBox(height: 24),
 
           if (_role == 'user') ...[
-            // Step 1: Enrollment Status
-            _buildSectionTitle(
-              'Are you currently enrolled?',
-              descriptionFontSize,
-            ),
-            const SizedBox(height: 12),
-            _buildRadioOption(
-              title: 'Yes, I am enrolled',
-              value: 'enrolled',
-              groupValue: _enrollmentStatus,
-              onChanged: (value) => setState(() => _enrollmentStatus = value),
-              fontSize: descriptionFontSize,
-            ),
-            const SizedBox(height: 12),
-            _buildRadioOption(
-              title: 'No, not yet enrolled',
-              value: 'not_enrolled',
-              groupValue: _enrollmentStatus,
-              onChanged: (value) {
-                setState(() {
-                  _enrollmentStatus = value;
-                  _selectedYear = '';
-                  _selectedCourse = '';
-                });
-              },
-              fontSize: descriptionFontSize,
-            ),
-
-            // Step 2: If enrolled, show Year and Program
-            if (_enrollmentStatus == 'enrolled') ...[
+            if (_enrollmentStatus == null) ...[
+              _buildSectionTitle(
+                  'Are you currently enrolled?', descriptionFontSize),
+              const SizedBox(height: 12),
+              _buildRadioOption(
+                title: 'Yes, I am enrolled',
+                value: 'enrolled',
+                groupValue: _enrollmentStatus,
+                onChanged: (value) => setState(() => _enrollmentStatus = value),
+                fontSize: descriptionFontSize,
+              ),
+              const SizedBox(height: 12),
+              _buildRadioOption(
+                title: 'No, not yet enrolled',
+                value: 'not_enrolled',
+                groupValue: _enrollmentStatus,
+                onChanged: (value) {
+                  setState(() {
+                    _enrollmentStatus = value;
+                    _selectedYear = '';
+                    _selectedCourse = '';
+                  });
+                },
+                fontSize: descriptionFontSize,
+              ),
+            ],
+            if (_enrollmentStatus == 'enrolled' &&
+                (_selectedYear.isEmpty || _selectedCourse.isEmpty)) ...[
               const SizedBox(height: 24),
               _buildSectionTitle('What year are you in?', descriptionFontSize),
               const SizedBox(height: 12),
               _buildDropdownField(
                 value: _selectedYear.isEmpty ? null : _selectedYear,
                 items: years,
-                onChanged:
-                    (value) => setState(() => _selectedYear = value ?? ''),
+                onChanged: (value) => setState(() => _selectedYear = value ?? ''),
                 hint: 'Select your year level',
                 icon: Icons.school_outlined,
                 fontSize: descriptionFontSize,
               ),
-
               const SizedBox(height: 24),
               _buildSectionTitle(
-                'What program are you taking?',
-                descriptionFontSize,
-              ),
+                  'What program are you taking?', descriptionFontSize),
               const SizedBox(height: 12),
               _buildDropdownField(
                 value: _selectedCourse.isEmpty ? null : _selectedCourse,
@@ -827,29 +821,11 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                 fontSize: descriptionFontSize,
               ),
             ],
-
-            // Step 3: Scholarship (shown after enrollment status is selected)
-            if (_enrollmentStatus != null) ...[
-              const SizedBox(height: 24),
-              _buildYesNoSection(
-                title: 'Do you have any scholarship?',
-                value: _hasScholarship,
-                onChanged: (value) {
-                  setState(() {
-                    _hasScholarship = value;
-                    if (!value) _selectedScholarship = null;
-                  });
-                },
-                dropdownValue: _selectedScholarship,
-                dropdownItems: _scholarships.isEmpty ? ['None'] : _scholarships,
-                dropdownHint: 'Select your scholarship',
-                dropdownIcon: Icons.card_membership_outlined,
-                onDropdownChanged:
-                    (value) => setState(() => _selectedScholarship = value),
-                fontSize: descriptionFontSize,
-              ),
-
-              // Step 4: Affiliation (shown last)
+            if (_enrollmentStatus != null &&
+                (_enrollmentStatus == 'not_enrolled' ||
+                    (_selectedYear.isNotEmpty &&
+                        _selectedCourse.isNotEmpty)) &&
+                _selectedAffiliation == null) ...[
               const SizedBox(height: 24),
               _buildYesNoSection(
                 title: 'Do you have any organizational affiliation?',
@@ -857,15 +833,42 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                 onChanged: (value) {
                   setState(() {
                     _hasAffiliation = value;
-                    if (!value) _selectedAffiliation = null;
+                    if (!value) _selectedAffiliation = 'N/A';
                   });
                 },
-                dropdownValue: _selectedAffiliation,
+                dropdownValue:
+                    _hasAffiliation && _selectedAffiliation != 'N/A'
+                        ? _selectedAffiliation
+                        : null,
                 dropdownItems: _affiliations.isEmpty ? ['None'] : _affiliations,
                 dropdownHint: 'Select your affiliation',
                 dropdownIcon: Icons.people_outline,
                 onDropdownChanged:
                     (value) => setState(() => _selectedAffiliation = value),
+                fontSize: descriptionFontSize,
+              ),
+            ],
+            if (_selectedAffiliation != null &&
+                _selectedScholarship == null) ...[
+              const SizedBox(height: 24),
+              _buildYesNoSection(
+                title: 'Do you have any scholarship?',
+                value: _hasScholarship,
+                onChanged: (value) {
+                  setState(() {
+                    _hasScholarship = value;
+                    if (!value) _selectedScholarship = 'N/A';
+                  });
+                },
+                dropdownValue:
+                    _hasScholarship && _selectedScholarship != 'N/A'
+                        ? _selectedScholarship
+                        : null,
+                dropdownItems: _scholarships.isEmpty ? ['None'] : _scholarships,
+                dropdownHint: 'Select your scholarship',
+                dropdownIcon: Icons.card_membership_outlined,
+                onDropdownChanged:
+                    (value) => setState(() => _selectedScholarship = value),
                 fontSize: descriptionFontSize,
               ),
             ],
@@ -875,7 +878,6 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
       ),
     );
   }
-
   Widget _buildFeaturesPage(
     UserOnboardingPage page,
     double iconSize,

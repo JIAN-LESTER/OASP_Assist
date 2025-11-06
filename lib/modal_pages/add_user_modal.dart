@@ -294,14 +294,17 @@ class _AddUserContentState extends State<AddUserContent> {
       return;
     }
 
-    if (!_emailController.text.trim().contains('@')) {
-      _showTopRightAlert(
-        'Please enter a valid email address',
-        AlertType.warning,
-      );
-      return;
-    }
+   final emailRegex = RegExp(
+  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$'
+);
 
+if (!emailRegex.hasMatch(_emailController.text.trim())) {
+  _showTopRightAlert(
+    'Please enter a valid email address',
+    AlertType.warning,
+  );
+  return;
+}
     if (_passwordController.text.trim().isEmpty) {
       _showTopRightAlert('Please enter password', AlertType.warning);
       return;

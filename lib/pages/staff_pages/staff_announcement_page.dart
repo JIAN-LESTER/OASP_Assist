@@ -28,8 +28,6 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
   }
 
   
-
-
   Future<void> _loadAnnouncements() async {
     try {
       final QuerySnapshot querySnapshot =
