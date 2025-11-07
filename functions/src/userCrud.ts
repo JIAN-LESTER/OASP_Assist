@@ -1,5 +1,3 @@
-// SOLUTION 1: Update your Cloud Functions to use correct v2 callable configuration
-// In your functions/src/user-management.ts file:
 
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
@@ -310,7 +308,3 @@ export const setAdminRole = onCall(
   }
 );
 
-// ============================================
-// AFTER UPDATING, REDEPLOY:
-// firebase deploy --only functions:createUser,functions:deleteUser,functions:updateUser,functions:setAdminRole
-// ============================================

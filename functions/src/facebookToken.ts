@@ -11,9 +11,6 @@ const db = admin.firestore();
 const FB_API_VERSION = "v24.0";
 const PAGE_ID = "730995450096065";
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
 
 async function verifyAuthToken(authHeader: string | undefined): Promise<string | null> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

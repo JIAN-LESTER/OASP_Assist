@@ -1,13 +1,9 @@
 import * as admin from "firebase-admin";
 
-// Initialize Firebase Admin (only once)
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// ============================================================================
-// EXPORT ALL FUNCTIONS FROM MODULES
-// ============================================================================
 
 // RAG Chatbot Functions
 export {

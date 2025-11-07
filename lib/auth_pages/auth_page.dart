@@ -152,17 +152,18 @@ class RoleBasedRouter extends StatelessWidget {
             .update({'lastLoginAt': FieldValue.serverTimestamp()});
       } else {
         // Create a user doc if not existing
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'uid': user.uid,
-          'email': user.email ?? '',
-          'name': name,
-          'photoURL': user.photoURL ?? '',
-          'role': 'user',
-          'profileCompleted': false,
-          'createdAt': FieldValue.serverTimestamp(),
-          'isActive': true,
-          'isVerified': user.emailVerified,
-        });
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+  'uid': user.uid,
+  'email': user.email ?? '',
+  'name': name,
+  'photoURL': user.photoURL ?? '',
+  'role': 'user',
+  'profileCompleted': false,
+  'createdAt': FieldValue.serverTimestamp(),
+  'isActive': true,
+  'isVerified': user.emailVerified,
+  'linkedProviders': ['password'], // ADD THIS LINE - default to password for fallback cases
+});
       }
 
       // Log login

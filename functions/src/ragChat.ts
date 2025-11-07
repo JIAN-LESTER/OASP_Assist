@@ -11,9 +11,6 @@ const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
 // Firestore reference
 const db = admin.firestore();
 
-// ============================================================================
-// COHERE API UTILITIES
-// ============================================================================
 
 export async function generateCohereEmbedding(
   text: string,

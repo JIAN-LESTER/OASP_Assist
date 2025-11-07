@@ -4,9 +4,7 @@ import * as admin from "firebase-admin";
 
 const db = admin.firestore();
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
+
 
 function parseDeadline(deadlineStr: string): Date | null {
   if (!deadlineStr) return null;
@@ -152,7 +150,7 @@ async function sendFCMNotifications(
   }
 }
 
-// ✅ CRITICAL FIX: Create individual notification per user
+
 async function createNotificationsForUsers(
   userIds: string[],
   targetRole: string,
@@ -170,8 +168,8 @@ async function createNotificationsForUsers(
     for (const userId of userIds) {
       const notificationRef = db.collection("notifications").doc();
       batch.set(notificationRef, {
-        userId: userId,           // ✅ CRITICAL: Individual user ID
-        targetRole: targetRole,   // ✅ For role-based queries
+        userId: userId,          
+        targetRole: targetRole,   
         title: title,
         body: body,
         type: type,

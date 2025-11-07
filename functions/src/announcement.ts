@@ -15,9 +15,6 @@ const storage = admin.storage();
 const FB_API_VERSION = "v24.0";
 const PAGE_ID = "730995450096065";
 
-// ============================================================================
-// INTERFACES
-// ============================================================================
 
 interface FacebookPost {
   id: string;
@@ -47,9 +44,6 @@ interface AnnouncementData {
   stored_in_storage: boolean;
 }
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
 
 async function verifyAuthToken(authHeader: string | undefined): Promise<string | null> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -734,5 +728,3 @@ export const cleanupDeletedAnnouncement = onDocumentUpdated(
     }
   }
 );
-
-// Continuing in next artifact due to size...

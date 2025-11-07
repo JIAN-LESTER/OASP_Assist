@@ -1,9 +1,5 @@
 import {onCall, onRequest} from "firebase-functions/v2/https";
 
-// ============================================================================
-// HEALTH CHECK & TEST FUNCTIONS
-// ============================================================================
-
 export const healthCheck = onRequest(
   {
     cors: true,

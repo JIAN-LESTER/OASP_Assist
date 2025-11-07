@@ -285,25 +285,25 @@ class _RegisterPageState extends State<RegisterPage> {
       final name = emailController.text.split('@').first;
       print('📝 User name extracted: $name');
 
-      // Step 2: Save to Firestore IMMEDIATELY (while user is still authenticated)
+    
       print('📁 Step 2: Saving user data to Firestore...');
 
       // First, ensure user is fully authenticated
       await Future.delayed(const Duration(milliseconds: 500));
       await user.reload();
-
-      final userData = {
-        'uid': user.uid,
-        'email': user.email ?? '',
-        'name': name,
-        'role': 'user',
-        'createdAt': FieldValue.serverTimestamp(),
-        'firstLogin': true,
-        'isActive': true,
-        'profileCompleted': false,
-        'onboardingCompleted': false,
-        'isVerified': false, // Set to false initially
-      };
+final userData = {
+  'uid': user.uid,
+  'email': user.email ?? '',
+  'name': name,
+  'role': 'user',
+  'createdAt': FieldValue.serverTimestamp(),
+  'firstLogin': true,
+  'isActive': true,
+  'profileCompleted': false,
+  'onboardingCompleted': false,
+  'isVerified': false,
+  'linkedProviders': ['password'], 
+};
 
       print('📦 Data to save: $userData');
       print('🔐 Auth token check: ${user.uid}');

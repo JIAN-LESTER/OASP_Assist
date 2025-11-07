@@ -762,7 +762,7 @@ Widget _buildRatingButtonsUI(String messageId, String? currentRating, Message me
   if (!mounted) return;
   
   // FIX 2: Validate conversationId exists
-  if (widget.conversationId == null || widget.conversationId!.isEmpty) {
+  if (widget.conversationId.isEmpty) {
     print('Error: No conversation ID available');
     if (mounted) {
       _showSnackBar('Unable to rate message', Icons.error);
@@ -1067,15 +1067,34 @@ Widget _buildRatingButtonsUI(String messageId, String? currentRating, Message me
         ? '$selectedReason — $userReason'
         : selectedReason;
 
-    // 🟩 Firestore write
+    // ✅ FIX: Find the actual user question that this bot message is responding to
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final messages = chatProvider.messages;
+    
+    String userQuestion = 'No question found';
+    
+    // Find the index of the current bot message
+    final botMessageIndex = messages.indexWhere((m) => m.id == message.id);
+    
+    if (botMessageIndex > 0) {
+      // Look backwards for the most recent user message
+      for (int i = botMessageIndex - 1; i >= 0; i--) {
+        if (messages[i].sender == 'user') {
+          userQuestion = messages[i].content;
+          break;
+        }
+      }
+    }
+
     final escalationId = _firestore.collection('escalations').doc().id;
     final escalatedData = {
       'escalationId': escalationId,
       'userId': FirebaseAuth.instance.currentUser?.uid,
       'conversationId': message.conversationId,
-      'question': message.sender == 'bot' ? 'Unknown' : message.content,
-      'botAnswer':
-          message.sender == 'bot' ? message.content : 'No bot response available',
+      'question': userQuestion, // ✅ Now contains the actual user question
+      'botAnswer': message.sender == 'bot' 
+          ? message.content 
+          : 'No bot response available',
       'status': 'pending',
       'reason': fullReason,
       'createdAt': Timestamp.now(),
@@ -1084,6 +1103,7 @@ Widget _buildRatingButtonsUI(String messageId, String? currentRating, Message me
 
     await _firestore.collection('escalations').add(escalatedData);
     print('Manual escalation logged for message ${message.id}');
+    print('User question: $userQuestion'); // Debug log
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
