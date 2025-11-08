@@ -89,36 +89,40 @@ class NotificationNavigationHandler {
     );
   }
 
-  Future<void> _showEscalationResponse(BuildContext context, Map<String, dynamic> data) async {
-    final escalationId = data['escalationId'];
-    if (escalationId == null || escalationId.isEmpty) {
-      _showErrorDialog(context, 'No escalation ID provided');
+Future<void> _showEscalationResponse(BuildContext context, Map<String, dynamic> data) async {
+  final escalationId = data['escalationId']; // ✅ Not relatedId
+  
+  print('🔍 DEBUG: escalationId = $escalationId');
+  print('🔍 DEBUG: data keys = ${data.keys}');
+  
+  if (escalationId == null || escalationId.isEmpty) {
+    _showErrorDialog(context, 'No escalation ID provided');
+    return;
+  }
+
+  try {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+      ),
+    );
+
+    // ✅ CRITICAL FIX: Use doc() directly
+    final escalationDoc = await FirebaseFirestore.instance
+        .collection('escalations')
+        .doc(escalationId) // ✅ Fetch by document ID
+        .get();
+
+    if (context.mounted) Navigator.of(context).pop();
+
+    if (!escalationDoc.exists) {
+      _showErrorDialog(context, 'Escalation not found');
       return;
     }
 
-    try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-        ),
-      );
-
-      final escalationDoc = await FirebaseFirestore.instance
-          .collection('escalations')
-          .where('escalationId', isEqualTo: escalationId)
-          .limit(1)
-          .get();
-
-      if (context.mounted) Navigator.of(context).pop();
-
-      if (escalationDoc.docs.isEmpty) {
-        _showErrorDialog(context, 'Escalation not found');
-        return;
-      }
-
-      final escalation = escalationDoc.docs.first.data();
+    final escalation = escalationDoc.data()!;
       final staffResponse = escalation['staffResponse'] ?? 'No response yet';
       final respondedBy = escalation['respondedBy'] ?? 'Staff';
       final respondedAt = escalation['respondedAt'] as Timestamp?;
@@ -236,10 +240,10 @@ class NotificationNavigationHandler {
         ),
       );
     } catch (e) {
-      print('❌ Error fetching escalation: $e');
-      _showErrorDialog(context, 'Failed to load response');
-    }
+    print('❌ Error fetching escalation: $e');
+    _showErrorDialog(context, 'Failed to load response');
   }
+}
 
   void _navigateToAnnouncement(BuildContext context, Map<String, dynamic> data) {
     final announcementId = data['announcementId'];

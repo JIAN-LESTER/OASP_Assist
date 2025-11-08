@@ -67,29 +67,36 @@ class _UserMainPageState extends State<UserMainPage> {
     });
   }
 
-  @override
-  void initState() {
-    super.initState();
+ @override
+void initState() {
+  super.initState();
 
-    _selectedIndex = widget.initialTabIndex ?? 0;
+  _selectedIndex = widget.initialTabIndex ?? 0;
 
-    // CRITICAL FIX: Use the passed conversationId if available
-    if (widget.conversationId != null && widget.conversationId!.isNotEmpty) {
-      _conversationId = widget.conversationId;
-      _initFuture = _loadExistingConversation(widget.conversationId!);
-      _showFAQs = false; // Don't show FAQs for existing conversations
-    } else {
-      _initFuture = _initializeConversationId();
-    }
+  print('🎯 UserMainPage initialized with:');
+  print('   - initialTabIndex: ${widget.initialTabIndex}');
+  print('   - conversationId: ${widget.conversationId}');
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      UserConstant.initializeChatSession(context, setState);
-
-      if (_selectedIndex == 1 && widget.conversationId == null) {
-        _handleChatNavigation();
-      }
-    });
+  // ✅ CRITICAL FIX: Properly handle passed conversationId
+  if (widget.conversationId != null && widget.conversationId!.isNotEmpty) {
+    print('✅ Initializing with passed conversation');
+    _conversationId = widget.conversationId;
+    _initFuture = _loadExistingConversation(widget.conversationId!);
+    _showFAQs = false;
+  } else {
+    print('ℹ️ No conversation passed, looking for active conversation');
+    _initFuture = _initializeConversationId();
   }
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    UserConstant.initializeChatSession(context, setState);
+
+    // Only create new conversation if no conversationId was passed
+    if (_selectedIndex == 1 && widget.conversationId == null) {
+      _handleChatNavigation();
+    }
+  });
+}
 
   bool _handledInitialArgs = false;
 
@@ -116,61 +123,88 @@ class _UserMainPageState extends State<UserMainPage> {
     }
   }
 
-  // NEW METHOD: Load an existing conversation
-  Future<void> _loadExistingConversation(String conversationId) async {
-    try {
-      print('DEBUG: Loading existing conversation: $conversationId');
+Future<void> _loadExistingConversation(String conversationId) async {
+  try {
+    print('📥 Loading existing conversation: $conversationId');
 
-      // Update the global state
-      await UserConstant.setSelectedConversation(conversationId);
+    // Update the global state
+    await UserConstant.setSelectedConversation(conversationId);
 
-      // Load the conversation in the chat provider
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      await chatProvider.setConversationId(conversationId);
+    // Load the conversation in the chat provider
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    await chatProvider.setConversationId(conversationId);
 
-      // Wait for messages to load
-      await Future.delayed(Duration(milliseconds: 300));
+    // Wait for messages to load
+    await Future.delayed(Duration(milliseconds: 300));
 
-      // Check if conversation has messages
-      final hasMessages = chatProvider.messages.isNotEmpty;
+    // ✅ CRITICAL: Always hide FAQs when loading from notification
+    setState(() {
+      _showFAQs = false; // Never show FAQs when coming from notification
+    });
 
-      setState(() {
-        _showFAQs = !hasMessages; // Show FAQs only if no messages
-      });
-
-      print(
-        'DEBUG: Conversation loaded. Messages: ${chatProvider.messages.length}',
-      );
-    } catch (e) {
-      print('DEBUG: Error loading conversation: $e');
-      setState(() {
-        _showFAQs = true;
-      });
-    }
+    print('✅ Conversation loaded. Messages: ${chatProvider.messages.length}');
+  } catch (e) {
+    print('❌ Error loading conversation: $e');
+    setState(() {
+      _showFAQs = true;
+    });
   }
+}
 
-  Future<void> _initializeConversationId() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      try {
-        final activeConversations =
-            await _firestore
-                .collection('conversations')
-                .where('userId', isEqualTo: user.uid)
-                .where('status', isEqualTo: 'active')
-                .limit(1)
-                .get();
+Future<void> _initializeConversationId() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
 
-        if (activeConversations.docs.isNotEmpty) {
-          _conversationId = activeConversations.docs.first.id;
-        } else {
-          _conversationId = null;
-        }
-      } catch (e) {
-        print('DEBUG: Error loading conversation: $e');
+  try {
+    // ✅ CRITICAL: Check if we have a conversationId passed from navigation
+    if (widget.conversationId != null && widget.conversationId!.isNotEmpty) {
+      print('✅ Using passed conversationId: ${widget.conversationId}');
+      
+
+      final convDoc = await _firestore
+          .collection('conversations')
+          .doc(widget.conversationId!)
+          .get();
+      
+      if (convDoc.exists) {
+        print('✅ Conversation exists, loading it');
+        setState(() {
+          _conversationId = widget.conversationId;
+        });
+        
+        // Load the conversation immediately
+        await _loadExistingConversation(widget.conversationId!);
+        return; // Exit early - don't look for other conversations
+      } else {
+        print('⚠️ Passed conversationId not found, falling back to active conversation');
       }
     }
+
+
+    print('🔍 Looking for active conversations...');
+    final activeConversations = await _firestore
+        .collection('conversations')
+        .where('userId', isEqualTo: user.uid)
+        .where('status', isEqualTo: 'active')
+        .limit(1)
+        .get();
+
+    if (activeConversations.docs.isNotEmpty) {
+      print('✅ Found active conversation: ${activeConversations.docs.first.id}');
+      setState(() {
+        _conversationId = activeConversations.docs.first.id;
+      });
+    } else {
+      print('ℹ️ No active conversations found');
+      setState(() {
+        _conversationId = null;
+      });
+    }
+  } catch (e) {
+    print('❌ Error loading conversation: $e');
   }
+}
+
 
   final List<String> _pageTitles = const [
     'Home',

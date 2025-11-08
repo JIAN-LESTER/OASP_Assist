@@ -407,53 +407,55 @@ class NotificationService {
     _navigateBasedOnNotification(type, data);
   }
 
-  // ✅ NEW: Navigate based on notification type and user role
   Future<void> _navigateBasedOnNotification(
-    String type,
-    Map<String, dynamic> data,
-  ) async {
-    if (_onNotificationTap == null) {
-      print('⚠️ No navigation handler registered');
+  String type,
+  Map<String, dynamic> data,
+) async {
+  print('🔍 ===== NAVIGATION DEBUG =====');
+  print('Type: $type');
+  print('Data keys: ${data.keys.toList()}');
+  print('Data values: $data');
+  print('Has escalationId: ${data.containsKey('escalationId')}');
+  print('EscalationId value: ${data['escalationId']}');
+  print('Handler registered: ${_onNotificationTap != null}');
+  print('=============================');
+  
+  if (_onNotificationTap == null) {
+    print('⚠️ No navigation handler registered');
+    return;
+  }
+
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('⚠️ No user logged in');
       return;
     }
 
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        print('⚠️ No user logged in');
-        return;
-      }
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    
+    final role = userDoc.data()?['role'] ?? 'user';
 
-      // Get user role
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      
-      final role = userDoc.data()?['role'] ?? 'user';
+    print('🔔 Navigation: Type=$type, Role=$role');
+    print('🔔 Data: $data');
 
-      print('🔔 Navigation: Type=$type, Role=$role');
-      print('🔔 Data: $data');
-
-      // Handle based on type and role
-      if (type == 'new_escalation' && role == 'staff') {
-        // Staff: Navigate to escalation detail
-        _onNotificationTap!('escalation_detail', data);
-      } else if (type == 'escalation_reply' && role == 'user') {
-        // User: Show escalation response dialog
-        _onNotificationTap!('escalation_response', data);
-      } else if (type == 'announcement') {
-        // Both: Navigate to announcement detail
-        _onNotificationTap!('announcement', data);
-      } else if (type == 'deadline_reminder') {
-        // Both: Navigate to announcements
-        _onNotificationTap!('announcements_list', data);
-      }
-    } catch (e) {
-      print('❌ Error handling notification navigation: $e');
+    // Handle based on type and role
+    if (type == 'new_escalation' && role == 'staff') {
+      _onNotificationTap!('escalation_detail', data);
+    } else if (type == 'escalation_reply' && role == 'user') {
+      _onNotificationTap!('escalation_response', data);
+    } else if (type == 'announcement') {
+      _onNotificationTap!('announcement', data);
+    } else if (type == 'deadline_reminder') {
+      _onNotificationTap!('announcements_list', data);
     }
+  } catch (e) {
+    print('❌ Error handling notification navigation: $e');
   }
-
+}
   Future<void> _saveWebToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;

@@ -4,8 +4,6 @@ import * as admin from "firebase-admin";
 
 const db = admin.firestore();
 
-
-
 function parseDeadline(deadlineStr: string): Date | null {
   if (!deadlineStr) return null;
 
@@ -39,7 +37,6 @@ function parseDeadline(deadlineStr: string): Date | null {
   }
 }
 
-// ✅ FIXED: Send FCM only to mobile devices
 async function sendFCMNotifications(
   userIds: string[],
   title: string,
@@ -81,6 +78,16 @@ async function sendFCMNotifications(
       data: {
         ...data,
         click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        ...(data.type === 'new_escalation' && data.escalationId ? {
+          escalationId: data.escalationId.toString()
+        } : {}),
+        ...(data.type === 'escalation_reply' && data.escalationId ? {
+          escalationId: data.escalationId.toString()
+        } : {}),
+        // ✅ NEW: Include conversationId for escalations
+        ...(data.conversationId ? {
+          conversationId: data.conversationId.toString()
+        } : {}),
       },
       tokens: tokens,
       android: {
@@ -150,7 +157,6 @@ async function sendFCMNotifications(
   }
 }
 
-
 async function createNotificationsForUsers(
   userIds: string[],
   targetRole: string,
@@ -167,12 +173,17 @@ async function createNotificationsForUsers(
 
     for (const userId of userIds) {
       const notificationRef = db.collection("notifications").doc();
+      
       batch.set(notificationRef, {
         userId: userId,          
         targetRole: targetRole,   
         title: title,
         body: body,
         type: type,
+        // ✅ Store all IDs at root level
+        escalationId: data.escalationId || null,
+        announcementId: data.announcementId || null,
+        conversationId: data.conversationId || null, // ✅ NEW: Add conversationId
         data: data,
         readBy: [],
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -180,13 +191,11 @@ async function createNotificationsForUsers(
 
       count++;
 
-      // Commit batch every 500 writes
       if (count % 500 === 0) {
         await batch.commit();
       }
     }
 
-    // Commit remaining
     if (count % 500 !== 0) {
       await batch.commit();
     }
@@ -233,7 +242,6 @@ export const onAnnouncementCreated = onDocumentCreated(
         notificationBody += ` | Deadline: ${deadline}`;
       }
 
-      // ✅ Get all active users
       const usersSnapshot = await db
         .collection("users")
         .where("isActive", "==", true)
@@ -243,7 +251,6 @@ export const onAnnouncementCreated = onDocumentCreated(
 
       console.log(`📤 Creating notifications for ${userIds.length} users`);
 
-      // ✅ Create individual notification for each user
       await createNotificationsForUsers(
         userIds,
         'user',
@@ -258,7 +265,6 @@ export const onAnnouncementCreated = onDocumentCreated(
         }
       );
 
-      // ✅ Send FCM to mobile devices
       await sendFCMNotifications(
         userIds,
         notificationTitle,
@@ -319,7 +325,6 @@ export const checkUpcomingDeadlines = onSchedule(
         if (daysUntilDeadline === 3) {
           console.log(`⏰ Deadline approaching: ${announcementId}`);
 
-          // Check if already sent
           const existingNotification = await db
             .collection("notifications")
             .where("data.announcementId", "==", announcementId)
@@ -342,7 +347,6 @@ export const checkUpcomingDeadlines = onSchedule(
 
           const userIds = usersSnapshot.docs.map(doc => doc.id);
 
-          // ✅ Create individual notifications
           await createNotificationsForUsers(
             userIds,
             'user',
@@ -358,7 +362,6 @@ export const checkUpcomingDeadlines = onSchedule(
             }
           );
 
-          // ✅ Send FCM
           await sendFCMNotifications(
             userIds,
             notificationTitle,
@@ -422,7 +425,6 @@ export const cleanupOldNotifications = onSchedule(
   }
 );
 
-// ✅ FIXED: Create individual notifications for each staff member
 export const onEscalationCreated = onDocumentCreated(
   {
     document: "escalations/{escalationId}",
@@ -442,8 +444,8 @@ export const onEscalationCreated = onDocumentCreated(
 
       const question = escalationData.question || "New question";
       const userId = escalationData.userId;
+      const conversationId = escalationData.conversationId || null; // ✅ NEW: Get conversationId
 
-      // Get user's name
       let userName = "A user";
       if (userId) {
         try {
@@ -460,7 +462,6 @@ export const onEscalationCreated = onDocumentCreated(
       const notificationTitle = "New Escalated Question";
       const notificationBody = `${userName} needs help: ${question.substring(0, 80)}${question.length > 80 ? '...' : ''}`;
 
-      // ✅ Get all staff members
       const staffSnapshot = await db
         .collection("users")
         .where("role", "==", "staff")
@@ -473,7 +474,7 @@ export const onEscalationCreated = onDocumentCreated(
 
       const staffIds = staffSnapshot.docs.map(doc => doc.id);
 
-      // ✅ Create individual notifications for each staff
+      // ✅ NEW: Include conversationId in notification data
       await createNotificationsForUsers(
         staffIds,
         'staff',
@@ -484,10 +485,11 @@ export const onEscalationCreated = onDocumentCreated(
           escalationId: escalationId,
           question: question,
           userId: userId,
+          conversationId: conversationId, // ✅ NEW: Add conversationId
         }
       );
 
-      // ✅ Send FCM to mobile staff
+      // ✅ NEW: Include conversationId in FCM data
       await sendFCMNotifications(
         staffIds,
         notificationTitle,
@@ -495,9 +497,11 @@ export const onEscalationCreated = onDocumentCreated(
         {
           type: "new_escalation",
           escalationId: escalationId,
+          conversationId: conversationId || '', // ✅ NEW: Add conversationId
         }
       );
 
+      console.log(`✅ Notifications sent with escalationId: ${escalationId}, conversationId: ${conversationId}`);
       return {success: true};
     } catch (error) {
       console.error("Error creating escalation notification:", error);
@@ -506,7 +510,6 @@ export const onEscalationCreated = onDocumentCreated(
   }
 );
 
-// ✅ FIXED: Create notification for the specific user
 export const onEscalationReplied = onDocumentUpdated(
   {
     document: "escalations/{escalationId}",
@@ -523,10 +526,9 @@ export const onEscalationReplied = onDocumentUpdated(
         return;
       }
 
-      // Check if staff has replied
       const hasNewReply = 
-        (afterData.staffReply && !beforeData.staffReply) ||
-        (afterData.status === 'resolved' && beforeData.status !== 'resolved' && afterData.staffReply);
+        (afterData.staffResponse && !beforeData.staffResponse) ||
+        (afterData.status === 'resolved' && beforeData.status !== 'resolved' && afterData.staffResponse);
 
       if (!hasNewReply) {
         console.log("No new staff reply detected");
@@ -537,7 +539,8 @@ export const onEscalationReplied = onDocumentUpdated(
 
       const userId = afterData.userId;
       const question = afterData.question || "Your question";
-      const staffReply = afterData.staffReply || "Staff has responded";
+      const staffResponse = afterData.staffResponse || "Staff has responded";
+      const conversationId = afterData.conversationId || null; // ✅ NEW: Get conversationId
 
       if (!userId) {
         console.log("No userId found in escalation");
@@ -550,9 +553,9 @@ export const onEscalationReplied = onDocumentUpdated(
         notificationBody += "...";
       }
 
-      // ✅ Create notification for THIS user only
+      // ✅ NEW: Include conversationId in notification data
       await createNotificationsForUsers(
-        [userId], // Single user
+        [userId],
         'user',
         notificationTitle,
         notificationBody,
@@ -560,11 +563,12 @@ export const onEscalationReplied = onDocumentUpdated(
         {
           escalationId: escalationId,
           question: question,
-          staffReply: staffReply,
+          staffResponse: staffResponse,
+          conversationId: conversationId, // ✅ NEW: Add conversationId
         }
       );
 
-      // ✅ Send FCM to this user's mobile device
+      // ✅ NEW: Include conversationId in FCM data
       await sendFCMNotifications(
         [userId],
         notificationTitle,
@@ -572,9 +576,11 @@ export const onEscalationReplied = onDocumentUpdated(
         {
           type: "escalation_reply",
           escalationId: escalationId,
+          conversationId: conversationId || '', // ✅ NEW: Add conversationId
         }
       );
 
+      console.log(`✅ Reply notification sent with escalationId: ${escalationId}, conversationId: ${conversationId}`);
       return {success: true, userId: userId};
     } catch (error) {
       console.error("Error creating escalation reply notification:", error);

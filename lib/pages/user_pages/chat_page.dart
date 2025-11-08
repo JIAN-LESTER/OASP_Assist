@@ -887,7 +887,7 @@ Widget _buildRatingButtonsUI(String messageId, String? currentRating, Message me
   }
 }
 
- Future<void> _processManualEscalation(Message message) async {
+Future<void> _processManualEscalation(Message message) async {
   final reasonController = TextEditingController();
   String selectedReason = 'Bot response not accurate'; // default option
 
@@ -1086,12 +1086,15 @@ Widget _buildRatingButtonsUI(String messageId, String? currentRating, Message me
       }
     }
 
-    final escalationId = _firestore.collection('escalations').doc().id;
+    // ✅ CRITICAL FIX: Create the document reference first to get the ID
+    final escalationRef = _firestore.collection('escalations').doc();
+    final escalationId = escalationRef.id; // This is the actual document ID
+    
     final escalatedData = {
-      'escalationId': escalationId,
+      'escalationId': escalationId, // ✅ Store the ID for reference
       'userId': FirebaseAuth.instance.currentUser?.uid,
       'conversationId': message.conversationId,
-      'question': userQuestion, // ✅ Now contains the actual user question
+      'question': userQuestion,
       'botAnswer': message.sender == 'bot' 
           ? message.content 
           : 'No bot response available',
@@ -1101,9 +1104,11 @@ Widget _buildRatingButtonsUI(String messageId, String? currentRating, Message me
       'messageId': message.id,
     };
 
-    await _firestore.collection('escalations').add(escalatedData);
-    print('Manual escalation logged for message ${message.id}');
-    print('User question: $userQuestion'); // Debug log
+    // ✅ Use .set() with the specific document reference instead of .add()
+    await escalationRef.set(escalatedData);
+    
+    print('✅ Manual escalation created with ID: $escalationId');
+    print('📝 User question: $userQuestion');
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1129,7 +1134,15 @@ Widget _buildRatingButtonsUI(String messageId, String? currentRating, Message me
       );
     }
   } catch (e) {
-    print('Error creating manual escalation: $e');
+    print('❌ Error creating manual escalation: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to escalate: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   } finally {
     reasonController.dispose();
   }
