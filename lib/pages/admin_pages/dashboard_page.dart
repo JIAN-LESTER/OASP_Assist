@@ -42,7 +42,7 @@ class _DashboardPageState extends State<DashboardPage> {
               .collection('users')
               .doc(currentUser.uid)
               .get();
-      if (!mounted) return; // <== ✅ add this
+      if (!mounted) return; 
 
       if (userDoc.exists) {
         setState(() {
@@ -59,7 +59,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _loadreportsData() async {
-    if (!mounted) return; // <== ✅ safety check
+    if (!mounted) return; 
     setState(() {
       isLoading = true;
     });
@@ -323,8 +323,6 @@ Widget dashboardContents(
   );
 }
 
-// Updated responsive header
-// Updated responsive header
 Widget _buildHeader(
   String selectedTimeFrame,
   ValueChanged<String> onTimeFrameChanged,

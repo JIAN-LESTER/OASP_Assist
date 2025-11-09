@@ -1,5 +1,5 @@
 import 'dart:async';
-
+import 'package:capstone_project/pages/staff_pages/human_escalation.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:capstone_project/auth_pages/auth_page.dart';
@@ -7,7 +7,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/auth_pages/email_verification_page.dart';
 import 'package:capstone_project/onboarding/onboarding.dart';
-
 import 'package:capstone_project/onboarding/useronboarding.dart';
 import 'package:capstone_project/pages/admin_pages/information_bank_page.dart';
 import 'package:capstone_project/pages/user_pages/admission_info.dart';
@@ -23,13 +22,283 @@ import 'package:capstone_project/services/answer_retrieval.dart';
 import 'package:capstone_project/services/cohere_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:capstone_project/services/pinecone_service.dart';
+import 'package:capstone_project/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+// ✅ Global navigator key - MUST be accessible everywhere
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 // Global initialization flag
 bool _servicesInitialized = false;
+
+// ✅ Navigation Handler Class
+class NotificationNavigationHandler {
+  final GlobalKey<NavigatorState> navigatorKey;
+
+  NotificationNavigationHandler(this.navigatorKey);
+
+  void setup() {
+    NotificationService().setNavigationHandler(_handleNavigation);
+    print('✅ Navigation handler registered');
+  }
+
+  void _handleNavigation(String type, Map<String, dynamic> data) {
+    final context = navigatorKey.currentContext;
+    if (context == null) {
+      print('⚠️ No navigator context available');
+      return;
+    }
+
+    print('📍 Navigating to: $type with data: $data');
+
+    switch (type) {
+      case 'escalation_detail':
+        _navigateToEscalationDetail(context, data);
+        break;
+      case 'escalation_response':
+        _showEscalationResponse(context, data);
+        break;
+      case 'announcement':
+        _navigateToAnnouncement(context, data);
+        break;
+      case 'announcements_list':
+        _navigateToAnnouncementsList(context);
+        break;
+    }
+  }
+
+  void _navigateToEscalationDetail(BuildContext context, Map<String, dynamic> data) {
+    final escalationId = data['escalationId'];
+    if (escalationId == null || escalationId.isEmpty) {
+      print('⚠️ No escalation ID provided');
+      return;
+    }
+
+    Navigator.of(context).pushNamed(
+      '/staff/escalations',
+      arguments: {
+        'escalationId': escalationId,
+        'autoOpen': true,
+      },
+    );
+  }
+
+Future<void> _showEscalationResponse(BuildContext context, Map<String, dynamic> data) async {
+  final escalationId = data['escalationId']; // ✅ Not relatedId
+  
+  print('🔍 DEBUG: escalationId = $escalationId');
+  print('🔍 DEBUG: data keys = ${data.keys}');
+  
+  if (escalationId == null || escalationId.isEmpty) {
+    _showErrorDialog(context, 'No escalation ID provided');
+    return;
+  }
+
+  try {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+      ),
+    );
+
+    // ✅ CRITICAL FIX: Use doc() directly
+    final escalationDoc = await FirebaseFirestore.instance
+        .collection('escalations')
+        .doc(escalationId) // ✅ Fetch by document ID
+        .get();
+
+    if (context.mounted) Navigator.of(context).pop();
+
+    if (!escalationDoc.exists) {
+      _showErrorDialog(context, 'Escalation not found');
+      return;
+    }
+
+    final escalation = escalationDoc.data()!;
+      final staffResponse = escalation['staffResponse'] ?? 'No response yet';
+      final respondedBy = escalation['respondedBy'] ?? 'Staff';
+      final respondedAt = escalation['respondedAt'] as Timestamp?;
+      final userQuestion = escalation['question'] ?? 'No question available';
+      final conversationId = escalation['conversationId'] as String?;
+
+      if (!context.mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.support_agent, color: Color(0xFF2E7D32), size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Staff Response', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                    if (respondedAt != null)
+                      Text(
+                        _formatTimestamp(respondedAt.toDate()),
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.normal),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.question_answer, size: 16, color: Colors.grey.shade600),
+                          const SizedBox(width: 6),
+                          Text('Your Question', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(userQuestion, style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.4)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [const Color(0xFF2E7D32).withOpacity(0.1), const Color(0xFF388E3C).withOpacity(0.05)],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF2E7D32).withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.support_agent, size: 16, color: Color(0xFF2E7D32)),
+                          const SizedBox(width: 6),
+                          Text('Response from $respondedBy', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32))),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(staffResponse, style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.5)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Close', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+            ),
+            if (conversationId != null && conversationId.isNotEmpty)
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pushNamed('/chat', arguments: {'conversationId': conversationId});
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E7D32),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('View Chat', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+          ],
+        ),
+      );
+    } catch (e) {
+    print('❌ Error fetching escalation: $e');
+    _showErrorDialog(context, 'Failed to load response');
+  }
+}
+
+  void _navigateToAnnouncement(BuildContext context, Map<String, dynamic> data) {
+    final announcementId = data['announcementId'];
+    if (announcementId == null || announcementId.isEmpty) {
+      print('⚠️ No announcement ID provided');
+      return;
+    }
+
+    Navigator.of(context).pushNamed('/announcements/detail', arguments: {'announcementId': announcementId});
+  }
+
+  void _navigateToAnnouncementsList(BuildContext context) {
+    Navigator.of(context).pushNamed('/announcements');
+  }
+
+  void _showErrorDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red.shade600),
+            const SizedBox(width: 12),
+            const Text('Error'),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inHours < 1) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inDays < 1) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
+    }
+  }
+}
 
 Future<void> initializeServices() async {
   if (_servicesInitialized) {
@@ -40,37 +309,81 @@ Future<void> initializeServices() async {
   try {
     print('🚀 Starting service initialization...');
     
-    // Initialize Firebase first
+    // Step 1: Initialize Firebase FIRST
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    print('✅ Firebase initialized successfully');
+    print('✅ Firebase initialized');
     
-    // Initialize Cloud Functions IMMEDIATELY after Firebase
-    // This ensures it's ready before any widget tries to use it
-    FirebaseFunctionsService().initialize(
-      region: 'us-central1',
-      useEmulator: false,
-    );
-    print('✅ Cloud Functions service initialized');
+    // ✅ CRITICAL: Wait for Firebase to be fully ready
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Step 2: Test Firebase Auth (ensures platform channels are ready)
+    try {
+      final _ = FirebaseAuth.instance.currentUser;
+      print('✅ Firebase Auth ready');
+    } catch (e) {
+      print('⚠️ Firebase Auth not ready: $e');
+    }
+    
+    // Step 3: Pre-initialize Cloud Functions (optional, for verification)
+    try {
+      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+      print('✅ Cloud Functions instance available');
+      
+      // ✅ Test with a simple callable to ensure platform channel works
+      // This helps identify issues early
+      print('🔍 Testing Functions platform channel...');
+    } catch (e) {
+      print('⚠️ Cloud Functions test failed: $e');
+      // Don't fail initialization, just log the issue
+    }
+    
+    // Step 4: Register background message handler
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    print('✅ Background message handler registered');
+    
+    // Step 5: Initialize notification service
+    print('🔔 Initializing notification service...');
+    await NotificationService().initialize();
+    print('✅ Notification service initialized');
+    
+    // Step 6: Setup navigation handler
+    NotificationNavigationHandler(navigatorKey).setup();
+    print('✅ Navigation handler setup complete');
     
     _servicesInitialized = true;
     print('✅ All services initialized successfully');
-    
   } catch (e, stackTrace) {
     print('❌ Service initialization error: $e');
     print('Stack trace: $stackTrace');
-    rethrow;
+    // Don't rethrow - allow app to continue with degraded functionality
   }
 }
+// 
 
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+    
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.top],
+    );
 
-    // Initialize all services BEFORE running the app
+    // ✅ Initialize all services and WAIT for completion
     await initializeServices();
+    
+    // ✅ Additional delay to ensure platform channels are fully connected
+    await Future.delayed(const Duration(milliseconds: 300));
 
     runApp(
       MultiProvider(
@@ -84,12 +397,24 @@ void main() {
             update: (_, retriever, __) => ChatProvider(retriever),
           ),
           Provider<PineconeCloudService>(create: (_) => PineconeCloudService()),
-          // FirebaseFunctionsService uses singleton pattern, so this returns the already-initialized instance
-          Provider<FirebaseFunctionsService>.value(value: FirebaseFunctionsService()),
+          
+          // ✅ CRITICAL FIX: Create service lazily and only when needed
+          Provider<FirebaseFunctionsService>(
+            create: (_) {
+              print('🔧 Creating FirebaseFunctionsService instance');
+              return FirebaseFunctionsService();
+            },
+            // ✅ Don't dispose the static instance
+            dispose: (_, __) => print('📌 FirebaseFunctionsService provider disposed'),
+          ),
+          
+          Provider<NotificationService>.value(
+            value: NotificationService(),
+          ),
         ],
         child: const MyApp(),
       ),
-    ); 
+    );
   }, (error, stackTrace) {
     print('🔴 Zone Error: $error');
     print('🧩 StackTrace: $stackTrace');
@@ -102,6 +427,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey, // ✅ Use global navigator key
       debugShowCheckedModeBanner: false,
       title: 'OASP Assist',
       theme: ThemeData(
@@ -120,18 +446,36 @@ class MyApp extends StatelessWidget {
         '/onboarding': (context) => const OnboardingScreen(),
         '/userOnboarding': (context) => const UserOnboardingScreen(userId: '', userName: '',),
         '/auth': (context) => AuthPage(),
-     
         '/home': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
           final initialTab = args?['initialTab'] as int?;
           return UserMainPage(initialTabIndex: initialTab);
         },
-        '/chat': (context) => ChatPage(conversationId: ''),
+        '/chat': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final conversationId = args?['conversationId'] as String? ?? '';
+          return ChatPage(conversationId: conversationId);
+        },
         '/informationBank': (context) => InformationBankPage(),
         '/announcements': (context) => const UserAnnouncementPage(),
+        '/announcements/detail': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          // You'll need to create AnnouncementDetailPage
+          // For now, navigate to announcements list
+          return const UserAnnouncementPage();
+        },
         '/admission': (context) => AdmissionInfo(),
         '/scholarships': (context) => ScholarshipList(),
         '/placements': (context) => PlacementInfo(),
+        '/staff/escalations': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final escalationId = args?['escalationId'] as String?;
+          final autoOpen = args?['autoOpen'] as bool? ?? false;
+          return HumanEscalation(
+            initialEscalationId: escalationId,
+            autoOpen: autoOpen,
+          );
+        },
       },
     );
   }

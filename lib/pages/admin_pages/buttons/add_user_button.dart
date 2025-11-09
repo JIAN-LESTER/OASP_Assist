@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 
 class AddUserButton extends StatelessWidget {
   final VoidCallback? onPressed;
+  final Function(int)? onNavigateToPage; // Add this parameter
 
-  const AddUserButton({Key? key, this.onPressed}) : super(key: key);
+  const AddUserButton({
+    Key? key,
+    this.onPressed,
+    this.onNavigateToPage, // Add this to constructor
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +20,6 @@ class AddUserButton extends StatelessWidget {
         // Using the same breakpoints as ResponsiveLayout
         bool isMobile = screenWidth < 600;
         bool isTablet = screenWidth >= 600 && screenWidth < 1100;
-      
 
         // Responsive dimensions
         double height = isMobile ? 44 : (isTablet ? 46 : 48);
@@ -69,12 +73,9 @@ class AddUserButton extends StatelessWidget {
   }
 
   void _showAddUserModal(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext context) {
-        return const AddUserModal();
-      },
+    showAddUserModal(
+      context,
+      onNavigateToPage: onNavigateToPage, // Pass the callback
     );
   }
 }

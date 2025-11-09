@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:capstone_project/components/number_tile.dart';
 import 'package:capstone_project/components/textfield.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -24,11 +27,13 @@ class _LoginPageState extends State<LoginPage> {
   String? _emailError;
   String? _passwordError;
   String? _generalError;
+  String? _verificationError;
 
   // Timers for error handling
   Timer? _emailErrorTimer;
   Timer? _passwordErrorTimer;
   Timer? _generalErrorTimer;
+  Timer? _verificationErrorTimer;
 
   // FONT CONFIGURATION
   static const String primaryFontFamily = 'Poppins';
@@ -91,15 +96,27 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
+  void _setVerificationError(String error) {
+    _verificationErrorTimer?.cancel();
+    setState(() => _verificationError = error);
+    _verificationErrorTimer = Timer(errorDuration, () {
+      if (mounted) {
+        setState(() => _verificationError = null);
+      }
+    });
+  }
+
   // Clear all errors and timers
   void _clearErrors() {
     _emailErrorTimer?.cancel();
     _passwordErrorTimer?.cancel();
     _generalErrorTimer?.cancel();
+    _verificationErrorTimer?.cancel();
     setState(() {
       _emailError = null;
       _passwordError = null;
       _generalError = null;
+      _verificationError = null;
     });
   }
 
@@ -162,6 +179,7 @@ class _LoginPageState extends State<LoginPage> {
         await FirebaseAuth.instance.signOut();
         if (mounted) {
           setState(() => _isLoading = false);
+          _setVerificationError('Please verify your email before signing in');
           _showVerificationRequiredDialog(user.email ?? '');
         }
         return;
@@ -259,6 +277,9 @@ class _LoginPageState extends State<LoginPage> {
               } else if (error == _passwordError) {
                 _passwordErrorTimer?.cancel();
                 setState(() => _passwordError = null);
+              } else if (error == _verificationError) {
+                _verificationErrorTimer?.cancel();
+                setState(() => _verificationError = null);
               }
             },
             child: Icon(
@@ -331,6 +352,7 @@ class _LoginPageState extends State<LoginPage> {
     _emailErrorTimer?.cancel();
     _passwordErrorTimer?.cancel();
     _generalErrorTimer?.cancel();
+    _verificationErrorTimer?.cancel();
 
     emailController.dispose();
     passwordController.dispose();
@@ -394,6 +416,9 @@ class _LoginPageState extends State<LoginPage> {
 
             // General error message
             _buildGeneralError(fontSizeMultiplier),
+
+            // Verification error message (above email field)
+            _buildErrorText(_verificationError, fontSizeMultiplier),
 
             // Email field
             Textfield(
@@ -520,9 +545,13 @@ class _LoginPageState extends State<LoginPage> {
             ),
 
             SizedBox(height: baseSpacing),
-
-            const SquareTile(imagePath: 'lib/images/google.png'),
-            SizedBox(height: sectionSpacing),
+            if (!(!kIsWeb &&
+                (Platform.isWindows ||
+                    Platform.isLinux ||
+                    Platform.isMacOS))) ...[
+              const SquareTile(imagePath: 'lib/images/google.png'),
+              SizedBox(height: sectionSpacing),
+            ],
 
             // Sign Up Link
             Row(

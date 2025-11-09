@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/modal_pages/faq_info.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
-import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 
 void showEditFAQModal(
   BuildContext context,
@@ -30,8 +29,6 @@ void showEditFAQModal(
         builder: (context, setState) {
           final screenWidth = MediaQuery.of(context).size.width;
           final isMobile = screenWidth < 600;
-          final isTablet = screenWidth >= 600 && screenWidth < 1024;
-          final isDesktop = screenWidth >= 1024;
 
           return Dialog(
             backgroundColor: Colors.transparent,
@@ -47,11 +44,6 @@ void showEditFAQModal(
                     blurRadius: 32,
                     offset: const Offset(0, 16),
                   ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
                 ],
               ),
               child: ClipRRect(
@@ -59,14 +51,13 @@ void showEditFAQModal(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Header with gradient (changed to match info modal)
+                    // Header
                     Container(
                       width: double.infinity,
                       padding: EdgeInsets.all(isMobile ? 20 : 28),
                       decoration: const BoxDecoration(color: Color(0xFF2E7D32)),
                       child: Row(
                         children: [
-                          // Show back button only if previousModal is provided
                           if (previousModal == 'info') ...[
                             Material(
                               color: Colors.transparent,
@@ -74,16 +65,9 @@ void showEditFAQModal(
                                 borderRadius: BorderRadius.circular(24),
                                 onTap: () {
                                   Navigator.of(context).pop();
-                                  // Add delay before showing previous modal
                                   Future.delayed(
                                     const Duration(milliseconds: 200),
-                                    () {
-                                      showFAQInfoModal(
-                                        context,
-                                        userDoc,
-                                        fromEdit: true,
-                                      );
-                                    },
+                                    () => showFAQInfoModal(context, userDoc, fromEdit: true),
                                   );
                                 },
                                 child: Container(
@@ -173,26 +157,18 @@ void showEditFAQModal(
                                 fontWeight: FontWeight.w500,
                               ),
                               decoration: InputDecoration(
-                                hintText:
-                                    'Enter the frequently asked question...',
+                                hintText: 'Enter the frequently asked question...',
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
-                                  ),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
-                                  ),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF2E7D32),
-                                    width: 2,
-                                  ),
+                                  borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
                                 ),
                                 filled: true,
                                 fillColor: const Color(0xFFF8FAFC),
@@ -203,15 +179,10 @@ void showEditFAQModal(
                               ),
                             ),
 
-                            buildTextField(controller: questionController, label: 'Question', hint: "Enter the frequently asked question...", icon: Icons.help_outline, isMobile: isMobile),
-
                             const SizedBox(height: 24),
 
                             // Answer Section
-                            buildSectionHeader(
-                              'Answer',
-                              Icons.lightbulb_outline,
-                            ),
+                            buildSectionHeader('Answer', Icons.lightbulb_outline),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: answerController,
@@ -221,26 +192,18 @@ void showEditFAQModal(
                                 fontWeight: FontWeight.w500,
                               ),
                               decoration: InputDecoration(
-                                hintText:
-                                    'Enter the detailed answer to this question...',
+                                hintText: 'Enter the detailed answer to this question...',
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
-                                  ),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
-                                  ),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF2E7D32),
-                                    width: 2,
-                                  ),
+                                  borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
                                 ),
                                 filled: true,
                                 fillColor: const Color(0xFFF8FAFC),
@@ -254,10 +217,7 @@ void showEditFAQModal(
                             const SizedBox(height: 24),
 
                             // Category Section
-                            buildSectionHeader(
-                              'Category',
-                              Icons.category_outlined,
-                            ),
+                            buildSectionHeader('Category', Icons.category_outlined),
                             const SizedBox(height: 12),
                             DropdownButtonFormField<String>(
                               value: selectedCategory,
@@ -269,22 +229,15 @@ void showEditFAQModal(
                               decoration: InputDecoration(
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
-                                  ),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
-                                  ),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF2E7D32),
-                                    width: 2,
-                                  ),
+                                  borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
                                 ),
                                 filled: true,
                                 fillColor: const Color(0xFFF8FAFC),
@@ -293,29 +246,25 @@ void showEditFAQModal(
                                   vertical: 16,
                                 ),
                               ),
-                              items:
-                                  categories.map((category) {
-                                    return DropdownMenuItem<String>(
-                                      value: category,
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 8,
-                                            height: 8,
-                                            decoration: BoxDecoration(
-                                              color: _getCategoryColor(
-                                                category,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Text(category),
-                                        ],
+                              items: categories.map((category) {
+                                return DropdownMenuItem<String>(
+                                  value: category,
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          color: _getCategoryColor(category),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
                                       ),
-                                    );
-                                  }).toList(),
+                                      const SizedBox(width: 12),
+                                      Text(category),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
                               onChanged: (String? newValue) {
                                 if (newValue != null) {
                                   setState(() {
@@ -331,13 +280,11 @@ void showEditFAQModal(
                             _buildActionButtons(
                               context,
                               userDoc,
-                              questionController.text.trim(),
-                              answerController.text.trim(),
+                              questionController,
+                              answerController,
                               selectedCategory,
                               previousModal,
                               isMobile,
-                              isTablet,
-                              isDesktop,
                             ),
                           ],
                         ),
@@ -371,81 +318,61 @@ void showEditFAQModal(
 Widget _buildActionButtons(
   BuildContext context,
   DocumentSnapshot userDoc,
-  String question,
-  String answer,
+  TextEditingController questionController,
+  TextEditingController answerController,
   String selectedCategory,
   String? previousModal,
   bool isMobile,
-  bool isTablet,
-  bool isDesktop,
 ) {
-  double buttonHeight =
-      isMobile
-          ? 40
-          : isTablet
-          ? 44
-          : 46;
-  double fontSize = isMobile ? 14 : 15;
-  double borderRadius = 10;
-
   return Row(
     children: [
       Expanded(
-        child: SizedBox(
-          height: buttonHeight,
-          child: OutlinedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF6B7280),
-              side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
+        child: OutlinedButton(
+          onPressed: () => Navigator.of(context).pop(),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF6B7280),
+            side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Text(
-              'Cancel',
-              style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600),
-            ),
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20, vertical: 14),
+          ),
+          child: Text(
+            'Cancel',
+            style: TextStyle(fontSize: isMobile ? 14 : 15, fontWeight: FontWeight.w600),
           ),
         ),
       ),
       const SizedBox(width: 12),
       Expanded(
-        child: SizedBox(
-          height: buttonHeight,
-          child: ElevatedButton.icon(
-            onPressed:
-                () => _handleSaveChanges(
-                  context,
-                  userDoc,
-                  question,
-                  answer,
-                  selectedCategory,
-                  previousModal,
-                ),
-            icon: const Icon(Icons.save_outlined, size: 18),
-            label: Text(
-              'Save Changes',
-              style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600),
+        child: ElevatedButton.icon(
+          onPressed: () => _handleSaveChanges(
+            context,
+            userDoc,
+            questionController.text.trim(),
+            answerController.text.trim(),
+            selectedCategory,
+            previousModal,
+          ),
+          icon: const Icon(Icons.save_outlined, size: 18),
+          label: Text(
+            'Save Changes',
+            style: TextStyle(fontSize: isMobile ? 14 : 15, fontWeight: FontWeight.w600),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2E7D32),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2E7D32),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
-            ),
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20, vertical: 14),
           ),
         ),
       ),
     ],
   );
 }
-
-
 
 Color _getCategoryColor(String category) {
   switch (category) {
@@ -473,10 +400,10 @@ Future<void> _handleSaveChanges(
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
-          children: [
-            const Icon(Icons.error, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            const Text('Please enter a FAQ question'),
+          children: const [
+            Icon(Icons.error, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Text('Please enter a FAQ question'),
           ],
         ),
         backgroundColor: Colors.red,
@@ -488,17 +415,14 @@ Future<void> _handleSaveChanges(
   }
 
   try {
-    // Show loading
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder:
-          (context) => const Center(
-            child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-          ),
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+      ),
     );
 
-    // Update the document
     await FirebaseFirestore.instance.collection('faqs').doc(userDoc.id).update({
       'question': question,
       'answer': answer,
@@ -506,16 +430,14 @@ Future<void> _handleSaveChanges(
       'updatedAt': Timestamp.now(),
     });
 
-    // Get current user for logging
     final currentUser = FirebaseAuth.instance.currentUser;
     String actorName = 'Unknown';
 
     if (currentUser != null) {
-      final doc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(currentUser.uid)
-              .get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         actorName = data['name'] ?? currentUser.email ?? 'Unknown';
@@ -525,24 +447,19 @@ Future<void> _handleSaveChanges(
     final faqData = userDoc.data() as Map<String, dynamic>;
     final originalQuestion = faqData['question'] ?? 'Unknown';
 
-    // Log the update
     final logRef = FirebaseFirestore.instance.collection('logs').doc();
-    final logData = {
+    await logRef.set({
       'logId': logRef.id,
       'user': actorName,
       'action': 'Updated FAQ: $originalQuestion to $question',
       'time': Timestamp.now(),
-    };
-    await logRef.set(logData);
+    });
 
-    // Close loading and modal, then navigate back if needed
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
       Navigator.of(context).pop(); // Close edit modal
 
-      // Use Future.delayed to prevent black screen flash
       Future.delayed(const Duration(milliseconds: 200), () {
-        // If we came from another modal, show it again
         if (previousModal == 'info') {
           showFAQInfoModal(context, userDoc, fromEdit: true);
         }
@@ -551,10 +468,10 @@ Future<void> _handleSaveChanges(
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              const Text('FAQ updated successfully'),
+            children: const [
+              Icon(Icons.check_circle, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Text('FAQ updated successfully'),
             ],
           ),
           backgroundColor: const Color(0xFF2E7D32),
@@ -565,7 +482,7 @@ Future<void> _handleSaveChanges(
     }
   } catch (e) {
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
+      Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(

@@ -40,25 +40,20 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
   String _selectedCourse = '';
   String _selectedYear = '';
   String? _enrollmentStatus;
-  List<String> _selectedInterests = [];
-  bool _hasAffiliation = false;
-  bool _hasScholarship = false;
+
+  bool? _hasAffiliation;
+  bool? _hasScholarship;
   String? _selectedAffiliation;
+  String _selectedProgram = '';
   String? _selectedScholarship;
+
+  // Add flag to track if summary should be shown
+  bool _showSummary = false;
 
   // Data lists
   List<String> _programs = [];
   List<String> _affiliations = [];
   List<String> _scholarships = [];
-
-  final List<String> courses = [
-    'Computer Science',
-    'Information Technology',
-    'Engineering',
-    'Business Administration',
-    'Education',
-    'Other',
-  ];
 
   final List<String> years = [
     'Incoming',
@@ -154,8 +149,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
       }
     }
   }
-
-  Future<void> _loadDropdownData() async {
+Future<void> _loadDropdownData() async {
     try {
       final futures = await Future.wait([
         _getDropdownItems('programs'),
@@ -173,10 +167,24 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     }
   }
 
+
   Future<List<String>> _getDropdownItems(String collection) async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection(collection).get();
-    return snapshot.docs.map((doc) => doc['name'] as String).toList();
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection(collection).get();
+      // Filter out empty or null values and ensure uniqueness
+      return snapshot.docs
+          .map((doc) {
+            final name = doc.data()['name'];
+            return name?.toString().trim() ?? '';
+          })
+          .where((name) => name.isNotEmpty)
+          .toSet()
+          .toList();
+    } catch (e) {
+      print('Error getting dropdown items from $collection: $e');
+      return [];
+    }
   }
 
   void _onPageChanged(int page) {
@@ -187,25 +195,28 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     _animationController.forward();
   }
 
-  void _nextPage() {
-    if (_currentPage < _pages.length - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOutCubic,
-      );
-    } else {
-      _finishOnboarding();
-    }
+  
+void _nextPage() {
+  if (_currentPage < _pages.length - 1) {
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOutCubic,
+    );
+  } else {
+    _finishOnboarding();
   }
+}
 
-  void _previousPage() {
-    if (_currentPage > 0) {
-      _pageController.previousPage(
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOutCubic,
-      );
-    }
+// Also update _previousPage() to remove _showSummary:
+
+void _previousPage() {
+  if (_currentPage > 0) {
+    _pageController.previousPage(
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOutCubic,
+    );
   }
+}
 
   void _finishOnboarding() async {
     try {
@@ -322,14 +333,16 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
       if (_role == 'user') {
         updateData.addAll({
           'isEnrolled': _enrollmentStatus == 'enrolled',
-          'affiliation': _hasAffiliation ? _selectedAffiliation : null,
-          'scholarship': _hasScholarship ? _selectedScholarship : null,
+          'affiliation': _hasAffiliation == true ? _selectedAffiliation : null,
+          'scholarship': _hasScholarship == true ? _selectedScholarship : null,
         });
 
         if (_enrollmentStatus == 'enrolled') {
           updateData.addAll({
             'year': _selectedYear,
-            'program': _selectedCourse,
+            'program': (_selectedYear == 'Incoming' || _selectedYear == 'Graduate') 
+                ? null 
+                : _selectedCourse,
           });
         } else {
           updateData.addAll({'year': 'Incoming', 'program': null});
@@ -356,25 +369,47 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     }
   }
 
- bool _canProceed() {
+  bool _canProceed() {
     switch (_pages[_currentPage].type) {
       case UserOnboardingType.welcome:
         return _nameController.text.trim().isNotEmpty;
+
       case UserOnboardingType.profile:
         if (_role == 'user') {
-          // Must select enrollment status first
+          // Must have enrollment status
           if (_enrollmentStatus == null) return false;
-          
-          // If enrolled, must complete year and program
-          if (_enrollmentStatus == 'enrolled' &&
-              (_selectedYear.isEmpty || _selectedCourse.isEmpty)) {
+
+          // If enrolled, must have year
+          if (_enrollmentStatus == 'enrolled') {
+            if (_selectedYear.isEmpty) return false;
+            // If year requires program (not Incoming or Graduate), must have program
+            if (_selectedYear != 'Incoming' && 
+                _selectedYear != 'Graduate' && 
+                _selectedCourse.isEmpty) {
+              return false;
+            }
+          }
+
+          // Must answer affiliation question
+          if (_hasAffiliation == null) return false;
+          // If has affiliation, must select one
+          if (_hasAffiliation == true &&
+              (_selectedAffiliation == null || _selectedAffiliation == 'N/A' || _selectedAffiliation!.isEmpty)) {
             return false;
           }
-          
-          // All enrollment questions answered, can proceed
+
+          // Must answer scholarship question
+          if (_hasScholarship == null) return false;
+          // If has scholarship, must select one
+          if (_hasScholarship == true &&
+              (_selectedScholarship == null || _selectedScholarship == 'N/A' || _selectedScholarship!.isEmpty)) {
+            return false;
+          }
+
           return true;
         }
         return true;
+
       default:
         return true;
     }
@@ -486,79 +521,79 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                   const SizedBox(height: 20),
 
                   // Navigation Buttons
-                  Row(
-                    children: [
-                      if (_currentPage > 0)
-                        Expanded(
-                          flex: 2,
-                          child: OutlinedButton(
-                            onPressed: _previousPage,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: primaryColor,
-                              side: const BorderSide(
-                                color: primaryColor,
-                                width: 2,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              padding: EdgeInsets.symmetric(
-                                vertical: buttonHeight,
-                              ),
-                            ),
-                            child: Text(
-                              'Back',
-                              style: TextStyle(
-                                fontSize: descriptionFontSize * 0.9,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (_currentPage > 0) const SizedBox(width: 12),
-                      Expanded(
-                        flex: 3,
-                        child: ElevatedButton(
-                          onPressed: _canProceed() ? _nextPage : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            foregroundColor: backgroundColor,
-                            disabledBackgroundColor: Colors.grey[300],
-                            elevation: 2,
-                            shadowColor: primaryColor.withOpacity(0.3),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: EdgeInsets.symmetric(
-                              vertical: buttonHeight,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _currentPage == _pages.length - 1
-                                    ? 'Start Chatting!'
-                                    : 'Continue',
-                                style: TextStyle(
-                                  fontSize: descriptionFontSize * 0.9,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Icon(
-                                _currentPage == _pages.length - 1
-                                    ? Icons.chat_bubble_outline
-                                    : Icons.arrow_forward_rounded,
-                                size: descriptionFontSize,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+               Row(
+  children: [
+    if (_currentPage > 0)
+      Expanded(
+        flex: 2,
+        child: OutlinedButton(
+          onPressed: _previousPage,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: primaryColor,
+            side: const BorderSide(
+              color: primaryColor,
+              width: 2,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: EdgeInsets.symmetric(
+              vertical: buttonHeight,
+            ),
+          ),
+          child: Text(
+            'Back',
+            style: TextStyle(
+              fontSize: descriptionFontSize * 0.9,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    if (_currentPage > 0) const SizedBox(width: 12),
+    Expanded(
+      flex: 3,
+      child: ElevatedButton(
+        onPressed: _canProceed() ? _nextPage : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: backgroundColor,
+          disabledBackgroundColor: Colors.grey[300],
+          elevation: 2,
+          shadowColor: primaryColor.withOpacity(0.3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          padding: EdgeInsets.symmetric(
+            vertical: buttonHeight,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _currentPage == _pages.length - 1
+                  ? 'Start Chatting!'
+                  : 'Continue',
+              style: TextStyle(
+                fontSize: descriptionFontSize * 0.9,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              _currentPage == _pages.length - 1
+                  ? Icons.chat_bubble_outline
+                  : Icons.arrow_forward_rounded,
+              size: descriptionFontSize,
+            ),
+          ],
+        ),
+      ),
+    ),
+  ],
+),
                 ],
               ),
             ),
@@ -712,63 +747,111 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     );
   }
 
-  Widget _buildProfilePage(
-    UserOnboardingPage page,
-    double iconSize,
-    double titleFontSize,
-    double descriptionFontSize,
-    double maxWidth,
-  ) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          Container(
-            width: iconSize * 0.9,
-            height: iconSize * 0.9,
-            decoration: BoxDecoration(
-              color: primaryColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(page.icon, size: iconSize * 0.4, color: primaryColor),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Hello ${_nameController.text.isNotEmpty ? _nameController.text.split(' ').first : 'there'}!',
-            style: TextStyle(
-              fontSize: titleFontSize * 0.8,
-              fontWeight: FontWeight.w800,
-              color: textPrimaryColor,
-              letterSpacing: -0.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            page.title,
-            style: TextStyle(
-              fontSize: titleFontSize * 0.7,
-              fontWeight: FontWeight.w700,
-              color: textPrimaryColor,
-              letterSpacing: -0.3,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            page.description,
-            style: TextStyle(
-              fontSize: descriptionFontSize * 0.9,
-              color: textSecondaryColor,
-              height: 1.4,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
+// Replace the _buildProfilePage method with this version that auto-shows summary:
 
-          if (_role == 'user') ...[
-            // Step 1: Enrollment Status
+Widget _buildProfilePage(
+  UserOnboardingPage page,
+  double iconSize,
+  double titleFontSize,
+  double descriptionFontSize,
+  double maxWidth,
+) {
+  // Check if all required fields are completed
+  bool allFieldsCompleted = false;
+  
+  if (_role == 'user') {
+    if (_enrollmentStatus != null) {
+      bool enrollmentComplete = false;
+      
+      // Check enrollment-specific fields
+      if (_enrollmentStatus == 'enrolled') {
+        if (_selectedYear.isNotEmpty) {
+          if (_selectedYear == 'Incoming' || _selectedYear == 'Graduate') {
+            enrollmentComplete = true;
+          } else if (_selectedCourse.isNotEmpty) {
+            enrollmentComplete = true;
+          }
+        }
+      } else {
+        // Not enrolled
+        enrollmentComplete = true;
+      }
+      
+      // Check affiliation and scholarship
+      bool affiliationComplete = _hasAffiliation != null &&
+          (_hasAffiliation == false || 
+           (_hasAffiliation == true && 
+            _selectedAffiliation != null && 
+            _selectedAffiliation != 'N/A' && 
+            _selectedAffiliation!.isNotEmpty));
+      
+      bool scholarshipComplete = _hasScholarship != null &&
+          (_hasScholarship == false || 
+           (_hasScholarship == true && 
+            _selectedScholarship != null && 
+            _selectedScholarship != 'N/A' && 
+            _selectedScholarship!.isNotEmpty));
+      
+      allFieldsCompleted = enrollmentComplete && affiliationComplete && scholarshipComplete;
+    }
+  }
+
+  // Automatically show summary when all fields are completed
+  if (allFieldsCompleted) {
+    return _buildProfileSummary(descriptionFontSize);
+  }
+
+  return SingleChildScrollView(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Column(
+      children: [
+        const SizedBox(height: 20),
+        Container(
+          width: iconSize * 0.9,
+          height: iconSize * 0.9,
+          decoration: BoxDecoration(
+            color: primaryColor.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(page.icon, size: iconSize * 0.4, color: primaryColor),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Hello ${_nameController.text.isNotEmpty ? _nameController.text.split(' ').first : 'there'}!',
+          style: TextStyle(
+            fontSize: titleFontSize * 0.8,
+            fontWeight: FontWeight.w800,
+            color: textPrimaryColor,
+            letterSpacing: -0.5,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          page.title,
+          style: TextStyle(
+            fontSize: titleFontSize * 0.7,
+            fontWeight: FontWeight.w700,
+            color: textPrimaryColor,
+            letterSpacing: -0.3,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          page.description,
+          style: TextStyle(
+            fontSize: descriptionFontSize * 0.9,
+            color: textSecondaryColor,
+            height: 1.4,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 24),
+
+        if (_role == 'user') ...[
+          // Step 1: Enrollment Status
+          if (_enrollmentStatus == null) ...[
             _buildSectionTitle(
               'Are you currently enrolled?',
               descriptionFontSize,
@@ -778,7 +861,11 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
               title: 'Yes, I am enrolled',
               value: 'enrolled',
               groupValue: _enrollmentStatus,
-              onChanged: (value) => setState(() => _enrollmentStatus = value),
+              onChanged: (value) => setState(() {
+                _enrollmentStatus = value;
+                _selectedYear = '';
+                _selectedCourse = '';
+              }),
               fontSize: descriptionFontSize,
             ),
             const SizedBox(height: 12),
@@ -786,93 +873,657 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
               title: 'No, not yet enrolled',
               value: 'not_enrolled',
               groupValue: _enrollmentStatus,
-              onChanged: (value) {
-                setState(() {
-                  _enrollmentStatus = value;
-                  _selectedYear = '';
-                  _selectedCourse = '';
-                });
-              },
+              onChanged: (value) => setState(() {
+                _enrollmentStatus = value;
+                _selectedYear = 'N/A';
+                _selectedCourse = 'N/A';
+              }),
               fontSize: descriptionFontSize,
             ),
-
-            // Step 2: If enrolled, show Year and Program
-            if (_enrollmentStatus == 'enrolled') ...[
-              const SizedBox(height: 24),
-              _buildSectionTitle('What year are you in?', descriptionFontSize),
+          ]
+          // Step 2: Year Selection (if enrolled)
+          else if (_enrollmentStatus == 'enrolled' && 
+                   (_selectedYear.isEmpty || 
+                    (_selectedYear.isNotEmpty && _selectedYear != 'Incoming' && _selectedYear != 'Graduate' && _selectedCourse.isEmpty))) ...[
+            const SizedBox(height: 24),
+            _buildSectionTitle('What year are you in?', descriptionFontSize),
+            const SizedBox(height: 12),
+            _buildDropdownField(
+              value: _selectedYear.isEmpty || !years.contains(_selectedYear) ? null : _selectedYear,
+              items: years,
+              onChanged: (value) => setState(() {
+                _selectedYear = value ?? '';
+              }),
+              hint: 'Select your year level',
+              icon: Icons.school_outlined,
+              fontSize: descriptionFontSize,
+            ),
+            
+            if (_selectedYear.isNotEmpty && 
+                _selectedYear != 'Incoming' && 
+                _selectedYear != 'Graduate') ...[
+              const SizedBox(height: 16),
+              _buildSectionTitle('What program are you taking?', descriptionFontSize),
               const SizedBox(height: 12),
               _buildDropdownField(
-                value: _selectedYear.isEmpty ? null : _selectedYear,
-                items: years,
-                onChanged:
-                    (value) => setState(() => _selectedYear = value ?? ''),
-                hint: 'Select your year level',
-                icon: Icons.school_outlined,
-                fontSize: descriptionFontSize,
-              ),
-
-              const SizedBox(height: 24),
-              _buildSectionTitle(
-                'What program are you taking?',
-                descriptionFontSize,
-              ),
-              const SizedBox(height: 12),
-              _buildDropdownField(
-                value: _selectedCourse.isEmpty ? null : _selectedCourse,
-                items: _programs.isEmpty ? courses : _programs,
-                onChanged:
-                    (value) => setState(() => _selectedCourse = value ?? ''),
+                value: _selectedCourse.isEmpty || !_programs.contains(_selectedCourse) ? null : _selectedCourse,
+                items: _programs,
+                onChanged: (value) => setState(() => _selectedCourse = value ?? ''),
                 hint: 'Select your program',
                 icon: Icons.book_outlined,
                 fontSize: descriptionFontSize,
               ),
             ],
+            
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _selectedYear = '';
+                      _selectedCourse = '';
+                      _enrollmentStatus = null;
+                    });
+                  },
+                  icon: const Icon(Icons.arrow_back, size: 18),
+                  label: Text(
+                    'Previous',
+                    style: TextStyle(fontSize: descriptionFontSize * 0.85),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: primaryColor,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ]
+          // Step 3: Affiliation Section
+          else if ((_enrollmentStatus == 'not_enrolled' ||
+                  (_enrollmentStatus == 'enrolled' && _selectedYear == 'Incoming') ||
+                  (_enrollmentStatus == 'enrolled' && _selectedYear == 'Graduate') ||
+                  (_enrollmentStatus == 'enrolled' && _selectedYear.isNotEmpty && _selectedYear != 'Incoming' && _selectedYear != 'Graduate' && _selectedCourse.isNotEmpty)) &&
+              (_hasAffiliation == null || 
+               (_hasAffiliation == true && (_selectedAffiliation == null || _selectedAffiliation!.isEmpty || _selectedAffiliation == 'N/A')))) ...[
+            const SizedBox(height: 24),
+            _buildYesNoSection(
+              title: 'Do you have any organizational affiliation?',
+              value: _hasAffiliation,
+              onChanged: (value) {
+                setState(() {
+                  _hasAffiliation = value;
+                  if (!value) {
+                    _selectedAffiliation = 'N/A';
+                  } else {
+                    _selectedAffiliation = null;
+                  }
+                });
+              },
+              dropdownValue: _hasAffiliation == true ? _selectedAffiliation : null,
+              dropdownItems: _affiliations,
+              dropdownHint: 'Select your affiliation',
+              dropdownIcon: Icons.people_outline,
+              onDropdownChanged: (value) => setState(() => _selectedAffiliation = value),
+              fontSize: descriptionFontSize,
+              onPrevious: () {
+                setState(() {
+                  _hasAffiliation = null;
+                  _selectedAffiliation = null;
+                  if (_enrollmentStatus == 'enrolled') {
+                    _selectedYear = '';
+                    _selectedCourse = '';
+                  } else {
+                    _enrollmentStatus = null;
+                  }
+                });
+              },
+            ),
+          ]
+          // Step 4: Scholarship Section  
+          else if (_hasAffiliation != null && 
+                   (_hasAffiliation == false || (_hasAffiliation == true && _selectedAffiliation != null && _selectedAffiliation != 'N/A' && _selectedAffiliation!.isNotEmpty)) &&
+                   (_hasScholarship == null || 
+                    (_hasScholarship == true && (_selectedScholarship == null || _selectedScholarship!.isEmpty || _selectedScholarship == 'N/A')))) ...[
+            const SizedBox(height: 24),
+            _buildYesNoSection(
+              title: 'Do you have any scholarship?',
+              value: _hasScholarship,
+              onChanged: (value) {
+                setState(() {
+                  _hasScholarship = value;
+                  if (!value) {
+                    _selectedScholarship = 'N/A';
+                  } else {
+                    _selectedScholarship = null;
+                  }
+                });
+              },
+              dropdownValue: _hasScholarship == true ? _selectedScholarship : null,
+              dropdownItems: _scholarships,
+              dropdownHint: 'Select your scholarship',
+              dropdownIcon: Icons.card_membership_outlined,
+              onDropdownChanged: (value) => setState(() => _selectedScholarship = value),
+              fontSize: descriptionFontSize,
+              onPrevious: () {
+                setState(() {
+                  _hasScholarship = null;
+                  _selectedScholarship = null;
+                  _hasAffiliation = null;
+                  _selectedAffiliation = null;
+                });
+              },
+              isLast: true,
+            ),
+          ],
+        ],
+        const SizedBox(height: 32),
+      ],
+    ),
+  );
+}
 
-            // Step 3: Scholarship (shown after enrollment status is selected)
-            if (_enrollmentStatus != null) ...[
-              const SizedBox(height: 24),
-              _buildYesNoSection(
-                title: 'Do you have any scholarship?',
-                value: _hasScholarship,
-                onChanged: (value) {
-                  setState(() {
-                    _hasScholarship = value;
-                    if (!value) _selectedScholarship = null;
-                  });
-                },
-                dropdownValue: _selectedScholarship,
-                dropdownItems: _scholarships.isEmpty ? ['None'] : _scholarships,
-                dropdownHint: 'Select your scholarship',
-                dropdownIcon: Icons.card_membership_outlined,
-                onDropdownChanged:
-                    (value) => setState(() => _selectedScholarship = value),
-                fontSize: descriptionFontSize,
+// ALSO update the _buildProfileSummary to have a proper "Edit" button that goes back:
+
+Widget _buildProfileSummary(double fontSize) {
+  return SingleChildScrollView(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 20),
+        // Header
+        Center(
+          child: Column(
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_outline,
+                  size: 40,
+                  color: primaryColor,
+                ),
               ),
-
-              // Step 4: Affiliation (shown last)
-              const SizedBox(height: 24),
-              _buildYesNoSection(
-                title: 'Do you have any organizational affiliation?',
-                value: _hasAffiliation,
-                onChanged: (value) {
-                  setState(() {
-                    _hasAffiliation = value;
-                    if (!value) _selectedAffiliation = null;
-                  });
-                },
-                dropdownValue: _selectedAffiliation,
-                dropdownItems: _affiliations.isEmpty ? ['None'] : _affiliations,
-                dropdownHint: 'Select your affiliation',
-                dropdownIcon: Icons.people_outline,
-                onDropdownChanged:
-                    (value) => setState(() => _selectedAffiliation = value),
-                fontSize: descriptionFontSize,
+              const SizedBox(height: 16),
+              Text(
+                'Confirm Your Information',
+                style: TextStyle(
+                  fontSize: fontSize * 1.4,
+                  fontWeight: FontWeight.w800,
+                  color: textPrimaryColor,
+                  letterSpacing: -0.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Please review your details before proceeding',
+                style: TextStyle(
+                  fontSize: fontSize * 0.95,
+                  color: textSecondaryColor,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
               ),
             ],
-          ],
-          const SizedBox(height: 32),
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        // Summary Card
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: primaryColor.withOpacity(0.2),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Name
+              _buildSummaryItem(
+                icon: Icons.person_outline,
+                label: 'Full Name',
+                value: _nameController.text.trim(),
+                fontSize: fontSize,
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+
+              // Enrollment Status
+              _buildSummaryItem(
+                icon: Icons.school_outlined,
+                label: 'Enrollment Status',
+                value:
+                    _enrollmentStatus == 'enrolled'
+                        ? 'Currently Enrolled'
+                        : 'Not Yet Enrolled',
+                fontSize: fontSize,
+              ),
+
+              // Year and Program (if enrolled)
+              if (_enrollmentStatus == 'enrolled') ...[
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
+                _buildSummaryItem(
+                  icon: Icons.calendar_today_outlined,
+                  label: 'Year Level',
+                  value: _selectedYear,
+                  fontSize: fontSize,
+                ),
+                if (_selectedYear != 'Incoming' && _selectedYear != 'Graduate') ...[
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
+                  _buildSummaryItem(
+                    icon: Icons.book_outlined,
+                    label: 'Program',
+                    value: _selectedCourse,
+                    fontSize: fontSize,
+                  ),
+                ],
+              ],
+
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+
+              // Affiliation
+              _buildSummaryItem(
+                icon: Icons.people_outline,
+                label: 'Organizational Affiliation',
+                value:
+                    _hasAffiliation == true && _selectedAffiliation != 'N/A' && _selectedAffiliation != null
+                        ? _selectedAffiliation!
+                        : 'None',
+                fontSize: fontSize,
+              ),
+
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+
+              // Scholarship
+              _buildSummaryItem(
+                icon: Icons.card_membership_outlined,
+                label: 'Scholarship',
+                value:
+                    _hasScholarship == true && _selectedScholarship != 'N/A' && _selectedScholarship != null
+                        ? _selectedScholarship!
+                        : 'None',
+                fontSize: fontSize,
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // Edit Button - goes back to scholarship section
+        Center(
+          child: TextButton.icon(
+            onPressed: () {
+              setState(() {
+                // Reset scholarship to show the form again
+                _hasScholarship = null;
+                _selectedScholarship = null;
+              });
+            },
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: Text(
+              'Edit Information',
+              style: TextStyle(fontSize: fontSize * 0.9),
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: primaryColor,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 32),
+      ],
+    ),
+  );
+}
+
+Widget _buildDropdownField({
+  required String? value,
+  required List<String> items,
+  required ValueChanged<String?> onChanged,
+  required String hint,
+  required IconData icon,
+  required double fontSize,
+}) {
+  final uniqueItems = items.toSet().toList();
+  final validValue = (value != null && value.isNotEmpty && uniqueItems.contains(value)) 
+      ? value 
+      : null;
+  
+  if (uniqueItems.isEmpty) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Loading options...',
+            style: TextStyle(
+              fontSize: fontSize * 0.85,
+              color: textSecondaryColor.withOpacity(0.6),
+            ),
+          ),
         ],
       ),
+    );
+  }
+  
+  return DropdownButtonFormField<String>(
+    value: validValue,
+    isExpanded: true,
+    menuMaxHeight: 300, // Add max height for scrolling
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: fontSize * 0.85,
+        color: textSecondaryColor.withOpacity(0.6),
+      ),
+      prefixIcon: Icon(icon, color: primaryColor),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: primaryColor, width: 2),
+      ),
+      filled: true,
+      fillColor: Colors.grey[50],
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 12,
+      ),
+    ),
+    style: TextStyle(fontSize: fontSize * 0.85, color: textPrimaryColor),
+    items: uniqueItems.map((item) {
+      return DropdownMenuItem<String>(
+        value: item,
+        child: Text(
+          item,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: fontSize * 0.85),
+        ),
+      );
+    }).toList(),
+    onChanged: onChanged,
+  );
+}
+
+Widget _buildYesNoSection({
+  required String title,
+  required bool? value,
+  required ValueChanged<bool> onChanged,
+  String? dropdownValue,
+  List<String>? dropdownItems,
+  String? dropdownHint,
+  IconData? dropdownIcon,
+  ValueChanged<String?>? onDropdownChanged,
+  required double fontSize,
+  VoidCallback? onPrevious,
+  bool isLast = false,
+}) {
+  // Add debug logging
+  print('=== _buildYesNoSection Debug ===');
+  print('Title: $title');
+  print('value (bool?): $value');
+  print('dropdownValue: $dropdownValue');
+  print('dropdownItems length: ${dropdownItems?.length ?? 0}');
+  print('dropdownItems: $dropdownItems');
+  
+  // Determine if this section is completed
+  bool isCompleted = false;
+  if (value == true && dropdownValue != null && dropdownValue != 'N/A' && dropdownValue.isNotEmpty) {
+    isCompleted = true;
+  } else if (value == false) {
+    isCompleted = true;
+  }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _buildSectionTitle(title, fontSize),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: _buildRadioOption(
+              title: 'Yes',
+              value: 'yes',
+              groupValue: value == null ? null : (value ? 'yes' : 'no'),
+              onChanged: (val) {
+                print('Yes selected, val: $val');
+                onChanged(val == 'yes');
+                if (val == 'yes' && onDropdownChanged != null && dropdownValue == 'N/A') {
+                  print('Clearing N/A value');
+                  onDropdownChanged(null);
+                }
+              },
+              fontSize: fontSize,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildRadioOption(
+              title: 'No',
+              value: 'no',
+              groupValue: value == null ? null : (value ? 'yes' : 'no'),
+              onChanged: (val) {
+                print('No selected, val: $val');
+                onChanged(val == 'yes');
+                if (val == 'no' && onDropdownChanged != null) {
+                  print('Setting N/A value');
+                  onDropdownChanged('N/A');
+                }
+              },
+              fontSize: fontSize,
+            ),
+          ),
+        ],
+      ),
+      // Debug: Always show what condition evaluates to
+      if (value == true) ...[
+        const SizedBox(height: 12),
+        // Add a debug text to see if we reach here
+
+        if (dropdownItems != null && dropdownItems.isNotEmpty)
+          _buildDropdownField(
+            value: (dropdownValue != null && 
+                    dropdownValue != 'N/A' && 
+                    dropdownValue.isNotEmpty && 
+                    dropdownItems.contains(dropdownValue))
+                ? dropdownValue
+                : null,
+            items: dropdownItems,
+            onChanged: onDropdownChanged!,
+            hint: dropdownHint ?? 'Select option',
+            icon: dropdownIcon ?? Icons.arrow_drop_down,
+            fontSize: fontSize,
+          )
+        else
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Loading options... (or empty list)',
+                  style: TextStyle(
+                    fontSize: fontSize * 0.85,
+                    color: textSecondaryColor.withOpacity(0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ] else ...[
+        const SizedBox(height: 12),
+
+      ],
+      // Show completion message for last section
+      if (isLast && isCompleted) ...[
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: primaryColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: primaryColor.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.check_circle, color: primaryColor, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'All set! You can now proceed to the next step.',
+                  style: TextStyle(
+                    fontSize: fontSize * 0.85,
+                    color: primaryColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      // Previous button
+      if (onPrevious != null) ...[
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            TextButton.icon(
+              onPressed: onPrevious,
+              icon: const Icon(Icons.arrow_back, size: 18),
+              label: Text(
+                'Previous',
+                style: TextStyle(fontSize: fontSize * 0.85),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: primaryColor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ],
+  );
+}
+
+
+  Widget _buildSummaryItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required double fontSize,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: primaryColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: primaryColor, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: fontSize * 0.85,
+                  color: textSecondaryColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: fontSize * 0.95,
+                  color: textPrimaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1120,113 +1771,6 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
         activeColor: primaryColor,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       ),
-    );
-  }
-
-  Widget _buildDropdownField({
-    required String? value,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-    required String hint,
-    required IconData icon,
-    required double fontSize,
-  }) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      isExpanded: true,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(
-          fontSize: fontSize * 0.85,
-          color: textSecondaryColor.withOpacity(0.6),
-        ),
-        prefixIcon: Icon(icon, color: primaryColor),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: primaryColor, width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.grey[50],
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 12,
-        ),
-      ),
-      style: TextStyle(fontSize: fontSize * 0.85, color: textPrimaryColor),
-      items:
-          items.map((item) {
-            return DropdownMenuItem<String>(
-              value: item,
-              child: Text(
-                item,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: fontSize * 0.85),
-              ),
-            );
-          }).toList(),
-      onChanged: onChanged,
-    );
-  }
-
-  Widget _buildYesNoSection({
-    required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-    String? dropdownValue,
-    List<String>? dropdownItems,
-    String? dropdownHint,
-    IconData? dropdownIcon,
-    ValueChanged<String?>? onDropdownChanged,
-    required double fontSize,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(title, fontSize),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildRadioOption(
-                title: 'Yes',
-                value: 'yes',
-                groupValue: value ? 'yes' : 'no',
-                onChanged: (val) => onChanged(val == 'yes'),
-                fontSize: fontSize,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildRadioOption(
-                title: 'No',
-                value: 'no',
-                groupValue: value ? 'yes' : 'no',
-                onChanged: (val) => onChanged(val == 'yes'),
-                fontSize: fontSize,
-              ),
-            ),
-          ],
-        ),
-        if (value && dropdownItems != null && dropdownItems.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _buildDropdownField(
-            value: dropdownValue,
-            items: dropdownItems,
-            onChanged: onDropdownChanged!,
-            hint: dropdownHint ?? 'Select option',
-            icon: dropdownIcon ?? Icons.arrow_drop_down,
-            fontSize: fontSize,
-          ),
-        ],
-      ],
     );
   }
 

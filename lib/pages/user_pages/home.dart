@@ -21,6 +21,9 @@ class _HomeDashboardState extends State<HomeDashboard>
   Stream<QuerySnapshot>? _scholarshipsStream;
   Stream<QuerySnapshot>? _placementsStream;
   Stream<QuerySnapshot>? _announcementsStream;
+  
+  // Store the current conversation ID
+  String? _currentConversationId;
 
   @override
   void initState() {
@@ -40,65 +43,67 @@ class _HomeDashboardState extends State<HomeDashboard>
     final user = FirebaseAuth.instance.currentUser;
 
     if (user != null) {
-      // Get latest conversation and its messages
       _messagesStream = FirebaseFirestore.instance
           .collection('conversations')
-          .where('userID', isEqualTo: user.uid)
-          .orderBy('created_at', descending: true)
+          .where('userId', isEqualTo: user.uid)
+          .orderBy('createdAt', descending: true)
           .limit(1)
           .snapshots()
           .asyncMap((conversationSnapshot) async {
             if (conversationSnapshot.docs.isEmpty) {
+              _currentConversationId = null; // No conversation exists
               return <Map<String, dynamic>>[];
             }
 
             final conversationId = conversationSnapshot.docs.first.id;
-            final messagesSnapshot =
-                await FirebaseFirestore.instance
-                    .collection('messages')
-                    .where('conversationID', isEqualTo: conversationId)
-                    .orderBy('sent_at', descending: true)
-                    .limit(2)
-                    .get();
+            _currentConversationId = conversationId; // Store conversation ID
+
+            // Query messages from subcollection
+            final messagesSnapshot = await FirebaseFirestore.instance
+                .collection('conversations')
+                .doc(conversationId)
+                .collection('messages')
+                .orderBy('sent_at', descending: true)
+                .limit(4) // Get last 4 messages (2 user + 2 bot)
+                .get();
 
             return messagesSnapshot.docs
-                .map((doc) => {'id': doc.id, ...doc.data()})
+                .map((doc) => {
+                      'id': doc.id,
+                      ...doc.data(),
+                    })
                 .toList();
           });
     }
 
     // Get latest admissions
-    _admissionsStream =
-        FirebaseFirestore.instance
-            .collection('admissions')
-            .orderBy('createdAt', descending: true)
-            .limit(1)
-            .snapshots();
+    _admissionsStream = FirebaseFirestore.instance
+        .collection('admissions')
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .snapshots();
 
     // Get latest scholarships
-    _scholarshipsStream =
-        FirebaseFirestore.instance
-            .collection('scholarships')
-            .orderBy('createdAt', descending: true)
-            .limit(3)
-            .snapshots();
+    _scholarshipsStream = FirebaseFirestore.instance
+        .collection('scholarships')
+        .orderBy('createdAt', descending: true)
+        .limit(3)
+        .snapshots();
 
     // Get latest placements
-    _placementsStream =
-        FirebaseFirestore.instance
-            .collection('placements')
-            .orderBy('createdAt', descending: true)
-            .limit(3)
-            .snapshots();
+    _placementsStream = FirebaseFirestore.instance
+        .collection('placements')
+        .orderBy('createdAt', descending: true)
+        .limit(3)
+        .snapshots();
 
     // Get latest announcements
-    _announcementsStream =
-        FirebaseFirestore.instance
-            .collection('announcements')
-            .where('deleted', isEqualTo: false)
-            .orderBy('created_time', descending: true)
-            .limit(3)
-            .snapshots();
+    _announcementsStream = FirebaseFirestore.instance
+        .collection('announcements')
+        .where('deleted', isEqualTo: false)
+        .orderBy('created_time', descending: true)
+        .limit(3)
+        .snapshots();
   }
 
   @override
@@ -279,8 +284,11 @@ class _HomeDashboardState extends State<HomeDashboard>
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _messagesStream,
       builder: (context, snapshot) {
+        // Determine if there's an existing conversation
+        final hasConversation = snapshot.hasData && snapshot.data!.isNotEmpty;
+
         return GestureDetector(
-          onTap: () => _navigateToTab(context, 1),
+          onTap: () => _navigateToChatTab(context, hasConversation),
           child: Container(
             margin: EdgeInsets.symmetric(
               horizontal: isMobile ? 16 : 20,
@@ -359,13 +367,17 @@ class _HomeDashboardState extends State<HomeDashboard>
                 const Divider(height: 1),
                 const SizedBox(height: 16),
                 if (snapshot.connectionState == ConnectionState.waiting)
-                  const Center(child: CircularProgressIndicator())
-                else if (snapshot.hasError)
-                  Text(
-                    'Error loading messages',
-                    style: TextStyle(fontSize: isMobile ? 12 : 13),
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF2E7D32),
+                      ),
+                    ),
                   )
-                else if (!snapshot.hasData || snapshot.data!.isEmpty)
+                else if (snapshot.hasError)
+                  _buildErrorState(snapshot.error.toString(), isMobile)
+                else if (!hasConversation)
                   _buildNoMessagesYet(isMobile)
                 else
                   _buildRealChatMessages(snapshot.data!, isMobile),
@@ -373,9 +385,11 @@ class _HomeDashboardState extends State<HomeDashboard>
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
-                    onPressed: () => _navigateToTab(context, 1),
+                    onPressed: () => _navigateToChatTab(context, hasConversation),
                     icon: const Icon(Icons.arrow_forward, size: 18),
-                    label: const Text('Open Chat'),
+                    label: Text(
+                      hasConversation ? 'Continue Chat' : 'Start Chat',
+                    ),
                     style: TextButton.styleFrom(
                       foregroundColor: const Color(0xFF2E7D32),
                     ),
@@ -390,12 +404,81 @@ class _HomeDashboardState extends State<HomeDashboard>
   }
 
   Widget _buildNoMessagesYet(bool isMobile) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Text(
-        'No messages yet — start a conversation with OASP Assist!',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: isMobile ? 13 : 14, color: Colors.grey[600]),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.chat_bubble_outline,
+            size: isMobile ? 40 : 48,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No messages yet',
+            style: TextStyle(
+              fontSize: isMobile ? 15 : 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Start a conversation with OASP Assist!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: isMobile ? 13 : 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String error, bool isMobile) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: Colors.red.shade600, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Error loading messages',
+                  style: TextStyle(
+                    fontSize: isMobile ? 13 : 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.red.shade800,
+                  ),
+                ),
+                if (!isMobile) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Please try again later',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red.shade600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -404,20 +487,31 @@ class _HomeDashboardState extends State<HomeDashboard>
     List<Map<String, dynamic>> messages,
     bool isMobile,
   ) {
+    // Show only last 2-3 messages for preview
+    final displayMessages = messages.take(3).toList();
+
     return Column(
-      children:
-          messages.reversed.map((message) {
-            final isUser = message['sender'] == 'user';
-            final content = message['content'] ?? '';
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _buildChatBubble(content, isUser, isMobile),
-            );
-          }).toList(),
+      children: displayMessages.reversed.map((message) {
+        final isUser = message['sender'] == 'user';
+        final content = message['content']?.toString() ?? '';
+
+        // Skip empty messages
+        if (content.trim().isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _buildChatBubble(content, isUser, isMobile),
+        );
+      }).toList(),
     );
   }
 
   Widget _buildChatBubble(String message, bool isUser, bool isMobile) {
+    // Truncate long messages for preview
+    final displayMessage = message.length > 100
+        ? '${message.substring(0, 100)}...'
+        : message;
+
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -429,16 +523,39 @@ class _HomeDashboardState extends State<HomeDashboard>
           vertical: isMobile ? 10 : 12,
         ),
         decoration: BoxDecoration(
-          color: isUser ? const Color(0xFF2E7D32) : Colors.grey[200],
-          borderRadius: BorderRadius.circular(12),
+          gradient: isUser
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF2E7D32), Color(0xFF388E3C)],
+                )
+              : null,
+          color: isUser ? null : Colors.grey[100],
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isUser ? 16 : 4),
+            bottomRight: Radius.circular(isUser ? 4 : 16),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isUser
+                  ? const Color(0xFF2E7D32).withOpacity(0.2)
+                  : Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Text(
-          message,
+          displayMessage,
           style: TextStyle(
             color: isUser ? Colors.white : Colors.black87,
             fontSize: isMobile ? 13 : 14,
             height: 1.4,
           ),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
         ),
       ),
     );
@@ -451,28 +568,28 @@ class _HomeDashboardState extends State<HomeDashboard>
     return SliverList(
       delegate: SliverChildListDelegate([
         // Row of 3 cards: Admission, Scholarship, Placement
-!isMobile
-    ? IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch, // 🔑 makes heights equal
-          children: [
-            Expanded(child: _buildAdmissionCard()),
-            const SizedBox(width: 16),
-            Expanded(child: _buildScholarshipCard()),
-            const SizedBox(width: 16),
-            Expanded(child: _buildPlacementCard()),
-          ],
-        ),
-      )
-    : Column(
-        children: [
-          _buildAdmissionCard(),
-          const SizedBox(height: 12),
-          _buildScholarshipCard(),
-          const SizedBox(height: 12),
-          _buildPlacementCard(),
-        ],
-      ),
+        !isMobile
+            ? IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: _buildAdmissionCard()),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildScholarshipCard()),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildPlacementCard()),
+                  ],
+                ),
+              )
+            : Column(
+                children: [
+                  _buildAdmissionCard(),
+                  const SizedBox(height: 12),
+                  _buildScholarshipCard(),
+                  const SizedBox(height: 12),
+                  _buildPlacementCard(),
+                ],
+              ),
         const SizedBox(height: 16),
         // Announcements full width (like chat)
         _buildAnnouncementCard(),
@@ -627,14 +744,13 @@ class _HomeDashboardState extends State<HomeDashboard>
         List<Map<String, dynamic>> scholarships = [];
 
         if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          scholarships =
-              snapshot.data!.docs.map((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                return {
-                  'name': data['name'] ?? 'Unnamed Scholarship',
-                  'provider': data['scholarshipProvider'] ?? 'Unknown',
-                };
-              }).toList();
+          scholarships = snapshot.data!.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return {
+              'name': data['name'] ?? 'Unnamed Scholarship',
+              'provider': data['scholarshipProvider'] ?? 'Unknown',
+            };
+          }).toList();
         }
 
         // Default scholarships if no data
@@ -916,57 +1032,54 @@ class _HomeDashboardState extends State<HomeDashboard>
         List<Map<String, dynamic>> announcements = [];
 
         if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          announcements =
-              snapshot.data!.docs.map((doc) {
-                final data = doc.data() as Map<String, dynamic>;
+          announcements = snapshot.data!.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
 
-                // Get category and determine priority
-                String category = data['category']?.toString() ?? 'General';
-                String priority = 'low';
-                if (category.toLowerCase().contains('urgent') ||
-                    category.toLowerCase().contains('important')) {
-                  priority = 'high';
-                } else if (category.toLowerCase().contains('announcement')) {
-                  priority = 'medium';
+            // Get category and determine priority
+            String category = data['category']?.toString() ?? 'General';
+            String priority = 'low';
+            if (category.toLowerCase().contains('urgent') ||
+                category.toLowerCase().contains('important')) {
+              priority = 'high';
+            } else if (category.toLowerCase().contains('announcement')) {
+              priority = 'medium';
+            }
+
+            // Format date
+            String date = 'Recent';
+            if (data['created_time'] != null) {
+              try {
+                DateTime createdTime;
+                if (data['created_time'] is Timestamp) {
+                  createdTime = (data['created_time'] as Timestamp).toDate();
+                } else if (data['created_time'] is String) {
+                  createdTime = DateTime.parse(data['created_time']);
+                } else {
+                  createdTime = DateTime.now();
                 }
+                date =
+                    '${createdTime.month}/${createdTime.day}/${createdTime.year}';
+              } catch (e) {
+                date = 'Recent';
+              }
+            }
 
-                // Format date
-                String date = 'Recent';
-                if (data['created_time'] != null) {
-                  try {
-                    DateTime createdTime;
-                    if (data['created_time'] is Timestamp) {
-                      createdTime =
-                          (data['created_time'] as Timestamp).toDate();
-                    } else if (data['created_time'] is String) {
-                      createdTime = DateTime.parse(data['created_time']);
-                    } else {
-                      createdTime = DateTime.now();
-                    }
-                    date =
-                        '${createdTime.month}/${createdTime.day}/${createdTime.year}';
-                  } catch (e) {
-                    date = 'Recent';
-                  }
-                }
+            // Get message and truncate for description
+            String message = data['message']?.toString() ?? 'No description';
+            String title =
+                message.length > 50 ? message.substring(0, 50) : message;
+            String description =
+                message.length > 100
+                    ? message.substring(0, 100) + '...'
+                    : message;
 
-                // Get message and truncate for description
-                String message =
-                    data['message']?.toString() ?? 'No description';
-                String title =
-                    message.length > 50 ? message.substring(0, 50) : message;
-                String description =
-                    message.length > 100
-                        ? message.substring(0, 100) + '...'
-                        : message;
-
-                return {
-                  'title': title,
-                  'description': description,
-                  'date': date,
-                  'priority': priority,
-                };
-              }).toList();
+            return {
+              'title': title,
+              'description': description,
+              'date': date,
+              'priority': priority,
+            };
+          }).toList();
         }
 
         // Default announcements if no data
@@ -998,7 +1111,7 @@ class _HomeDashboardState extends State<HomeDashboard>
         return GestureDetector(
           onTap: () => _navigateToTab(context, 2),
           child: Container(
-            margin: EdgeInsets.only(top: 0, bottom: 0),
+            margin: const EdgeInsets.only(top: 0, bottom: 0),
             padding: EdgeInsets.all(isMobile ? 16 : 20),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -1062,10 +1175,9 @@ class _HomeDashboardState extends State<HomeDashboard>
                   const Center(child: CircularProgressIndicator())
                 else
                   ...announcements.map((announcement) {
-                    Color priorityColor =
-                        announcement['priority'] == 'high'
-                            ? Colors.red
-                            : announcement['priority'] == 'medium'
+                    Color priorityColor = announcement['priority'] == 'high'
+                        ? Colors.red
+                        : announcement['priority'] == 'medium'
                             ? Colors.orange
                             : Colors.blue;
 
@@ -1235,7 +1347,29 @@ class _HomeDashboardState extends State<HomeDashboard>
     );
   }
 
- void _showContactInfo(BuildContext context) {
+
+  void _navigateToChatTab(BuildContext context, bool hasConversation) {
+    if (hasConversation && _currentConversationId != null) {
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => UserMainPage(
+            initialTabIndex: 1,
+            conversationId: _currentConversationId, 
+          ),
+        ),
+      );
+    } else {
+      // Start new conversation
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => UserMainPage(initialTabIndex: 1),
+        ),
+      );
+    }
+  }
+
+void _showContactInfo(BuildContext context) {
   final isMobile = MediaQuery.of(context).size.width < 600;
 
   showDialog(
@@ -1266,13 +1400,14 @@ class _HomeDashboardState extends State<HomeDashboard>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildContactRow(Icons.access_time, 'Office Hours', '9:00 AM - 5:00 PM'),
+            _buildContactRow(Icons.access_time, 'Office Hours', '7:00 AM - 5:00 PM'),
             const SizedBox(height: 10),
-            _buildContactRow(Icons.phone, 'Phone', '+1-555-0100'),
+      
+            _buildContactRow(Icons.email_outlined, 'Email', 'oasp@cmu.edu.ph'),
             const SizedBox(height: 10),
-            _buildContactRow(Icons.email_outlined, 'Email', 'info@oasp.edu'),
+            _buildContactRow(Icons.email_outlined, 'Website', 'http://www.cmu.edu.ph'),
             const SizedBox(height: 10),
-            _buildContactRow(Icons.location_on_outlined, 'Address', '123 Education St, Campus City'),
+            _buildContactRow(Icons.location_on_outlined, 'Address', 'Musuan, Maramag, Philippines, 8714'),
           ],
         ),
         actionsPadding: const EdgeInsets.only(bottom: 12, right: 16),
@@ -1290,38 +1425,39 @@ class _HomeDashboardState extends State<HomeDashboard>
     },
   );
 }
-
-Widget _buildContactRow(IconData icon, String label, String value) {
-  return Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Icon(icon, color: const Color(0xFF2E7D32), size: 22),
-      const SizedBox(width: 10),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-                fontSize: 14,
+  Widget _buildContactRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: const Color(0xFF2E7D32), size: 22),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                  fontSize: 14,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.black54,
-                fontSize: 13,
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.black54,
+                  fontSize: 13,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
-}
+
+

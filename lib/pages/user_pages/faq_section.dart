@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:capstone_project/responsive/user_constant.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:permission_handler/permission_handler.dart';
 
 typedef OnFAQSelected = void Function(String question);
 
@@ -11,23 +13,32 @@ typedef OnFAQSelected = void Function(String question);
 class FAQSection extends StatefulWidget {
   final OnFAQSelected onFAQSelected;
   final bool isLoading;
+  final TextEditingController?
+  messageController; // Add controller to update text field
 
   const FAQSection({
     Key? key,
     required this.onFAQSelected,
     this.isLoading = false,
+    this.messageController,
   }) : super(key: key);
 
   @override
-  _FAQSectionState createState() => _FAQSectionState();
+  FAQSectionState createState() => FAQSectionState();
 }
 
-class _FAQSectionState extends State<FAQSection>
+class FAQSectionState extends State<FAQSection>
     with SingleTickerProviderStateMixin {
   Map<String, List<Map<String, String>>> faqCategories = {};
   bool _isLoadingFAQs = true;
   String? _expandedCategory;
   late AnimationController _expandController;
+
+  // Speech-to-text variables
+  late stt.SpeechToText _speechToText;
+  bool _isListening = false;
+  bool _speechAvailable = false;
+  String _lastWords = '';
 
   final List<String> categoryOrder = [
     'General',
@@ -43,6 +54,7 @@ class _FAQSectionState extends State<FAQSection>
       duration: Duration(milliseconds: 300),
       vsync: this,
     );
+    _initSpeechToText();
     _fetchFAQs();
   }
 
@@ -50,6 +62,116 @@ class _FAQSectionState extends State<FAQSection>
   void dispose() {
     _expandController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initSpeechToText() async {
+    _speechToText = stt.SpeechToText();
+    try {
+      _speechAvailable = await _speechToText.initialize(
+        onError: (error) {
+          print('Speech recognition error: $error');
+          if (mounted) {
+            setState(() {
+              _isListening = false;
+            });
+          }
+        },
+        onStatus: (status) {
+          print('Speech recognition status: $status');
+          if (status == 'done' || status == 'notListening') {
+            if (mounted) {
+              setState(() {
+                _isListening = false;
+              });
+            }
+          }
+        },
+      );
+      print('Speech recognition available: $_speechAvailable');
+    } catch (e) {
+      print('Failed to initialize speech recognition: $e');
+      _speechAvailable = false;
+    }
+  }
+
+  Future<void> _toggleListening() async {
+    if (!_speechAvailable) {
+      _showSnackBar(
+        'Speech recognition not available on this device',
+        Icons.mic_off,
+        Colors.orange,
+      );
+      return;
+    }
+
+    // Check microphone permission
+    final status = await Permission.microphone.status;
+    if (!status.isGranted) {
+      final result = await Permission.microphone.request();
+      if (!result.isGranted) {
+        _showSnackBar(
+          'Microphone permission denied',
+          Icons.mic_off,
+          Colors.red,
+        );
+        return;
+      }
+    }
+
+    if (_isListening) {
+      // Stop listening
+      await _speechToText.stop();
+      setState(() {
+        _isListening = false;
+      });
+    } else {
+      // Start listening
+      setState(() {
+        _isListening = true;
+        _lastWords = '';
+      });
+
+      await _speechToText.listen(
+        onResult: (result) {
+          setState(() {
+            _lastWords = result.recognizedWords;
+            // Update the message controller if provided
+            if (widget.messageController != null) {
+              widget.messageController!.text = _lastWords;
+            }
+          });
+        },
+        listenFor: Duration(seconds: 30),
+        pauseFor: Duration(seconds: 3),
+        partialResults: true,
+        cancelOnError: true,
+        listenMode: stt.ListenMode.confirmation,
+      );
+    }
+
+    HapticFeedback.mediumImpact();
+  }
+
+  void _showSnackBar(String message, IconData icon, Color color) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Expanded(child: Text(message)),
+            ],
+          ),
+          backgroundColor: color,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Future<void> _fetchFAQs() async {
@@ -246,7 +368,7 @@ class _FAQSectionState extends State<FAQSection>
               ],
             ),
           ),
-          // Scrollable FAQ list - Only scroll here
+          // Scrollable FAQ list
           Expanded(
             child:
                 faqItems.isEmpty
@@ -433,7 +555,6 @@ class _FAQSectionState extends State<FAQSection>
           child: InkWell(
             onTap: () {
               HapticFeedback.lightImpact();
-              // Automatically send the FAQ question
               widget.onFAQSelected(question);
             },
             borderRadius: BorderRadius.circular(8),
@@ -509,11 +630,9 @@ class _FAQSectionState extends State<FAQSection>
     final spacing = _getGridSpacing(context);
     final padding = _getResponsivePadding(context);
 
-    // Filter to only show available categories, in order
     final availableCategories =
         categoryOrder.where((cat) => faqCategories.containsKey(cat)).toList();
 
-    // Add any categories not in the predefined order
     for (var cat in faqCategories.keys) {
       if (!availableCategories.contains(cat)) {
         availableCategories.add(cat);
@@ -531,15 +650,13 @@ class _FAQSectionState extends State<FAQSection>
         children: [
           _buildHeader(),
           SizedBox(height: 40),
-          // Desktop Grid - 4 columns with equal height, NO scrolling on main view
           Expanded(
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: 1400),
                 child: GridView.builder(
                   shrinkWrap: false,
-                  physics:
-                      NeverScrollableScrollPhysics(), // Disable outer scroll
+                  physics: NeverScrollableScrollPhysics(),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 4,
                     mainAxisSpacing: spacing,
@@ -566,11 +683,9 @@ class _FAQSectionState extends State<FAQSection>
   Widget _buildMobileTabletView() {
     final padding = _getResponsivePadding(context);
 
-    // Filter to only show available categories, in order
     final availableCategories =
         categoryOrder.where((cat) => faqCategories.containsKey(cat)).toList();
 
-    // Add any categories not in the predefined order
     for (var cat in faqCategories.keys) {
       if (!availableCategories.contains(cat)) {
         availableCategories.add(cat);
@@ -589,7 +704,6 @@ class _FAQSectionState extends State<FAQSection>
           children: [
             _buildHeader(),
             SizedBox(height: 32),
-            // Single column list of categories
             ...availableCategories.map(
               (category) => _buildMobileTabletCategoryCard(category),
             ),
@@ -600,7 +714,7 @@ class _FAQSectionState extends State<FAQSection>
     );
   }
 
-  /// Builds the header section
+  /// Builds the header section with speech-to-text indicator
   Widget _buildHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -649,7 +763,86 @@ class _FAQSectionState extends State<FAQSection>
             textAlign: TextAlign.center,
           ),
         ),
+        // Speech-to-text listening indicator
+        if (_isListening) ...[
+          SizedBox(height: 20),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: Color(0xFF2E7D32).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: Color(0xFF2E7D32), width: 2),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildPulsingMicIcon(),
+                SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Listening...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF2E7D32),
+                      ),
+                    ),
+                    if (_lastWords.isNotEmpty)
+                      Container(
+                        constraints: BoxConstraints(maxWidth: 200),
+                        child: Text(
+                          _lastWords,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
+    );
+  }
+
+  /// Builds pulsing microphone icon animation
+  Widget _buildPulsingMicIcon() {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 800),
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 1.0 + (value * 0.2),
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Color(0xFF2E7D32),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0xFF2E7D32).withOpacity(0.3 * value),
+                  blurRadius: 10 * value,
+                  spreadRadius: 5 * value,
+                ),
+              ],
+            ),
+            child: Icon(Icons.mic, color: Colors.white, size: 20),
+          ),
+        );
+      },
+      onEnd: () {
+        if (_isListening && mounted) {
+          setState(() {});
+        }
+      },
     );
   }
 
@@ -680,13 +873,22 @@ class _FAQSectionState extends State<FAQSection>
       return _buildLoadingState();
     }
 
-    // Choose layout based on screen size
     if (_isDesktop(context)) {
       return _buildDesktopView();
     } else {
       return _buildMobileTabletView();
     }
   }
+
+  void toggleSpeechRecognition() {
+    _toggleListening();
+  }
+
+  bool get isListening => _isListening;
+
+  bool get speechAvailable => _speechAvailable;
+
+  String get lastWords => _lastWords;
 }
 
 /// FAQToggleButton Widget
@@ -721,14 +923,14 @@ class FAQToggleButton extends StatelessWidget {
   }
 }
 
-/// FAQInputSection Widget
-/// FAQInputSection Widget - Professional Design
 class FAQInputSection extends StatelessWidget {
   final TextEditingController controller;
   final bool showFAQs;
   final bool isLoading;
   final VoidCallback onFAQToggle;
   final VoidCallback onSendMessage;
+  final VoidCallback? onMicrophoneTap;
+  final bool isListening;
 
   const FAQInputSection({
     Key? key,
@@ -737,12 +939,13 @@ class FAQInputSection extends StatelessWidget {
     required this.isLoading,
     required this.onFAQToggle,
     required this.onSendMessage,
+    this.onMicrophoneTap,
+    this.isListening = false,
   }) : super(key: key);
 
   Map<String, double> _getResponsiveSizes(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     if (width < 600) {
-      // Mobile
       return {
         'buttonSize': 40.0,
         'horizontalPadding': 16.0,
@@ -752,7 +955,6 @@ class FAQInputSection extends StatelessWidget {
         'fontSize': 15.0,
       };
     } else if (width < 1100) {
-      // Tablet
       return {
         'buttonSize': 42.0,
         'horizontalPadding': 24.0,
@@ -762,7 +964,6 @@ class FAQInputSection extends StatelessWidget {
         'fontSize': 16.0,
       };
     } else {
-      // Desktop
       return {
         'buttonSize': 44.0,
         'horizontalPadding': 32.0,
@@ -784,11 +985,9 @@ class FAQInputSection extends StatelessWidget {
     final iconSize = sizes['iconSize']!;
     final fontSize = sizes['fontSize']!;
 
-    const primaryColor = Color(0xFF2E7D32); // Green primary for send button
+    const primaryColor = Color(0xFF2E7D32);
     final surfaceColor = Colors.grey.shade50;
     final borderColor = Colors.grey.shade300;
-    final faqButtonColor = Colors.grey.shade700; // Dark gray for FAQ button
-    final faqIconColor = Colors.white; // White icon
 
     return Container(
       decoration: BoxDecoration(color: surfaceColor),
@@ -804,7 +1003,7 @@ class FAQInputSection extends StatelessWidget {
             constraints: BoxConstraints(maxWidth: 900),
             child: Row(
               children: [
-                // FAQ Toggle Button - Simple Light Border Style
+                // FAQ Toggle Button
                 Tooltip(
                   message: showFAQs ? 'Hide FAQs' : 'Show FAQs',
                   preferBelow: true,
@@ -861,7 +1060,7 @@ class FAQInputSection extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: 12),
-                // Text Input Field - Enhanced Visibility
+                // Text Input Field
                 Expanded(
                   child: Container(
                     constraints: BoxConstraints(
@@ -882,7 +1081,8 @@ class FAQInputSection extends StatelessWidget {
                     ),
                     child: TextField(
                       controller: controller,
-                      enabled: !isLoading,
+                      enabled:
+                          !isLoading, // Add && !_isTyping if you want to disable during typewriter
                       maxLines: null,
                       minLines: 1,
                       textAlignVertical: TextAlignVertical.center,
@@ -910,6 +1110,77 @@ class FAQInputSection extends StatelessWidget {
                     ),
                   ),
                 ),
+                SizedBox(width: 12),
+                // Microphone Button
+                if (onMicrophoneTap != null)
+                  Tooltip(
+                    message: isListening ? 'Stop listening' : 'Voice input',
+                    preferBelow: true,
+                    verticalOffset: 12,
+                    textStyle: TextStyle(
+                      color: Colors.white,
+                      fontSize: fontSize - 2,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade800,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Container(
+                      width: buttonSize,
+                      height: buttonSize,
+                      decoration: BoxDecoration(
+                        color: isListening ? primaryColor : Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isListening ? primaryColor : Color(0xFFE0E0E0),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                isListening
+                                    ? primaryColor.withOpacity(0.3)
+                                    : Colors.black.withOpacity(0.06),
+                            blurRadius: isListening ? 12 : 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            HapticFeedback.mediumImpact();
+                            onMicrophoneTap!();
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          splashColor:
+                              isListening
+                                  ? Colors.white.withOpacity(0.2)
+                                  : Colors.grey.withOpacity(0.1),
+                          highlightColor:
+                              isListening
+                                  ? Colors.white.withOpacity(0.1)
+                                  : Colors.grey.withOpacity(0.05),
+                          child: Center(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: Icon(
+                                isListening ? Icons.mic : Icons.mic_none,
+                                key: ValueKey(isListening),
+                                color:
+                                    isListening
+                                        ? Colors.white
+                                        : Color(0xFF666666),
+                                size: iconSize,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 SizedBox(width: 12),
                 // Send Button
                 Container(

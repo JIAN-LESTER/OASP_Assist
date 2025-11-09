@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -26,68 +28,22 @@ class _SquareTileState extends State<SquareTile> {
     });
 
     try {
-      print('🚀 Starting Google Sign-In with account selection...');
+      print('🚀 Starting Google Sign-In...');
 
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        forceCodeForRefreshToken: true,
-      );
-
-      // Force account selection each time
-      await googleSignIn.signOut();
-
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        print("❌ User cancelled sign-in");
-        return;
-      }
-
-      // 🔑 Auth tokens
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      // 🔥 Firebase Auth
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final UserCredential userCredential = await FirebaseAuth.instance
-          .signInWithCredential(credential);
-
-      print('✅ Firebase sign-in successful: ${userCredential.user?.email}');
-
-      if (userCredential.user != null) {
-        final bool isFirstTime =
-            userCredential.additionalUserInfo?.isNewUser ?? false;
-
-        await _createOrUpdateUserDocument(userCredential.user!, isFirstTime);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                isFirstTime
-                    ? '🎉 Welcome for the first time, ${userCredential.user?.displayName ?? 'User'}!'
-                    : 'Welcome back, ${userCredential.user?.displayName ?? 'User'}!',
-              ),
-              backgroundColor: isFirstTime ? Colors.blue : Colors.green,
-            ),
-          );
-
-          // Example: Redirect first-time users to setup screen
-          if (isFirstTime) {
-            Navigator.pushReplacementNamed(context, "/userOnboarding");
-          } else {
-            Navigator.pushReplacementNamed(context, "/home");
-          }
-        }
+      // Platform-specific implementation
+      if (kIsWeb || (!kIsWeb && (Platform.isWindows || Platform.isLinux))) {
+        // Use Firebase Auth web flow for web/desktop
+        await _signInWithGoogleWeb();
+      } else {
+        // Use native Google Sign-In for mobile
+        await _signInWithGoogleNative();
       }
     } catch (e, st) {
       print('❌ Error during Google sign-in: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Sign-in failed: $e'),
+            content: Text('Sign-in failed: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -101,11 +57,381 @@ class _SquareTileState extends State<SquareTile> {
     }
   }
 
+  // Web/Desktop sign-in using Firebase Auth directly
+  Future<void> _signInWithGoogleWeb() async {
+    final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+
+    // Force account selection
+    googleProvider.setCustomParameters({'prompt': 'select_account'});
+
+    try {
+      final UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithPopup(googleProvider);
+
+      print('✅ Firebase sign-in successful: ${userCredential.user?.email}');
+
+      if (userCredential.user != null) {
+        final bool isFirstTime =
+            userCredential.additionalUserInfo?.isNewUser ?? false;
+
+        await _createOrUpdateUserDocument(userCredential.user!, isFirstTime);
+
+        if (mounted) {
+          _handleSuccessfulSignIn(userCredential.user!, isFirstTime);
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'account-exists-with-different-credential') {
+        await _handleAccountExistsError(e);
+      } else {
+        rethrow;
+      }
+    }
+  }
+
+  // Native mobile sign-in using google_sign_in package
+  Future<void> _signInWithGoogleNative() async {
+    final GoogleSignIn googleSignIn = GoogleSignIn(
+      scopes: ['email', 'profile'],
+      serverClientId: '1008880584715-q015emqallpopqhpme1gqjrmsi72rocu.apps.googleusercontent.com',
+    );
+
+    // Force account selection each time
+    await googleSignIn.signOut();
+
+    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+    if (googleUser == null) {
+      print("❌ User cancelled sign-in");
+      return;
+    }
+
+    // 🔑 Auth tokens
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+
+    // 🔥 Firebase Auth
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    try {
+      final UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+
+      print('✅ Firebase sign-in successful: ${userCredential.user?.email}');
+
+      if (userCredential.user != null) {
+        final bool isFirstTime =
+            userCredential.additionalUserInfo?.isNewUser ?? false;
+
+        await _createOrUpdateUserDocument(userCredential.user!, isFirstTime);
+
+        if (mounted) {
+          _handleSuccessfulSignIn(userCredential.user!, isFirstTime);
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'account-exists-with-different-credential') {
+        await _handleAccountExistsError(e, pendingCredential: credential);
+      } else {
+        rethrow;
+      }
+    }
+  }
+
+  /// Handle account exists error by linking credentials
+  Future<void> _handleAccountExistsError(
+    FirebaseAuthException e, {
+    AuthCredential? pendingCredential,
+  }) async {
+    print('⚠️ Account exists with different credential');
+
+    final email = e.email;
+    if (email == null) {
+      throw Exception('Unable to retrieve email from error');
+    }
+
+    print('📧 Conflicting email: $email');
+
+    // Check Firestore to see what provider the user has
+    String existingMethod = 'password'; // Default assumption
+    
+    try {
+      final userQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+
+      if (userQuery.docs.isNotEmpty) {
+        final userData = userQuery.docs.first.data();
+        final linkedProviders = userData['linkedProviders'] as List<dynamic>?;
+        
+        if (linkedProviders != null && linkedProviders.isNotEmpty) {
+          existingMethod = linkedProviders.first.toString();
+          print('🔑 Found existing provider in Firestore: $existingMethod');
+        }
+      }
+    } catch (firestoreError) {
+      print('⚠️ Could not check Firestore: $firestoreError');
+      // Continue with default 'password' assumption
+    }
+
+    // Show dialog asking user to sign in with existing method
+    if (mounted) {
+      await _showAccountLinkingDialog(
+        email: email,
+        existingMethod: existingMethod,
+        pendingCredential: pendingCredential ?? e.credential!,
+      );
+    }
+  }
+
+  /// Show dialog to link accounts
+  Future<void> _showAccountLinkingDialog({
+    required String email,
+    required String existingMethod,
+    required AuthCredential pendingCredential,
+  }) async {
+    final methodName = existingMethod == 'password' 
+        ? 'Email/Password' 
+        : existingMethod == 'google.com' 
+            ? 'Google' 
+            : existingMethod;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.link, color: Color(0xFF2E7D32)),
+            SizedBox(width: 12),
+            Expanded(child: Text('Link Accounts')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'An account already exists with the email:',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                email,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'This account uses $methodName for sign-in. Would you like to link your Google account to this existing account?',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E7D32),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _linkAccountWithPassword(email, pendingCredential);
+            },
+            child: const Text('Link Accounts'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Link Google credential to existing email/password account
+  Future<void> _linkAccountWithPassword(
+    String email,
+    AuthCredential pendingCredential,
+  ) async {
+    // Show password input dialog
+    final passwordController = TextEditingController();
+    bool? confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Enter Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Please enter your password for:',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              email,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                prefixIcon: const Icon(Icons.lock),
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E7D32),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || passwordController.text.isEmpty) {
+      print('❌ User cancelled password entry');
+      return;
+    }
+
+    try {
+      print('🔐 Signing in with email/password...');
+      
+      // Sign in with email/password first
+      final emailCredential = EmailAuthProvider.credential(
+        email: email,
+        password: passwordController.text,
+      );
+
+      final UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithCredential(emailCredential);
+
+      print('✅ Signed in with email/password');
+      print('🔗 Now linking Google credential...');
+
+      // Link the Google credential
+      await userCredential.user!.linkWithCredential(pendingCredential);
+
+      print('✅ Google account linked successfully!');
+
+      // Update Firestore to reflect linked account
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .update({
+        'linkedProviders': FieldValue.arrayUnion(['google.com']),
+        'lastLoginAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text('Google account linked successfully!'),
+                ),
+              ],
+            ),
+            backgroundColor: Color(0xFF2E7D32),
+          ),
+        );
+
+        // Navigate to home
+        Navigator.pushReplacementNamed(context, "/home");
+      }
+    } on FirebaseAuthException catch (e) {
+      print('❌ Linking error: ${e.code} - ${e.message}');
+      
+      String errorMessage = 'Failed to link accounts';
+      if (e.code == 'wrong-password') {
+        errorMessage = 'Incorrect password';
+      } else if (e.code == 'user-not-found') {
+        errorMessage = 'Account not found';
+      } else if (e.code == 'provider-already-linked') {
+        errorMessage = 'Google account is already linked';
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Unexpected error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An error occurred: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleSuccessfulSignIn(User user, bool isFirstTime) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isFirstTime
+              ? '🎉 Welcome for the first time, ${user.displayName ?? 'User'}!'
+              : 'Welcome back, ${user.displayName ?? 'User'}!',
+        ),
+        backgroundColor: isFirstTime ? Colors.blue : Colors.green,
+      ),
+    );
+
+    // Navigate based on first-time status
+    if (isFirstTime) {
+      Navigator.pushReplacementNamed(context, "/userOnboarding");
+    } else {
+      Navigator.pushReplacementNamed(context, "/home");
+    }
+  }
+
   Future<void> _createOrUpdateUserDocument(User user, bool isFirstTime) async {
     try {
-      final userDoc = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid);
+      final userDoc =
+          FirebaseFirestore.instance.collection('users').doc(user.uid);
 
       if (isFirstTime) {
         // ✅ First-time login → create new user record
@@ -118,16 +444,36 @@ class _SquareTileState extends State<SquareTile> {
           'createdAt': FieldValue.serverTimestamp(),
           'isActive': true,
           'isVerified': user.emailVerified,
+          'ProfileCompleted': false,
+          'onboardingCompleted': false,
           'isFirstLogin': true,
+          'profileCompleted': false,
+          'linkedProviders': ['google.com'],
         });
         print('🎉 Created new user: ${user.email}');
       } else {
-        // 🔄 Returning user → just update info
-        await userDoc.update({
-          'lastLoginAt': FieldValue.serverTimestamp(),
-          'isActive': true,
-          'isFirstLogin': false,
-        });
+        // 🔄 Returning user → update info and ensure provider is tracked
+        final docSnapshot = await userDoc.get();
+        final existingData = docSnapshot.data();
+        
+        // Ensure linkedProviders array exists and includes google.com
+        if (existingData != null) {
+          final linkedProviders = existingData['linkedProviders'] as List<dynamic>?;
+          if (linkedProviders == null || !linkedProviders.contains('google.com')) {
+            await userDoc.update({
+              'lastLoginAt': FieldValue.serverTimestamp(),
+              'isActive': true,
+              'isFirstLogin': false,
+              'linkedProviders': FieldValue.arrayUnion(['google.com']),
+            });
+          } else {
+            await userDoc.update({
+              'lastLoginAt': FieldValue.serverTimestamp(),
+              'isActive': true,
+              'isFirstLogin': false,
+            });
+          }
+        }
         print('🔑 Updated returning user: ${user.email}');
       }
     } catch (e) {
@@ -151,16 +497,15 @@ class _SquareTileState extends State<SquareTile> {
             ),
             borderRadius: BorderRadius.circular(8),
             color: _isLoading ? Colors.grey.shade50 : Colors.white,
-            boxShadow:
-                _isLoading
-                    ? []
-                    : [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+            boxShadow: _isLoading
+                ? []
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

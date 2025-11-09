@@ -1,5 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:capstone_project/services/fb_sync.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:capstone_project/colors.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
@@ -30,7 +36,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   void initState() {
     super.initState();
     loadAnnouncements();
-    _refreshFromFacebook();
+
   }
 
   Future<void> loadAnnouncements() async {
@@ -56,24 +62,725 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
   }
 
-  Future<void> _refreshFromFacebook() async {
-    setState(() {
-      isRefreshing = true;
-    });
 
-    try {
-      await fetchAndProcessPosts();
+Future<String?> _getAuthToken() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      return await user.getIdToken();
+    }
+  } catch (e) {
+    print('Error getting auth token: $e');
+  }
+  return null;
+}
+
+
+// Manual refresh button (keep as is for manual sync)
+Future<void> _refreshFromFacebook() async {
+  if (isRefreshing) {
+    print('⚠️ Sync already in progress');
+    return;
+  }
+
+  setState(() => isRefreshing = true);
+
+  try {
+    print('🔄 Manual Facebook sync triggered...');
+    
+    final result = await FacebookSyncService.syncPosts();
+    
+    print('📦 Sync result: $result');
+    
+    if (result['success'] == true) {
+      await Future.delayed(Duration(milliseconds: 500));
       await loadAnnouncements();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error syncing with Facebook: $e')),
-      );
-    } finally {
-      setState(() {
-        isRefreshing = false;
-      });
+      
+      final count = result['count'] ?? 0;
+      final failed = result['failed'] ?? 0;
+      
+      if (mounted) {
+        _showSuccessSnackBar(
+          '✅ Synced $count posts' + (failed > 0 ? ' ($failed failed)' : '')
+        );
+      }
+    } else {
+      final errorMsg = result['error'] ?? result['message'] ?? 'Sync failed';
+      throw Exception(errorMsg);
+    }
+    
+  } catch (e) {
+    print('❌ Sync error: $e');
+    
+    if (mounted) {
+      final errorMessage = FacebookSyncService.parseErrorMessage(e);
+      _showErrorSnackBar(errorMessage);
+    }
+  } finally {
+    if (mounted) {
+      setState(() => isRefreshing = false);
     }
   }
+}
+
+
+Future<void> _showTokenInputModal() async {
+  final TextEditingController tokenController = TextEditingController();
+  bool isExchanging = false;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+          title: Row(
+            children: const [
+              Icon(Icons.facebook, color: Color(0xFF2E7D32), size: 28),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Configure Facebook Token',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2E7D32),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 🧭 Instruction Box
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Color(0xFF2E7D32).withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline,
+                                color: Color(0xFF2E7D32), size: 20),
+                            SizedBox(width: 6),
+                            Text(
+                              'How to Get Your Facebook Access Token:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1B5E20),
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 10),
+                        Text.rich(
+                          TextSpan(
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: Color(0xFF2E7D32),
+                              height: 1.55,
+                            ),
+                            children: [
+                              TextSpan(text: '1. Visit '),
+                              TextSpan(
+                                text: 'https://developers.facebook.com/',
+                                style: TextStyle(
+                                  color: Colors.blueAccent,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                              TextSpan(
+                                  text:
+                                      ' and log in using your Facebook account.\n'),
+                              TextSpan(
+                                  text:
+                                      '2. On the top bar, click “My Apps” → “Create App”.\n'),
+                              TextSpan(
+                                text:
+                                    '3. Choose "Manage everything on your Page" as the use case, and select "Business" as the App Type.',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(
+                                  text:
+                                      '\n4. Fill out the following details:\n   • App Display Name: OASP Assist\n   • Contact Email: your official email\n   • Business Account: Optional\n'),
+                              TextSpan(text: '5. Click “Create App”.\n\n'),
+                              TextSpan(
+                                  text:
+                                      '6. In the left sidebar, open “Use Cases” and select your created app.\n'),
+                              TextSpan(
+                                  text:
+                                      '7. Under “Manage everything on your Page”, enable:\n   '),
+                              TextSpan(
+                                text:
+                                    '✅ pages_read_engagement\n   ✅ pages_manage_posts\n   ✅ pages_show_list\n   ✅ pages_read_user_content\n   ✅ pages_manage_metadata\n',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  color: Color(0xFF1B5E20),
+                                ),
+                              ),
+                              TextSpan(
+                                  text:
+                                      '8. Go to “Tools” → “Graph API Explorer”.\n9. Select your app and check the same permissions.\n10. Click “Generate Access Token” and copy it below.'),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        Divider(color: Color(0xFFBDBDBD)),
+                        Text(
+                          '💡 Tip: Use a Business App to access Page posts and insights effectively.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF2E7D32),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // 🔑 Token Input
+                  const Text(
+                    'Facebook Access Token',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1B5E20),
+                      fontSize: 14.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: tokenController,
+                    maxLines: 3,
+                    enabled: !isExchanging,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Paste your token here...',
+                      hintStyle: const TextStyle(color: Colors.grey),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Color(0xFF2E7D32), width: 1),
+                      ),
+                      focusedBorder: const OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderSide: BorderSide(
+                          color: Color(0xFF2E7D32),
+                          width: 2,
+                        ),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.all(12),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // 📋 Paste Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: isExchanging
+                          ? null
+                          : () async {
+                              final data =
+                                  await Clipboard.getData('text/plain');
+                              if (data?.text != null) {
+                                tokenController.text = data!.text!;
+                                _showSuccessSnackBar(
+                                    '✅ Token pasted from clipboard');
+                              }
+                            },
+                      icon: const Icon(Icons.content_paste_rounded,
+                          color: Color(0xFF2E7D32), size: 18),
+                      label: const Text(
+                        'Paste from Clipboard',
+                        style: TextStyle(
+                          color: Color(0xFF2E7D32),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF2E7D32), width: 1.5),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 🟢 Action Buttons
+          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          actions: [
+            TextButton(
+              onPressed: isExchanging ? null : () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: isExchanging
+                  ? null
+                  : () async {
+                      final token = tokenController.text.trim();
+
+                      if (token.isEmpty) {
+                        _showErrorSnackBar('Please enter a token');
+                        return;
+                      }
+
+                      if (token.length < 50) {
+                        _showErrorSnackBar('Token seems too short');
+                        return;
+                      }
+
+                      setDialogState(() => isExchanging = true);
+
+                      try {
+                        print('🔄 Exchanging token...');
+                        final result =
+                            await FacebookSyncService.exchangeToken(token);
+
+                        if (result['success'] == true ||
+                            result['ok'] == true) {
+                          final expiresIn = result['expires_in'] ?? 0;
+                          final daysValid = (expiresIn / 86400).round();
+
+                          Navigator.pop(context);
+                          _showSuccessSnackBar(
+                              '✅ Token saved! Valid for ~$daysValid days.');
+                          await _autoSyncAfterTokenSave();
+                          return;
+                        }
+
+                        throw Exception(result['message'] ?? result['error']);
+                      } catch (e) {
+                        print('❌ Error: $e');
+                        setDialogState(() => isExchanging = false);
+                        final errorMessage =
+                            FacebookSyncService.parseErrorMessage(e);
+                        _showErrorSnackBar(
+                            'Failed to save token: $errorMessage');
+                      }
+                    },
+              icon: isExchanging
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.save, size: 18),
+              label: Text(isExchanging ? 'Saving...' : 'Save Token'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E7D32),
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 2,
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+
+
+// 🎯 NEW: Auto-sync after token is saved
+Future<void> _autoSyncAfterTokenSave() async {
+  // Show loading indicator
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => Center(
+      child: Container(
+        padding: EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              'Syncing Facebook posts...',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'This may take a moment',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  try {
+    print('🔄 Starting auto-sync after token save...');
+    
+    final result = await FacebookSyncService.syncPosts();
+    
+    Navigator.pop(context); // Close loading dialog
+    
+    if (result['success'] == true) {
+      final count = result['count'] ?? 0;
+      final failed = result['failed'] ?? 0;
+      
+      print('✅ Auto-sync completed: $count posts synced');
+      
+      // Reload announcements
+      await loadAnnouncements();
+      
+      // Show success message
+      _showSuccessSnackBar(
+        '✅ Successfully synced $count posts!' + 
+        (failed > 0 ? ' ($failed failed)' : '')
+      );
+    } else {
+      throw Exception(result['error'] ?? result['message'] ?? 'Sync failed');
+    }
+    
+  } catch (e) {
+    Navigator.pop(context); // Close loading dialog
+    
+    print('❌ Auto-sync failed: $e');
+    
+    final errorMessage = FacebookSyncService.parseErrorMessage(e);
+    
+    // Show error with retry option
+    _showSyncErrorDialog(errorMessage);
+  }
+}
+
+// Show error dialog with retry option
+void _showSyncErrorDialog(String errorMessage) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: Row(
+        children: [
+          Icon(Icons.error, color: Colors.red[700], size: 28),
+          SizedBox(width: 12),
+          Text('Sync Failed'),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            errorMessage,
+            style: TextStyle(fontSize: 15),
+          ),
+          SizedBox(height: 16),
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Colors.grey[700]),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'You can manually sync later using the refresh button',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancel'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () {
+            Navigator.pop(context);
+            _refreshFromFacebook(); // Trigger manual sync
+          },
+          icon: Icon(Icons.refresh),
+          label: Text('Retry Sync'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue[700],
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+
+Future<void> _testFacebookConnection() async {
+  try {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          padding: EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Testing connection...'),
+            ],
+          ),
+        ),
+      ),
+    );
+    
+    final result = await FacebookSyncService.testConnection();
+    
+    Navigator.pop(context); // Close loading dialog
+    
+    // Show detailed result dialog
+    _showConnectionTestResultDialog(result);
+    
+  } catch (e) {
+    Navigator.pop(context); // Close loading dialog
+    
+    final errorMessage = FacebookSyncService.parseErrorMessage(e);
+    _showErrorSnackBar('Test failed: $errorMessage');
+  }
+}
+
+void _showConnectionTestResultDialog(Map<String, dynamic> result) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Row(
+        children: [
+          Icon(
+            result['success'] == true ? Icons.check_circle : Icons.error,
+            color: result['success'] == true ? Colors.green : Colors.red,
+          ),
+          SizedBox(width: 8),
+          Text('Connection Test'),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildTestResultItem('Status', result['success'] == true ? 'Success' : 'Failed'),
+            
+            if (result['message'] != null)
+              _buildTestResultItem('Message', result['message']),
+            
+            if (result['error'] != null)
+              _buildTestResultItem('Error', result['error'], isError: true),
+            
+            if (result['errorCode'] != null)
+              _buildTestResultItem('Error Code', result['errorCode'].toString()),
+            
+            if (result['tokenInfo'] != null) ...[
+              SizedBox(height: 16),
+              Text('Token Info:', style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              _buildTestResultItem('Has Token', result['tokenInfo']['hasToken'].toString()),
+              if (result['tokenInfo']['daysLeft'] != null)
+                _buildTestResultItem('Days Left', result['tokenInfo']['daysLeft'].toString()),
+              if (result['tokenInfo']['pagesCount'] != null)
+                _buildTestResultItem('Pages Count', result['tokenInfo']['pagesCount'].toString()),
+            ],
+            
+            if (result['pageInfo'] != null) ...[
+              SizedBox(height: 16),
+              Text('Page Info:', style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              _buildTestResultItem('Page ID', result['pageInfo']['id']),
+              _buildTestResultItem('Page Name', result['pageInfo']['name']),
+              if (result['pageInfo']['about'] != null)
+                _buildTestResultItem('About', result['pageInfo']['about']),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Close'),
+        ),
+        if (result['success'] != true)
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showTokenInputModal();
+            },
+            child: Text('Configure Token'),
+          ),
+      ],
+    ),
+  );
+}
+
+Widget _buildTestResultItem(String label, String value, {bool isError = false}) {
+  return Padding(
+    padding: EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(
+            '$label:',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: isError ? Colors.red : Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Helper methods for snackbars
+void _showSuccessSnackBar(String message) {
+  if (!mounted) return;
+  
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          Icon(Icons.check_circle, color: Colors.white, size: 20),
+          SizedBox(width: 8),
+          Expanded(child: Text(message)),
+        ],
+      ),
+      backgroundColor: Colors.green[600],
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    ),
+  );
+}
+
+void _showErrorSnackBar(String message) {
+  if (!mounted) return;
+  
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          Icon(Icons.error, color: Colors.white, size: 20),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: Colors.red,
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    ),
+  );
+}
+
+
+
+Future<void> testCloudFunctions() async {
+  print('🧪 Testing Cloud Functions...');
+  
+  try {
+    // Test 1: Simple test function
+    print('Test 1: Calling testSync...');
+    final testCallable = FirebaseFunctions.instance.httpsCallable('testSync');
+    final testResult = await testCallable.call(<String, dynamic>{
+      'test': 'data',
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+    print('✅ testSync response: ${testResult.data}');
+    
+    // Test 2: Actual sync function
+    print('Test 2: Calling manualSyncFacebookPosts...');
+    final syncCallable = FirebaseFunctions.instance
+        .httpsCallable('manualSyncFacebookPosts');
+    final syncResult = await syncCallable.call(<String, dynamic>{});
+    print('✅ manualSyncFacebookPosts response: ${syncResult.data}');
+    
+  } catch (e) {
+    print('❌ Test failed: $e');
+  }
+}
 
   List<DocumentSnapshot> get filteredAnnouncements {
     var filtered =
@@ -279,44 +986,104 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     );
   }
 
-  Widget _buildRefreshButton({required bool isDesktop}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isRefreshing ? Colors.grey[100] : Colors.green[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isRefreshing ? Colors.grey[300]! : Colors.green[200]!,
+ static Future<Map<String, dynamic>> testConnection() async {
+  print('🧪 Testing Facebook connection...');
+  
+  try {
+    final callable = FirebaseFunctions.instance
+        .httpsCallable('testFacebookConnection');
+    
+    final result = await callable.call(<String, dynamic>{})
+        .timeout(Duration(seconds: 30));
+    
+    print('📦 Test result: ${json.encode(result.data)}');
+    return result.data as Map<String, dynamic>;
+  } catch (e) {
+    print('❌ Test failed: $e');
+    rethrow;
+  }
+}
+
+
+
+// Update your refresh button row to include the test button:
+Widget _buildRefreshButton({required bool isDesktop}) {
+  return Row(
+    children: [
+      // Test button
+
+      SizedBox(width: 8),
+      
+      // Facebook Token Config Button
+      Container(
+        decoration: BoxDecoration(
+          color: Colors.blue[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue[200]!),
         ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: isRefreshing ? null : _refreshFromFacebook,
-          child: Padding(
-            padding: EdgeInsets.all(isDesktop ? 12 : 10),
-            child:
-                isRefreshing
-                    ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.grey[600]!,
-                        ),
-                      ),
-                    )
-                    : Icon(
-                      Icons.sync_rounded,
-                      color: Colors.green[700],
-                      size: isDesktop ? 24 : 20,
-                    ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: _showTokenInputModal,
+            child: Tooltip(
+              message: 'Configure Facebook Token (Auto-syncs after save)',
+              child: Padding(
+                padding: EdgeInsets.all(isDesktop ? 12 : 10),
+                child: Icon(
+                  Icons.vpn_key,
+                  color: Colors.blue[700],
+                  size: isDesktop ? 24 : 20,
+                ),
+              ),
+            ),
           ),
         ),
       ),
-    );
-  }
+      SizedBox(width: 8),
+      
+      // Manual Sync Button
+      Container(
+        decoration: BoxDecoration(
+          color: isRefreshing ? Colors.grey[100] : Colors.green[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isRefreshing ? Colors.grey[300]! : Colors.green[200]!,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: isRefreshing ? null : _refreshFromFacebook,
+            child: Tooltip(
+              message: 'Manual Sync Facebook Posts',
+              child: Padding(
+                padding: EdgeInsets.all(isDesktop ? 12 : 10),
+                child: isRefreshing
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.grey[600]!,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        Icons.sync_rounded,
+                        color: Colors.green[700],
+                        size: isDesktop ? 24 : 20,
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
 
   // SEARCH FIELD
   Widget _buildSearchField() {
@@ -1843,79 +2610,3 @@ Color getCategoryColor(String category) {
 }
 
 // FACEBOOK API FUNCTION
-Future<List<dynamic>> fetchAndProcessPosts() async {
-  const pageId = '730995450096065';
-  const accessToken =
-      'EAAYTTmxaZBDIBPMA3YuTdB4VM1VoR1qTqeVsZC6zJqYOBZBbQxFkrtZCVM1YXE1o3hoXDWjlgAgnrtQQubu7L9WV6JIGrs5KrZCjcqCtjdqu4DVZAVcykRDBontQftcb7cfNQ85lMmUXQbQJD3PCWV2l4iG6An39i2ZBMUiIzP4Mu45tibI75ZBaxL9RiKEOwltJD6A9xEzx';
-
-  final response = await http.get(
-    Uri.parse(
-      'https://graph.facebook.com/v19.0/$pageId/posts?fields=message,created_time,full_picture,permalink_url&limit=10&access_token=$accessToken',
-    ),
-  );
-
-  if (response.statusCode == 200) {
-    final data = json.decode(response.body);
-    final List<dynamic> posts = data['data'];
-    final cohere = CohereService();
-
-    for (var post in posts) {
-      final postId = post['id'];
-      final message = post['message'] ?? '';
-
-      final postRef = FirebaseFirestore.instance
-          .collection('announcements')
-          .doc(postId);
-
-      final doc = await postRef.get();
-
-      if (!doc.exists && message.isNotEmpty) {
-        try {
-          final cohereResult = await cohere.analyzeAnnouncement(message);
-
-          await postRef.set({
-            'message': message,
-            'created_time': post['created_time'],
-            'full_picture': post['full_picture'] ?? '',
-            'permalink_url': post['permalink_url'] ?? '',
-            'category': cohereResult['category'] ?? 'General',
-            'deadline': cohereResult['deadline'],
-            'deleted': false,
-            'fetched_at': FieldValue.serverTimestamp(),
-            'processed_by_cohere': true,
-          });
-        } catch (e) {
-          await postRef.set({
-            'message': message,
-            'created_time': post['created_time'],
-            'full_picture': post['full_picture'] ?? '',
-            'permalink_url': post['permalink_url'] ?? '',
-            'category': 'General',
-            'deadline': null,
-            'deleted': false,
-            'fetched_at': FieldValue.serverTimestamp(),
-            'processed_by_cohere': false,
-          });
-        }
-      } else if (doc.exists) {
-        final docData = doc.data() as Map<String, dynamic>;
-        final isDeleted = docData['deleted'] ?? false;
-
-        if (isDeleted) {
-          continue;
-        }
-
-        await postRef.update({
-          'message': message,
-          'full_picture': post['full_picture'] ?? '',
-          'permalink_url': post['permalink_url'] ?? '',
-          'last_synced_at': FieldValue.serverTimestamp(),
-        });
-      }
-    }
-
-    return posts;
-  } else {
-    throw Exception('Failed to load Facebook posts: ${response.statusCode}');
-  }
-}

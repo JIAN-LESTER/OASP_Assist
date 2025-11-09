@@ -650,7 +650,7 @@ Future<void> handleComplexDocumentDelete(
       }
     }
 
-    // --- Delete related placements ---
+
     final placementsSnap = await firestore
         .collection('placements')
         .where('sourceId', isEqualTo: doc.id)

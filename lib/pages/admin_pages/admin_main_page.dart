@@ -1,16 +1,17 @@
 import 'package:capstone_project/pages/admin_pages/admission_management.dart';
+import 'package:capstone_project/pages/admin_pages/affiliation.dart';
 import 'package:capstone_project/pages/admin_pages/announcement_page.dart';
 import 'package:capstone_project/pages/admin_pages/dashboard_page.dart';
 import 'package:capstone_project/pages/admin_pages/faq_page.dart';
 import 'package:capstone_project/pages/admin_pages/information_bank_page.dart';
 import 'package:capstone_project/pages/admin_pages/message_logs.dart';
 import 'package:capstone_project/pages/admin_pages/placement_management.dart';
+import 'package:capstone_project/pages/admin_pages/programs.dart';
 import 'package:capstone_project/pages/admin_pages/reports_page.dart';
 import 'package:capstone_project/pages/admin_pages/scholarship_management.dart';
 import 'package:capstone_project/pages/admin_pages/system_logs_page.dart';
 import 'package:capstone_project/pages/admin_pages/user_management_page.dart';
 
-// Import the new universal UI components
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
@@ -27,32 +28,47 @@ class _AdminMainPageState extends State<AdminMainPage> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
 
-  final List<Widget> _pages = [
-    const DashboardPage(),        // 0
-    const ReportsPage(),          // 1
-    const InformationBankPage(),  // 2
-    const FaqManagementPage(),    // 3
-    const AnnouncementPage(),     // 4
-    const UserManagementPage(),   // 5
-    const UserActivityLogsPage(), // 6
-    const AdminMessageLogsPage(), // 7
-    const AdmissionManagementPage(), // 8
-    const ScholarshipManagementPage(), // 9
-    const PlacementManagementPage(), // 10
+  // Create a method to handle navigation
+  void _navigateToPage(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  // Update the _pages list to pass the callback
+  List<Widget> get _pages => [
+    const DashboardPage(),        
+    const ReportsPage(),
+    const InformationBankPage(),
+    const FaqManagementPage(),
+    const AnnouncementPage(),
+    UserManagementPage(
+      onNavigateToPage: _navigateToPage, // ✅ Pass the callback
+    ),
+    const UserActivityLogsPage(),
+    const AdminMessageLogsPage(),
+    const AdmissionManagementPage(),
+    const ScholarshipManagementPage(),
+    const PlacementManagementPage(),
+    const AffiliationManagementPage(),
+    const ProgramManagementPage()
   ];
 
+  // Rest of your code remains the same...
   final List<String> _pageTitles = [
-    'Dashboard',                  // 0
-    'Reports',                   // 1
-    'Information Bank',          // 2
-    'FAQs',                     // 3
-    'Announcement',             // 4
-    'User Management',          // 5
-    'System Activity Logs',     // 6
-    'Message Logs',             // 7
-    'Admission',                // 8
-    'Scholarship',              // 9
-    'Placement',                // 10
+    'Dashboard',
+    'Reports',
+    'Information Bank',
+    'FAQs',
+    'Announcement',
+    'Users',
+    'System Activity Logs',
+    'Message Logs',
+    'Admission',
+    'Scholarship',
+    'Placement',
+    'Affiliations',
+    'Programs'
   ];
 
   void _onNavigationItemTap(int index) {

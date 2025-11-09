@@ -3,8 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:capstone_project/modal_pages/escalation_info.dart';
 
 class HumanEscalation extends StatefulWidget {
-  const HumanEscalation({super.key});
-
+  final String? initialEscalationId;
+  final bool autoOpen;
+  
+  const HumanEscalation({
+    super.key, 
+    this.initialEscalationId,
+    this.autoOpen = false,
+  });
+  
   @override
   State<HumanEscalation> createState() => _HumanEscalationState();
 }
@@ -22,21 +29,51 @@ class _HumanEscalationState extends State<HumanEscalation>
     'resolved',
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    
-    _refreshAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-    
-    _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
-      });
+ @override
+void initState() {
+  super.initState();
+  
+  _refreshAnimationController = AnimationController(
+    duration: const Duration(milliseconds: 600),
+    vsync: this,
+  );
+  
+  _searchController.addListener(() {
+    setState(() {
+      _searchQuery = _searchController.text.toLowerCase();
+    });
+  });
+  
+  // ✅ ADD THIS: Auto-open escalation if specified
+  if (widget.autoOpen && widget.initialEscalationId != null) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openEscalationById(widget.initialEscalationId!);
     });
   }
+}
+
+// ✅ ADD THIS METHOD:
+Future<void> _openEscalationById(String escalationId) async {
+  try {
+    final doc = await FirebaseFirestore.instance
+        .collection('escalations')
+        .doc(escalationId)
+        .get();
+    
+    if (doc.exists && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => EscalationDetailModal(
+          escalationId: doc.id,
+          escalationData: doc.data() as Map<String, dynamic>,
+        ),
+      );
+    }
+  } catch (e) {
+    print('❌ Error opening escalation: $e');
+  }
+}
 
   @override
   void dispose() {

@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "1008880584715-j92eur7evul3fme6jf6vb9pg7k62pvif.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.capstone_project",
+            "certificate_hash": "0ce6da7b575ea0636fd9774a4e428e474065cb0d"
+          }
+        },
+        {
           "client_id": "1008880584715-mfnr2jv6b499g2e1uuuam9hgsv764vua.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -31,10 +39,10 @@
               "client_type": 3
             },
             {
-              "client_id": "1008880584715-f8hdr43259v2mfjev6ub4ue2og5im5u8.apps.googleusercontent.com",
+              "client_id": "1008880584715-agrc825q27btck9nv23hg7s59sfc0dcn.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.example.oaspCapstoneProject"
+                "bundle_id": "com.example.capstoneProject"
               }
             }
           ]
@@ -75,10 +83,10 @@
               "client_type": 3
             },
             {
-              "client_id": "1008880584715-f8hdr43259v2mfjev6ub4ue2og5im5u8.apps.googleusercontent.com",
+              "client_id": "1008880584715-agrc825q27btck9nv23hg7s59sfc0dcn.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.example.oaspCapstoneProject"
+                "bundle_id": "com.example.capstoneProject"
               }
             }
           ]
