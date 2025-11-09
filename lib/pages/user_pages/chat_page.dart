@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:capstone_project/pages/user_pages/typewriter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -50,7 +51,7 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-   final Map<String, String?> _localRatings = {};
+  final Map<String, String?> _localRatings = {};
 
   String? actualConversationId;
   bool isLoading = true;
@@ -65,9 +66,13 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   late Animation<double> _attachmentRotationAnimation;
 
   late stt.SpeechToText _speechToText;
-bool _isListening = false;
-bool _speechAvailable = false;
-String _lastWords = '';
+  bool _isListening = false;
+  bool _speechAvailable = false;
+  String _lastWords = '';
+
+  final Map<String, bool> _completedTypewriterMessages = {};
+  bool _isTyping = false;
+  final Set<String> _initialMessageIds = {}; // Track messages that existed on load
 
   String? _expandedCategory;
   String? _selectedConversationId;
@@ -77,303 +82,293 @@ String _lastWords = '';
   bool _showAttachmentOptions = false;
   bool _showFAQs = false;
 
-bool _isLoadingConversation = false;
+  bool _isLoadingConversation = false;
 
-// Updated initState() method
-@override
-void initState() {
-  super.initState();
+  @override
+  void initState() {
+    super.initState();
 
-  _micAnimationController = AnimationController(
-    duration: Duration(milliseconds: 200),
-    vsync: this,
-  );
-  _attachmentAnimationController = AnimationController(
-    duration: Duration(milliseconds: 300),
-    vsync: this,
-  );
-
-  _micScaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
-    CurvedAnimation(
-      parent: _micAnimationController,
-      curve: Curves.elasticOut,
-    ),
-  );
-
-  _attachmentRotationAnimation = Tween<double>(
-    begin: 0.0,
-    end: 0.125,
-  ).animate(
-    CurvedAnimation(
-      parent: _attachmentAnimationController,
-      curve: Curves.easeInOut,
-    ),
-  );
-
-  // FIXED: Initialize FAQ state from widget parameter
-  _showFAQs = widget.showFAQs;
-
- _initChatSpeechToText();
-  _setupConversation();
-
-  chatProvider = Provider.of<ChatProvider>(context, listen: false);
-
-  WidgetsBinding.instance.addPostFrameCallback((_) async {
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-
-    if (widget.conversationId.isNotEmpty) {
-      setState(() {
-        _isLoadingConversation = true;
-      });
-
-      try {
-        await chatProvider.setConversationId(widget.conversationId);
-        
-        // Wait for messages to load
-        await Future.delayed(Duration(milliseconds: 500));
-        
-        // Check if there are messages and update FAQ state accordingly
-        final hasMessages = chatProvider.messages.isNotEmpty;
-        
-        if (mounted) {
-          setState(() {
-            _selectedConversationId = widget.conversationId;
-            // Close FAQs if conversation has messages
-            _showFAQs = !hasMessages;
-            _isLoadingConversation = false;
-          });
-        }
-        
-        print('DEBUG: ChatPage loaded. Messages: ${chatProvider.messages.length}, Show FAQs: $_showFAQs');
-      } catch (e) {
-        print('DEBUG: Error loading conversation: $e');
-        if (mounted) {
-          setState(() {
-            _isLoadingConversation = false;
-          });
-        }
-      }
-    } else {
-      chatProvider.clearMessages();
-      // Show FAQs for empty conversation
-      setState(() {
-        _showFAQs = true;
-        _isLoadingConversation = false;
-      });
-    }
-  });
-}
-
-Future<void> _initChatSpeechToText() async {
-  _speechToText = stt.SpeechToText();
-  try {
-    _speechAvailable = await _speechToText.initialize(
-      onError: (error) {
-        print('Chat speech recognition error: $error');
-        if (mounted) {
-          setState(() {
-            _isListening = false;
-          });
-        }
-      },
-      onStatus: (status) {
-        print('Chat speech recognition status: $status');
-        if (status == 'done' || status == 'notListening') {
-          if (mounted) {
-            setState(() {
-              _isListening = false;
-            });
-          }
-        }
-      },
+    _micAnimationController = AnimationController(
+      duration: Duration(milliseconds: 200),
+      vsync: this,
     );
-    print('Chat speech recognition available: $_speechAvailable');
-  } catch (e) {
-    print('Failed to initialize chat speech recognition: $e');
-    _speechAvailable = false;
-  }
-}
-
-Future<void> _toggleListening() async {
-  if (!_speechAvailable) {
-    _showSnackBar(
-      'Speech recognition not available on this device',
-      Icons.mic_off,
+    _attachmentAnimationController = AnimationController(
+      duration: Duration(milliseconds: 300),
+      vsync: this,
     );
-    return;
-  }
 
-  final status = await Permission.microphone.status;
-  if (!status.isGranted) {
-    final result = await Permission.microphone.request();
-    if (!result.isGranted) {
-      _showSnackBar('Microphone permission denied', Icons.mic_off);
-      return;
-    }
-  }
+    _micScaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(
+        parent: _micAnimationController,
+        curve: Curves.elasticOut,
+      ),
+    );
 
-  if (_isListening) {
-    // Stop listening
-    await _speechToText.stop();
-    setState(() {
-      _isListening = false;
-    });
-    _micAnimationController.reverse();
-  } else {
-    // Start listening
-    setState(() {
-      _isListening = true;
-      _lastWords = '';
-    });
-    _micAnimationController.repeat(reverse: true);
+    _attachmentRotationAnimation = Tween<double>(
+      begin: 0.0,
+      end: 0.125,
+    ).animate(
+      CurvedAnimation(
+        parent: _attachmentAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
 
-    await _speechToText.listen(
-      onResult: (result) {
+    _showFAQs = widget.showFAQs;
+
+    _initChatSpeechToText();
+    _setupConversation();
+
+    chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+      if (widget.conversationId.isNotEmpty) {
         setState(() {
-          _lastWords = result.recognizedWords;
-          _controller.text = _lastWords;
+          _isLoadingConversation = true;
         });
-      },
-      listenFor: Duration(seconds: 30),
-      pauseFor: Duration(seconds: 3),
-      partialResults: true,
-      cancelOnError: true,
-      listenMode: stt.ListenMode.confirmation,
-    );
-  }
 
-  HapticFeedback.mediumImpact();
-}
-
-void _handleMicrophoneTap() {
-  if (_showFAQs) {
-    // If showing FAQs, trigger FAQ section's speech recognition
-    _faqSectionKey.currentState?.toggleSpeechRecognition();
-  } else {
-    // If showing chat, use the existing chat speech recognition
-    _toggleListening();
-  }
-}
-
-
-// Updated didUpdateWidget to handle loading state IMMEDIATELY
-@override
-void didUpdateWidget(ChatPage oldWidget) {
-  super.didUpdateWidget(oldWidget);
-  
-  // Handle conversation ID changes FIRST - show loading immediately
-  if (widget.conversationId != oldWidget.conversationId) {
-    // IMMEDIATELY show loading indicator when conversation changes
-    setState(() {
-      _isLoadingConversation = true;
-    });
-    
-    print('DEBUG: Conversation changing from ${oldWidget.conversationId} to ${widget.conversationId}');
-
-    if (widget.conversationId.isNotEmpty) {
-      // Load the new conversation
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
-          final chatProvider = Provider.of<ChatProvider>(context, listen: false);
           await chatProvider.setConversationId(widget.conversationId);
           
           await Future.delayed(Duration(milliseconds: 500));
+          
+          // Mark all loaded messages as initial (don't typewrite them)
+          for (var message in chatProvider.messages) {
+            _initialMessageIds.add(message.id);
+          }
           
           final hasMessages = chatProvider.messages.isNotEmpty;
           
           if (mounted) {
             setState(() {
+              _selectedConversationId = widget.conversationId;
               _showFAQs = !hasMessages;
               _isLoadingConversation = false;
             });
           }
           
-          print('DEBUG: Conversation changed. Messages: ${chatProvider.messages.length}, Show FAQs: $_showFAQs');
+          print('DEBUG: ChatPage loaded. Messages: ${chatProvider.messages.length}, Show FAQs: $_showFAQs');
         } catch (e) {
-          print('DEBUG: Error updating conversation: $e');
+          print('DEBUG: Error loading conversation: $e');
           if (mounted) {
             setState(() {
               _isLoadingConversation = false;
             });
           }
         }
-      });
-    } else {
-      // Empty conversation ID - clear messages and show FAQs
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      chatProvider.clearMessages();
-      
-      if (mounted) {
+      } else {
+        chatProvider.clearMessages();
         setState(() {
           _showFAQs = true;
           _isLoadingConversation = false;
         });
       }
-    }
-    return; // Exit early since we handled conversation change
-  }
-  
-  // Update local state when parent changes showFAQs (only if conversation didn't change)
-  if (widget.showFAQs != oldWidget.showFAQs) {
-    setState(() {
-      _showFAQs = widget.showFAQs;
     });
-    print('DEBUG: ChatPage received FAQ state update: $_showFAQs');
   }
-}
 
-// Add this new method to build the loading indicator
-Widget _buildLoadingIndicator() {
-  return Center(
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Animated loading spinner
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: Offset(0, 4),
+  Future<void> _initChatSpeechToText() async {
+    _speechToText = stt.SpeechToText();
+    try {
+      _speechAvailable = await _speechToText.initialize(
+        onError: (error) {
+          print('Chat speech recognition error: $error');
+          if (mounted) {
+            setState(() {
+              _isListening = false;
+            });
+          }
+        },
+        onStatus: (status) {
+          print('Chat speech recognition status: $status');
+          if (status == 'done' || status == 'notListening') {
+            if (mounted) {
+              setState(() {
+                _isListening = false;
+              });
+            }
+          }
+        },
+      );
+      print('Chat speech recognition available: $_speechAvailable');
+    } catch (e) {
+      print('Failed to initialize chat speech recognition: $e');
+      _speechAvailable = false;
+    }
+  }
+
+  Future<void> _toggleListening() async {
+    if (!_speechAvailable) {
+      _showSnackBar(
+        'Speech recognition not available on this device',
+        Icons.mic_off,
+      );
+      return;
+    }
+
+    final status = await Permission.microphone.status;
+    if (!status.isGranted) {
+      final result = await Permission.microphone.request();
+      if (!result.isGranted) {
+        _showSnackBar('Microphone permission denied', Icons.mic_off);
+        return;
+      }
+    }
+
+    if (_isListening) {
+      await _speechToText.stop();
+      setState(() {
+        _isListening = false;
+      });
+      _micAnimationController.reverse();
+    } else {
+      setState(() {
+        _isListening = true;
+        _lastWords = '';
+      });
+      _micAnimationController.repeat(reverse: true);
+
+      await _speechToText.listen(
+        onResult: (result) {
+          setState(() {
+            _lastWords = result.recognizedWords;
+            _controller.text = _lastWords;
+          });
+        },
+        listenFor: Duration(seconds: 30),
+        pauseFor: Duration(seconds: 3),
+        partialResults: true,
+        cancelOnError: true,
+        listenMode: stt.ListenMode.confirmation,
+      );
+    }
+
+    HapticFeedback.mediumImpact();
+  }
+
+  void _handleMicrophoneTap() {
+    if (_showFAQs) {
+      _faqSectionKey.currentState?.toggleSpeechRecognition();
+    } else {
+      _toggleListening();
+    }
+  }
+
+  @override
+  void didUpdateWidget(ChatPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    if (widget.conversationId != oldWidget.conversationId) {
+      setState(() {
+        _isLoadingConversation = true;
+      });
+      
+      print('DEBUG: Conversation changing from ${oldWidget.conversationId} to ${widget.conversationId}');
+
+      if (widget.conversationId.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          try {
+            final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+            await chatProvider.setConversationId(widget.conversationId);
+            
+            await Future.delayed(Duration(milliseconds: 500));
+            
+            // Mark all loaded messages as initial (don't typewrite them)
+            _initialMessageIds.clear();
+            for (var message in chatProvider.messages) {
+              _initialMessageIds.add(message.id);
+            }
+            
+            final hasMessages = chatProvider.messages.isNotEmpty;
+            
+            if (mounted) {
+              setState(() {
+                _showFAQs = !hasMessages;
+                _isLoadingConversation = false;
+              });
+            }
+            
+            print('DEBUG: Conversation changed. Messages: ${chatProvider.messages.length}, Show FAQs: $_showFAQs');
+          } catch (e) {
+            print('DEBUG: Error updating conversation: $e');
+            if (mounted) {
+              setState(() {
+                _isLoadingConversation = false;
+              });
+            }
+          }
+        });
+      } else {
+        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+        chatProvider.clearMessages();
+        
+        if (mounted) {
+          setState(() {
+            _showFAQs = true;
+            _isLoadingConversation = false;
+          });
+        }
+      }
+      return;
+    }
+    
+    if (widget.showFAQs != oldWidget.showFAQs) {
+      setState(() {
+        _showFAQs = widget.showFAQs;
+      });
+      print('DEBUG: ChatPage received FAQ state update: $_showFAQs');
+    }
+  }
+
+  Widget _buildLoadingIndicator() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
+                strokeWidth: 3,
               ),
-            ],
-          ),
-          child: Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
-              strokeWidth: 3,
             ),
           ),
-        ),
-        SizedBox(height: 24),
-        // Loading text
-        Text(
-          'Loading chat...',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
-            letterSpacing: 0.3,
+          SizedBox(height: 24),
+          Text(
+            'Loading chat...',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+              letterSpacing: 0.3,
+            ),
           ),
-        ),
-        SizedBox(height: 8),
-        // Subtle hint text
-        Text(
-          'Please wait a moment',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade500,
+          SizedBox(height: 8),
+          Text(
+            'Please wait a moment',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
   Future<void> _setupConversation() async {
     try {
@@ -419,7 +414,6 @@ Widget _buildLoadingIndicator() {
         setState(() {
           isLoading = false;
         });
-        
       }
     }
   }
@@ -439,17 +433,13 @@ Widget _buildLoadingIndicator() {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     chatProvider.incrementFAQSimilarityCount(question);
 
-    // Set the question in the text field
     _controller.text = question;
 
-    // Automatically hide FAQs
     setState(() {
       _expandedCategory = null;
       _showFAQs = false;
     });
 
-    // Automatically send the message after a brief delay
-    // This allows the UI to update smoothly
     Future.delayed(Duration(milliseconds: 100), () {
       _sendMessage(chatProvider);
     });
@@ -469,6 +459,12 @@ Widget _buildLoadingIndicator() {
     return FutureBuilder<String?>(
       future: isUser ? _getUserAvatarUrl() : null,
       builder: (context, snapshot) {
+        // Only typewrite NEW bot messages (not loaded from history)
+        final shouldTypewrite = !isUser && 
+                                message.sender == 'bot' && 
+                                !_initialMessageIds.contains(message.id) &&
+                                !_completedTypewriterMessages.containsKey(message.id);
+        
         return GestureDetector(
           onLongPress: () => _showMessageOptions(context, message),
           child: Container(
@@ -545,27 +541,46 @@ Widget _buildLoadingIndicator() {
                               : CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Linkify(
-                          onOpen: _onLinkTap,
-                          text: message.content,
-                          textAlign: TextAlign.justify,
-                          style: TextStyle(
-                            color: isUser ? Colors.white : Colors.grey.shade800,
-                            fontSize: 15,
-                            height: 1.5,
-                            fontWeight: FontWeight.w500,
+                        if (shouldTypewrite)
+                          TypewriterText(
+                            text: message.content,
+                            textAlign: TextAlign.justify,
+                            style: TextStyle(
+                              color: Colors.grey.shade800,
+                              fontSize: 15,
+                              height: 1.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            speed: Duration(milliseconds: 5),
+                            onComplete: () {
+                              setState(() {
+                                _completedTypewriterMessages[message.id] = true;
+                                _isTyping = false;
+                              });
+                            },
+                          )
+                        else
+                          Linkify(
+                            onOpen: _onLinkTap,
+                            text: message.content,
+                            textAlign: TextAlign.justify,
+                            style: TextStyle(
+                              color: isUser ? Colors.white : Colors.grey.shade800,
+                              fontSize: 15,
+                              height: 1.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            linkStyle: TextStyle(
+                              decoration: TextDecoration.underline,
+                              color: isUser ? Colors.yellow[100] : Colors.blue,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            options: LinkifyOptions(
+                              humanize: false,
+                              looseUrl: true,
+                              defaultToHttps: true,
+                            ),
                           ),
-                          linkStyle: TextStyle(
-                            decoration: TextDecoration.underline,
-                            color: isUser ? Colors.yellow[100] : Colors.blue,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          options: LinkifyOptions(
-                            humanize: false,
-                            looseUrl: true,
-                            defaultToHttps: true,
-                          ),
-                        ),
                         SizedBox(height: 6),
                         Text(
                           _formatTimestamp(message.sentAt),
@@ -615,416 +630,228 @@ Widget _buildLoadingIndicator() {
     );
   }
 
-Widget _buildLikeDislikeButtons(Message message) {
-  // ALWAYS check local state first for instant feedback
-  final localRating = _localRatings[message.id];
-  
-  // If we have local rating, use it immediately
-  if (localRating != null) {
-    return _buildRatingButtonsUI(message.id, localRating, message);
+  Widget _buildLikeDislikeButtons(Message message) {
+    final localRating = _localRatings[message.id];
+    
+    if (localRating != null) {
+      return _buildRatingButtonsUI(message.id, localRating, message);
+    }
+    
+    final cachedRating = Provider.of<ChatProvider>(context, listen: false)
+        .getCachedRating(message.id);
+    
+    if (cachedRating != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_localRatings.containsKey(message.id)) {
+          setState(() {
+            _localRatings[message.id] = cachedRating;
+          });
+        }
+      });
+      return _buildRatingButtonsUI(message.id, cachedRating, message);
+    }
+    
+    if (message.rating != null && message.rating!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_localRatings.containsKey(message.id)) {
+          setState(() {
+            _localRatings[message.id] = message.rating;
+          });
+        }
+      });
+      return _buildRatingButtonsUI(message.id, message.rating, message);
+    }
+    
+    return _buildRatingButtonsUI(message.id, null, message);
   }
-  
-  // Check provider's cache for initial load
-  final cachedRating = Provider.of<ChatProvider>(context, listen: false)
-      .getCachedRating(message.id);
-  
-  if (cachedRating != null) {
-    // Store in local cache for future instant access
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_localRatings.containsKey(message.id)) {
-        setState(() {
-          _localRatings[message.id] = cachedRating;
-        });
-      }
-    });
-    return _buildRatingButtonsUI(message.id, cachedRating, message);
-  }
-  
-  // Check message object directly
-  if (message.rating != null && message.rating!.isNotEmpty) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_localRatings.containsKey(message.id)) {
-        setState(() {
-          _localRatings[message.id] = message.rating;
-        });
-      }
-    });
-    return _buildRatingButtonsUI(message.id, message.rating, message);
-  }
-  
-  // Default: no rating yet
-  return _buildRatingButtonsUI(message.id, null, message);
-}
 
-// Extract the UI building logic
-Widget _buildRatingButtonsUI(String messageId, String? currentRating, Message message) {
-  return Container(
-    margin: EdgeInsets.only(top: 8),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        InkWell(
-          onTap: () => _handleLikeDislike(messageId, true),
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: currentRating == 'like'
-                  ? Color(0xFF2E7D32).withOpacity(0.1)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
+  Widget _buildRatingButtonsUI(String messageId, String? currentRating, Message message) {
+    return Container(
+      margin: EdgeInsets.only(top: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: () => _handleLikeDislike(messageId, true),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
                 color: currentRating == 'like'
-                    ? Color(0xFF2E7D32)
-                    : Colors.grey.shade300,
-                width: 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.thumb_up_outlined,
-                  size: 16,
+                    ? Color(0xFF2E7D32).withOpacity(0.1)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
                   color: currentRating == 'like'
                       ? Color(0xFF2E7D32)
-                      : Colors.grey.shade600,
+                      : Colors.grey.shade300,
+                  width: 1,
                 ),
-                SizedBox(width: 4),
-                Text(
-                  'Helpful',
-                  style: TextStyle(
-                    fontSize: 12,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.thumb_up_outlined,
+                    size: 16,
                     color: currentRating == 'like'
                         ? Color(0xFF2E7D32)
                         : Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        SizedBox(width: 8),
-        InkWell(
-          onTap: () => _handleLikeDislike(messageId, false, message),
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: currentRating == 'dislike'
-                  ? Colors.red.withOpacity(0.1)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: currentRating == 'dislike'
-                    ? Colors.red
-                    : Colors.grey.shade300,
-                width: 1,
+                  SizedBox(width: 4),
+                  Text(
+                    'Helpful',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: currentRating == 'like'
+                          ? Color(0xFF2E7D32)
+                          : Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.thumb_down_outlined,
-                  size: 16,
+          ),
+          SizedBox(width: 8),
+          InkWell(
+            onTap: () => _handleLikeDislike(messageId, false, message),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: currentRating == 'dislike'
+                    ? Colors.red.withOpacity(0.1)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
                   color: currentRating == 'dislike'
                       ? Colors.red
-                      : Colors.grey.shade600,
+                      : Colors.grey.shade300,
+                  width: 1,
                 ),
-                SizedBox(width: 4),
-                Text(
-                  'Not helpful',
-                  style: TextStyle(
-                    fontSize: 12,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.thumb_down_outlined,
+                    size: 16,
                     color: currentRating == 'dislike'
                         ? Colors.red
                         : Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
                   ),
-                ),
-              ],
+                  SizedBox(width: 4),
+                  Text(
+                    'Not helpful',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: currentRating == 'dislike'
+                          ? Colors.red
+                          : Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
   Future<void> _handleLikeDislike(
-  String messageId,
-  bool isLike, [
-  Message? message,
-]) async {
-  // FIX 1: Check if widget is still mounted before any async operations
-  if (!mounted) return;
-  
-  // FIX 2: Validate conversationId exists
-  if (widget.conversationId.isEmpty) {
-    print('Error: No conversation ID available');
-    if (mounted) {
-      _showSnackBar('Unable to rate message', Icons.error);
+    String messageId,
+    bool isLike, [
+    Message? message,
+  ]) async {
+    if (!mounted) return;
+    
+    if (widget.conversationId.isEmpty) {
+      print('Error: No conversation ID available');
+      if (mounted) {
+        _showSnackBar('Unable to rate message', Icons.error);
+      }
+      return;
     }
-    return;
-  }
 
-  // INSTANT UI UPDATE - Update local state immediately
-  setState(() {
-    _localRatings[messageId] = isLike ? 'like' : 'dislike';
-  });
+    setState(() {
+      _localRatings[messageId] = isLike ? 'like' : 'dislike';
+    });
 
-  // Then update Firestore in the background
-  try {
-    await Provider.of<ChatProvider>(
-      context,
-      listen: false,
-    ).rateMessage(messageId, isLike, widget.conversationId!); // Use conversationId from state
-  } catch (e) {
-    print('Error rating message: $e');
-    // Revert local state on error
-    if (mounted) {
-      setState(() {
-        _localRatings.remove(messageId);
-      });
-      _showSnackBar('Failed to save rating', Icons.error);
+    try {
+      await Provider.of<ChatProvider>(
+        context,
+        listen: false,
+      ).rateMessage(messageId, isLike, widget.conversationId);
+    } catch (e) {
+      print('Error rating message: $e');
+      if (mounted) {
+        setState(() {
+          _localRatings.remove(messageId);
+        });
+        _showSnackBar('Failed to save rating', Icons.error);
+      }
+      return;
     }
-    return; // Exit early on error
-  }
 
-  // Handle dislike escalation dialog
-  if (!isLike && message != null && mounted) {
-    final bool? escalate = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              Icon(
-                Icons.report_problem_outlined,
-                color: Colors.orange.shade600,
-                size: 24,
-              ),
-              SizedBox(width: 12),
-              Text(
-                'Escalate to Staff?',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade800,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "This response wasn't helpful. Would you like to escalate this message to staff for human assistance?",
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.grey.shade700,
-                  height: 1.4,
-                ),
-              ),
-              SizedBox(height: 12),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Text(
-                  "A staff member will review your conversation and provide personalized assistance.",
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                'Not Now',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF2E7D32),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(
-                'Yes, Escalate',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (escalate == true && mounted) {
-      await _processManualEscalation(message);
-    }
-  }
-}
-
-Future<void> _processManualEscalation(Message message) async {
-  final reasonController = TextEditingController();
-  String selectedReason = 'Bot response not accurate'; // default option
-
-  try {
-    final bool? shouldEscalate = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) => AlertDialog(
+    if (!isLike && message != null && mounted) {
+      final bool? escalate = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (BuildContext context) {
+          return AlertDialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
             title: Row(
               children: [
-                Icon(Icons.report_problem_outlined,
-                    color: Colors.orange.shade600, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Escalate to Staff?',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
+                Icon(
+                  Icons.report_problem_outlined,
+                  color: Colors.orange.shade600,
+                  size: 24,
+                ),
+                SizedBox(width: 12),
+                Text(
+                  'Escalate to Staff?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
                   ),
                 ),
               ],
             ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "This response wasn't helpful. Would you like to escalate this message to staff for human assistance?",
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "This response wasn't helpful. Would you like to escalate this message to staff for human assistance?",
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.grey.shade700,
+                    height: 1.4,
+                  ),
+                ),
+                SizedBox(height: 12),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Text(
+                    "A staff member will review your conversation and provide personalized assistance.",
                     style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.grey.shade700,
-                      height: 1.4,
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Text(
-                      "A staff member will review your conversation and provide personalized assistance.",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Select a reason:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // ✅ Predefined radio reasons
-                  Column(
-                    children: [
-                      RadioListTile<String>(
-                        title: const Text('Bot response not accurate'),
-                        value: 'Bot response not accurate',
-                        groupValue: selectedReason,
-                        onChanged: (val) => setState(() => selectedReason = val!),
-                        dense: true,
-                      ),
-                      RadioListTile<String>(
-                        title: const Text('Bot did not understand my question'),
-                        value: 'Bot did not understand my question',
-                        groupValue: selectedReason,
-                        onChanged: (val) => setState(() => selectedReason = val!),
-                        dense: true,
-                      ),
-                      RadioListTile<String>(
-                        title: const Text('Need clarification from staff'),
-                        value: 'Need clarification from staff',
-                        groupValue: selectedReason,
-                        onChanged: (val) => setState(() => selectedReason = val!),
-                        dense: true,
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-                  Text(
-                    'Additional details (optional)',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  TextField(
-                    controller: reasonController,
-                    maxLines: 3,
-                    maxLength: 200,
-                    decoration: InputDecoration(
-                      hintText:
-                          'e.g., "I need more specific information about scholarship deadlines"',
-                      hintStyle: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade400,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(
-                            color: Color(0xFF2E7D32), width: 2),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                      contentPadding: const EdgeInsets.all(12),
-                      counterStyle: const TextStyle(fontSize: 11),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
             actions: [
               TextButton(
@@ -1040,113 +867,278 @@ Future<void> _processManualEscalation(Message message) async {
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E7D32),
+                  backgroundColor: Color(0xFF2E7D32),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 12),
                 ),
-                child: const Text(
+                child: Text(
                   'Yes, Escalate',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
             ],
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
 
-    if (shouldEscalate != true || !mounted) return;
-
-    // 🔹 Combine predefined + optional reason
-    final userReason = reasonController.text.trim();
-    final fullReason = userReason.isNotEmpty
-        ? '$selectedReason — $userReason'
-        : selectedReason;
-
-    // ✅ FIX: Find the actual user question that this bot message is responding to
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    final messages = chatProvider.messages;
-    
-    String userQuestion = 'No question found';
-    
-    // Find the index of the current bot message
-    final botMessageIndex = messages.indexWhere((m) => m.id == message.id);
-    
-    if (botMessageIndex > 0) {
-      // Look backwards for the most recent user message
-      for (int i = botMessageIndex - 1; i >= 0; i--) {
-        if (messages[i].sender == 'user') {
-          userQuestion = messages[i].content;
-          break;
-        }
+      if (escalate == true && mounted) {
+        await _processManualEscalation(message);
       }
     }
+  }
 
-    // ✅ CRITICAL FIX: Create the document reference first to get the ID
-    final escalationRef = _firestore.collection('escalations').doc();
-    final escalationId = escalationRef.id; // This is the actual document ID
-    
-    final escalatedData = {
-      'escalationId': escalationId, // ✅ Store the ID for reference
-      'userId': FirebaseAuth.instance.currentUser?.uid,
-      'conversationId': message.conversationId,
-      'question': userQuestion,
-      'botAnswer': message.sender == 'bot' 
-          ? message.content 
-          : 'No bot response available',
-      'status': 'pending',
-      'reason': fullReason,
-      'createdAt': Timestamp.now(),
-      'messageId': message.id,
-    };
+  Future<void> _processManualEscalation(Message message) async {
+    final reasonController = TextEditingController();
+    String selectedReason = 'Bot response not accurate';
 
-    // ✅ Use .set() with the specific document reference instead of .add()
-    await escalationRef.set(escalatedData);
-    
-    print('✅ Manual escalation created with ID: $escalationId');
-    print('📝 User question: $userQuestion');
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: const [
-              Icon(Icons.check_circle, color: Colors.white, size: 20),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Your request has been escalated to staff. We\'ll get back to you soon!',
-                  style: TextStyle(fontWeight: FontWeight.w500),
+    try {
+      final bool? shouldEscalate = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (BuildContext context) {
+          return StatefulBuilder(
+            builder: (context, setState) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(Icons.report_problem_outlined,
+                      color: Colors.orange.shade600, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Escalate to Staff?',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "This response wasn't helpful. Would you like to escalate this message to staff for human assistance?",
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade700,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Text(
+                        "A staff member will review your conversation and provide personalized assistance.",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Select a reason:',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Column(
+                      children: [
+                        RadioListTile<String>(
+                          title: const Text('Bot response not accurate'),
+                          value: 'Bot response not accurate',
+                          groupValue: selectedReason,
+                          onChanged: (val) => setState(() => selectedReason = val!),
+                          dense: true,
+                        ),
+                        RadioListTile<String>(
+                          title: const Text('Bot did not understand my question'),
+                          value: 'Bot did not understand my question',
+                          groupValue: selectedReason,
+                          onChanged: (val) => setState(() => selectedReason = val!),
+                          dense: true,
+                        ),
+                        RadioListTile<String>(
+                          title: const Text('Need clarification from staff'),
+                          value: 'Need clarification from staff',
+                          groupValue: selectedReason,
+                          onChanged: (val) => setState(() => selectedReason = val!),
+                          dense: true,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Additional details (optional)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: reasonController,
+                      maxLines: 3,
+                      maxLength: 200,
+                      decoration: InputDecoration(
+                        hintText:
+                            'e.g., "I need more specific information about scholarship deadlines"',
+                        hintStyle: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade400,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide:
+                              BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF2E7D32), width: 2),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.all(12),
+                        counterStyle: const TextStyle(fontSize: 11),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(
+                    'Not Now',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E7D32),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                  ),
+                  child: const Text(
+                    'Yes, Escalate',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
+      if (shouldEscalate != true || !mounted) return;
+
+      final userReason = reasonController.text.trim();
+      final fullReason = userReason.isNotEmpty
+          ? '$selectedReason — $userReason'
+          : selectedReason;
+
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      final messages = chatProvider.messages;
+      
+      String userQuestion = 'No question found';
+      
+      final botMessageIndex = messages.indexWhere((m) => m.id == message.id);
+      
+      if (botMessageIndex > 0) {
+        for (int i = botMessageIndex - 1; i >= 0; i--) {
+          if (messages[i].sender == 'user') {
+            userQuestion = messages[i].content;
+            break;
+          }
+        }
+      }
+
+      final escalationRef = _firestore.collection('escalations').doc();
+      final escalationId = escalationRef.id;
+      
+      final escalatedData = {
+        'escalationId': escalationId,
+        'userId': FirebaseAuth.instance.currentUser?.uid,
+        'conversationId': message.conversationId,
+        'question': userQuestion,
+        'botAnswer': message.sender == 'bot' 
+            ? message.content 
+            : 'No bot response available',
+        'status': 'pending',
+        'reason': fullReason,
+        'createdAt': Timestamp.now(),
+        'messageId': message.id,
+      };
+
+      await escalationRef.set(escalatedData);
+      
+      print('✅ Manual escalation created with ID: $escalationId');
+      print('📝 User question: $userQuestion');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Your request has been escalated to staff. We\'ll get back to you soon!',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF2E7D32),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 4),
           ),
-          backgroundColor: const Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          duration: const Duration(seconds: 4),
-        ),
-      );
+        );
+      }
+    } catch (e) {
+      print('❌ Error creating manual escalation: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to escalate: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      reasonController.dispose();
     }
-  } catch (e) {
-    print('❌ Error creating manual escalation: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to escalate: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  } finally {
-    reasonController.dispose();
   }
-}
 
   Future<String?> _getUserAvatarUrl() async {
     try {
@@ -1299,33 +1291,31 @@ Future<void> _processManualEscalation(Message message) async {
     );
   }
 
-void _showSnackBar(String message, IconData icon) {
-  // FIX 3: Only show SnackBar if widget is still mounted
-  if (!mounted) return;
-  
-  try {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(icon, color: Colors.white, size: 20),
-            SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
+  void _showSnackBar(String message, IconData icon) {
+    if (!mounted) return;
+    
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Expanded(child: Text(message)),
+            ],
+          ),
+          backgroundColor: Color(0xFF2E7D32),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          duration: Duration(seconds: 2),
         ),
-        backgroundColor: Color(0xFF2E7D32),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  } catch (e) {
-    // Silently catch errors if widget is disposed
-    print('Could not show SnackBar: $e');
+      );
+    } catch (e) {
+      print('Could not show SnackBar: $e');
+    }
   }
-}
 
   void _sendMessage(ChatProvider chatProvider) async {
     final text = _controller.text.trim();
@@ -1378,52 +1368,51 @@ void _showSnackBar(String message, IconData icon) {
     super.dispose();
   }
 
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    backgroundColor: Colors.grey.shade50,
-    body: Consumer<ChatProvider>(
-      builder: (context, chatProvider, child) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!_showFAQs && !_isLoadingConversation) _scrollToBottom();
-        });
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      body: Consumer<ChatProvider>(
+        builder: (context, chatProvider, child) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!_showFAQs && !_isLoadingConversation) _scrollToBottom();
+          });
 
-        final messages = chatProvider.messages;
+          final messages = chatProvider.messages;
 
-        return Column(
-          children: [
-            Expanded(
-              child: _isLoadingConversation
-                  ? _buildLoadingIndicator()
-                  : (_showFAQs
-                      ? FAQSection(
-                          key: _faqSectionKey,
-                          onFAQSelected: _onFAQSelected,
-                          messageController: _controller,
-                        )
-                      : (messages.isEmpty
-                          ? _buildEmptyChatState()
-                          : _buildMessagesList(messages, chatProvider))),
-            ),
-            FAQInputSection(
-              controller: _controller,
-              showFAQs: _showFAQs,
-              isLoading: chatProvider.isLoading || _isLoadingConversation,
-              onFAQToggle: _toggleFAQsDisplay,
-              onSendMessage: () => _sendMessage(chatProvider),
-              onMicrophoneTap: _handleMicrophoneTap,
-              // FIXED: Properly handle nullable state with ?? operator
-              isListening: _showFAQs 
-                  ? (_faqSectionKey.currentState?.isListening ?? false)
-                  : _isListening, 
-            ),
-          ],
-        );
-      },
-    ),
-  );
-}
-  /// Builds the empty chat state
+          return Column(
+            children: [
+              Expanded(
+                child: _isLoadingConversation
+                    ? _buildLoadingIndicator()
+                    : (_showFAQs
+                        ? FAQSection(
+                            key: _faqSectionKey,
+                            onFAQSelected: _onFAQSelected,
+                            messageController: _controller,
+                          )
+                        : (messages.isEmpty
+                            ? _buildEmptyChatState()
+                            : _buildMessagesList(messages, chatProvider))),
+              ),
+              FAQInputSection(
+                controller: _controller,
+                showFAQs: _showFAQs,
+                isLoading: chatProvider.isLoading || _isLoadingConversation,
+                onFAQToggle: _toggleFAQsDisplay,
+                onSendMessage: () => _sendMessage(chatProvider),
+                onMicrophoneTap: _handleMicrophoneTap,
+                isListening: _showFAQs 
+                    ? (_faqSectionKey.currentState?.isListening ?? false)
+                    : _isListening, 
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildEmptyChatState() {
     return Center(
       child: Column(
@@ -1469,7 +1458,6 @@ Widget build(BuildContext context) {
     );
   }
 
-  /// Builds the messages list
   Widget _buildMessagesList(List<Message> messages, ChatProvider chatProvider) {
     return ListView.builder(
       controller: _scrollController,
@@ -1478,7 +1466,6 @@ Widget build(BuildContext context) {
       itemCount: messages.length + (chatProvider.isLoading ? 1 : 0),
       padding: EdgeInsets.symmetric(vertical: 20),
       itemBuilder: (context, index) {
-        // Show typing indicator as last item when loading
         if (index == messages.length && chatProvider.isLoading) {
           return _buildTypingIndicator();
         }
@@ -1491,7 +1478,6 @@ Widget build(BuildContext context) {
     );
   }
 
-  /// Builds the typing indicator
   Widget _buildTypingIndicator() {
     return Align(
       alignment: Alignment.centerLeft,

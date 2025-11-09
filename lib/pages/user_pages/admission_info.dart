@@ -437,10 +437,12 @@ class _AdmissionInfoState extends State<AdmissionInfo>
   Widget _buildStepCard(int stepNumber, String stepTitle) {
     // Remove leading numbers like "1. ", "2. ", etc.
     // Remove prefixes like "1. ", "Step 1: ", "Step 2 - ", etc.
-    final cleanedTitle = stepTitle.replaceFirst(
-      RegExp(r'^(Step\s*\d+[:.\-\s]*)|(^\d+[.:-\s]*)', caseSensitive: false),
-      '',
-    );
+   final cleanedTitle = stepTitle.replaceFirst(
+  RegExp(r'^(Step\s*\d+[:.\-\s]*)|(^\d+[.:-\s]*)|^\[\d+\]\s*', caseSensitive: false),
+  '',
+);
+
+
 
     return Container(
       decoration: BoxDecoration(

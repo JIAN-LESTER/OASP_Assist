@@ -539,7 +539,7 @@ Widget _buildAdmissionRow({
                   context,
                   doc,
                   DeleteConfigs.admissions,
-                  'admission',
+                  'admissions',
                   customDeleteHandler: handleComplexDocumentDelete,
                 );
               }

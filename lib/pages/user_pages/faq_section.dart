@@ -13,7 +13,8 @@ typedef OnFAQSelected = void Function(String question);
 class FAQSection extends StatefulWidget {
   final OnFAQSelected onFAQSelected;
   final bool isLoading;
-  final TextEditingController? messageController; // Add controller to update text field
+  final TextEditingController?
+  messageController; // Add controller to update text field
 
   const FAQSection({
     Key? key,
@@ -369,28 +370,29 @@ class FAQSectionState extends State<FAQSection>
           ),
           // Scrollable FAQ list
           Expanded(
-            child: faqItems.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Text(
-                        'No questions available',
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontSize: 14,
+            child:
+                faqItems.isEmpty
+                    ? Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text(
+                          'No questions available',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
+                    )
+                    : ListView.builder(
+                      padding: EdgeInsets.zero,
+                      itemCount: faqItems.length,
+                      itemBuilder: (context, index) {
+                        final question = faqItems[index]['question']!;
+                        final isLast = index == faqItems.length - 1;
+                        return _buildFAQItem(question, isLast);
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    padding: EdgeInsets.zero,
-                    itemCount: faqItems.length,
-                    itemBuilder: (context, index) {
-                      final question = faqItems[index]['question']!;
-                      final isLast = index == faqItems.length - 1;
-                      return _buildFAQItem(question, isLast);
-                    },
-                  ),
           ),
         ],
       ),
@@ -409,16 +411,18 @@ class FAQSectionState extends State<FAQSection>
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isExpanded
-              ? Color(0xFF2E7D32).withOpacity(0.3)
-              : Colors.grey.shade200,
+          color:
+              isExpanded
+                  ? Color(0xFF2E7D32).withOpacity(0.3)
+                  : Colors.grey.shade200,
           width: isExpanded ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: isExpanded
-                ? Color(0xFF2E7D32).withOpacity(0.1)
-                : Colors.black.withOpacity(0.05),
+            color:
+                isExpanded
+                    ? Color(0xFF2E7D32).withOpacity(0.1)
+                    : Colors.black.withOpacity(0.05),
             blurRadius: isExpanded ? 12 : 6,
             offset: Offset(0, isExpanded ? 4 : 2),
           ),
@@ -450,17 +454,19 @@ class FAQSectionState extends State<FAQSection>
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: isExpanded
-                          ? Color(0xFF2E7D32).withOpacity(0.15)
-                          : Colors.grey.shade100,
+                      color:
+                          isExpanded
+                              ? Color(0xFF2E7D32).withOpacity(0.15)
+                              : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
                       child: Icon(
                         icon,
-                        color: isExpanded
-                            ? Color(0xFF2E7D32)
-                            : Colors.grey.shade600,
+                        color:
+                            isExpanded
+                                ? Color(0xFF2E7D32)
+                                : Colors.grey.shade600,
                         size: 24,
                       ),
                     ),
@@ -476,9 +482,10 @@ class FAQSectionState extends State<FAQSection>
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: isExpanded
-                                ? Color(0xFF2E7D32)
-                                : Colors.grey.shade800,
+                            color:
+                                isExpanded
+                                    ? Color(0xFF2E7D32)
+                                    : Colors.grey.shade800,
                           ),
                         ),
                         SizedBox(height: 4),
@@ -499,7 +506,8 @@ class FAQSectionState extends State<FAQSection>
                     duration: Duration(milliseconds: 300),
                     child: Icon(
                       Icons.keyboard_arrow_down_rounded,
-                      color: isExpanded ? Color(0xFF2E7D32) : Colors.grey.shade400,
+                      color:
+                          isExpanded ? Color(0xFF2E7D32) : Colors.grey.shade400,
                       size: 24,
                     ),
                   ),
@@ -554,18 +562,20 @@ class FAQSectionState extends State<FAQSection>
               duration: Duration(milliseconds: 200),
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: hovered
-                    ? Color(0xFF2E7D32).withOpacity(0.08)
-                    : Colors.transparent,
+                color:
+                    hovered
+                        ? Color(0xFF2E7D32).withOpacity(0.08)
+                        : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
-                border: isLast
-                    ? null
-                    : Border(
-                        bottom: BorderSide(
-                          color: Colors.grey.shade100,
-                          width: 1,
+                border:
+                    isLast
+                        ? null
+                        : Border(
+                          bottom: BorderSide(
+                            color: Colors.grey.shade100,
+                            width: 1,
+                          ),
                         ),
-                      ),
               ),
               child: Row(
                 children: [
@@ -574,9 +584,10 @@ class FAQSectionState extends State<FAQSection>
                     width: hovered ? 6 : 4,
                     height: 16,
                     decoration: BoxDecoration(
-                      color: hovered
-                          ? Color(0xFF2E7D32)
-                          : Color(0xFF2E7D32).withOpacity(0.6),
+                      color:
+                          hovered
+                              ? Color(0xFF2E7D32)
+                              : Color(0xFF2E7D32).withOpacity(0.6),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -586,7 +597,8 @@ class FAQSectionState extends State<FAQSection>
                       question,
                       style: TextStyle(
                         fontSize: 14,
-                        color: hovered ? Color(0xFF2E7D32) : Colors.grey.shade700,
+                        color:
+                            hovered ? Color(0xFF2E7D32) : Colors.grey.shade700,
                         fontWeight: hovered ? FontWeight.w600 : FontWeight.w500,
                         height: 1.4,
                       ),
@@ -759,10 +771,7 @@ class FAQSectionState extends State<FAQSection>
             decoration: BoxDecoration(
               color: Color(0xFF2E7D32).withOpacity(0.1),
               borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: Color(0xFF2E7D32),
-                width: 2,
-              ),
+              border: Border.all(color: Color(0xFF2E7D32), width: 2),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -825,11 +834,7 @@ class FAQSectionState extends State<FAQSection>
                 ),
               ],
             ),
-            child: Icon(
-              Icons.mic,
-              color: Colors.white,
-              size: 20,
-            ),
+            child: Icon(Icons.mic, color: Colors.white, size: 20),
           ),
         );
       },
@@ -875,11 +880,9 @@ class FAQSectionState extends State<FAQSection>
     }
   }
 
-
   void toggleSpeechRecognition() {
     _toggleListening();
   }
-
 
   bool get isListening => _isListening;
 
@@ -894,7 +897,7 @@ class FAQToggleButton extends StatelessWidget {
   final VoidCallback? onToggle;
 
   const FAQToggleButton({Key? key, required this.showFAQs, this.onToggle})
-      : super(key: key);
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -908,12 +911,13 @@ class FAQToggleButton extends StatelessWidget {
           size: 24,
         ),
       ),
-      onPressed: onToggle != null
-          ? () {
-              HapticFeedback.lightImpact();
-              onToggle!();
-            }
-          : null,
+      onPressed:
+          onToggle != null
+              ? () {
+                HapticFeedback.lightImpact();
+                onToggle!();
+              }
+              : null,
       tooltip: showFAQs ? 'View Chat' : 'View FAQs',
     );
   }
@@ -925,7 +929,7 @@ class FAQInputSection extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onFAQToggle;
   final VoidCallback onSendMessage;
-  final VoidCallback? onMicrophoneTap; 
+  final VoidCallback? onMicrophoneTap;
   final bool isListening;
 
   const FAQInputSection({
@@ -1077,7 +1081,8 @@ class FAQInputSection extends StatelessWidget {
                     ),
                     child: TextField(
                       controller: controller,
-                      enabled: !isLoading,
+                      enabled:
+                          !isLoading, // Add && !_isTyping if you want to disable during typewriter
                       maxLines: null,
                       minLines: 1,
                       textAlignVertical: TextAlignVertical.center,
@@ -1128,16 +1133,15 @@ class FAQInputSection extends StatelessWidget {
                         color: isListening ? primaryColor : Color(0xFFF5F5F5),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: isListening
-                              ? primaryColor
-                              : Color(0xFFE0E0E0),
+                          color: isListening ? primaryColor : Color(0xFFE0E0E0),
                           width: 1.5,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: isListening
-                                ? primaryColor.withOpacity(0.3)
-                                : Colors.black.withOpacity(0.06),
+                            color:
+                                isListening
+                                    ? primaryColor.withOpacity(0.3)
+                                    : Colors.black.withOpacity(0.06),
                             blurRadius: isListening ? 12 : 8,
                             offset: Offset(0, 2),
                           ),
@@ -1151,21 +1155,24 @@ class FAQInputSection extends StatelessWidget {
                             onMicrophoneTap!();
                           },
                           borderRadius: BorderRadius.circular(8),
-                          splashColor: isListening
-                              ? Colors.white.withOpacity(0.2)
-                              : Colors.grey.withOpacity(0.1),
-                          highlightColor: isListening
-                              ? Colors.white.withOpacity(0.1)
-                              : Colors.grey.withOpacity(0.05),
+                          splashColor:
+                              isListening
+                                  ? Colors.white.withOpacity(0.2)
+                                  : Colors.grey.withOpacity(0.1),
+                          highlightColor:
+                              isListening
+                                  ? Colors.white.withOpacity(0.1)
+                                  : Colors.grey.withOpacity(0.05),
                           child: Center(
                             child: AnimatedSwitcher(
                               duration: const Duration(milliseconds: 200),
                               child: Icon(
                                 isListening ? Icons.mic : Icons.mic_none,
                                 key: ValueKey(isListening),
-                                color: isListening
-                                    ? Colors.white
-                                    : Color(0xFF666666),
+                                color:
+                                    isListening
+                                        ? Colors.white
+                                        : Color(0xFF666666),
                                 size: iconSize,
                               ),
                             ),
@@ -1182,15 +1189,16 @@ class FAQInputSection extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isLoading ? Colors.grey.shade400 : primaryColor,
                     borderRadius: BorderRadius.circular(10),
-                    boxShadow: isLoading
-                        ? []
-                        : [
-                            BoxShadow(
-                              color: primaryColor.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
+                    boxShadow:
+                        isLoading
+                            ? []
+                            : [
+                              BoxShadow(
+                                color: primaryColor.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
                   ),
                   child: Material(
                     color: Colors.transparent,
