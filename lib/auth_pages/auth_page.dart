@@ -42,7 +42,7 @@ class _AuthPageState extends State<AuthPage> {
   @override
   void initState() {
     super.initState();
-    _trySilentGoogleLogin(); // Run once when widget mounts
+    _trySilentGoogleLogin();
   }
 
   @override
@@ -52,7 +52,17 @@ class _AuthPageState extends State<AuthPage> {
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
           if (snapshot.hasData) {
-            // User is logged in, check their role and first login status
+            final user = snapshot.data!;
+
+            // CHECK EMAIL VERIFICATION FIRST (FIXED - DON'T SIGN OUT)
+            if (!user.emailVerified) {
+              print('⚠️ Email not verified for ${user.email}');
+              // Just show login page - don't sign out
+              // The register page handles the sign out flow
+              return const LoginPage();
+            }
+
+            // Email is verified, proceed to role-based routing
             return RoleBasedRouter();
           } else {
             // User is not logged in
@@ -152,18 +162,18 @@ class RoleBasedRouter extends StatelessWidget {
             .update({'lastLoginAt': FieldValue.serverTimestamp()});
       } else {
         // Create a user doc if not existing
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-  'uid': user.uid,
-  'email': user.email ?? '',
-  'name': name,
-  'photoURL': user.photoURL ?? '',
-  'role': 'user',
-  'profileCompleted': false,
-  'createdAt': FieldValue.serverTimestamp(),
-  'isActive': true,
-  'isVerified': user.emailVerified,
-  'linkedProviders': ['password'], // ADD THIS LINE - default to password for fallback cases
-});
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'email': user.email ?? '',
+          'name': name,
+          'photoURL': user.photoURL ?? '',
+          'role': 'user',
+          'profileCompleted': false,
+          'createdAt': FieldValue.serverTimestamp(),
+          'isActive': true,
+          'isVerified': user.emailVerified,
+          'linkedProviders': ['password'],
+        });
       }
 
       // Log login

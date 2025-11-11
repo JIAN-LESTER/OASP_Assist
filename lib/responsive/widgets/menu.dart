@@ -292,9 +292,17 @@ class UniversalUIComponents {
               index: -1,
               isExpandable: true,
               subItems: [
-                MenuItem(icon: Icons.person, title: "Users", index: 5),
-                MenuItem(icon: Icons.book, title: "Affiliations", index: 11),
-                MenuItem(icon: Icons.book, title: "Programs", index: 12),
+                MenuItem(icon: Icons.groups_outlined, title: "Users", index: 5),
+                MenuItem(
+                  icon: Icons.business_outlined,
+                  title: "Affiliations",
+                  index: 11,
+                ),
+                MenuItem(
+                  icon: Icons.bookmark_outline_outlined,
+                  title: "Programs",
+                  index: 12,
+                ),
               ],
             ),
             MenuItem(
