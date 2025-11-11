@@ -534,7 +534,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
           padding: const EdgeInsets.all(12),
           margin: const EdgeInsets.only(right: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFF2E7D32).withOpacity(0.12),
+            // color: const Color(0xFF2E7D32).withOpacity(0.12),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, size: 18, color: const Color(0xFF2E7D32)),
@@ -588,7 +588,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
           padding: const EdgeInsets.all(12),
           margin: const EdgeInsets.only(right: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFF2E7D32).withOpacity(0.12),
+            // color: const Color(0xFF2E7D32).withOpacity(0.12),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
