@@ -60,10 +60,15 @@ class _AdminMessageLogsPageState extends State<AdminMessageLogsPage> {
           isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Message logs refreshed'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: const Text('Message logs refreshed'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(
+              bottom: 16,
+              right: 16,
+              left: MediaQuery.of(context).size.width - 350,
+            ),
           ),
         );
       }
@@ -115,7 +120,6 @@ class _AdminMessageLogsPageState extends State<AdminMessageLogsPage> {
     );
   }
 }
-
 
 class DesktopAdminMessageLogsPage extends StatefulWidget {
   final DateTimeRange? selectedDateRange;
@@ -236,7 +240,6 @@ class _TabletAdminMessageLogsPageState
     );
   }
 }
-
 
 class MobileAdminMessageLogsPage extends StatefulWidget {
   final DateTimeRange? selectedDateRange;
@@ -752,12 +755,11 @@ Widget _buildLogsList({
                   itemBuilder: (context, index) {
                     final doc = currentPageLogs[index];
                     final data = doc.data() as Map<String, dynamic>;
-                final Timestamp timestamp = data['time'] ?? Timestamp.now();
-final DateTime logDate = timestamp.toDate();
-final String formattedTime = DateFormat(
-  "MMMM d, yyyy 'at' h:mm a",
-).format(logDate);
-
+                    final Timestamp timestamp = data['time'] ?? Timestamp.now();
+                    final DateTime logDate = timestamp.toDate();
+                    final String formattedTime = DateFormat(
+                      "MMMM d, yyyy 'at' h:mm a",
+                    ).format(logDate);
 
                     final msglogs = MessageLogs(
                       id: data['logId'] ?? 'N/A',

@@ -30,12 +30,12 @@ class _AuthPageState extends State<AuthPage> {
           idToken: googleAuth.idToken,
         );
         await FirebaseAuth.instance.signInWithCredential(credential);
-        print("✅ Silent Google login successful: ${googleUser.email}");
+        print(" Silent Google login successful: ${googleUser.email}");
       } else {
-        print("ℹ️ No Google account found for silent sign-in");
+        print("ℹ No Google account found for silent sign-in");
       }
     } catch (e) {
-      print("❌ Silent Google login failed: $e");
+      print(" Silent Google login failed: $e");
     }
   }
 
@@ -54,9 +54,9 @@ class _AuthPageState extends State<AuthPage> {
           if (snapshot.hasData) {
             final user = snapshot.data!;
 
-            // CHECK EMAIL VERIFICATION FIRST (FIXED - DON'T SIGN OUT)
+            // CHECK EMAIL VERIFICATION FIRST
             if (!user.emailVerified) {
-              print('⚠️ Email not verified for ${user.email}');
+              print(' Email not verified for ${user.email}');
               // Just show login page - don't sign out
               // The register page handles the sign out flow
               return const LoginPage();
@@ -100,14 +100,14 @@ class RoleBasedRouter extends StatelessWidget {
         }
 
         if (snapshot.hasError || !snapshot.hasData) {
-          print('❌ Error in RoleBasedRouter: ${snapshot.error}');
+          print(' Error in RoleBasedRouter: ${snapshot.error}');
           return UserMainPage();
         }
 
         final userData = snapshot.data!;
-        print('🔄 Routing user: ${userData.name}');
-        print('📋 Role: ${userData.role}');
-        print('🧩 Profile Completed: ${userData.isProfileCompleted}');
+        print(' Routing user: ${userData.name}');
+        print(' Role: ${userData.role}');
+        print(' Profile Completed: ${userData.isProfileCompleted}');
 
         // Route based on role and profile completion
         switch (userData.role) {
@@ -117,13 +117,13 @@ class RoleBasedRouter extends StatelessWidget {
             return StaffMainPage();
           case 'user':
             if (!userData.isProfileCompleted) {
-              print('🎉 Profile incomplete - showing onboarding');
+              print(' Profile incomplete - showing onboarding');
               return UserOnboardingScreen(
                 userId: user?.uid ?? '',
                 userName: userData.name,
               );
             } else {
-              print('✅ Profile complete - going to main page');
+              print(' Profile complete - going to main page');
               return UserMainPage();
             }
           default:
@@ -138,7 +138,7 @@ class RoleBasedRouter extends StatelessWidget {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('No authenticated user found');
 
-      print('🔍 Fetching user data for: ${user.uid}');
+      print(' Fetching user data for: ${user.uid}');
       final doc =
           await FirebaseFirestore.instance
               .collection('users')
@@ -185,7 +185,7 @@ class RoleBasedRouter extends StatelessWidget {
         isProfileCompleted: profileCompleted,
       );
     } catch (e) {
-      print('❌ Error getting user data: $e');
+      print(' Error getting user data: $e');
       return UserData(
         role: 'user',
         name: FirebaseAuth.instance.currentUser?.displayName ?? 'User',
@@ -204,9 +204,9 @@ class RoleBasedRouter extends StatelessWidget {
         'time': Timestamp.now(),
         'userId': userId,
       });
-      print('📝 Login event logged');
+      print(' Login event logged');
     } catch (e) {
-      print('❌ Failed to log login event: $e');
+      print(' Failed to log login event: $e');
     }
   }
 }
