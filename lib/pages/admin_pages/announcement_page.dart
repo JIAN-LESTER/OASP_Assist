@@ -1839,10 +1839,9 @@ Widget _buildRefreshButton({required bool isDesktop}) {
                               .update({
                                 'message': messageController.text.trim(),
                                 'category': selectedCategory,
-                                'deadline':
-                                    deadlineController.text.trim().isEmpty
-                                        ? null
-                                        : deadlineController.text.trim(),
+                                'deadline': deadlineController.text.trim().isEmpty
+            ? null
+            : Timestamp.fromDate(DateTime.parse(deadlineController.text.trim())),
                                 'updated_at': FieldValue.serverTimestamp(),
                               });
 
@@ -2218,77 +2217,82 @@ class AnnouncementCard extends StatelessWidget {
             ),
           ),
 
-          // Deadline notice
-          if (deadline != null && deadline.isNotEmpty)
-            Container(
-              margin: EdgeInsets.fromLTRB(
-                isDesktop ? 24 : 20,
-                0,
-                isDesktop ? 24 : 20,
-                isDesktop ? 20 : 16,
-              ),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.orange[50]!,
-                    Colors.orange[100]!.withOpacity(0.3),
-                  ],
+         // Deadline notice
+if (deadline != null)
+  Container(
+    margin: EdgeInsets.fromLTRB(
+      isDesktop ? 24 : 20,
+      0,
+      isDesktop ? 24 : 20,
+      isDesktop ? 20 : 16,
+    ),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          Colors.orange[50]!,
+          Colors.orange[100]!.withOpacity(0.3),
+        ],
+      ),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Colors.orange[300]!, width: 1.5),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.orange[100]!.withOpacity(0.5),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.orange[600],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(
+            Icons.schedule_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'DEADLINE',
+                style: TextStyle(
+                  color: Colors.orange[800],
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
                 ),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange[300]!, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.orange[100]!.withOpacity(0.5),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
               ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.orange[600],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.schedule_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'DEADLINE',
-                          style: TextStyle(
-                            color: Colors.orange[800],
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          deadline,
-                          style: TextStyle(
-                            color: Colors.orange[900],
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 2),
+
+              // ✅ Format the Firestore Timestamp into readable text
+              Text(
+                DateFormat('MMMM d, yyyy').format(
+                  (deadline as Timestamp).toDate(),
+                ),
+                style: TextStyle(
+                  color: Colors.orange[900],
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  letterSpacing: -0.2,
+                ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  ),
+
 
           // Message content
           if (message.isNotEmpty)

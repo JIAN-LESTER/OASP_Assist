@@ -569,23 +569,32 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
   }
 
-  void _onFAQSelected(String question) {
+void _onFAQSelected(String question) {
+  print('📝 FAQ selected: $question');
+  
   final chatProvider = Provider.of<ChatProvider>(context, listen: false);
   chatProvider.incrementFAQSimilarityCount(question);
 
+  // ✅ Set the question in the controller
   _controller.text = question;
 
-  // ✅ Close FAQs
-  setState(() {
-    _expandedCategory = null;
-    _showFAQs = false;
-  });
+  // ✅ Close FAQs immediately
+  if (mounted) {
+    setState(() {
+      _expandedCategory = null;
+      _showFAQs = false;
+    });
+  }
 
   // ✅ Send the message after a short delay
-  Future.delayed(Duration(milliseconds: 100), () {
-    _sendMessage(chatProvider);
+  Future.delayed(Duration(milliseconds: 150), () {
+    if (mounted && !chatProvider.isLoading) {
+      _sendMessage(chatProvider);
+    }
   });
 }
+
+
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -1724,10 +1733,11 @@ void _sendMessage(ChatProvider chatProvider) async {
   final text = _controller.text.trim();
   if (text.isEmpty || chatProvider.isLoading) return;
 
+  // ✅ Clear the input immediately
   _controller.clear();
 
-  // 🔹 FIX: Close FAQs when sending a message
-  if (_showFAQs) {
+  // ✅ Close FAQs when sending a message
+  if (_showFAQs && mounted) {
     setState(() {
       _showFAQs = false;
     });
@@ -1735,6 +1745,13 @@ void _sendMessage(ChatProvider chatProvider) async {
 
   try {
     await chatProvider.askQuestionWithStreaming(context, text);
+    
+    // ✅ Scroll to bottom after sending
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_showFAQs) {
+        _scrollToBottom();
+      }
+    });
   } catch (e) {
     debugPrint('Error sending message: $e');
     if (mounted) {
@@ -1768,15 +1785,17 @@ void _sendMessage(ChatProvider chatProvider) async {
   }
 }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _scrollController.dispose();
-    _conversationsSubscription?.cancel();
-    _micAnimationController.dispose();
-    _attachmentAnimationController.dispose();
-    super.dispose();
-  }
+
+@override
+void dispose() {
+  print('🧹 ChatPage disposing...');
+  _controller.dispose();
+  _scrollController.dispose();
+  _conversationsSubscription?.cancel();
+  _micAnimationController.dispose();
+  _attachmentAnimationController.dispose();
+  super.dispose();
+}
 
   @override
   Widget build(BuildContext context) {

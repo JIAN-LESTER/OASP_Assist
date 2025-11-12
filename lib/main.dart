@@ -40,6 +40,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 bool _servicesInitialized = false;
 
 // ✅ Navigation Handler Class
+// ✅ Navigation Handler Class - FIXED VERSION
 class NotificationNavigationHandler {
   final GlobalKey<NavigatorState> navigatorKey;
 
@@ -76,236 +77,271 @@ class NotificationNavigationHandler {
   }
 
   void _navigateToEscalationDetail(BuildContext context, Map<String, dynamic> data) async {
-  final escalationId = data['escalationId'];
-  if (escalationId == null || escalationId.isEmpty) {
-    print('⚠️ No escalation ID provided');
-    return;
-  }
-
-  // ✅ Determine if user is staff or admin
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    print('⚠️ No user logged in');
-    return;
-  }
-
-  try {
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-    
-    final role = userDoc.data()?['role'] ?? 'user';
-    
-    // ✅ Route based on role
-    final route = role == 'admin' ? '/admin/home' : '/staff/home';
-    final tabIndex = role == 'admin' ? 5 : 2; // Adjust based on your admin tab structure
-    
-    print('📍 Navigating $role to escalations (route: $route, tab: $tabIndex)');
-    
-    Navigator.of(context).pushNamed(
-      route,
-      arguments: {
-        'initialTab': tabIndex,
-        'escalationId': escalationId,
-        'autoOpen': true,
-      },
-    );
-  } catch (e) {
-    print('❌ Error determining user role: $e');
-    // Fallback to staff route
-    Navigator.of(context).pushNamed(
-      '/staff/escalations',
-      arguments: {
-        'escalationId': escalationId,
-        'autoOpen': true,
-      },
-    );
-  }
-}
-
-Future<void> _showEscalationResponse(BuildContext context, Map<String, dynamic> data) async {
-  final escalationId = data['escalationId'] ?? data['relatedId'];
-  
-  print('🔍 DEBUG: escalationId = $escalationId');
-  print('🔍 DEBUG: data keys = ${data.keys}');
-  
-  if (escalationId == null || escalationId.isEmpty) {
-    _showErrorDialog(context, 'No escalation ID provided');
-    return;
-  }
-
-  try {
-    // Show loading indicator
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-      ),
-    );
-
-    // Fetch escalation document by ID
-    final escalationDoc = await FirebaseFirestore.instance
-        .collection('escalations')
-        .doc(escalationId)
-        .get();
-
-    if (context.mounted) Navigator.of(context).pop(); // Close loading
-
-    if (!escalationDoc.exists) {
-      _showErrorDialog(context, 'Escalation not found');
+    final escalationId = data['escalationId'];
+    if (escalationId == null || escalationId.isEmpty) {
+      print('⚠️ No escalation ID provided');
       return;
     }
 
-    final escalation = escalationDoc.data()!;
-    final staffResponse = escalation['staffResponse'] ?? 'No response yet';
-    final respondedBy = escalation['respondedBy'] ?? 'Staff';
-    final respondedAt = escalation['respondedAt'] as Timestamp?;
-    final userQuestion = escalation['question'] ?? 'No question available';
-    final conversationId = escalation['conversationId'] as String?;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print('⚠️ No user logged in');
+        return;
+      }
 
-    if (!context.mounted) return;
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      final role = userDoc.data()?['role'] ?? 'user';
+      
+      final route = role == 'admin' ? '/admin/home' : '/staff/home';
+      final tabIndex = role == 'admin' ? 5 : 2;
+      
+      print('📍 Navigating $role to escalations (route: $route, tab: $tabIndex)');
+      
+      Navigator.of(context).pushReplacementNamed(
+        route,
+        arguments: {
+          'initialTab': tabIndex,
+          'escalationId': escalationId,
+          'autoOpen': true,
+        },
+      );
+    } catch (e) {
+      print('❌ Error determining user role: $e');
+      Navigator.of(context).pushReplacementNamed(
+        '/staff/escalations',
+        arguments: {
+          'escalationId': escalationId,
+          'autoOpen': true,
+        },
+      );
+    }
+  }
 
-    // ✅ Show the dialog and wait for result
-    final shouldNavigate = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2E7D32).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.support_agent, color: Color(0xFF2E7D32), size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Staff Response', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                  if (respondedAt != null)
-                    Text(
-                      _formatTimestamp(respondedAt.toDate()),
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.normal),
-                    ),
-                ],
-              ),
-            ),
-          ],
+  Future<void> _showEscalationResponse(BuildContext context, Map<String, dynamic> data) async {
+    final escalationId = data['escalationId'] ?? data['relatedId'];
+    
+    print('🔍 DEBUG: escalationId = $escalationId');
+    print('🔍 DEBUG: data keys = ${data.keys}');
+    
+    if (escalationId == null || escalationId.isEmpty) {
+      _showErrorDialog(context, 'No escalation ID provided');
+      return;
+    }
+
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+      );
+
+      final escalationDoc = await FirebaseFirestore.instance
+          .collection('escalations')
+          .doc(escalationId)
+          .get();
+
+      if (context.mounted) Navigator.of(context).pop();
+
+      if (!escalationDoc.exists) {
+        _showErrorDialog(context, 'Escalation not found');
+        return;
+      }
+
+      final escalation = escalationDoc.data()!;
+      final staffResponse = escalation['staffResponse'] ?? 'No response yet';
+      final respondedBy = escalation['respondedBy'] ?? 'Staff';
+      final respondedAt = escalation['respondedAt'] as Timestamp?;
+      final userQuestion = escalation['question'] ?? 'No question available';
+      final conversationId = escalation['conversationId'] as String?;
+
+      if (!context.mounted) return;
+
+      final shouldNavigate = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: const Color(0xFF2E7D32).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade200),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.question_answer, size: 16, color: Colors.grey.shade600),
-                        const SizedBox(width: 6),
-                        Text('Your Question', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(userQuestion, style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.4)),
-                  ],
-                ),
+                child: const Icon(Icons.support_agent, color: Color(0xFF2E7D32), size: 24),
               ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [const Color(0xFF2E7D32).withOpacity(0.1), const Color(0xFF388E3C).withOpacity(0.05)],
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF2E7D32).withOpacity(0.3)),
-                ),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.support_agent, size: 16, color: Color(0xFF2E7D32)),
-                        const SizedBox(width: 6),
-                        Text('Response from $respondedBy', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32))),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(staffResponse, style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.5)),
+                    const Text('Staff Response', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                    if (respondedAt != null)
+                      Text(
+                        _formatTimestamp(respondedAt.toDate()),
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.normal),
+                      ),
                   ],
                 ),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Close', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
-          ),
-          if (conversationId != null && conversationId.isNotEmpty)
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true), // Return true
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E7D32),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text('View Chat', style: TextStyle(fontWeight: FontWeight.w600)),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.question_answer, size: 16, color: Colors.grey.shade600),
+                          const SizedBox(width: 6),
+                          Text('Your Question', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(userQuestion, style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.4)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [const Color(0xFF2E7D32).withOpacity(0.1), const Color(0xFF388E3C).withOpacity(0.05)],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF2E7D32).withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.support_agent, size: 16, color: Color(0xFF2E7D32)),
+                          const SizedBox(width: 6),
+                          Text('Response from $respondedBy', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32))),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(staffResponse, style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.5)),
+                    ],
+                  ),
+                ),
+              ],
             ),
-        ],
-      ),
-    );
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Close', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+            ),
+            if (conversationId != null && conversationId.isNotEmpty)
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E7D32),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('View Chat', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+          ],
+        ),
+      );
 
-    // ✅ Navigate to chat if user clicked "View Chat"
-    if (shouldNavigate == true && conversationId != null && conversationId.isNotEmpty) {
-      print('✅ Navigating to chat with conversation: $conversationId');
-      
+      if (shouldNavigate == true && conversationId != null && conversationId.isNotEmpty) {
+        print('✅ Navigating to chat with conversation: $conversationId');
+        
+        if (context.mounted) {
+          Navigator.of(context).pushReplacementNamed(
+            '/home',
+            arguments: {
+              'initialTab': 1,
+              'conversationId': conversationId,
+              'loadExisting': true,
+            },
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ Error fetching escalation: $e');
       if (context.mounted) {
-        Navigator.of(context).pushNamed(
+        Navigator.of(context).pop();
+        _showErrorDialog(context, 'Failed to load response');
+      }
+    }
+  }
+
+  // ✅ FIXED: Navigate directly to the announcements tab based on role
+  Future<void> _navigateToAnnouncement(BuildContext context, Map<String, dynamic> data) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print('⚠️ No user logged in');
+        return;
+      }
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      final role = userDoc.data()?['role'] ?? 'user';
+      final announcementId = data['announcementId'];
+
+      print('📢 Navigating to announcements for role: $role');
+      print('📢 Announcement ID: $announcementId');
+
+      // ✅ FIXED: Navigate with proper route and tab index for each role
+      if (role == 'user') {
+        Navigator.of(context).pushReplacementNamed(
           '/home',
           arguments: {
-            'initialTab': 1, // Chat tab
-            'conversationId': conversationId,
-            'loadExisting': true,
+            'initialTab': 2, // Announcements tab for users
+            'announcementId': announcementId,
+          },
+        );
+      } else if (role == 'staff') {
+        Navigator.of(context).pushReplacementNamed(
+          '/staff/home',
+          arguments: {
+            'initialTab': 3, // Announcements tab for staff
+            'announcementId': announcementId,
+          },
+        );
+      } else if (role == 'admin') {
+        Navigator.of(context).pushReplacementNamed(
+          '/admin/home',
+          arguments: {
+            'initialTab': 4, // Announcements tab for admin (adjust based on your structure)
+            'announcementId': announcementId,
           },
         );
       }
+    } catch (e) {
+      print('❌ Error navigating to announcement: $e');
+      _showErrorDialog(context, 'Failed to navigate to announcement');
     }
-  } catch (e) {
-    print('❌ Error fetching escalation: $e');
-    if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading if still open
-      _showErrorDialog(context, 'Failed to load response');
-    }
-  }
-}
-
-  void _navigateToAnnouncement(BuildContext context, Map<String, dynamic> data) {
-    final announcementId = data['announcementId'];
-    if (announcementId == null || announcementId.isEmpty) {
-      print('⚠️ No announcement ID provided');
-      return;
-    }
-
-    Navigator.of(context).pushNamed('/announcements/detail', arguments: {'announcementId': announcementId});
   }
 
   void _navigateToAnnouncementsList(BuildContext context) {

@@ -1,3 +1,4 @@
+import 'package:capstone_project/pages/data/charts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:capstone_project/modal_pages/scholarship_edit.dart';
@@ -652,6 +653,41 @@ Widget _buildHeader(
             ],
           ),
           SizedBox(height: isMobile ? 16 : 20),
+                 Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: isMobile
+                ? Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    children: [
+                      buildStatCard('Total Scholarships', '59', Colors.blue, Icons.message),
+                      buildStatCard('New Scholarship', '58', Colors.green, Icons.check_circle),
+    
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: buildStatCard(
+                          'Total Scholarshipss',
+                          '59',
+                          Colors.blue,
+                          Icons.message,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
+                          'New Scholarship',
+                          '58',
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                      ),
+               
+                    ],
+                  ),
+          ),
 
           // Search and Filter Row
           isMobile

@@ -36,6 +36,7 @@ class UserConstant {
   static const Duration _faqCacheExpiry = Duration(hours: 1);
 
   static bool _isServicesExpanded = false;
+   static bool shouldShowFAQs = false;
 
   // Fixed logout method that handles both Firebase Auth and Google Sign In
   static Future<void> signUserOut() async {
@@ -562,74 +563,58 @@ static Future<void> onConversationSelected(
     }
   }
 
-  // UPDATED: New Chat will end active conversation and create a new one
-  static Future<void> startNewChat(
-    BuildContext context, [
-    String? firstUserMessage,
-    bool pushIfNeeded = true,
-  ]) async {
-    print('DEBUG: Starting new chat...');
+static Future<void> startNewChat(
+  BuildContext context, [
+  String? firstUserMessage,
+  bool pushIfNeeded = true,
+]) async {
+  print('DEBUG: Starting new chat...');
 
-    if (!context.mounted) return;
+  if (!context.mounted) return;
 
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) {
-      _showErrorSnackBar(context, 'Please log in to start a chat');
-      return;
-    }
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  if (userId == null) {
+    _showErrorSnackBar(context, 'Please log in to start a chat');
+    return;
+  }
 
-    try {
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  try {
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-      // FIXED: End ALL active conversations before creating new one
-      await _endAllActiveConversations(userId);
+    // End ALL active conversations before creating new one
+    await _endAllActiveConversations(userId);
 
-      // Clear messages first
-      chatProvider.clearMessages();
+    // Clear messages first
+    chatProvider.clearMessages();
 
-      // Create new conversation
-      final newConversationId = await _createNewConversation(userId);
+    // Create new conversation
+    final newConversationId = await _createNewConversation(userId);
 
-      // Set up the new conversation
-      await chatProvider.setConversationId(newConversationId);
+    // Set up the new conversation
+    await chatProvider.setConversationId(newConversationId);
 
-      // Update the static variable directly (no setState needed in static context)
-      _selectedConversationId = newConversationId;
+    // Update the static variable directly
+    _selectedConversationId = newConversationId;
+    
+    // ✅ Set flag to show FAQs
+    shouldShowFAQs = true;
 
-      // REMOVED: Navigation logic - let parent handle tab switching
-      // The parent (UserMainPage) should handle switching to chat tab
+    print('DEBUG: New chat created with ID: $newConversationId');
 
-      // Clear any input field if present
-      _controller.clear();
-
-      // Show success snackbar
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: const [
-              Icon(Icons.refresh, color: Colors.white, size: 20),
-              SizedBox(width: 12),
-              Text('New chat started!'),
-            ],
-          ),
-          backgroundColor: const Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          duration: const Duration(seconds: 2),
-        ),
+    // ✅ Return the new conversation ID
+    return;
+    
+  } catch (e) {
+    print('DEBUG: Error starting new chat: $e');
+    if (context.mounted) {
+      _showErrorSnackBar(
+        context,
+        'Failed to start new chat: ${e.toString()}',
       );
-    } catch (e) {
-      print('DEBUG: Error starting new chat: $e');
-      if (context.mounted) {
-        _showErrorSnackBar(
-          context,
-          'Failed to start new chat: ${e.toString()}',
-        );
-      }
     }
   }
+}
+
 
   static Future<void> _endAllActiveConversations(String userId) async {
     try {

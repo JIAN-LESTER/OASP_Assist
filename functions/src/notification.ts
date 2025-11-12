@@ -7,42 +7,7 @@ import * as admin from "firebase-admin";
 
 const db = admin.firestore();
 
-function parseDeadline(deadlineStr: string): Date | null {
-  if (!deadlineStr) return null;
-
-  try {
-    const monthDayYear = deadlineStr.match(/(\w+)\s+(\d{1,2}),?\s+(\d{4})/);
-    if (monthDayYear) {
-      const dateString = `${monthDayYear[1]} ${monthDayYear[2]}, ${monthDayYear[3]}`;
-      const date = new Date(dateString);
-      if (!isNaN(date.getTime())) {
-        return date;
-      }
-    }
-
-    const slashFormat = deadlineStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (slashFormat) {
-      const date = new Date(
-        `${slashFormat[3]}-${slashFormat[1]}-${slashFormat[2]}`
-      );
-      if (!isNaN(date.getTime())) {
-        return date;
-      }
-    }
-
-    const date = new Date(deadlineStr);
-    if (!isNaN(date.getTime())) {
-      return date;
-    }
-
-    return null;
-  } catch (error) {
-    console.error(`Error parsing deadline: ${deadlineStr}`, error);
-    return null;
-  }
-}
-
-// ✅ FIXED: Get FCM tokens grouped by userId
+// ✅ Get FCM tokens grouped by userId
 async function getUserFCMTokens(
   userIds: string[]
 ): Promise<Map<string, string[]>> {
@@ -204,7 +169,6 @@ async function sendFCMNotifications(
   }
 }
 
-// ✅ FIXED: Create only ONE notification per user
 async function createNotificationsForUsers(
   userIds: string[],
   targetRole: string,
@@ -215,85 +179,95 @@ async function createNotificationsForUsers(
 ): Promise<number> {
   try {
     console.log(
-      `📝 Creating ${userIds.length} notifications for ${targetRole}`
+      `📝 Creating notifications for ${userIds.length} ${targetRole} users`
     );
 
-    const batch = db.batch();
-    let count = 0;
-    const notificationsToCreate: string[] = [];
-
-    // ✅ Step 1: Check for existing notifications in bulk
+    // ✅ Build unique notification key
+    let uniqueKey = `${type}`;
     if (data.announcementId) {
-      console.log(
-        `🔍 Checking for existing notifications for announcement: ${data.announcementId}`
-      );
-
-      const existingNotifications = await db
-        .collection("notifications")
-        .where("data.announcementId", "==", data.announcementId)
-        .where("type", "==", type)
-        .select("userId") // Only fetch userId field for efficiency
-        .get();
-
-      const existingUserIds = new Set(
-        existingNotifications.docs.map((doc) => doc.data().userId)
-      );
-
-      console.log(`ℹ️ Found ${existingUserIds.size} existing notifications`);
-
-      // Filter out users who already have this notification
-      for (const userId of userIds) {
-        if (!existingUserIds.has(userId)) {
-          notificationsToCreate.push(userId);
-        }
-      }
-
-      console.log(
-        `📝 Will create ${notificationsToCreate.length} new notifications`
-      );
-    } else {
-      // If no announcementId, create for all users (escalations, etc.)
-      notificationsToCreate.push(...userIds);
+      uniqueKey += `-${data.announcementId}`;
+    } else if (data.escalationId) {
+      uniqueKey += `-${data.escalationId}`;
+    }
+    if (data.reminderDate) {
+      uniqueKey += `-${data.reminderDate}`;
+    }
+    if (data.eventId) {
+      uniqueKey += `-${data.eventId}`;
     }
 
-    // ✅ Step 2: Create notifications only for users who don't have them
-    for (const userId of notificationsToCreate) {
-      const notificationRef = db.collection("notifications").doc();
+    console.log(`🔑 Using unique key: ${uniqueKey}`);
 
-      batch.set(notificationRef, {
-        userId: userId,
-        targetRole: targetRole,
-        title: title,
-        body: body,
-        type: type,
-        escalationId: data.escalationId || null,
-        announcementId: data.announcementId || null,
-        conversationId: data.conversationId || null,
-        data: data,
-        readBy: [],
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+    let batch = db.batch();
+    let batchCount = 0;
+    let totalCreated = 0;
 
-      count++;
+    for (const userId of userIds) {
+      // ✅ Create deterministic notification ID
+      const notificationId = `${userId}_${uniqueKey}`;
+      const notificationRef = db.collection("notifications").doc(notificationId);
 
-      // Commit in batches of 500 (Firestore limit)
-      if (count % 500 === 0) {
+      // ✅ Use set with merge to prevent duplicates (idempotent operation)
+      batch.set(
+        notificationRef,
+        {
+          notificationId: notificationId,
+          userId: userId,
+          targetRole: targetRole,
+          title: title,
+          body: body,
+          type: type,
+          escalationId: data.escalationId || null,
+          announcementId: data.announcementId || null,
+          conversationId: data.conversationId || null,
+          data: data,
+          readBy: [],
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      totalCreated++;
+      batchCount++;
+
+      if (batchCount >= 500) {
         await batch.commit();
+        console.log(`✅ Committed batch of ${batchCount} notifications`);
+        batch = db.batch();
+        batchCount = 0;
       }
     }
 
-    // Commit remaining notifications
-    if (count % 500 !== 0) {
+    if (batchCount > 0) {
       await batch.commit();
+      console.log(`✅ Committed final batch of ${batchCount} notifications`);
     }
 
     console.log(
-      `✅ Created ${count} Firestore notifications (1 per user, no duplicates)`
+      `✅ Processed ${totalCreated} notifications (duplicates automatically prevented by document ID)`
     );
-    return count;
+    return totalCreated;
   } catch (error) {
     console.error("❌ Error creating Firestore notifications:", error);
     return 0;
+  }
+}
+
+function formatDeadlineForNotification(deadline: admin.firestore.Timestamp | null): string {
+  if (!deadline || typeof deadline.toDate !== 'function') {
+    return '';
+  }
+
+  try {
+    const deadlineDate = deadline.toDate();
+    return deadlineDate.toLocaleDateString("en-US", {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  } catch (error) {
+    console.error('Error formatting deadline:', error);
+    return '';
   }
 }
 
@@ -305,35 +279,61 @@ export const onAnnouncementCreated = onDocumentCreated(
   {
     document: "announcements/{announcementId}",
     region: "us-central1",
+    retry: false, // ✅ Don't retry on failure to prevent duplicates
   },
   async (event) => {
+    const announcementId = event.params.announcementId;
+    
+    console.log(`📢 onAnnouncementCreated triggered for: ${announcementId}`);
+    console.log(`📢 Event ID: ${event.id}`);
+    
     try {
       const announcementData = event.data?.data();
-      const announcementId = event.params.announcementId;
 
       if (!announcementData || announcementData.deleted === true) {
         console.log("Announcement is deleted or invalid, skipping");
         return;
       }
 
-      // ✅ CRITICAL FIX: Check if we already sent notifications for this announcement
-      const existingNotifications = await db
-        .collection("notifications")
-        .where("data.announcementId", "==", announcementId)
-        .where("type", "==", "announcement")
-        .limit(1)
-        .get();
-
-      if (!existingNotifications.empty) {
-        console.log(
-          `⚠️ Notifications already sent for announcement ${announcementId}, skipping`
-        );
-        return;
+      // ✅ CRITICAL: Use idempotency key based on event ID
+      const idempotencyRef = db.collection("notification_processing")
+        .doc(`announcement_${announcementId}_${event.id}`);
+      
+      // ✅ Try to create idempotency record
+      try {
+        await idempotencyRef.create({
+          announcementId: announcementId,
+          eventId: event.id,
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          status: "processing"
+        });
+        console.log(`✅ Idempotency lock acquired for ${announcementId}`);
+      } catch (error: any) {
+        if (error.code === 6) { // ALREADY_EXISTS
+          console.log(`⚠️ Notification already being processed for ${announcementId} (event: ${event.id})`);
+          return { success: false, reason: "already_processing" };
+        }
+        throw error;
       }
 
-      console.log(
-        `📢 New announcement: ${announcementId} - Processing notifications`
-      );
+      // ✅ Double-check notification_sent flag
+      const announcementRef = db.collection("announcements").doc(announcementId);
+      const currentDoc = await announcementRef.get();
+      
+      if (currentDoc.data()?.notification_sent === true) {
+        console.log(`⚠️ Notification already sent for ${announcementId}, skipping`);
+        await idempotencyRef.update({ status: "skipped_already_sent" });
+        return { success: false, reason: "already_sent" };
+      }
+
+      // ✅ Mark as sent BEFORE creating notifications
+      await announcementRef.update({
+        notification_sent: true,
+        notification_sent_at: admin.firestore.FieldValue.serverTimestamp(),
+        notification_event_id: event.id,
+      });
+      
+      console.log(`✅ Marked announcement ${announcementId} as notification_sent`);
 
       const message = announcementData.message || "New announcement posted";
       const category = announcementData.category || "General";
@@ -344,8 +344,10 @@ export const onAnnouncementCreated = onDocumentCreated(
       if (message.length > 100) {
         notificationBody += "...";
       }
-      if (deadline) {
-        notificationBody += ` | Deadline: ${deadline}`;
+
+      const formattedDeadline = formatDeadlineForNotification(deadline);
+      if (formattedDeadline) {
+        notificationBody += ` | Deadline: ${formattedDeadline}`;
       }
 
       const usersSnapshot = await db
@@ -368,36 +370,58 @@ export const onAnnouncementCreated = onDocumentCreated(
         {
           announcementId: announcementId,
           category: category,
-          deadline: deadline,
+          deadline: deadline ? deadline.toMillis().toString() : null,
           message: message,
+          eventId: event.id, // ✅ Pass event ID for extra uniqueness
         }
       );
 
       console.log(`✅ Created ${notificationsCreated} notifications`);
 
-      // Send FCM after Firestore notifications are created
-      await sendFCMNotifications(userIds, notificationTitle, notificationBody, {
-        type: "announcement",
-        announcementId: announcementId,
-        category: category,
+      // ✅ Update idempotency record
+      await idempotencyRef.update({ 
+        status: "completed",
+        notificationsCreated: notificationsCreated,
+        completedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      return { success: true, notificationsCreated };
+      // Send FCM after Firestore notifications are created
+      if (notificationsCreated > 0) {
+        await sendFCMNotifications(userIds, notificationTitle, notificationBody, {
+          type: "announcement",
+          announcementId: announcementId,
+          category: category,
+        });
+      }
+
+      return { success: true, notificationsCreated, eventId: event.id };
     } catch (error) {
       console.error("Error creating announcement notification:", error);
+      
+      // ✅ Mark idempotency record as failed
+      try {
+        const idempotencyRef = db.collection("notification_processing")
+          .doc(`announcement_${event.params.announcementId}_${event.id}`);
+        await idempotencyRef.update({ 
+          status: "failed",
+          error: String(error),
+          failedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (e) {
+        console.error("Failed to update idempotency record:", e);
+      }
+      
       return { success: false, error: error };
     }
   }
 );
 
 export const checkUpcomingDeadlines = onSchedule(
-  // 1. Correct Options Object (First Argument)
   {
-    schedule: "0 9 * * *", // Run daily at 9AM Manila time
+    schedule: "0 9 * * *",
     timeZone: "Asia/Manila",
     region: "us-central1",
   },
-  // 2. Correct Handler Function (Second Argument) - Must return Promise<void>
   async (event) => {
     let totalNotificationsCreated = 0;
     const processedAnnouncements = [];
@@ -410,14 +434,14 @@ export const checkUpcomingDeadlines = onSchedule(
         })}`
       );
 
-      // 🔹 Use Manila timezone date for today (not UTC)
       const now = new Date(
         new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
       );
       now.setHours(0, 0, 0, 0);
-      const reminderDateKey = now.toISOString().substring(0, 10); // e.g., '2025-11-12'
+      const reminderDateKey = now.toISOString().substring(0, 10);
 
-      // 1. Get all active users once
+      console.log(`📅 Today (Manila): ${reminderDateKey}`);
+
       const usersSnapshot = await db
         .collection("users")
         .where("isActive", "==", true)
@@ -425,7 +449,7 @@ export const checkUpcomingDeadlines = onSchedule(
       const allUserIds = usersSnapshot.docs.map((doc) => doc.id);
       if (allUserIds.length === 0) {
         console.log("ℹ️ No active users found. Exiting.");
-        return; // Return void/Promise<void>
+        return;
       }
       console.log(`👤 Found ${allUserIds.length} active users.`);
 
@@ -439,30 +463,23 @@ export const checkUpcomingDeadlines = onSchedule(
         `📋 Found ${announcementsSnapshot.size} announcements with deadlines`
       );
 
-      // ✅ Use a single master batch for all writes
-      let masterBatch = db.batch(); // Initialize the batch
-      let batchCount = 0;
-
       for (const announcementDoc of announcementsSnapshot.docs) {
         const data = announcementDoc.data();
         const announcementId = announcementDoc.id;
 
         const { deadline, message = "", category = "General" } = data;
-        const deadlineDate = parseDeadline(deadline);
-        if (!deadlineDate) {
-          console.log(
-            `⚠️ Could not parse deadline for ${announcementId}: ${deadline}`
-          );
+
+        if (!deadline || typeof deadline.toDate !== 'function') {
+          console.log(`⚠️ No valid Firestore Timestamp deadline for ${announcementId}`);
           continue;
         }
 
-        // 🔹 Convert to Manila timezone start of day
+        const deadlineDate = deadline.toDate();
         const deadlineLocal = new Date(
           deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
         );
         deadlineLocal.setHours(0, 0, 0, 0);
 
-        // 🔹 Compute days difference correctly
         const diffMs = deadlineLocal.getTime() - now.getTime();
         const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
@@ -470,75 +487,44 @@ export const checkUpcomingDeadlines = onSchedule(
           `📅 ${announcementId}: ${daysUntilDeadline} days until ${deadlineLocal.toDateString()}`
         );
 
-        // ✅ Send notification if exactly 3 days away
         if (daysUntilDeadline === 3) {
           console.log(`⏰ Deadline approaching in 3 days: ${announcementId}`);
 
-          // 🔹 CRITICAL: Check for duplicates based on announcementId AND the specific reminder date
-          const existingNotification = await db
-            .collection("notifications")
-            .where("data.announcementId", "==", announcementId)
-            .where("type", "==", "deadline_reminder")
-            .where("data.reminderDate", "==", reminderDateKey)
-            .limit(1)
-            .get();
-
-          if (!existingNotification.empty) {
-            console.log(
-              `ℹ️ Reminder already sent for ${announcementId} on ${reminderDateKey}`
-            );
-            continue;
-          }
-
           const title = `⏰ Deadline Reminder: ${category}`;
+          const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          });
           const body = `${message.substring(0, 80)}${
             message.length > 80 ? "..." : ""
-          } | Deadline in 3 days: ${deadlineLocal.toDateString()}`;
+          } | Deadline in 3 days: ${formattedDate}`;
 
-          // Add notifications to the master batch
-          for (const uid of allUserIds) {
-            const notifRef = db.collection("notifications").doc();
-
-            masterBatch.set(notifRef, {
-              userId: uid,
-              role: "user",
-              title,
-              body,
-              type: "deadline_reminder",
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
-              data: {
-                announcementId,
-                category,
-                deadline: deadlineLocal.toISOString(),
-                message,
-                daysUntilDeadline: 3,
-                reminderDate: reminderDateKey,
-                reminderSentAt: admin.firestore.FieldValue.serverTimestamp(),
-              },
-              read: false,
-              deleted: false,
-            });
-            batchCount++;
-
-            // Commit in batches of 500 (Firestore limit)
-            if (batchCount % 500 === 0) {
-              await masterBatch.commit();
-              console.log(`➡️ Committed batch of ${batchCount} notifications.`);
-              // Create a new batch for the remainder
-              masterBatch = db.batch(); // Reinitialize the batch
+          const notificationsCreated = await createNotificationsForUsers(
+            allUserIds,
+            "user",
+            title,
+            body,
+            "deadline_reminder",
+            {
+              announcementId,
+              category,
+              deadline: deadlineLocal.toISOString(),
+              message,
+              daysUntilDeadline: 3,
+              reminderDate: reminderDateKey,
             }
-          }
+          );
 
-          totalNotificationsCreated += allUserIds.length;
+          totalNotificationsCreated += notificationsCreated;
           processedAnnouncements.push({
             id: announcementId,
             category,
             deadline: deadlineLocal.toISOString(),
-            notificationsSent: allUserIds.length,
+            notificationsSent: notificationsCreated,
           });
 
-          // 🔹 Send FCM notifications
-          if (typeof sendFCMNotifications === "function") {
+          if (notificationsCreated > 0) {
             const fcmData = {
               type: "deadline_reminder",
               announcementId,
@@ -551,20 +537,12 @@ export const checkUpcomingDeadlines = onSchedule(
         }
       }
 
-      // Commit remaining notifications
-      if (batchCount > 0 && batchCount % 500 !== 0) {
-        await masterBatch.commit();
-      }
-
       console.log(
         `✅ Done. Created ${totalNotificationsCreated} notifications in total.`
       );
       console.log("📊 Processed announcements:", processedAnnouncements);
-
-      // Successfully complete the function (returns Promise<void>)
     } catch (error) {
       console.error("❌ Error checking deadlines:", error);
-      // Throwing the error signals failure to the Cloud Functions runtime
       throw error;
     }
   }
@@ -572,65 +550,70 @@ export const checkUpcomingDeadlines = onSchedule(
 
 export const cleanupDuplicateNotifications = onSchedule(
   {
-    schedule: "0 3 * * *", // Run at 3 AM daily
-
+    schedule: "0 3 * * *",
     timeZone: "Asia/Manila",
-
     region: "us-central1",
   },
-
   async (event) => {
     try {
       console.log("🧹 Checking for duplicate notifications...");
 
       const notifications = await db
-
         .collection("notifications")
-
         .orderBy("createdAt", "desc")
-
         .get();
 
-      const seen = new Map<string, string>(); // key: userId-announcementId-type, value: docId
-
+      const seen = new Map<string, string>();
       const toDelete: string[] = [];
 
       notifications.forEach((doc) => {
         const data = doc.data();
-
         const userId = data.userId;
-
         const announcementId = data.data?.announcementId || data.announcementId;
-
+        const escalationId = data.data?.escalationId || data.escalationId;
         const type = data.type;
+        const reminderDate = data.data?.reminderDate;
 
+        let key = `${userId}-${type}`;
         if (announcementId) {
-          const key = `${userId}-${announcementId}-${type}`;
+          key += `-${announcementId}`;
+        } else if (escalationId) {
+          key += `-${escalationId}`;
+        }
+        if (reminderDate) {
+          key += `-${reminderDate}`;
+        }
 
-          if (seen.has(key)) {
-            // This is a duplicate
-
-            toDelete.push(doc.id);
-
-            console.log(
-              `🗑️ Duplicate found: ${doc.id} (user: ${userId}, announcement: ${announcementId})`
-            );
-          } else {
-            seen.set(key, doc.id);
-          }
+        if (seen.has(key)) {
+          toDelete.push(doc.id);
+          console.log(
+            `🗑️ Duplicate found: ${doc.id} (user: ${userId}, type: ${type})`
+          );
+        } else {
+          seen.set(key, doc.id);
         }
       });
 
       if (toDelete.length > 0) {
         console.log(`🗑️ Deleting ${toDelete.length} duplicate notifications`);
 
-        const batch = db.batch();
+        let batch = db.batch();
+        let batchCount = 0;
 
         toDelete.forEach((docId) => {
           batch.delete(db.collection("notifications").doc(docId));
+          batchCount++;
+
+          if (batchCount >= 500) {
+            batch.commit();
+            batch = db.batch();
+            batchCount = 0;
+          }
         });
 
-        await batch.commit();
+        if (batchCount > 0) {
+          await batch.commit();
+        }
 
         console.log(`✅ Deleted ${toDelete.length} duplicates`);
       } else {
@@ -650,8 +633,9 @@ export const cleanupOldNotifications = onSchedule(
   },
   async (event) => {
     try {
-      console.log("🧹 Cleaning up old notifications...");
+      console.log("🧹 Cleaning up old notifications and idempotency records...");
 
+      // Clean old notifications (30 days)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -661,23 +645,43 @@ export const cleanupOldNotifications = onSchedule(
         .limit(500)
         .get();
 
-      if (oldNotificationsSnapshot.empty) {
+      if (!oldNotificationsSnapshot.empty) {
+        const batch = db.batch();
+        oldNotificationsSnapshot.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log(
+          `✅ Deleted ${oldNotificationsSnapshot.size} old notifications`
+        );
+      } else {
         console.log("ℹ️ No old notifications to delete");
-        return;
       }
 
-      const batch = db.batch();
-      oldNotificationsSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
+      // Clean old idempotency records (7 days)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      await batch.commit();
+      const oldProcessingSnapshot = await db
+        .collection("notification_processing")
+        .where("processedAt", "<", sevenDaysAgo)
+        .limit(500)
+        .get();
 
-      console.log(
-        `✅ Deleted ${oldNotificationsSnapshot.size} old notifications`
-      );
+      if (!oldProcessingSnapshot.empty) {
+        const batch = db.batch();
+        oldProcessingSnapshot.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log(
+          `✅ Deleted ${oldProcessingSnapshot.size} old idempotency records`
+        );
+      } else {
+        console.log("ℹ️ No old idempotency records to delete");
+      }
     } catch (error) {
-      console.error("Error cleaning up notifications:", error);
+      console.error("Error cleaning up:", error);
     }
   }
 );
@@ -822,7 +826,6 @@ export const onEscalationReplied = onDocumentUpdated(
         return;
       }
 
-      // Detect if a new reply or resolution has occurred
       const hasNewReply =
         (afterData.staffResponse && !beforeData.staffResponse) ||
         (afterData.status === "resolved" &&
@@ -841,14 +844,13 @@ export const onEscalationReplied = onDocumentUpdated(
       const staffResponse = afterData.staffResponse || null;
       const adminResponse = afterData.adminResponse || null;
       const conversationId = afterData.conversationId || null;
-      const responderRole = afterData.respondedByRole || "staff"; // optional field to determine who replied
+      const responderRole = afterData.respondedByRole || "staff";
 
       if (!userId) {
         console.log("No userId found in escalation");
         return;
       }
 
-      // Determine notification title and message based on responder
       const notificationTitle =
         responderRole === "admin"
           ? "Admin Response to Your Escalation"
@@ -862,7 +864,6 @@ export const onEscalationReplied = onDocumentUpdated(
           ? adminResponse || "Admin has responded."
           : staffResponse || "Staff has responded.";
 
-      // Create Firestore notification
       await createNotificationsForUsers(
         [userId],
         "user",
@@ -878,7 +879,6 @@ export const onEscalationReplied = onDocumentUpdated(
         }
       );
 
-      // Send FCM push notification
       await sendFCMNotifications(
         [userId],
         notificationTitle,

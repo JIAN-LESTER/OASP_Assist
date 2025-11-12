@@ -449,15 +449,22 @@ Future<void> _initializeConversationId() async {
     _selectedIndex = index;
     _isBottomNavExpanded = true;
 
-    // ✅ FIX: Only show FAQs if no active conversation exists
+    // ✅ FIX: Show FAQs logic
     if (index == 1) {
-      if (_conversationId == null || _conversationId!.isEmpty) {
+      // Check UserConstant flag first
+      if (UserConstant.shouldShowFAQs) {
+        _showFAQs = true;
+        print('📱 Chat tab: shouldShowFAQs flag is true');
+      } else if (_conversationId == null || _conversationId!.isEmpty) {
         _showFAQs = true;
         print('📱 Chat tab: No conversation, showing FAQs');
       } else {
         _showFAQs = false;
         print('📱 Chat tab: Has conversation $_conversationId, hiding FAQs');
       }
+      
+      // Reset the flag after checking
+      UserConstant.shouldShowFAQs = false;
     } else {
       _showFAQs = false;
     }
@@ -465,7 +472,6 @@ Future<void> _initializeConversationId() async {
   
   _startBottomNavTimer();
 
-  // ✅ FIX: Don't create conversation on navigation, just check status
   if (index == 1) {
     print('📱 Navigated to chat tab');
     print('   - Current conversation: $_conversationId');
@@ -484,26 +490,47 @@ Future<void> _initializeConversationId() async {
     });
   }
 
-  void _onNewChatPressed() async {
-  print('🆕 Creating new chat...');
+ void _onNewChatPressed() async {
+  print('🆕 New Chat button pressed');
+  print('   - Current index: $_selectedIndex');
   
-  setState(() {
-    _selectedIndex = 1;
-    _showFAQs = true; // Show FAQs for new chat
-    _conversationId = null; // ✅ Clear old conversation ID
-  });
+  HapticFeedback.mediumImpact();
 
-  await UserConstant.startNewChat(context, null, false);
-
-  final newId = UserConstant.selectedConversationId;
-  if (newId != null) {
+  // ✅ STEP 1: Navigate to chat tab FIRST
+  if (_selectedIndex != 1) {
     setState(() {
-      _conversationId = newId;
+      _selectedIndex = 1;
+      _tabController.index = 1;
     });
-    print('✅ New chat created: $newId');
+    
+    // Small delay to ensure UI updates
+    await Future.delayed(Duration(milliseconds: 100));
+  }
+
+  // ✅ STEP 2: Clear and create new chat
+  if (mounted) {
+    // Clear current state
+    setState(() {
+      _showFAQs = true; // Show FAQs immediately
+      _conversationId = null;
+      _pendingConversationId = null;
+    });
+
+    // Create new chat
+    await UserConstant.startNewChat(context, null, false);
+
+    // Update with the new conversation ID
+    final newId = UserConstant.selectedConversationId;
+    if (newId != null && mounted) {
+      setState(() {
+        _conversationId = newId;
+        _pendingConversationId = newId;
+        _showFAQs = true; // Ensure FAQs stay visible
+      });
+      print('✅ New chat created: $newId with FAQs visible');
+    }
   }
 }
-
 
 
   Future<void> _handleChatNavigation() async {
@@ -845,51 +872,52 @@ Future<void> _initializeConversationId() async {
     );
   }
 
-  Widget _buildTabletDesktopLayout(List<Widget> pages) {
-    return Scaffold(
-      backgroundColor: UniversalUIComponents.backgroundGrey,
-      appBar: UniversalUIComponents.buildAppBar(
-        context: context,
-        userRole: UserRole.user,
-        title: _pageTitles[_selectedIndex],
-        isChatPage: _selectedIndex == 1,
-        showFAQToggle: _selectedIndex == 1,
-        showFAQs: _showFAQs,
-        showBackButton: false,
-        onFAQToggle: _toggleFAQs,
-        onLeadingPressed: _toggleSidebar,
-        hasActiveConversation: _conversationId != null,
-        // 🔑 PASS KEYS TO APP BAR
-        sidebarKey: _sidebarKey,
-        notificationKey: _notificationKey,
-        profileKey: _profileKey,
-      ),
-      body: Row(
-        children: [
-          UniversalUIComponents.buildPersistentDrawer(
-            context: context,
-            userRole: UserRole.user,
-            selectedIndex: _selectedIndex,
-            onItemTap: _onNavigationItemTap,
-            isExpanded: _isSidebarExpanded,
-            onConversationSelected: _onConversationSelected,
-          ),
-          Expanded(child: pages[_selectedIndex]),
-        ],
-      ),
-      drawer: UniversalUIComponents.buildDrawer(
-        context: context,
-        userRole: UserRole.user,
-        selectedIndex: _selectedIndex,
-        onItemTap: _onNavigationItemTap,
-        setState: setState,
-        recentConversations: UserConstant.recentConversations,
-        selectedConversationId: UserConstant.selectedConversationId,
-        onConversationSelected: _onConversationSelected,
-        onNewChat: _onNewChatPressed,
-      ),
-    );
-  }
+ Widget _buildTabletDesktopLayout(List<Widget> pages) {
+  return Scaffold(
+    backgroundColor: UniversalUIComponents.backgroundGrey,
+    appBar: UniversalUIComponents.buildAppBar(
+      context: context,
+      userRole: UserRole.user,
+      title: _pageTitles[_selectedIndex],
+      isChatPage: _selectedIndex == 1,
+      showFAQToggle: _selectedIndex == 1,
+      showFAQs: _showFAQs,
+      showBackButton: false,
+      onFAQToggle: _toggleFAQs,
+      onLeadingPressed: _toggleSidebar,
+      hasActiveConversation: _conversationId != null,
+      sidebarKey: _sidebarKey,
+      notificationKey: _notificationKey,
+      profileKey: _profileKey,
+    ),
+    body: Row(
+      children: [
+        UniversalUIComponents.buildPersistentDrawer(
+          context: context,
+          userRole: UserRole.user,
+          selectedIndex: _selectedIndex,
+          onItemTap: _onNavigationItemTap,
+          isExpanded: _isSidebarExpanded,
+          onConversationSelected: _onConversationSelected,
+          onNewChat: _onNewChatPressed, // ✅ ADD THIS
+        ),
+        Expanded(child: pages[_selectedIndex]),
+      ],
+    ),
+    drawer: UniversalUIComponents.buildDrawer(
+      context: context,
+      userRole: UserRole.user,
+      selectedIndex: _selectedIndex,
+      onItemTap: _onNavigationItemTap,
+      setState: setState,
+      recentConversations: UserConstant.recentConversations,
+      selectedConversationId: UserConstant.selectedConversationId,
+      onConversationSelected: _onConversationSelected,
+      onNewChat: _onNewChatPressed,
+    ),
+  );
+}
+
   Widget _buildBottomNavigationBar() {
     int getActualIndex() {
       if (_selectedIndex == 0) return 0;

@@ -1,3 +1,4 @@
+import 'package:capstone_project/pages/data/charts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:capstone_project/modal_pages/pl_info.dart';
 
@@ -643,6 +644,59 @@ Widget _buildHeader(
             ],
           ),
           SizedBox(height: isMobile ? 16 : 20),
+                 Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: isMobile
+                ? Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    children: [
+                      buildStatCard('Total Users', '59', Colors.blue, Icons.message),
+                      buildStatCard('Active Users', '58', Colors.green, Icons.check_circle),
+                      buildStatCard('New Users (This Month)', '26', Colors.red, Icons.group),
+                      buildStatCard('Users Logged in Today', 'General', Colors.orange, Icons.help_outline),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: buildStatCard(
+                          'Total Users',
+                          '59',
+                          Colors.blue,
+                          Icons.message,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
+                          'Active Users',
+                          '58',
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
+                          'New Users (This Month)',
+                          '26',
+                          Colors.red,
+                          Icons.group,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
+                          'Users Logged in Today',
+                          'General',
+                          Colors.orange,
+                          Icons.help_outline,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
 
           // Search and Filter Row
           isMobile

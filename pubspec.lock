@@ -604,10 +604,10 @@ packages:
     dependency: "direct main"
     description:
       name: google_speech
-      sha256: "4df9ffc46a3fa042e2e3b9466d50461b778dfbdb7e47d673efe421ce28da72bb"
+      sha256: "8951d58806df1a2836cebbb48cdddb91d0118a7a8b2fa4a95412ad4fbc2c1aff"
       url: "https://pub.dev"
     source: hosted
-    version: "5.3.0"
+    version: "4.4.0"
   googleapis_auth:
     dependency: transitive
     description:
@@ -1017,7 +1017,7 @@ packages:
     source: hosted
     version: "3.0.2"
   rxdart:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: rxdart
       sha256: "0c7c0cedd93788d996e33041ffecda924cc54389199cde4e6a34b440f50044cb"
@@ -1221,6 +1221,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.4"
+  timeago:
+    dependency: "direct main"
+    description:
+      name: timeago
+      sha256: b05159406a97e1cbb2b9ee4faa9fb096fe0e2dfcd8b08fcd2a00553450d3422e
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.7.1"
   timezone:
     dependency: transitive
     description:
