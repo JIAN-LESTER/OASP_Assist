@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:capstone_project/models/message.dart';
 import 'package:capstone_project/onboarding/onBoardingGuide.dart';
 import 'package:circle_nav_bar/circle_nav_bar.dart' show CircleNavBar;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -25,17 +26,29 @@ import 'package:capstone_project/services/cohere_service.dart';
 class UserMainPage extends StatefulWidget {
   final int? initialTabIndex;
   final String? conversationId;
+  final bool? loadExisting;
+  final bool? fromNotification;
 
-  const UserMainPage({super.key, this.initialTabIndex, this.conversationId});
+  const UserMainPage({
+    Key? key,
+    this.initialTabIndex,
+    this.conversationId,
+    this.loadExisting,
+    this.fromNotification,
+  }) : super(key: key);
 
   @override
   State<UserMainPage> createState() => _UserMainPageState();
 }
 
-class _UserMainPageState extends State<UserMainPage> {
+class _UserMainPageState extends State<UserMainPage> with TickerProviderStateMixin {
   int _selectedIndex = 0;
+  int _currentIndex = 0;
+  late TabController _tabController;
   bool _isChatSidebarExpanded = true;
   bool _isBottomNavExpanded = true;
+  String? _pendingConversationId;
+  bool? loadExistingConversation;
 
   // 🔑 Onboarding Keys
   final GlobalKey _sidebarKey = GlobalKey();
@@ -67,22 +80,45 @@ class _UserMainPageState extends State<UserMainPage> {
     });
   }
 
- @override
+  @override
 void initState() {
   super.initState();
+  
+  // Initialize controllers
+  _currentIndex = widget.initialTabIndex ?? 0;
+  _selectedIndex = _currentIndex;
+  _tabController = TabController(
+    length: 5,
+    vsync: this,
+    initialIndex: _currentIndex,
+  );
+  
+  // Store the conversation ID if provided
+  _pendingConversationId = widget.conversationId;
+  loadExistingConversation = widget.loadExisting ?? false;
+  
+  print('🏠 UserMainPage initialized:');
+  print('   - Initial tab: $_currentIndex');
+  print('   - Conversation ID: $_pendingConversationId');
+  print('   - Load existing: $loadExistingConversation');
+  print('   - From notification: ${widget.fromNotification}');
+  
+  _tabController.addListener(() {
+    if (_tabController.indexIsChanging) {
+      setState(() {
+        _currentIndex = _tabController.index;
+      });
+    }
+  });
 
-  _selectedIndex = widget.initialTabIndex ?? 0;
-
-  print('🎯 UserMainPage initialized with:');
-  print('   - initialTabIndex: ${widget.initialTabIndex}');
-  print('   - conversationId: ${widget.conversationId}');
-
-  // ✅ CRITICAL FIX: Properly handle passed conversationId
-  if (widget.conversationId != null && widget.conversationId!.isNotEmpty) {
-    print('✅ Initializing with passed conversation');
+  // ✅ FIX: Only load conversation if passed, don't create new one
+  if (widget.conversationId != null && 
+      widget.conversationId!.isNotEmpty && 
+      widget.conversationId != 'null') {
+    print('✅ Initializing with passed conversation: ${widget.conversationId}');
     _conversationId = widget.conversationId;
     _initFuture = _loadExistingConversation(widget.conversationId!);
-    _showFAQs = false;
+    _showFAQs = false; // Never show FAQs when loading from notification
   } else {
     print('ℹ️ No conversation passed, looking for active conversation');
     _initFuture = _initializeConversationId();
@@ -91,24 +127,61 @@ void initState() {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     UserConstant.initializeChatSession(context, setState);
 
-    // Only create new conversation if no conversationId was passed
-    if (_selectedIndex == 1 && widget.conversationId == null) {
-      _handleChatNavigation();
+    // ✅ FIX: Don't create new conversation on navigation
+    // Only handle chat navigation if we're on chat tab and have a conversation
+    if (_selectedIndex == 1 && _conversationId != null) {
+      print('📱 Already on chat tab with conversation: $_conversationId');
     }
   });
 }
 
   bool _handledInitialArgs = false;
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
+  
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
 
-    if (!_handledInitialArgs) {
-      final args =
-          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      if (args != null && args['initialTab'] != null) {
-        final initialTab = args['initialTab'] as int;
+  if (!_handledInitialArgs) {
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    
+    if (args != null) {
+      print('📍 Route arguments in didChangeDependencies: $args');
+      
+      final initialTab = args['initialTab'] as int?;
+      final conversationId = args['conversationId'] as String?;
+      final loadExisting = args['loadExisting'] as bool?;
+      
+      // ✅ CRITICAL: Handle conversation ID from notification
+      if (conversationId != null && conversationId.isNotEmpty && conversationId != 'null') {
+        print('✅ Received conversationId from route: $conversationId');
+        print('✅ LoadExisting flag: $loadExisting');
+        
+        setState(() {
+          _pendingConversationId = conversationId;
+          loadExistingConversation = loadExisting ?? true;
+          _conversationId = conversationId; // ✅ Set this immediately
+          _showFAQs = false; // ✅ Never show FAQs when loading from notification
+          
+          if (initialTab != null) {
+            _selectedIndex = initialTab;
+          }
+        });
+        
+        // ✅ Load the conversation immediately
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          print('🔄 Loading conversation from notification: $conversationId');
+          await _loadExistingConversation(conversationId);
+          
+          // ✅ Navigate to chat tab if not already there
+          if (_selectedIndex != 1) {
+            setState(() {
+              _selectedIndex = 1;
+            });
+          }
+        });
+      } else if (initialTab != null) {
+        // Handle normal tab navigation
         setState(() {
           _selectedIndex = initialTab;
         });
@@ -119,13 +192,40 @@ void initState() {
           });
         }
       }
-      _handledInitialArgs = true;
     }
+    _handledInitialArgs = true;
   }
+}
 
-Future<void> _loadExistingConversation(String conversationId) async {
+  Future<void> _loadExistingConversation(String conversationId) async {
   try {
     print('📥 Loading existing conversation: $conversationId');
+
+    // Verify conversation exists
+    final convDoc = await _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .get();
+    
+    if (!convDoc.exists) {
+      print('❌ Conversation not found: $conversationId');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Conversation not found'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() {
+          _showFAQs = true;
+          _conversationId = null;
+          _pendingConversationId = null;
+        });
+      }
+      return;
+    }
+
+    print('✅ Conversation exists, loading...');
 
     // Update the global state
     await UserConstant.setSelectedConversation(conversationId);
@@ -135,31 +235,157 @@ Future<void> _loadExistingConversation(String conversationId) async {
     await chatProvider.setConversationId(conversationId);
 
     // Wait for messages to load
-    await Future.delayed(Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 800));
 
-    // ✅ CRITICAL: Always hide FAQs when loading from notification
-    setState(() {
-      _showFAQs = false; // Never show FAQs when coming from notification
-    });
+    print('✅ Messages loaded: ${chatProvider.messages.length}');
 
-    print('✅ Conversation loaded. Messages: ${chatProvider.messages.length}');
+    // ✅ CRITICAL: Check for escalation responses and add them to chat
+    await _checkAndAddEscalationResponses(conversationId, chatProvider);
+
+    // ✅ Always hide FAQs when loading from notification
+    if (mounted) {
+      setState(() {
+        _showFAQs = false;
+        _conversationId = conversationId;
+        _pendingConversationId = conversationId;
+      });
+    }
+
+    print('✅ Conversation fully loaded with ${chatProvider.messages.length} messages');
   } catch (e) {
     print('❌ Error loading conversation: $e');
-    setState(() {
-      _showFAQs = true;
-    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading conversation: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() {
+        _showFAQs = true;
+        _conversationId = null;
+        _pendingConversationId = null;
+      });
+    }
   }
 }
+
+ Future<void> _checkAndAddEscalationResponses(
+  String conversationId,
+  ChatProvider chatProvider,
+) async {
+  try {
+    print('🔍 Checking for escalation responses in conversation: $conversationId');
+    
+    final escalationsSnapshot = await _firestore
+        .collection('escalations')
+        .where('conversationId', isEqualTo: conversationId)
+        .where('status', isEqualTo: 'resolved')
+        .get();
+    
+    if (escalationsSnapshot.docs.isEmpty) {
+      print('ℹ️ No resolved escalations found');
+      return;
+    }
+    
+    print('✅ Found ${escalationsSnapshot.docs.length} resolved escalations');
+    
+    for (var escalationDoc in escalationsSnapshot.docs) {
+      final escalation = escalationDoc.data();
+      final staffResponse = escalation['staffResponse'] as String?;
+      final respondedBy = escalation['respondedBy'] as String? ?? 'Staff';
+      final messageId = escalation['messageId'] as String?;
+      final escalationId = escalationDoc.id;
+      
+      if (staffResponse == null || staffResponse.isEmpty) {
+        print('⚠️ Escalation $escalationId has no staff response');
+        continue;
+      }
+      
+      // ✅ CRITICAL FIX: Check Firestore first, not just memory
+      final existingStaffMessages = await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages')
+          .where('sender', isEqualTo: 'staff')
+          .where('content', isEqualTo: '**Staff Response from $respondedBy:**\n\n$staffResponse')
+          .limit(1)
+          .get();
+      
+      if (existingStaffMessages.docs.isNotEmpty) {
+        print('ℹ️ Staff response already exists in Firestore for escalation $escalationId');
+        continue;
+      }
+      
+      print('📝 Adding staff response to chat for escalation $escalationId');
+      
+      final staffMessageRef = _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages')
+          .doc();
+      
+      final staffMessage = Message(
+        id: staffMessageRef.id,
+        conversationId: conversationId,
+        content: '**Staff Response from $respondedBy:**\n\n$staffResponse',
+        sender: 'staff',
+        status: 'sent',
+        type: 'text',
+        sentAt: DateTime.now(),
+      );
+      
+      await chatProvider.saveMessageToFirebase(
+        conversationId,
+        staffMessage,
+      );
+      
+      if (messageId != null && messageId.isNotEmpty) {
+        try {
+          await _firestore
+              .collection('conversations')
+              .doc(conversationId)
+              .collection('messages')
+              .doc(messageId)
+              .update({
+            'escalationResolved': true,
+            'escalationResponse': staffResponse,
+            'escalationRespondedBy': respondedBy,
+            'escalationRespondedAt': Timestamp.now(),
+            'escalationId': escalationId,
+          });
+          
+          print('✅ Updated original message $messageId with escalation response');
+        } catch (e) {
+          print('⚠️ Could not update original message: $e');
+        }
+      }
+    }
+    
+    await chatProvider.loadExistingMessages();
+    
+  } catch (e) {
+    print('❌ Error checking escalation responses: $e');
+  }
+}
+
 
 Future<void> _initializeConversationId() async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
 
   try {
-    // ✅ CRITICAL: Check if we have a conversationId passed from navigation
-    if (widget.conversationId != null && widget.conversationId!.isNotEmpty) {
+    // ✅ Check if we already have a conversationId from widget/navigation
+    if (_conversationId != null && _conversationId!.isNotEmpty) {
+      print('✅ Already have conversationId: $_conversationId, skipping initialization');
+      return;
+    }
+
+    // ✅ Check if we have a conversationId passed from navigation
+    if (widget.conversationId != null && 
+        widget.conversationId!.isNotEmpty && 
+        widget.conversationId != 'null') {
       print('✅ Using passed conversationId: ${widget.conversationId}');
-      
 
       final convDoc = await _firestore
           .collection('conversations')
@@ -170,22 +396,22 @@ Future<void> _initializeConversationId() async {
         print('✅ Conversation exists, loading it');
         setState(() {
           _conversationId = widget.conversationId;
+          _pendingConversationId = widget.conversationId;
         });
         
-        // Load the conversation immediately
         await _loadExistingConversation(widget.conversationId!);
-        return; // Exit early - don't look for other conversations
+        return;
       } else {
         print('⚠️ Passed conversationId not found, falling back to active conversation');
       }
     }
-
 
     print('🔍 Looking for active conversations...');
     final activeConversations = await _firestore
         .collection('conversations')
         .where('userId', isEqualTo: user.uid)
         .where('status', isEqualTo: 'active')
+        .orderBy('lastActivity', descending: true)
         .limit(1)
         .get();
 
@@ -193,18 +419,21 @@ Future<void> _initializeConversationId() async {
       print('✅ Found active conversation: ${activeConversations.docs.first.id}');
       setState(() {
         _conversationId = activeConversations.docs.first.id;
+        _pendingConversationId = activeConversations.docs.first.id;
+        _showFAQs = false; // ✅ Hide FAQs if we have an active conversation
       });
     } else {
       print('ℹ️ No active conversations found');
       setState(() {
         _conversationId = null;
+        _pendingConversationId = null;
+        _showFAQs = true; // ✅ Show FAQs if no conversation
       });
     }
   } catch (e) {
-    print('❌ Error loading conversation: $e');
+    print('❌ Error in _initializeConversationId: $e');
   }
 }
-
 
   final List<String> _pageTitles = const [
     'Home',
@@ -216,27 +445,33 @@ Future<void> _initializeConversationId() async {
   ];
 
   void _onNavigationItemTap(int index) {
-    setState(() {
-      _selectedIndex = index;
+  setState(() {
+    _selectedIndex = index;
+    _isBottomNavExpanded = true;
 
-      _isBottomNavExpanded = true;
-
-      if (index == 1) {
-        if (_conversationId == null) {
-          _showFAQs = true;
-        } else {
-          _showFAQs = false;
-        }
+    // ✅ FIX: Only show FAQs if no active conversation exists
+    if (index == 1) {
+      if (_conversationId == null || _conversationId!.isEmpty) {
+        _showFAQs = true;
+        print('📱 Chat tab: No conversation, showing FAQs');
       } else {
         _showFAQs = false;
+        print('📱 Chat tab: Has conversation $_conversationId, hiding FAQs');
       }
-    });
-    _startBottomNavTimer();
-
-    if (index == 1) {
-      _handleChatNavigation();
+    } else {
+      _showFAQs = false;
     }
+  });
+  
+  _startBottomNavTimer();
+
+  // ✅ FIX: Don't create conversation on navigation, just check status
+  if (index == 1) {
+    print('📱 Navigated to chat tab');
+    print('   - Current conversation: $_conversationId');
+    print('   - Show FAQs: $_showFAQs');
   }
+}
 
   void _startBottomNavTimer() {
     _bottomNavTimer?.cancel();
@@ -250,20 +485,26 @@ Future<void> _initializeConversationId() async {
   }
 
   void _onNewChatPressed() async {
+  print('🆕 Creating new chat...');
+  
+  setState(() {
+    _selectedIndex = 1;
+    _showFAQs = true; // Show FAQs for new chat
+    _conversationId = null; // ✅ Clear old conversation ID
+  });
+
+  await UserConstant.startNewChat(context, null, false);
+
+  final newId = UserConstant.selectedConversationId;
+  if (newId != null) {
     setState(() {
-      _selectedIndex = 1;
-      _showFAQs = true;
+      _conversationId = newId;
     });
-
-    await UserConstant.startNewChat(context, null, false);
-
-    final newId = UserConstant.selectedConversationId;
-    if (newId != null) {
-      setState(() {
-        _conversationId = newId;
-      });
-    }
+    print('✅ New chat created: $newId');
   }
+}
+
+
 
   Future<void> _handleChatNavigation() async {
     try {
@@ -281,59 +522,57 @@ Future<void> _initializeConversationId() async {
     }
   }
 
-  void _onConversationSelected(
-    BuildContext context,
-    String? conversationId,
-  ) async {
-    if (conversationId == null) return;
+ void _onConversationSelected(
+  BuildContext context,
+  String? conversationId,
+) async {
+  if (conversationId == null) return;
 
-    print('DEBUG: Conversation selected: $conversationId');
+  print('📝 Conversation selected: $conversationId');
 
-    try {
-      // IMMEDIATE UPDATE: Switch to chat page first with new conversation ID
-      if (mounted) {
-        setState(() {
-          _selectedIndex = 1;
-          _conversationId = conversationId;
-        });
-      }
+  try {
+    // IMMEDIATE UPDATE: Switch to chat page first with new conversation ID
+    if (mounted) {
+      setState(() {
+        _selectedIndex = 1;
+        _conversationId = conversationId;
+        _showFAQs = false; // ✅ Hide FAQs when loading existing conversation
+      });
+    }
 
-      // Update the global state
-      await UserConstant.setSelectedConversation(conversationId);
+    // Update the global state
+    await UserConstant.setSelectedConversation(conversationId);
 
-      // Load the conversation in the chat provider
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      await chatProvider.setConversationId(conversationId);
+    // Load the conversation in the chat provider
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    await chatProvider.setConversationId(conversationId);
 
-      // Wait for messages to load completely
-      await Future.delayed(Duration(milliseconds: 500));
+    // Wait for messages to load completely
+    await Future.delayed(Duration(milliseconds: 500));
 
-      // Check if conversation has messages
-      final hasMessages = chatProvider.messages.isNotEmpty;
+    // Check if conversation has messages
+    final hasMessages = chatProvider.messages.isNotEmpty;
 
-      print('DEBUG: Messages loaded: ${chatProvider.messages.length}');
-      print('DEBUG: Has messages: $hasMessages');
-      print('DEBUG: Should show FAQs: ${!hasMessages}');
+    print('✅ Messages loaded: ${chatProvider.messages.length}');
+    print('✅ Has messages: $hasMessages');
 
-      // Update FAQ state after loading is complete
-      if (mounted) {
-        setState(() {
-          _showFAQs = !hasMessages;
-        });
+    // Update FAQ state after loading is complete
+    if (mounted) {
+      setState(() {
+        _showFAQs = !hasMessages;
+      });
 
-        print(
-          'DEBUG: FAQ state updated. Show FAQs: $_showFAQs (Messages count: ${chatProvider.messages.length})',
-        );
-      }
-    } catch (e) {
-      print('DEBUG: Error selecting conversation: $e');
-      if (mounted) {
-        setState(() {
-          _showFAQs = true;
-        });
-      }
+      print('✅ FAQ state updated. Show FAQs: $_showFAQs');
+    }
+  } catch (e) {
+    print('❌ Error selecting conversation: $e');
+    if (mounted) {
+      setState(() {
+        _showFAQs = true;
+      });
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -346,18 +585,19 @@ Future<void> _initializeConversationId() async {
           );
         }
 
-        final List<Widget> _pages = [
-          const HomeDashboard(),
-          ChatPage(
-            conversationId: _conversationId ?? '',
-            showFAQs: _showFAQs,
-            onFAQToggle: _toggleFAQs,
-          ),
-          const UserAnnouncementPage(),
-          const AdmissionInfo(),
-          const ScholarshipList(),
-          const PlacementInfo(),
-        ];
+       final List<Widget> _pages = [
+  const HomeDashboard(),
+  ChatPage(
+    conversationId: _conversationId ?? _pendingConversationId ?? '',
+    showFAQs: _showFAQs,
+    onFAQToggle: _toggleFAQs,
+    key: ValueKey(_conversationId ?? _pendingConversationId), // ✅ Force rebuild when conversation changes
+  ),
+  const UserAnnouncementPage(),
+  const AdmissionInfo(),
+  const ScholarshipList(),
+  const PlacementInfo(),
+];
 
         // WRAPPED WITH ONBOARDING GUIDE
         return OnboardingGuide(
@@ -650,7 +890,6 @@ Future<void> _initializeConversationId() async {
       ),
     );
   }
-
   Widget _buildBottomNavigationBar() {
     int getActualIndex() {
       if (_selectedIndex == 0) return 0;

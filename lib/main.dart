@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:capstone_project/pages/admin_pages/admin_main_page.dart';
 import 'package:capstone_project/pages/staff_pages/human_escalation.dart';
+import 'package:capstone_project/pages/staff_pages/staff_main_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:capstone_project/auth_pages/auth_page.dart';
@@ -73,13 +75,45 @@ class NotificationNavigationHandler {
     }
   }
 
-  void _navigateToEscalationDetail(BuildContext context, Map<String, dynamic> data) {
-    final escalationId = data['escalationId'];
-    if (escalationId == null || escalationId.isEmpty) {
-      print('⚠️ No escalation ID provided');
-      return;
-    }
+  void _navigateToEscalationDetail(BuildContext context, Map<String, dynamic> data) async {
+  final escalationId = data['escalationId'];
+  if (escalationId == null || escalationId.isEmpty) {
+    print('⚠️ No escalation ID provided');
+    return;
+  }
 
+  // ✅ Determine if user is staff or admin
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    print('⚠️ No user logged in');
+    return;
+  }
+
+  try {
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    
+    final role = userDoc.data()?['role'] ?? 'user';
+    
+    // ✅ Route based on role
+    final route = role == 'admin' ? '/admin/home' : '/staff/home';
+    final tabIndex = role == 'admin' ? 5 : 2; // Adjust based on your admin tab structure
+    
+    print('📍 Navigating $role to escalations (route: $route, tab: $tabIndex)');
+    
+    Navigator.of(context).pushNamed(
+      route,
+      arguments: {
+        'initialTab': tabIndex,
+        'escalationId': escalationId,
+        'autoOpen': true,
+      },
+    );
+  } catch (e) {
+    print('❌ Error determining user role: $e');
+    // Fallback to staff route
     Navigator.of(context).pushNamed(
       '/staff/escalations',
       arguments: {
@@ -88,9 +122,10 @@ class NotificationNavigationHandler {
       },
     );
   }
+}
 
 Future<void> _showEscalationResponse(BuildContext context, Map<String, dynamic> data) async {
-  final escalationId = data['escalationId']; // ✅ Not relatedId
+  final escalationId = data['escalationId'] ?? data['relatedId'];
   
   print('🔍 DEBUG: escalationId = $escalationId');
   print('🔍 DEBUG: data keys = ${data.keys}');
@@ -101,6 +136,7 @@ Future<void> _showEscalationResponse(BuildContext context, Map<String, dynamic> 
   }
 
   try {
+    // Show loading indicator
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -109,13 +145,13 @@ Future<void> _showEscalationResponse(BuildContext context, Map<String, dynamic> 
       ),
     );
 
-    // ✅ CRITICAL FIX: Use doc() directly
+    // Fetch escalation document by ID
     final escalationDoc = await FirebaseFirestore.instance
         .collection('escalations')
-        .doc(escalationId) // ✅ Fetch by document ID
+        .doc(escalationId)
         .get();
 
-    if (context.mounted) Navigator.of(context).pop();
+    if (context.mounted) Navigator.of(context).pop(); // Close loading
 
     if (!escalationDoc.exists) {
       _showErrorDialog(context, 'Escalation not found');
@@ -123,125 +159,142 @@ Future<void> _showEscalationResponse(BuildContext context, Map<String, dynamic> 
     }
 
     final escalation = escalationDoc.data()!;
-      final staffResponse = escalation['staffResponse'] ?? 'No response yet';
-      final respondedBy = escalation['respondedBy'] ?? 'Staff';
-      final respondedAt = escalation['respondedAt'] as Timestamp?;
-      final userQuestion = escalation['question'] ?? 'No question available';
-      final conversationId = escalation['conversationId'] as String?;
+    final staffResponse = escalation['staffResponse'] ?? 'No response yet';
+    final respondedBy = escalation['respondedBy'] ?? 'Staff';
+    final respondedAt = escalation['respondedAt'] as Timestamp?;
+    final userQuestion = escalation['question'] ?? 'No question available';
+    final conversationId = escalation['conversationId'] as String?;
 
-      if (!context.mounted) return;
+    if (!context.mounted) return;
 
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
+    // ✅ Show the dialog and wait for result
+    final shouldNavigate = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2E7D32).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.support_agent, color: Color(0xFF2E7D32), size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Staff Response', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                  if (respondedAt != null)
+                    Text(
+                      _formatTimestamp(respondedAt.toDate()),
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.normal),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2E7D32).withOpacity(0.1),
+                  color: Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
                 ),
-                child: const Icon(Icons.support_agent, color: Color(0xFF2E7D32), size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Staff Response', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                    if (respondedAt != null)
-                      Text(
-                        _formatTimestamp(respondedAt.toDate()),
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.normal),
-                      ),
+                    Row(
+                      children: [
+                        Icon(Icons.question_answer, size: 16, color: Colors.grey.shade600),
+                        const SizedBox(width: 6),
+                        Text('Your Question', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(userQuestion, style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.4)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [const Color(0xFF2E7D32).withOpacity(0.1), const Color(0xFF388E3C).withOpacity(0.05)],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF2E7D32).withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.support_agent, size: 16, color: Color(0xFF2E7D32)),
+                        const SizedBox(width: 6),
+                        Text('Response from $respondedBy', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32))),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(staffResponse, style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.5)),
                   ],
                 ),
               ),
             ],
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.question_answer, size: 16, color: Colors.grey.shade600),
-                          const SizedBox(width: 6),
-                          Text('Your Question', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(userQuestion, style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.4)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [const Color(0xFF2E7D32).withOpacity(0.1), const Color(0xFF388E3C).withOpacity(0.05)],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF2E7D32).withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.support_agent, size: 16, color: Color(0xFF2E7D32)),
-                          const SizedBox(width: 6),
-                          Text('Response from $respondedBy', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32))),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(staffResponse, style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.5)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Close', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
-            ),
-            if (conversationId != null && conversationId.isNotEmpty)
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pushNamed('/chat', arguments: {'conversationId': conversationId});
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E7D32),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('View Chat', style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-          ],
         ),
-      );
-    } catch (e) {
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Close', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+          ),
+          if (conversationId != null && conversationId.isNotEmpty)
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true), // Return true
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E7D32),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('View Chat', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+        ],
+      ),
+    );
+
+    // ✅ Navigate to chat if user clicked "View Chat"
+    if (shouldNavigate == true && conversationId != null && conversationId.isNotEmpty) {
+      print('✅ Navigating to chat with conversation: $conversationId');
+      
+      if (context.mounted) {
+        Navigator.of(context).pushNamed(
+          '/home',
+          arguments: {
+            'initialTab': 1, // Chat tab
+            'conversationId': conversationId,
+            'loadExisting': true,
+          },
+        );
+      }
+    }
+  } catch (e) {
     print('❌ Error fetching escalation: $e');
-    _showErrorDialog(context, 'Failed to load response');
+    if (context.mounted) {
+      Navigator.of(context).pop(); // Close loading if still open
+      _showErrorDialog(context, 'Failed to load response');
+    }
   }
 }
 
@@ -443,14 +496,49 @@ class MyApp extends StatelessWidget {
       ),
       home: const AppInitializer(),
       routes: {
+         '/admin/home': (context) {
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    
+    print('📍 /admin/home route called');
+    print('📍 Arguments: $args');
+    
+    return AdminMainPage(
+      initialTabIndex: args?['initialTab'] as int?,
+      escalationId: args?['escalationId'] as String?,
+      conversationId: args?['conversationId'] as String?,
+      autoOpen: args?['autoOpen'] as bool? ?? false,
+    );
+  },
+
+  '/admin/escalations': (context) {
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final escalationId = args?['escalationId'] as String?;
+    final autoOpen = args?['autoOpen'] as bool? ?? false;
+    return HumanEscalation(
+      initialEscalationId: escalationId,
+      autoOpen: autoOpen,
+    );
+  },
+  
         '/onboarding': (context) => const OnboardingScreen(),
         '/userOnboarding': (context) => const UserOnboardingScreen(userId: '', userName: '',),
         '/auth': (context) => AuthPage(),
-        '/home': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-          final initialTab = args?['initialTab'] as int?;
-          return UserMainPage(initialTabIndex: initialTab);
-        },
+    '/home': (context) {
+  final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+  
+  print('🏠 /home route called with args: $args');
+  
+  final initialTab = args?['initialTab'] as int?;
+  final conversationId = args?['conversationId'] as String?;
+  final loadExisting = args?['loadExisting'] as bool?;
+  
+  return UserMainPage(
+    initialTabIndex: initialTab,
+    conversationId: conversationId,
+    loadExisting: loadExisting,
+    fromNotification: loadExisting ?? false,
+  );
+},
         '/chat': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
           final conversationId = args?['conversationId'] as String? ?? '';
@@ -467,6 +555,19 @@ class MyApp extends StatelessWidget {
         '/admission': (context) => AdmissionInfo(),
         '/scholarships': (context) => ScholarshipList(),
         '/placements': (context) => PlacementInfo(),
+        '/staff/home': (context) {
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    
+    print('📍 /staff/home route called');
+    print('📍 Arguments: $args');
+    
+    return StaffMainPage(
+      initialTabIndex: args?['initialTab'] as int?,
+      escalationId: args?['escalationId'] as String?,
+      conversationId: args?['conversationId'] as String?,
+      autoOpen: args?['autoOpen'] as bool? ?? false,
+    );
+  },
         '/staff/escalations': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
           final escalationId = args?['escalationId'] as String?;

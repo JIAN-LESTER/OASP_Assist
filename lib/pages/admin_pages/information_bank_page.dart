@@ -1,3 +1,4 @@
+import 'package:capstone_project/pages/data/charts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -318,7 +319,7 @@ Widget _buildHeader(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title and Upload Button
+          // 🔹 Title and Upload Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -346,50 +347,101 @@ Widget _buildHeader(
               UploadDocumentButton(),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
 
-          // Search and Filter Row
-          isMobile
-              ? Column(
-                children: [
-                  buildSearchField(
-                    'documents, source or category',
-                    searchController,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
+          const SizedBox(height: 20),
+
+          // 🔹 Stat Cards Section
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: isMobile
+                ? Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    children: [
+                      buildStatCard('Total Documents', '59', Colors.blue, Icons.message),
+                      buildStatCard('Most Frequent Category', '58', Colors.green, Icons.check_circle),
+                      buildStatCard('Latest Upload', '26', Colors.red, Icons.group),
+       
+                    ],
+                  )
+                : Row(
                     children: [
                       Expanded(
-                        child: CategoryDropdownButton(
-                          initialValue: selectedCategory,
-                          onChanged: onCategoryChanged,
+                        child: buildStatCard(
+                          'Total Documents',
+                          '59',
+                          Colors.blue,
+                          Icons.message,
                         ),
                       ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
+                          'Most Frequent Category',
+                          '58',
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
+                          'Latest Upload',
+                          '26',
+                          Colors.red,
+                          Icons.group,
+                        ),
+                      ),
+                     
                     ],
                   ),
-                ],
-              )
-              : Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: buildSearchField(
+          ),
+
+          const SizedBox(height: 24),
+
+          // 🔹 Search and Filter Row (below stat cards)
+          isMobile
+              ? Column(
+                  children: [
+                    buildSearchField(
                       'documents, source or category',
                       searchController,
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  CategoryDropdownButton(
-                    initialValue: selectedCategory,
-                    onChanged: onCategoryChanged,
-                  ),
-                ],
-              ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: CategoryDropdownButton(
+                            initialValue: selectedCategory,
+                            onChanged: onCategoryChanged,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: buildSearchField(
+                        'documents, source or category',
+                        searchController,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    CategoryDropdownButton(
+                      initialValue: selectedCategory,
+                      onChanged: onCategoryChanged,
+                    ),
+                  ],
+                ),
         ],
       );
     },
   );
 }
+
 
 Widget _buildTableHeader() {
   return LayoutBuilder(

@@ -1,3 +1,4 @@
+import 'package:capstone_project/pages/data/charts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
@@ -187,14 +188,15 @@ Widget mainContent(
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
-    body: SingleChildScrollView(
+    body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(searchController, context),
           const SizedBox(height: 16),
-          Container(
+          Expanded(
+          child: Container(
             height: MediaQuery.of(context).size.height - 200,
             padding: EdgeInsets.all(padding),
             decoration: BoxDecoration(
@@ -245,6 +247,7 @@ Widget mainContent(
                 ),
               ],
             ),
+          ),
           ),
         ],
       ),
@@ -494,6 +497,60 @@ Widget _buildHeader(
             ],
           ),
           SizedBox(height: isMobile ? 16 : 20),
+            Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: isMobile
+                ? Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    children: [
+                      buildStatCard('Total Messages', '59', Colors.blue, Icons.message),
+                      buildStatCard('Answered Messages', '58', Colors.green, Icons.check_circle),
+                      buildStatCard('Total Users', '26', Colors.red, Icons.group),
+                      buildStatCard('Most Frequent Category', 'General', Colors.orange, Icons.help_outline),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: buildStatCard(
+                          'Total Messages',
+                          '59',
+                          Colors.blue,
+                          Icons.message,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
+                          'Answered Messages',
+                          '58',
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
+                          'Total Users',
+                          '26',
+                          Colors.red,
+                          Icons.group,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
+                          'Most Frequent Category',
+                          'General',
+                          Colors.orange,
+                          Icons.help_outline,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+
 
           // Search Row
           buildSearchField('Search affiliations by name', searchController),

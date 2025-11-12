@@ -286,23 +286,22 @@ class UniversalUIComponents {
               title: 'Announcement',
               index: 4,
             ),
+                    MenuItem(
+              icon: Icons.announcement_outlined,
+              title: 'Human Escalation',
+              index: 5,
+            ),
+            
+
             MenuItem(
               icon: Icons.person_outline,
               title: 'User Management',
               index: -1,
               isExpandable: true,
               subItems: [
-                MenuItem(icon: Icons.groups_outlined, title: "Users", index: 5),
-                MenuItem(
-                  icon: Icons.business_outlined,
-                  title: "Affiliations",
-                  index: 11,
-                ),
-                MenuItem(
-                  icon: Icons.bookmark_outline_outlined,
-                  title: "Programs",
-                  index: 12,
-                ),
+                MenuItem(icon: Icons.person, title: "Users", index: 6),
+                MenuItem(icon: Icons.book, title: "Affiliations", index: 12),
+                MenuItem(icon: Icons.book, title: "Programs", index: 13),
               ],
             ),
             MenuItem(
@@ -314,17 +313,17 @@ class UniversalUIComponents {
                 MenuItem(
                   icon: Icons.school_outlined,
                   title: 'Admission',
-                  index: 8,
+                  index: 9,
                 ),
                 MenuItem(
                   icon: Icons.card_giftcard_outlined,
                   title: 'Scholarship',
-                  index: 9,
+                  index: 10,
                 ),
                 MenuItem(
                   icon: Icons.work_outline,
                   title: 'Placement',
-                  index: 10,
+                  index: 11,
                 ),
               ],
             ),
@@ -337,12 +336,12 @@ class UniversalUIComponents {
                 MenuItem(
                   icon: Icons.history_outlined,
                   title: 'System Activity Logs',
-                  index: 6,
+                  index: 7,
                 ),
                 MenuItem(
                   icon: Icons.chat_bubble_outline,
                   title: 'Message Logs',
-                  index: 7,
+                  index: 8,
                 ),
               ],
             ),

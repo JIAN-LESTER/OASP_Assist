@@ -26,6 +26,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:markdown/markdown.dart' as md;
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import 'chat_utilities.dart';
 import 'faq_section.dart';
@@ -39,7 +41,7 @@ class ChatPage extends StatefulWidget {
   const ChatPage({
     Key? key,
     required this.conversationId,
-    this.initialMessage,  
+    this.initialMessage,
     this.showFAQs = false,
     this.onFAQToggle,
   }) : super(key: key);
@@ -58,7 +60,8 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  final GlobalKey<FAQSectionState> _faqSectionKey = GlobalKey<FAQSectionState>();
+  final GlobalKey<FAQSectionState> _faqSectionKey =
+      GlobalKey<FAQSectionState>();
 
   late AnimationController _micAnimationController;
   late AnimationController _attachmentAnimationController;
@@ -72,7 +75,8 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
   final Map<String, bool> _completedTypewriterMessages = {};
   bool _isTyping = false;
-  final Set<String> _initialMessageIds = {}; // Track messages that existed on load
+  final Set<String> _initialMessageIds =
+      {}; // Track messages that existed on load
 
   String? _expandedCategory;
   String? _selectedConversationId;
@@ -131,25 +135,31 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
         try {
           await chatProvider.setConversationId(widget.conversationId);
-          
-          await Future.delayed(Duration(milliseconds: 500));
-          
+
+          // ✅ IMPORTANT: Wait for messages to load
+          await Future.delayed(Duration(milliseconds: 800));
+
           // Mark all loaded messages as initial (don't typewrite them)
           for (var message in chatProvider.messages) {
             _initialMessageIds.add(message.id);
           }
-          
+
           final hasMessages = chatProvider.messages.isNotEmpty;
-          
+
           if (mounted) {
             setState(() {
               _selectedConversationId = widget.conversationId;
               _showFAQs = !hasMessages;
               _isLoadingConversation = false;
             });
+
+            // ✅ NEW: Check for any escalation responses
+            await _checkAndLoadEscalationResponses();
           }
-          
-          print('DEBUG: ChatPage loaded. Messages: ${chatProvider.messages.length}, Show FAQs: $_showFAQs');
+
+          print(
+            'DEBUG: ChatPage loaded. Messages: ${chatProvider.messages.length}, Show FAQs: $_showFAQs',
+          );
         } catch (e) {
           print('DEBUG: Error loading conversation: $e');
           if (mounted) {
@@ -166,6 +176,132 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
         });
       }
     });
+  }
+
+  Future<void> _checkAndLoadEscalationResponses() async {
+    if (widget.conversationId.isEmpty) return;
+
+    try {
+      print(
+        '🔍 Checking for escalation responses in conversation: ${widget.conversationId}',
+      );
+
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+      // Query escalations for this conversation that have staff responses
+      final escalationsSnapshot =
+          await _firestore
+              .collection('escalations')
+              .where('conversationId', isEqualTo: widget.conversationId)
+              .where('status', isEqualTo: 'resolved')
+              .get();
+
+      if (escalationsSnapshot.docs.isEmpty) {
+        print('ℹ️ No resolved escalations found');
+        return;
+      }
+
+      print('✅ Found ${escalationsSnapshot.docs.length} resolved escalations');
+
+      for (var escalationDoc in escalationsSnapshot.docs) {
+        final escalation = escalationDoc.data();
+        final staffResponse = escalation['staffResponse'] as String?;
+        final respondedBy = escalation['respondedBy'] as String? ?? 'Staff';
+        final messageId = escalation['messageId'] as String?;
+        final escalationId = escalationDoc.id;
+
+        if (staffResponse == null || staffResponse.isEmpty) continue;
+
+        // ✅ CRITICAL FIX: Check if staff response already exists in Firestore
+        final existingStaffMessages =
+            await _firestore
+                .collection('conversations')
+                .doc(widget.conversationId)
+                .collection('messages')
+                .where('sender', isEqualTo: 'staff')
+                .where(
+                  'content',
+                  isEqualTo:
+                      '**Staff Response from $respondedBy:**\n\n$staffResponse',
+                )
+                .limit(1)
+                .get();
+
+        if (existingStaffMessages.docs.isNotEmpty) {
+          print(
+            'ℹ️ Staff response already exists in Firestore for escalation $escalationId',
+          );
+          continue;
+        }
+
+        // Also check in-memory messages
+        final existingInMemory = chatProvider.messages.any(
+          (msg) => msg.content.contains(staffResponse) && msg.sender == 'staff',
+        );
+
+        if (existingInMemory) {
+          print(
+            'ℹ️ Staff response already exists in memory for escalation $escalationId',
+          );
+          continue;
+        }
+
+        print('📝 Adding staff response to chat for escalation $escalationId');
+
+        // Create a staff message
+        final staffMessageRef =
+            _firestore
+                .collection('conversations')
+                .doc(widget.conversationId)
+                .collection('messages')
+                .doc();
+
+        final staffMessage = Message(
+          id: staffMessageRef.id,
+          conversationId: widget.conversationId,
+          content: '**Staff Response from $respondedBy:**\n\n$staffResponse',
+          sender: 'staff',
+          status: 'sent',
+          type: 'text',
+          sentAt: DateTime.now(),
+        );
+
+        // Save to Firestore
+        await chatProvider.saveMessageToFirebase(
+          widget.conversationId,
+          staffMessage,
+        );
+
+        // Update the original escalated message
+        if (messageId != null && messageId.isNotEmpty) {
+          try {
+            await _firestore
+                .collection('conversations')
+                .doc(widget.conversationId)
+                .collection('messages')
+                .doc(messageId)
+                .update({
+                  'escalationResolved': true,
+                  'escalationResponse': staffResponse,
+                  'escalationRespondedBy': respondedBy,
+                  'escalationRespondedAt': Timestamp.now(),
+                  'escalationId': escalationId,
+                });
+
+            print(
+              '✅ Updated original message $messageId with escalation response',
+            );
+          } catch (e) {
+            print('⚠️ Could not update original message: $e');
+          }
+        }
+      }
+
+      // Refresh messages
+      await chatProvider.loadExistingMessages();
+    } catch (e) {
+      print('❌ Error checking escalation responses: $e');
+    }
   }
 
   Future<void> _initChatSpeechToText() async {
@@ -258,38 +394,45 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   @override
   void didUpdateWidget(ChatPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (widget.conversationId != oldWidget.conversationId) {
       setState(() {
         _isLoadingConversation = true;
       });
-      
-      print('DEBUG: Conversation changing from ${oldWidget.conversationId} to ${widget.conversationId}');
+
+      print(
+        'DEBUG: Conversation changing from ${oldWidget.conversationId} to ${widget.conversationId}',
+      );
 
       if (widget.conversationId.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           try {
-            final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+            final chatProvider = Provider.of<ChatProvider>(
+              context,
+              listen: false,
+            );
             await chatProvider.setConversationId(widget.conversationId);
-            
+
             await Future.delayed(Duration(milliseconds: 500));
-            
+
             // Mark all loaded messages as initial (don't typewrite them)
             _initialMessageIds.clear();
             for (var message in chatProvider.messages) {
               _initialMessageIds.add(message.id);
             }
-            
+
             final hasMessages = chatProvider.messages.isNotEmpty;
-            
+
             if (mounted) {
               setState(() {
                 _showFAQs = !hasMessages;
                 _isLoadingConversation = false;
               });
             }
-            
-            print('DEBUG: Conversation changed. Messages: ${chatProvider.messages.length}, Show FAQs: $_showFAQs');
+
+            print(
+              'DEBUG: Conversation changed. Messages: ${chatProvider.messages.length}, Show FAQs: $_showFAQs',
+            );
           } catch (e) {
             print('DEBUG: Error updating conversation: $e');
             if (mounted) {
@@ -302,7 +445,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       } else {
         final chatProvider = Provider.of<ChatProvider>(context, listen: false);
         chatProvider.clearMessages();
-        
+
         if (mounted) {
           setState(() {
             _showFAQs = true;
@@ -312,7 +455,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       }
       return;
     }
-    
+
     if (widget.showFAQs != oldWidget.showFAQs) {
       setState(() {
         _showFAQs = widget.showFAQs;
@@ -360,10 +503,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
           SizedBox(height: 8),
           Text(
             'Please wait a moment',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade500,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
           ),
         ],
       ),
@@ -430,21 +570,22 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   }
 
   void _onFAQSelected(String question) {
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    chatProvider.incrementFAQSimilarityCount(question);
+  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  chatProvider.incrementFAQSimilarityCount(question);
 
-    _controller.text = question;
+  _controller.text = question;
 
-    setState(() {
-      _expandedCategory = null;
-      _showFAQs = false;
-    });
+  // ✅ Close FAQs
+  setState(() {
+    _expandedCategory = null;
+    _showFAQs = false;
+  });
 
-    Future.delayed(Duration(milliseconds: 100), () {
-      _sendMessage(chatProvider);
-    });
-  }
-
+  // ✅ Send the message after a short delay
+  Future.delayed(Duration(milliseconds: 100), () {
+    _sendMessage(chatProvider);
+  });
+}
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -455,191 +596,422 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
   }
 
-  Widget _buildMessageBubble(Message message, bool isUser) {
-    return FutureBuilder<String?>(
-      future: isUser ? _getUserAvatarUrl() : null,
-      builder: (context, snapshot) {
-        // Only typewrite NEW bot messages (not loaded from history)
-        final shouldTypewrite = !isUser && 
-                                message.sender == 'bot' && 
-                                !_initialMessageIds.contains(message.id) &&
-                                !_completedTypewriterMessages.containsKey(message.id);
-        
-        return GestureDetector(
-          onLongPress: () => _showMessageOptions(context, message),
-          child: Container(
-            margin: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-            child: Row(
-              mainAxisAlignment:
-                  isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (!isUser)
-                  Container(
-                    width: 32,
-                    height: 32,
-                    margin: EdgeInsets.only(right: 8, bottom: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Color(0xFF2E7D32).withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'lib/images/oasp.png',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(
-                            Icons.smart_toy_outlined,
-                            color: Color(0xFF2E7D32),
-                            size: 18,
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                Flexible(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient:
-                          isUser
-                              ? LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [Color(0xFF2E7D32), Color(0xFF388E3C)],
-                              )
-                              : LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [Colors.white, Colors.grey.shade50],
-                              ),
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20),
-                        bottomLeft: Radius.circular(isUser ? 20 : 4),
-                        bottomRight: Radius.circular(isUser ? 4 : 20),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              isUser
-                                  ? Color(0xFF2E7D32).withOpacity(0.3)
-                                  : Colors.black.withOpacity(0.1),
-                          blurRadius: 15,
-                          offset: Offset(0, 5),
+Widget _buildMessageBubble(Message message, bool isUser) {
+  return FutureBuilder<String?>(
+    future: isUser ? _getUserAvatarUrl() : null,
+    builder: (context, snapshot) {
+      // Get streaming content if this message is currently streaming
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      final streamingContent = chatProvider.getStreamingContent(message.id);
+      final isStreaming = streamingContent != null;
+      
+      // ✅ FIX: Use streaming content ONLY if streaming, otherwise use message content
+      final displayContent = isStreaming ? streamingContent : message.content;
+      
+      // Check if this is a new message that just arrived (for initial messages, skip typewriter)
+      final isNewMessage = !_initialMessageIds.contains(message.id);
+      
+      // ✅ FIX: Only show typing cursor while actively streaming AND not empty
+      final showTypingCursor = isStreaming && displayContent.isNotEmpty;
+      
+      final isEscalatedMessage = message.sender == 'bot' && message.rating == 'dislike';
+      
+      return FutureBuilder<Map<String, dynamic>?>(
+        future: isEscalatedMessage ? _getEscalationStatus(message.id) : Future.value(null),
+        builder: (context, escalationSnapshot) {
+          final escalationData = escalationSnapshot.data;
+          final isEscalated = escalationData != null;
+          final isResolved = escalationData?['status'] == 'resolved';
+          
+          return GestureDetector(
+            onLongPress: () => _showMessageOptions(context, message),
+            child: Container(
+              margin: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+              child: Column(
+                crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  if (isEscalated)
+                    Container(
+                      margin: EdgeInsets.only(bottom: 4, left: isUser ? 0 : 44),
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isResolved ? Colors.green.shade100 : Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isResolved ? Colors.green.shade300 : Colors.orange.shade300
                         ),
-                      ],
-                    ),
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment:
-                          isUser
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (shouldTypewrite)
-                          TypewriterText(
-                            text: message.content,
-                            textAlign: TextAlign.justify,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isResolved ? Icons.check_circle : Icons.support_agent,
+                            size: 14,
+                            color: isResolved ? Colors.green.shade700 : Colors.orange.shade700,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            isResolved ? 'Resolved by staff' : 'Escalated to staff',
                             style: TextStyle(
-                              color: Colors.grey.shade800,
-                              fontSize: 15,
-                              height: 1.5,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            speed: Duration(milliseconds: 5),
-                            onComplete: () {
-                              setState(() {
-                                _completedTypewriterMessages[message.id] = true;
-                                _isTyping = false;
-                              });
-                            },
-                          )
-                        else
-                          Linkify(
-                            onOpen: _onLinkTap,
-                            text: message.content,
-                            textAlign: TextAlign.justify,
-                            style: TextStyle(
-                              color: isUser ? Colors.white : Colors.grey.shade800,
-                              fontSize: 15,
-                              height: 1.5,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            linkStyle: TextStyle(
-                              decoration: TextDecoration.underline,
-                              color: isUser ? Colors.yellow[100] : Colors.blue,
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
-                            ),
-                            options: LinkifyOptions(
-                              humanize: false,
-                              looseUrl: true,
-                              defaultToHttps: true,
+                              color: isResolved ? Colors.green.shade700 : Colors.orange.shade700,
                             ),
                           ),
-                        SizedBox(height: 6),
-                        Text(
-                          _formatTimestamp(message.sentAt),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color:
-                                isUser ? Colors.white70 : Colors.grey.shade600,
-                          ),
-                        ),
-                        if (!isUser && message.sender == 'bot') ...[
-                          _buildLikeDislikeButtons(message),
                         ],
-                      ],
-                    ),
-                  ),
-                ),
-                if (isUser)
-                  Container(
-                    width: 32,
-                    height: 32,
-                    margin: EdgeInsets.only(left: 8, bottom: 4),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Color(0xFF2E7D32).withOpacity(0.3),
-                        width: 1,
                       ),
                     ),
-                    child: ClipOval(
-                      child:
-                          snapshot.data != null
-                              ? CachedNetworkImage(
-                                imageUrl: snapshot.data!,
-                                fit: BoxFit.cover,
-                                errorWidget:
-                                    (context, url, error) =>
+                  
+                  Row(
+                    mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (!isUser)
+                        Container(
+                          width: 32,
+                          height: 32,
+                          margin: EdgeInsets.only(right: 8, bottom: 4),
+                          decoration: BoxDecoration(
+                            color: message.sender == 'staff' 
+                                ? Colors.blue.shade100 
+                                : Colors.grey.shade100,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: message.sender == 'staff'
+                                  ? Colors.blue.shade300
+                                  : Color(0xFF2E7D32).withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: message.sender == 'staff'
+                                ? Icon(
+                                    Icons.support_agent,
+                                    color: Colors.blue.shade700,
+                                    size: 18,
+                                  )
+                                : Image.asset(
+                                    'lib/images/oasp.png',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Icon(
+                                        Icons.smart_toy_outlined,
+                                        color: Color(0xFF2E7D32),
+                                        size: 18,
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ),
+                      Flexible(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: isUser
+                                ? LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [Color(0xFF2E7D32), Color(0xFF388E3C)],
+                                  )
+                                : message.sender == 'staff'
+                                    ? LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [Colors.blue.shade50, Colors.blue.shade100],
+                                      )
+                                    : LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [Colors.white, Colors.grey.shade50],
+                                      ),
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(20),
+                              topRight: Radius.circular(20),
+                              bottomLeft: Radius.circular(isUser ? 20 : 4),
+                              bottomRight: Radius.circular(isUser ? 4 : 20),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isUser
+                                    ? Color(0xFF2E7D32).withOpacity(0.3)
+                                    : Colors.black.withOpacity(0.1),
+                                blurRadius: 15,
+                                offset: Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          padding: EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: isUser
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Display content without inline cursor
+                              isUser 
+                                  ? // User messages - plain text with links
+                                    Linkify(
+                                      onOpen: _onLinkTap,
+                                      text: displayContent,
+                                      textAlign: TextAlign.justify,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        height: 1.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      linkStyle: TextStyle(
+                                        decoration: TextDecoration.underline,
+                                        color: Colors.yellow[100],
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      options: LinkifyOptions(
+                                        humanize: false,
+                                        looseUrl: true,
+                                        defaultToHttps: true,
+                                      ),
+                                    )
+                                  : // Bot/Staff messages - markdown support
+                                    MarkdownBody(
+                                      data: displayContent,
+                                      selectable: true,
+                                      onTapLink: (text, href, title) {
+                                        if (href != null) {
+                                          _onLinkTap(LinkableElement(href, text));
+                                        }
+                                      },
+                                      styleSheet: MarkdownStyleSheet(
+                                        p: TextStyle(
+                                          color: message.sender == 'staff'
+                                              ? Colors.blue.shade900
+                                              : Colors.grey.shade800,
+                                          fontSize: 15,
+                                          height: 1.5,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        strong: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: message.sender == 'staff'
+                                              ? Colors.blue.shade900
+                                              : Colors.grey.shade900,
+                                        ),
+                                        em: TextStyle(
+                                          fontStyle: FontStyle.italic,
+                                          color: message.sender == 'staff'
+                                              ? Colors.blue.shade900
+                                              : Colors.grey.shade800,
+                                        ),
+                                        a: TextStyle(
+                                          decoration: TextDecoration.underline,
+                                          color: Colors.blue,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        listBullet: TextStyle(
+                                          color: message.sender == 'staff'
+                                              ? Colors.blue.shade900
+                                              : Colors.grey.shade800,
+                                          fontSize: 15,
+                                        ),
+                                        h1: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: message.sender == 'staff'
+                                              ? Colors.blue.shade900
+                                              : Colors.grey.shade900,
+                                        ),
+                                        h2: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: message.sender == 'staff'
+                                              ? Colors.blue.shade900
+                                              : Colors.grey.shade900,
+                                        ),
+                                        h3: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: message.sender == 'staff'
+                                              ? Colors.blue.shade900
+                                              : Colors.grey.shade900,
+                                        ),
+                                        code: TextStyle(
+                                          backgroundColor: Colors.grey.shade100,
+                                          color: Colors.red.shade700,
+                                          fontFamily: 'monospace',
+                                          fontSize: 14,
+                                        ),
+                                        blockquote: TextStyle(
+                                          color: Colors.grey.shade700,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                        blockquoteDecoration: BoxDecoration(
+                                          color: Colors.grey.shade100,
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border(
+                                            left: BorderSide(
+                                              color: Colors.grey.shade400,
+                                              width: 4,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      extensionSet: md.ExtensionSet(
+                                        md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+                                        [
+                                          md.EmojiSyntax(),
+                                          ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes
+                                        ],
+                                      ),
+                                    ),
+                              // ✅ FIX: Show cursor below the text when streaming
+                              if (showTypingCursor) ...[
+                                SizedBox(height: 8),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: _buildTypingCursor(),
+                                ),
+                              ],
+                              SizedBox(height: 6),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _formatTimestamp(message.sentAt),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isUser ? Colors.white70 : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  if (isStreaming) ...[
+                                    SizedBox(width: 8),
+                                    SizedBox(
+                                      width: 10,
+                                      height: 10,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.5,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          isUser ? Colors.white70 : Color(0xFF2E7D32),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              if (!isUser && message.sender == 'bot' && !isStreaming && (!isEscalated || !isResolved)) ...[
+                                _buildLikeDislikeButtons(message),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (isUser)
+                        Container(
+                          width: 32,
+                          height: 32,
+                          margin: EdgeInsets.only(left: 8, bottom: 4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Color(0xFF2E7D32).withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: snapshot.data != null
+                                ? CachedNetworkImage(
+                                    imageUrl: snapshot.data!,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (context, url, error) =>
                                         _buildDefaultUserAvatar(),
-                              )
-                              : _buildDefaultUserAvatar(),
-                    ),
+                                  )
+                                : _buildDefaultUserAvatar(),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
+                ],
+              ),
             ),
+          );
+        },
+      );
+    },
+  );
+}
+
+// ✅ NEW: Simpler typing cursor widget
+Widget _buildTypingCursor() {
+  return TweenAnimationBuilder<double>(
+    tween: Tween(begin: 0.0, end: 1.0),
+    duration: Duration(milliseconds: 530),
+    builder: (context, value, child) {
+      return Opacity(
+        opacity: value > 0.5 ? 1.0 : 0.0,
+        child: Container(
+          width: 8,
+          height: 2,
+          decoration: BoxDecoration(
+            color: Color(0xFF2E7D32),
+            borderRadius: BorderRadius.circular(1),
           ),
-        );
-      },
-    );
+        ),
+      );
+    },
+    onEnd: () {
+      // Restart animation
+      if (mounted) {
+        setState(() {});
+      }
+    },
+  );
+}
+
+  Future<Map<String, dynamic>?> _getEscalationStatus(String messageId) async {
+    try {
+      final escalationSnapshot =
+          await _firestore
+              .collection('escalations')
+              .where('messageId', isEqualTo: messageId)
+              .limit(1)
+              .get();
+
+      if (escalationSnapshot.docs.isEmpty) {
+        return null;
+      }
+
+      return escalationSnapshot.docs.first.data();
+    } catch (e) {
+      print('Error getting escalation status: $e');
+      return null;
+    }
+  }
+
+  Future<bool> _checkIfMessageEscalated(String messageId) async {
+    try {
+      final escalationSnapshot =
+          await _firestore
+              .collection('escalations')
+              .where('messageId', isEqualTo: messageId)
+              .limit(1)
+              .get();
+
+      return escalationSnapshot.docs.isNotEmpty;
+    } catch (e) {
+      print('Error checking escalation: $e');
+      return false;
+    }
   }
 
   Widget _buildLikeDislikeButtons(Message message) {
     final localRating = _localRatings[message.id];
-    
+
     if (localRating != null) {
       return _buildRatingButtonsUI(message.id, localRating, message);
     }
-    
-    final cachedRating = Provider.of<ChatProvider>(context, listen: false)
-        .getCachedRating(message.id);
-    
+
+    final cachedRating = Provider.of<ChatProvider>(
+      context,
+      listen: false,
+    ).getCachedRating(message.id);
+
     if (cachedRating != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_localRatings.containsKey(message.id)) {
@@ -650,7 +1022,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       });
       return _buildRatingButtonsUI(message.id, cachedRating, message);
     }
-    
+
     if (message.rating != null && message.rating!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_localRatings.containsKey(message.id)) {
@@ -661,11 +1033,15 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       });
       return _buildRatingButtonsUI(message.id, message.rating, message);
     }
-    
+
     return _buildRatingButtonsUI(message.id, null, message);
   }
 
-  Widget _buildRatingButtonsUI(String messageId, String? currentRating, Message message) {
+  Widget _buildRatingButtonsUI(
+    String messageId,
+    String? currentRating,
+    Message message,
+  ) {
     return Container(
       margin: EdgeInsets.only(top: 8),
       child: Row(
@@ -677,14 +1053,16 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: currentRating == 'like'
-                    ? Color(0xFF2E7D32).withOpacity(0.1)
-                    : Colors.transparent,
+                color:
+                    currentRating == 'like'
+                        ? Color(0xFF2E7D32).withOpacity(0.1)
+                        : Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: currentRating == 'like'
-                      ? Color(0xFF2E7D32)
-                      : Colors.grey.shade300,
+                  color:
+                      currentRating == 'like'
+                          ? Color(0xFF2E7D32)
+                          : Colors.grey.shade300,
                   width: 1,
                 ),
               ),
@@ -694,18 +1072,20 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                   Icon(
                     Icons.thumb_up_outlined,
                     size: 16,
-                    color: currentRating == 'like'
-                        ? Color(0xFF2E7D32)
-                        : Colors.grey.shade600,
+                    color:
+                        currentRating == 'like'
+                            ? Color(0xFF2E7D32)
+                            : Colors.grey.shade600,
                   ),
                   SizedBox(width: 4),
                   Text(
                     'Helpful',
                     style: TextStyle(
                       fontSize: 12,
-                      color: currentRating == 'like'
-                          ? Color(0xFF2E7D32)
-                          : Colors.grey.shade600,
+                      color:
+                          currentRating == 'like'
+                              ? Color(0xFF2E7D32)
+                              : Colors.grey.shade600,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -720,14 +1100,16 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: currentRating == 'dislike'
-                    ? Colors.red.withOpacity(0.1)
-                    : Colors.transparent,
+                color:
+                    currentRating == 'dislike'
+                        ? Colors.red.withOpacity(0.1)
+                        : Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: currentRating == 'dislike'
-                      ? Colors.red
-                      : Colors.grey.shade300,
+                  color:
+                      currentRating == 'dislike'
+                          ? Colors.red
+                          : Colors.grey.shade300,
                   width: 1,
                 ),
               ),
@@ -737,18 +1119,20 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                   Icon(
                     Icons.thumb_down_outlined,
                     size: 16,
-                    color: currentRating == 'dislike'
-                        ? Colors.red
-                        : Colors.grey.shade600,
+                    color:
+                        currentRating == 'dislike'
+                            ? Colors.red
+                            : Colors.grey.shade600,
                   ),
                   SizedBox(width: 4),
                   Text(
                     'Not helpful',
                     style: TextStyle(
                       fontSize: 12,
-                      color: currentRating == 'dislike'
-                          ? Colors.red
-                          : Colors.grey.shade600,
+                      color:
+                          currentRating == 'dislike'
+                              ? Colors.red
+                              : Colors.grey.shade600,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -767,7 +1151,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     Message? message,
   ]) async {
     if (!mounted) return;
-    
+
     if (widget.conversationId.isEmpty) {
       print('Error: No conversation ID available');
       if (mounted) {
@@ -845,10 +1229,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                   ),
                   child: Text(
                     "A staff member will review your conversation and provide personalized assistance.",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                   ),
                 ),
               ],
@@ -899,160 +1280,179 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
         barrierDismissible: true,
         builder: (BuildContext context) {
           return StatefulBuilder(
-            builder: (context, setState) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Row(
-                children: [
-                  Icon(Icons.report_problem_outlined,
-                      color: Colors.orange.shade600, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Escalate to Staff?',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
+            builder:
+                (context, setState) => AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "This response wasn't helpful. Would you like to escalate this message to staff for human assistance?",
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey.shade700,
-                        height: 1.4,
+                  title: Row(
+                    children: [
+                      Icon(
+                        Icons.report_problem_outlined,
+                        color: Colors.orange.shade600,
+                        size: 24,
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: Text(
-                        "A staff member will review your conversation and provide personalized assistance.",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Escalate to Staff?',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade800,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Select a reason:',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Column(
+                    ],
+                  ),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        RadioListTile<String>(
-                          title: const Text('Bot response not accurate'),
-                          value: 'Bot response not accurate',
-                          groupValue: selectedReason,
-                          onChanged: (val) => setState(() => selectedReason = val!),
-                          dense: true,
+                        Text(
+                          "This response wasn't helpful. Would you like to escalate this message to staff for human assistance?",
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.grey.shade700,
+                            height: 1.4,
+                          ),
                         ),
-                        RadioListTile<String>(
-                          title: const Text('Bot did not understand my question'),
-                          value: 'Bot did not understand my question',
-                          groupValue: selectedReason,
-                          onChanged: (val) => setState(() => selectedReason = val!),
-                          dense: true,
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Text(
+                            "A staff member will review your conversation and provide personalized assistance.",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
                         ),
-                        RadioListTile<String>(
-                          title: const Text('Need clarification from staff'),
-                          value: 'Need clarification from staff',
-                          groupValue: selectedReason,
-                          onChanged: (val) => setState(() => selectedReason = val!),
-                          dense: true,
+                        const SizedBox(height: 20),
+                        Text(
+                          'Select a reason:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Column(
+                          children: [
+                            RadioListTile<String>(
+                              title: const Text('Bot response not accurate'),
+                              value: 'Bot response not accurate',
+                              groupValue: selectedReason,
+                              onChanged:
+                                  (val) =>
+                                      setState(() => selectedReason = val!),
+                              dense: true,
+                            ),
+                            RadioListTile<String>(
+                              title: const Text(
+                                'Bot did not understand my question',
+                              ),
+                              value: 'Bot did not understand my question',
+                              groupValue: selectedReason,
+                              onChanged:
+                                  (val) =>
+                                      setState(() => selectedReason = val!),
+                              dense: true,
+                            ),
+                            RadioListTile<String>(
+                              title: const Text(
+                                'Need clarification from staff',
+                              ),
+                              value: 'Need clarification from staff',
+                              groupValue: selectedReason,
+                              onChanged:
+                                  (val) =>
+                                      setState(() => selectedReason = val!),
+                              dense: true,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Additional details (optional)',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: reasonController,
+                          maxLines: 3,
+                          maxLength: 200,
+                          decoration: InputDecoration(
+                            hintText:
+                                'e.g., "I need more specific information about scholarship deadlines"',
+                            hintStyle: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade400,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF2E7D32),
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            contentPadding: const EdgeInsets.all(12),
+                            counterStyle: const TextStyle(fontSize: 11),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Additional details (optional)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade800,
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: Text(
+                        'Not Now',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: reasonController,
-                      maxLines: 3,
-                      maxLength: 200,
-                      decoration: InputDecoration(
-                        hintText:
-                            'e.g., "I need more specific information about scholarship deadlines"',
-                        hintStyle: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade400,
-                        ),
-                        border: OutlineInputBorder(
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E7D32),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide:
-                              BorderSide(color: Colors.grey.shade300),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                              color: Color(0xFF2E7D32), width: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
                         ),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                        contentPadding: const EdgeInsets.all(12),
-                        counterStyle: const TextStyle(fontSize: 11),
+                      ),
+                      child: const Text(
+                        'Yes, Escalate',
+                        style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(
-                    'Not Now',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                  ),
-                  child: const Text(
-                    'Yes, Escalate',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
           );
         },
       );
@@ -1060,17 +1460,18 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       if (shouldEscalate != true || !mounted) return;
 
       final userReason = reasonController.text.trim();
-      final fullReason = userReason.isNotEmpty
-          ? '$selectedReason — $userReason'
-          : selectedReason;
+      final fullReason =
+          userReason.isNotEmpty
+              ? '$selectedReason — $userReason'
+              : selectedReason;
 
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
       final messages = chatProvider.messages;
-      
+
       String userQuestion = 'No question found';
-      
+
       final botMessageIndex = messages.indexWhere((m) => m.id == message.id);
-      
+
       if (botMessageIndex > 0) {
         for (int i = botMessageIndex - 1; i >= 0; i--) {
           if (messages[i].sender == 'user') {
@@ -1082,15 +1483,16 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
       final escalationRef = _firestore.collection('escalations').doc();
       final escalationId = escalationRef.id;
-      
+
       final escalatedData = {
         'escalationId': escalationId,
         'userId': FirebaseAuth.instance.currentUser?.uid,
         'conversationId': message.conversationId,
         'question': userQuestion,
-        'botAnswer': message.sender == 'bot' 
-            ? message.content 
-            : 'No bot response available',
+        'botAnswer':
+            message.sender == 'bot'
+                ? message.content
+                : 'No bot response available',
         'status': 'pending',
         'reason': fullReason,
         'createdAt': Timestamp.now(),
@@ -1098,7 +1500,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       };
 
       await escalationRef.set(escalatedData);
-      
+
       print('✅ Manual escalation created with ID: $escalationId');
       print('📝 User question: $userQuestion');
 
@@ -1119,8 +1521,9 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
             ),
             backgroundColor: const Color(0xFF2E7D32),
             behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             duration: const Duration(seconds: 4),
           ),
         );
@@ -1293,7 +1696,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
   void _showSnackBar(String message, IconData icon) {
     if (!mounted) return;
-    
+
     try {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1317,46 +1720,53 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
   }
 
-  void _sendMessage(ChatProvider chatProvider) async {
-    final text = _controller.text.trim();
-    if (text.isEmpty || chatProvider.isLoading) return;
+void _sendMessage(ChatProvider chatProvider) async {
+  final text = _controller.text.trim();
+  if (text.isEmpty || chatProvider.isLoading) return;
 
-    _controller.clear();
+  _controller.clear();
 
-    try {
-      await chatProvider.askQuestion(context, text);
-    } catch (e) {
-      debugPrint('Error sending message: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  Icons.error_outline_rounded,
-                  color: Colors.white,
-                  size: 20,
+  // 🔹 FIX: Close FAQs when sending a message
+  if (_showFAQs) {
+    setState(() {
+      _showFAQs = false;
+    });
+  }
+
+  try {
+    await chatProvider.askQuestionWithStreaming(context, text);
+  } catch (e) {
+    debugPrint('Error sending message: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Error sending message: ${e.toString()}',
+                  style: TextStyle(fontWeight: FontWeight.w500),
                 ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Error sending message: ${e.toString()}',
-                    style: TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red.shade400,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: EdgeInsets.all(16),
+              ),
+            ],
           ),
-        );
-      }
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: EdgeInsets.all(16),
+        ),
+      );
     }
   }
+}
 
   @override
   void dispose() {
@@ -1383,17 +1793,18 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
           return Column(
             children: [
               Expanded(
-                child: _isLoadingConversation
-                    ? _buildLoadingIndicator()
-                    : (_showFAQs
-                        ? FAQSection(
-                            key: _faqSectionKey,
-                            onFAQSelected: _onFAQSelected,
-                            messageController: _controller,
-                          )
-                        : (messages.isEmpty
-                            ? _buildEmptyChatState()
-                            : _buildMessagesList(messages, chatProvider))),
+                child:
+                    _isLoadingConversation
+                        ? _buildLoadingIndicator()
+                        : (_showFAQs
+                            ? FAQSection(
+                              key: _faqSectionKey,
+                              onFAQSelected: _onFAQSelected,
+                              messageController: _controller,
+                            )
+                            : (messages.isEmpty
+                                ? _buildEmptyChatState()
+                                : _buildMessagesList(messages, chatProvider))),
               ),
               FAQInputSection(
                 controller: _controller,
@@ -1402,9 +1813,10 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                 onFAQToggle: _toggleFAQsDisplay,
                 onSendMessage: () => _sendMessage(chatProvider),
                 onMicrophoneTap: _handleMicrophoneTap,
-                isListening: _showFAQs 
-                    ? (_faqSectionKey.currentState?.isListening ?? false)
-                    : _isListening, 
+                isListening:
+                    _showFAQs
+                        ? (_faqSectionKey.currentState?.isListening ?? false)
+                        : _isListening,
               ),
             ],
           );
@@ -1459,25 +1871,27 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   }
 
   Widget _buildMessagesList(List<Message> messages, ChatProvider chatProvider) {
-    return ListView.builder(
-      controller: _scrollController,
-      shrinkWrap: true,
-      physics: BouncingScrollPhysics(),
-      itemCount: messages.length + (chatProvider.isLoading ? 1 : 0),
-      padding: EdgeInsets.symmetric(vertical: 20),
-      itemBuilder: (context, index) {
-        if (index == messages.length && chatProvider.isLoading) {
-          return _buildTypingIndicator();
-        }
+  // ✅ FIX: Check if we have any streaming messages
+  final hasStreamingMessage = messages.any((msg) => 
+    chatProvider.getStreamingContent(msg.id) != null
+  );
+  print("Current message IDs: ${chatProvider.messages.map((m) => m.id).toList()}");
 
-        final Message message = messages[index];
-        final bool isUser = message.sender == 'user';
+  return ListView.builder(
+    controller: _scrollController,
+    shrinkWrap: true,
+    physics: BouncingScrollPhysics(),
+    // ✅ FIX: Don't add extra loading indicator if we're streaming
+    itemCount: messages.length,
+    padding: EdgeInsets.symmetric(vertical: 20),
+    itemBuilder: (context, index) {
+      final Message message = messages[index];
+      final bool isUser = message.sender == 'user';
 
-        return _buildMessageBubble(message, isUser);
-      },
-    );
-  }
-
+      return _buildMessageBubble(message, isUser);
+    },
+  );
+}
   Widget _buildTypingIndicator() {
     return Align(
       alignment: Alignment.centerLeft,

@@ -1,3 +1,4 @@
+import 'package:capstone_project/pages/data/charts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -340,6 +341,60 @@ Widget _buildHeader(
             ],
           ),
           SizedBox(height: isMobile ? 16 : 20),
+           // 🔹 Stat Cards Section
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: isMobile
+                ? Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    children: [
+                      buildStatCard('Total FAQs', '59', Colors.blue, Icons.message),
+                      buildStatCard('Most Frequent Category', '58', Colors.green, Icons.check_circle),
+                      buildStatCard('Most Asked Question', '26', Colors.red, Icons.group),
+                      buildStatCard('Latest FAQ', 'General', Colors.orange, Icons.help_outline),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: buildStatCard(
+                          'Total FAQs',
+                          '59',
+                          Colors.blue,
+                          Icons.message,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
+                          'Most Frequent Category',
+                          '58',
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
+                          'Most Asked Question',
+                          '26',
+                          Colors.red,
+                          Icons.group,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
+                          'Latest FAQs',
+                          'General',
+                          Colors.orange,
+                          Icons.help_outline,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
 
           // Search and Filter Row
           isMobile

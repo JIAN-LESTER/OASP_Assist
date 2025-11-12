@@ -255,7 +255,7 @@ Widget mainContent(
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
-    body: SingleChildScrollView(
+    body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,7 +267,8 @@ Widget mainContent(
             searchController,
           ),
           const SizedBox(height: 16),
-          Container(
+          Expanded(
+          child:Container(
             height: MediaQuery.of(context).size.height - 200,
             padding: EdgeInsets.all(padding),
             decoration: BoxDecoration(
@@ -299,6 +300,7 @@ Widget mainContent(
                 ),
               ],
             ),
+          ),
           ),
         ],
       ),
