@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -7,7 +8,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
-import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 
 import 'package:capstone_project/models/admissions.dart';
 import 'package:capstone_project/models/placement.dart';
@@ -16,6 +16,7 @@ import 'package:capstone_project/services/cohere_service.dart';
 import 'package:capstone_project/services/file_service2.dart';
 import 'package:uuid/uuid.dart';
 import 'package:capstone_project/models/info_bank.dart';
+import 'package:capstone_project/utils/snackbar_util.dart'; // Add this import
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
 
@@ -202,11 +203,14 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
             _titleController.text = fileName.split('.').first;
           }
         });
-
-        _showTopRightAlert('File processed successfully!', AlertType.success);
       }
     } catch (e) {
-      _showTopRightAlert('Error processing file: $e', AlertType.error);
+      if (mounted) {
+        SnackbarUtil.showError(
+          context,
+          'Error processing file: ${e.toString()}',
+        );
+      }
     }
   }
 
@@ -421,20 +425,17 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
   Future<void> _uploadDocument() async {
     if (_selectedFile == null || _extractedText == null) {
-      _showTopRightAlert('Please select a file first', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Please select a file first');
       return;
     }
 
     if (_titleController.text.trim().isEmpty) {
-      _showTopRightAlert('Please enter a title', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Please enter a title');
       return;
     }
 
     if (_categoryController.text.trim().isEmpty) {
-      _showTopRightAlert(
-        'Please select or enter a category',
-        AlertType.warning,
-      );
+      SnackbarUtil.showWarning(context, 'Please select or enter a category');
       return;
     }
 
@@ -457,7 +458,8 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
       await _fileService.saveToInformationBank(informationBank);
 
-      Navigator.of(context).pop(true);
+      // Store context for later use
+      final savedContext = context;
 
       switch (_categoryController.text.trim()) {
         case 'Admission':
@@ -564,16 +566,20 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
             await _fileService.saveMultipleScholarships(scholarships);
 
-            _showTopRightAlert(
-              'Found and saved ${scholarships.length} scholarship(s)!',
-              AlertType.success,
-            );
+            if (mounted) {
+              SnackbarUtil.showSuccess(
+                context,
+                'Found and saved ${scholarships.length} scholarship(s)',
+              );
+            }
           } else {
             print("⚠️ No scholarships found in the document");
-            _showTopRightAlert(
-              'No scholarships found in the document',
-              AlertType.warning,
-            );
+            if (mounted) {
+              SnackbarUtil.showWarning(
+                context,
+                'No scholarships found in the document',
+              );
+            }
           }
           break;
 
@@ -649,15 +655,20 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
       await _logUploadAction();
 
-      _showTopRightAlert('Document uploaded successfully!', AlertType.success);
-      Navigator.of(context).pop(true);
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
     } catch (e) {
       print("❌ Upload error: $e");
-      _showTopRightAlert('Upload failed: $e', AlertType.error);
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Upload failed: ${e.toString()}');
+      }
     } finally {
-      setState(() {
-        _isUploading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
     }
   }
 

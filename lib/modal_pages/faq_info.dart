@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:capstone_project/modal_pages/faq_edit.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 void showFAQInfoModal(
   BuildContext context,
@@ -562,45 +563,19 @@ Future<void> _handleDeleteFAQ(
       // Close info modal
       Navigator.of(context).pop();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              const Text('FAQ deleted successfully'),
-            ],
-          ),
-          backgroundColor: const Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      // Show success snackbar using SnackbarUtil
+      SnackbarUtil.showSuccess(context, 'FAQ deleted successfully');
     }
   } catch (error) {
     if (context.mounted) {
       // Close loading dialog
       Navigator.of(context).pop();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Text('Delete failed: $error'),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      // Show error snackbar using SnackbarUtil
+      SnackbarUtil.showError(context, 'Failed to delete FAQ');
     }
   }
 }
-
-
 
 Widget _buildContentCard(String content) {
   return Container(

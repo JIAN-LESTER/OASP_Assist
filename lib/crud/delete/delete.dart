@@ -4,8 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:capstone_project/services/admin_functions.dart' show FirebaseFunctionsService;
-
+import 'package:capstone_project/services/admin_functions.dart'
+    show FirebaseFunctionsService;
+// Add the snackbar utility import
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 class DeleteConfig {
   final String title;
@@ -14,7 +16,8 @@ class DeleteConfig {
   final String titleField;
   final Color? headerColor;
   final IconData? icon;
-  final bool isComplex; // true for document-like deletes, false for simple deletes
+  final bool
+  isComplex; // true for document-like deletes, false for simple deletes
 
   const DeleteConfig({
     required this.title,
@@ -31,7 +34,8 @@ class DeleteConfig {
 class DeleteConfigs {
   static const document = DeleteConfig(
     title: 'Delete Document',
-    confirmationMessage: 'Are you sure you want to delete this document? This action cannot be undone and will also delete related scholarships.',
+    confirmationMessage:
+        'Are you sure you want to delete this document? This action cannot be undone and will also delete related scholarships.',
     successMessage: 'Document deleted successfully',
     titleField: 'ib_title',
     headerColor: Color(0xFFEF4444),
@@ -41,7 +45,8 @@ class DeleteConfigs {
 
   static const announcement = DeleteConfig(
     title: 'Delete Announcement',
-    confirmationMessage: 'Are you sure you want to delete this announcement? This action cannot be undone.',
+    confirmationMessage:
+        'Are you sure you want to delete this announcement? This action cannot be undone.',
     successMessage: 'Announcement deleted successfully',
     titleField: 'message',
     headerColor: Color(0xFFEF4444),
@@ -59,9 +64,10 @@ class DeleteConfigs {
     isComplex: false,
   );
 
-   static const msgLog = DeleteConfig(
+  static const msgLog = DeleteConfig(
     title: 'Delete Message Log',
-    confirmationMessage: 'Are you sure you want to delete this message log entry?',
+    confirmationMessage:
+        'Are you sure you want to delete this message log entry?',
     successMessage: 'Message Log deleted successfully',
     titleField: 'question',
     headerColor: Color(0xFFEF4444),
@@ -79,7 +85,7 @@ class DeleteConfigs {
     isComplex: false,
   );
 
-    static const faqs = DeleteConfig(
+  static const faqs = DeleteConfig(
     title: 'Delete FAQ',
     confirmationMessage: 'Are you sure you want to delete this FAQ?',
     successMessage: 'FAQ deleted successfully',
@@ -89,9 +95,10 @@ class DeleteConfigs {
     isComplex: false,
   );
 
-      static const admissions = DeleteConfig(
+  static const admissions = DeleteConfig(
     title: 'Delete Admission',
-    confirmationMessage: 'Are you sure you want to delete this admission document?',
+    confirmationMessage:
+        'Are you sure you want to delete this admission document?',
     successMessage: 'Admission document deleted successfully',
     titleField: 'title',
     headerColor: Color(0xFFEF4444),
@@ -99,7 +106,7 @@ class DeleteConfigs {
     isComplex: true,
   );
 
-       static const affiliations = DeleteConfig(
+  static const affiliations = DeleteConfig(
     title: 'Delete Affiliation',
     confirmationMessage: 'Are you sure you want to delete this affiliation?',
     successMessage: 'Affiliation document deleted successfully',
@@ -109,7 +116,7 @@ class DeleteConfigs {
     isComplex: false,
   );
 
-         static const users = DeleteConfig(
+  static const users = DeleteConfig(
     title: 'Delete User',
     confirmationMessage: 'Are you sure you want to delete this user?',
     successMessage: 'User deleted successfully',
@@ -119,7 +126,7 @@ class DeleteConfigs {
     isComplex: false,
   );
 
-           static const placements = DeleteConfig(
+  static const placements = DeleteConfig(
     title: 'Delete Company',
     confirmationMessage: 'Are you sure you want to delete this company?',
     successMessage: 'Company deleted successfully',
@@ -128,9 +135,6 @@ class DeleteConfigs {
     icon: Icons.warning_amber_rounded,
     isComplex: false,
   );
-
-  
-
 }
 
 // Reusable delete confirmation dialog
@@ -138,12 +142,10 @@ void showDeleteConfirmation(
   BuildContext context,
   DocumentSnapshot doc,
   DeleteConfig config,
-  String collection,
-  {
-    Future<void> Function(BuildContext, DocumentSnapshot)? customDeleteHandler,
-    Set<String>? deletedItemsTracker, // For announcements tracking
-  }
-) {
+  String collection, {
+  Future<void> Function(BuildContext, DocumentSnapshot)? customDeleteHandler,
+  Set<String>? deletedItemsTracker, // For announcements tracking
+}) {
   final data = doc.data() as Map<String, dynamic>;
   final screenWidth = MediaQuery.of(context).size.width;
   final isMobile = screenWidth < 600;
@@ -289,16 +291,18 @@ void showDeleteConfirmation(
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () => _handleReusableDelete(
-                              context,
-                              doc,
-                              config,
-                              collection,
-                              customDeleteHandler: customDeleteHandler,
-                              deletedItemsTracker: deletedItemsTracker,
-                            ),
+                            onPressed:
+                                () => _handleReusableDelete(
+                                  context,
+                                  doc,
+                                  config,
+                                  collection,
+                                  customDeleteHandler: customDeleteHandler,
+                                  deletedItemsTracker: deletedItemsTracker,
+                                ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: config.headerColor ?? const Color(0xFFEF4444),
+                              backgroundColor:
+                                  config.headerColor ?? const Color(0xFFEF4444),
                               foregroundColor: Colors.white,
                               elevation: 0,
                               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -354,20 +358,19 @@ Future<void> _handleReusableDelete(
   BuildContext context,
   DocumentSnapshot doc,
   DeleteConfig config,
-  String collection,
-  {
-    Future<void> Function(BuildContext, DocumentSnapshot)? customDeleteHandler,
-    Set<String>? deletedItemsTracker,
-  }
-) async {
+  String collection, {
+  Future<void> Function(BuildContext, DocumentSnapshot)? customDeleteHandler,
+  Set<String>? deletedItemsTracker,
+}) async {
   try {
     // Show loading indicator
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF10B981)),
-      ),
+      builder:
+          (context) => const Center(
+            child: CircularProgressIndicator(color: Color(0xFF10B981)),
+          ),
     );
 
     // Use custom handler if provided (for complex deletes like documents)
@@ -384,27 +387,14 @@ Future<void> _handleReusableDelete(
       collection,
       deletedItemsTracker: deletedItemsTracker,
     );
-
   } catch (error) {
     print("❌ Delete operation failed: $error");
 
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Flexible(child: Text('Delete failed: $error')),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      // Use consistent error snackbar
+      SnackbarUtil.showError(context, 'Delete failed: $error');
     }
   }
 }
@@ -414,19 +404,18 @@ Future<void> _performStandardDelete(
   BuildContext context,
   DocumentSnapshot doc,
   DeleteConfig config,
-  String collection,
-  {
-    Set<String>? deletedItemsTracker,
-  }
-) async {
+  String collection, {
+  Set<String>? deletedItemsTracker,
+}) async {
   final currentUser = FirebaseAuth.instance.currentUser;
   String actorName = 'Unknown';
 
   if (currentUser != null) {
-    final currentUserDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(currentUser.uid)
-        .get();
+    final currentUserDoc =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
 
     if (currentUserDoc.exists) {
       final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
@@ -440,7 +429,7 @@ Future<void> _performStandardDelete(
   // For announcements, add to tracking
   if (deletedItemsTracker != null) {
     deletedItemsTracker.add(doc.id);
-    
+
     // Store in deleted_announcements collection
     await FirebaseFirestore.instance
         .collection('deleted_announcements')
@@ -460,21 +449,8 @@ Future<void> _performStandardDelete(
     Navigator.of(context).pop(); // Close loading
     Navigator.of(context).pop(); // Close confirmation dialog
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(config.successMessage)),
-          ],
-        ),
-        backgroundColor: const Color(0xFF10B981),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    // Use consistent success snackbar
+    SnackbarUtil.showSuccess(context, config.successMessage);
   }
 
   // Log the action
@@ -500,10 +476,11 @@ Future<void> handleUserDelete(
     String actorName = 'Unknown';
 
     if (currentUser != null) {
-      final currentUserDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      final currentUserDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
 
       if (currentUserDoc.exists) {
         final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
@@ -534,21 +511,8 @@ Future<void> handleUserDelete(
       Navigator.of(context).pop(); // Close loading
       Navigator.of(context).pop(); // Close confirmation dialog
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              const Text('User deleted successfully'),
-            ],
-          ),
-          backgroundColor: const Color(0xFF10B981),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      // Use consistent success snackbar
+      SnackbarUtil.showSuccess(context, 'User deleted successfully');
     }
 
     // Step 3: Log the action
@@ -570,25 +534,11 @@ Future<void> handleUserDelete(
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Flexible(child: Text('Delete failed: $error')),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      // Use consistent error snackbar
+      SnackbarUtil.showError(context, 'Delete failed: $error');
     }
   }
 }
-
-
 
 Future<void> handleComplexDocumentDelete(
   BuildContext context,
@@ -599,10 +549,11 @@ Future<void> handleComplexDocumentDelete(
     String actorName = 'Unknown';
 
     if (currentUser != null) {
-      final currentUserDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      final currentUserDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
 
       if (currentUserDoc.exists) {
         final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
@@ -617,15 +568,19 @@ Future<void> handleComplexDocumentDelete(
     final firestore = FirebaseFirestore.instance;
 
     // --- Delete related scholarships ---
-    final scholarshipsSnap = await firestore
-        .collection('scholarships')
-        .where('sourceId', isEqualTo: doc.id)
-        .get();
+    final scholarshipsSnap =
+        await firestore
+            .collection('scholarships')
+            .where('sourceId', isEqualTo: doc.id)
+            .get();
 
     List<String> failedScholarshipDeletes = [];
     for (final scholarshipDoc in scholarshipsSnap.docs) {
       try {
-        await firestore.collection('scholarships').doc(scholarshipDoc.id).delete();
+        await firestore
+            .collection('scholarships')
+            .doc(scholarshipDoc.id)
+            .delete();
         print("✅ Deleted scholarship ${scholarshipDoc.id}");
       } catch (e) {
         print("❌ Failed to delete scholarship ${scholarshipDoc.id}: $e");
@@ -634,10 +589,11 @@ Future<void> handleComplexDocumentDelete(
     }
 
     // --- Delete related admissions ---
-    final admissionsSnap = await firestore
-        .collection('admissions')
-        .where('sourceId', isEqualTo: doc.id)
-        .get();
+    final admissionsSnap =
+        await firestore
+            .collection('admissions')
+            .where('sourceId', isEqualTo: doc.id)
+            .get();
 
     List<String> failedAdmissionDeletes = [];
     for (final admissionDoc in admissionsSnap.docs) {
@@ -650,11 +606,11 @@ Future<void> handleComplexDocumentDelete(
       }
     }
 
-
-    final placementsSnap = await firestore
-        .collection('placements')
-        .where('sourceId', isEqualTo: doc.id)
-        .get();
+    final placementsSnap =
+        await firestore
+            .collection('placements')
+            .where('sourceId', isEqualTo: doc.id)
+            .get();
 
     List<String> failedPlacementDeletes = [];
     for (final placementDoc in placementsSnap.docs) {
@@ -676,36 +632,21 @@ Future<void> handleComplexDocumentDelete(
       Navigator.of(context).pop(); // Close loading
       Navigator.of(context).pop(); // Close confirmation
 
-      String message = 'Document deleted successfully';
-      int totalFailures = failedScholarshipDeletes.length +
+      int totalFailures =
+          failedScholarshipDeletes.length +
           failedAdmissionDeletes.length +
           failedPlacementDeletes.length;
 
-      if (totalFailures > 0) {
-        message +=
-            ' ($totalFailures related docs could not be deleted)';
+      if (totalFailures == 0) {
+        // Use consistent success snackbar
+        SnackbarUtil.showSuccess(context, 'Document deleted successfully');
+      } else {
+        // Use warning snackbar for partial success
+        SnackbarUtil.showWarning(
+          context,
+          'Document deleted successfully ($totalFailures related docs could not be deleted)',
+        );
       }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                totalFailures == 0 ? Icons.check_circle : Icons.warning,
-                color: Colors.white,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(child: Text(message)),
-            ],
-          ),
-          backgroundColor:
-              totalFailures == 0 ? const Color(0xFF10B981) : Colors.orange,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          duration: const Duration(seconds: 4),
-        ),
-      );
     }
 
     // Log the action
@@ -738,26 +679,11 @@ Future<void> handleComplexDocumentDelete(
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Flexible(child: Text('Delete failed: $error')),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      // Use consistent error snackbar
+      SnackbarUtil.showError(context, 'Delete failed: $error');
     }
   }
 }
-
-
-
 
 // Improved Weaviate deletion with better error handling
 void _deleteFromPineconeInBackground(
@@ -766,13 +692,12 @@ void _deleteFromPineconeInBackground(
 ) async {
   try {
     final chunkIds = List<String>.from(docData['chunkIds'] ?? []);
-    final apiKey = 'pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa';
-    final indexHost = 'https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io';
+    final apiKey =
+        'pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa';
+    final indexHost =
+        'https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io';
 
-    final authHeader = {
-      'Content-Type': 'application/json',
-      'Api-Key': apiKey,
-    };
+    final authHeader = {'Content-Type': 'application/json', 'Api-Key': apiKey};
 
     int successfulDeletes = 0;
     int failedDeletes = 0;
@@ -794,7 +719,9 @@ void _deleteFromPineconeInBackground(
           print("✅ Pinecone vectors deleted successfully");
           successfulDeletes = chunkIds.length;
         } else {
-          print("⚠️ Failed to delete Pinecone vectors: ${res.statusCode} - ${res.body}");
+          print(
+            "⚠️ Failed to delete Pinecone vectors: ${res.statusCode} - ${res.body}",
+          );
           failedDeletes = chunkIds.length;
         }
       } catch (e) {
@@ -810,7 +737,6 @@ void _deleteFromPineconeInBackground(
     print("   - Vectors attempted: ${chunkIds.length}");
     print("   - Vectors successfully deleted: $successfulDeletes");
     print("   - Vectors failed to delete: $failedDeletes");
-    
   } catch (e) {
     print("❌ Pinecone background deletion failed: $e");
   }

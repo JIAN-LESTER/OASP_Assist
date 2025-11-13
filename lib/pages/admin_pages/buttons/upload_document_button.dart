@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../modal_pages/upload_document_modal.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 class UploadDocumentButton extends StatelessWidget {
   final VoidCallback? onPressed;
@@ -131,10 +132,18 @@ class UploadDocumentButton extends StatelessWidget {
       context: context,
       barrierDismissible: true,
       barrierColor: Colors.black.withOpacity(0.5),
-      builder: (BuildContext context) => dialog,
+      builder: (BuildContext context) {
+        return const UploadDocumentModal();
+      },
     ).then((result) {
-      if (result == true && onUploadComplete != null) {
-        onUploadComplete!();
+      // Show success snackbar when upload is complete
+      if (result == true) {
+        SnackbarUtil.showSuccess(context, 'File uploaded successfully');
+
+        // Call the callback if provided
+        if (onUploadComplete != null) {
+          onUploadComplete!();
+        }
       }
     });
   }
@@ -193,13 +202,17 @@ class CompactUploadButton extends StatelessWidget {
       barrierDismissible: true,
       barrierColor: Colors.black.withOpacity(0.5),
       builder: (BuildContext context) {
-        // Use UploadDocumentModal instead of UploadDocumentContent
         return const UploadDocumentModal();
       },
     ).then((result) {
-      // Call the callback if upload was successful
-      if (result == true && onUploadComplete != null) {
-        onUploadComplete!();
+      // Show success snackbar when upload is complete
+      if (result == true) {
+        SnackbarUtil.showSuccess(context, 'File uploaded successfully');
+
+        // Call the callback if provided
+        if (onUploadComplete != null) {
+          onUploadComplete!();
+        }
       }
     });
   }
@@ -237,13 +250,17 @@ class UploadDocumentFAB extends StatelessWidget {
       barrierDismissible: true,
       barrierColor: Colors.black.withOpacity(0.5),
       builder: (BuildContext context) {
-        // Use UploadDocumentModal instead of UploadDocumentContent
         return const UploadDocumentModal();
       },
     ).then((result) {
-      // Call the callback if upload was successful
-      if (result == true && onUploadComplete != null) {
-        onUploadComplete!();
+      // Show success snackbar when upload is complete
+      if (result == true) {
+        SnackbarUtil.showSuccess(context, 'File uploaded successfully');
+
+        // Call the callback if provided
+        if (onUploadComplete != null) {
+          onUploadComplete!();
+        }
       }
     });
   }

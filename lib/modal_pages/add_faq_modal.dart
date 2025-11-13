@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
-
-import 'modal_widget/top_right_alert.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 void showAddFaqModal(BuildContext context) {
   showGeneralDialog(
@@ -156,12 +155,12 @@ class _AddFaqContentState extends State<AddFaqContent> {
     }
 
     if (_questionController.text.trim().isEmpty) {
-      _showTopRightAlert('Please enter a question', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Please enter a question');
       return;
     }
 
     if (_answerController.text.trim().isEmpty) {
-      _showTopRightAlert('Please enter an answer', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Please enter an answer');
       return;
     }
 
@@ -183,14 +182,20 @@ class _AddFaqContentState extends State<AddFaqContent> {
       // Log the action
       await _logCreateAction();
 
-      _showTopRightAlert('FAQ created successfully!', AlertType.success);
-      Navigator.of(context).pop(true);
+      if (context.mounted) {
+        SnackbarUtil.showSuccess(context, 'FAQ created successfully!');
+        Navigator.of(context).pop(true);
+      }
     } catch (e) {
-      _showTopRightAlert('Failed to create FAQ: $e', AlertType.error);
+      if (context.mounted) {
+        SnackbarUtil.showError(context, 'Failed to create FAQ: $e');
+      }
     } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -221,32 +226,6 @@ class _AddFaqContentState extends State<AddFaqContent> {
     } catch (e) {
       print('Failed to log action: $e');
     }
-  }
-
-  void _showTopRightAlert(String message, AlertType type) {
-    if (!mounted) return;
-
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
-
-    overlayEntry = OverlayEntry(
-      builder:
-          (context) => TopRightAlert(
-            message: message,
-            type: type,
-            onDismiss: () => overlayEntry.remove(),
-            isMobile: widget.isMobile,
-            isTablet: widget.isTablet,
-          ),
-    );
-
-    overlay.insert(overlayEntry);
-
-    Future.delayed(const Duration(seconds: 4), () {
-      if (overlayEntry.mounted) {
-        overlayEntry.remove();
-      }
-    });
   }
 
   @override
@@ -382,8 +361,6 @@ class _AddFaqContentState extends State<AddFaqContent> {
       ),
     );
   }
-
-
 
   Widget _buildCategorySection() {
     return Column(
@@ -539,5 +516,3 @@ class _AddFaqContentState extends State<AddFaqContent> {
     );
   }
 }
-
-

@@ -74,7 +74,8 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  // ✅ OPTIMIZED: Refresh function for the refresh button
+  //  OPTIMIZED: Refresh function for the refresh button
+
   Future<void> _refreshData() async {
     if (!mounted || isRefreshing) return;
 
@@ -98,18 +99,49 @@ class _DashboardPageState extends State<DashboardPage> {
         isRefreshing = false;
       });
 
-      // Show success feedback at bottom right
+      // Show success feedback with responsive sizing
       if (mounted) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isMobile = screenWidth < 600;
+        final isTablet = screenWidth >= 600 && screenWidth < 1100;
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Dashboard refreshed successfully'),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.only(
-              bottom: 16,
-              right: 16,
-              left: MediaQuery.of(context).size.width - 350,
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.check_circle_outline_outlined,
+                  color: Colors.white,
+                  size: isMobile ? 20 : 24,
+                ),
+                SizedBox(width: isMobile ? 8 : 12),
+                Flexible(
+                  child: Text(
+                    'Dashboard refreshed successfully',
+                    style: TextStyle(
+                      fontSize: isMobile ? 15 : (isTablet ? 16 : 17),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 16 : 20,
+              vertical: isMobile ? 14 : 16,
+            ),
+            margin: EdgeInsets.only(
+              bottom: 20,
+              right: 20,
+              left: isMobile ? 20 : (screenWidth - (isTablet ? 380 : 420)),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+            elevation: 6,
           ),
         );
       }
@@ -120,19 +152,50 @@ class _DashboardPageState extends State<DashboardPage> {
         isRefreshing = false;
       });
 
-      // Show error feedback at bottom right
+      // Show error feedback with responsive sizing
       if (mounted) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isMobile = screenWidth < 600;
+        final isTablet = screenWidth >= 600 && screenWidth < 1100;
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Failed to refresh dashboard'),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.red,
-            margin: EdgeInsets.only(
-              bottom: 16,
-              right: 16,
-              left: MediaQuery.of(context).size.width - 350,
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  color: Colors.white,
+                  size: isMobile ? 20 : 24,
+                ),
+                SizedBox(width: isMobile ? 8 : 12),
+                Flexible(
+                  child: Text(
+                    'Failed to refresh dashboard',
+                    style: TextStyle(
+                      fontSize: isMobile ? 15 : (isTablet ? 16 : 17),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red[600],
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 16 : 20,
+              vertical: isMobile ? 14 : 16,
+            ),
+            margin: EdgeInsets.only(
+              bottom: 20,
+              right: 20,
+              left: isMobile ? 20 : (screenWidth - (isTablet ? 380 : 420)),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(isMobile ? 10 : 12),
+            ),
+            elevation: 6,
           ),
         );
       }
