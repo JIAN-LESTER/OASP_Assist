@@ -13,6 +13,7 @@ Widget buildTextField({
     VoidCallback? onTogglePassword,
     String? Function(String?)? validator,
     int maxLines = 1,
+    bool? enabled,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

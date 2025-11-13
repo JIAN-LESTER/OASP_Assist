@@ -1,13 +1,12 @@
 import 'dart:convert';
-import 'dart:io';
+
 import 'package:capstone_project/services/fb_sync.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-import 'package:capstone_project/colors.dart';
+
 import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/category_dropdown_button.dart';
@@ -566,145 +565,6 @@ void _showSyncErrorDialog(String errorMessage) {
 }
 
 
-Future<void> _testFacebookConnection() async {
-  try {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Center(
-        child: Container(
-          padding: EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Testing connection...'),
-            ],
-          ),
-        ),
-      ),
-    );
-    
-    final result = await FacebookSyncService.testConnection();
-    
-    Navigator.pop(context); // Close loading dialog
-    
-    // Show detailed result dialog
-    _showConnectionTestResultDialog(result);
-    
-  } catch (e) {
-    Navigator.pop(context); // Close loading dialog
-    
-    final errorMessage = FacebookSyncService.parseErrorMessage(e);
-    _showErrorSnackBar('Test failed: $errorMessage');
-  }
-}
-
-void _showConnectionTestResultDialog(Map<String, dynamic> result) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Row(
-        children: [
-          Icon(
-            result['success'] == true ? Icons.check_circle : Icons.error,
-            color: result['success'] == true ? Colors.green : Colors.red,
-          ),
-          SizedBox(width: 8),
-          Text('Connection Test'),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildTestResultItem('Status', result['success'] == true ? 'Success' : 'Failed'),
-            
-            if (result['message'] != null)
-              _buildTestResultItem('Message', result['message']),
-            
-            if (result['error'] != null)
-              _buildTestResultItem('Error', result['error'], isError: true),
-            
-            if (result['errorCode'] != null)
-              _buildTestResultItem('Error Code', result['errorCode'].toString()),
-            
-            if (result['tokenInfo'] != null) ...[
-              SizedBox(height: 16),
-              Text('Token Info:', style: TextStyle(fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              _buildTestResultItem('Has Token', result['tokenInfo']['hasToken'].toString()),
-              if (result['tokenInfo']['daysLeft'] != null)
-                _buildTestResultItem('Days Left', result['tokenInfo']['daysLeft'].toString()),
-              if (result['tokenInfo']['pagesCount'] != null)
-                _buildTestResultItem('Pages Count', result['tokenInfo']['pagesCount'].toString()),
-            ],
-            
-            if (result['pageInfo'] != null) ...[
-              SizedBox(height: 16),
-              Text('Page Info:', style: TextStyle(fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              _buildTestResultItem('Page ID', result['pageInfo']['id']),
-              _buildTestResultItem('Page Name', result['pageInfo']['name']),
-              if (result['pageInfo']['about'] != null)
-                _buildTestResultItem('About', result['pageInfo']['about']),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Close'),
-        ),
-        if (result['success'] != true)
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showTokenInputModal();
-            },
-            child: Text('Configure Token'),
-          ),
-      ],
-    ),
-  );
-}
-
-Widget _buildTestResultItem(String label, String value, {bool isError = false}) {
-  return Padding(
-    padding: EdgeInsets.only(bottom: 8),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 120,
-          child: Text(
-            '$label:',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              color: isError ? Colors.red : Colors.black87,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 // Helper methods for snackbars
 void _showSuccessSnackBar(String message) {
   if (!mounted) return;
@@ -753,33 +613,6 @@ void _showErrorSnackBar(String message) {
       ),
     ),
   );
-}
-
-
-
-Future<void> testCloudFunctions() async {
-  print('🧪 Testing Cloud Functions...');
-  
-  try {
-    // Test 1: Simple test function
-    print('Test 1: Calling testSync...');
-    final testCallable = FirebaseFunctions.instance.httpsCallable('testSync');
-    final testResult = await testCallable.call(<String, dynamic>{
-      'test': 'data',
-      'timestamp': DateTime.now().toIso8601String(),
-    });
-    print('✅ testSync response: ${testResult.data}');
-    
-    // Test 2: Actual sync function
-    print('Test 2: Calling manualSyncFacebookPosts...');
-    final syncCallable = FirebaseFunctions.instance
-        .httpsCallable('manualSyncFacebookPosts');
-    final syncResult = await syncCallable.call(<String, dynamic>{});
-    print('✅ manualSyncFacebookPosts response: ${syncResult.data}');
-    
-  } catch (e) {
-    print('❌ Test failed: $e');
-  }
 }
 
   List<DocumentSnapshot> get filteredAnnouncements {
@@ -986,27 +819,7 @@ Future<void> testCloudFunctions() async {
     );
   }
 
- static Future<Map<String, dynamic>> testConnection() async {
-  print('🧪 Testing Facebook connection...');
-  
-  try {
-    final callable = FirebaseFunctions.instance
-        .httpsCallable('testFacebookConnection');
-    
-    final result = await callable.call(<String, dynamic>{})
-        .timeout(Duration(seconds: 30));
-    
-    print('📦 Test result: ${json.encode(result.data)}');
-    return result.data as Map<String, dynamic>;
-  } catch (e) {
-    print('❌ Test failed: $e');
-    rethrow;
-  }
-}
 
-
-
-// Update your refresh button row to include the test button:
 Widget _buildRefreshButton({required bool isDesktop}) {
   return Row(
     children: [
@@ -2612,5 +2425,3 @@ IconData getCategoryIcon(String category) {
 Color getCategoryColor(String category) {
   return getColorForCategory(category);
 }
-
-// FACEBOOK API FUNCTION

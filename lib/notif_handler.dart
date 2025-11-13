@@ -1,5 +1,6 @@
 // Add this to your main.dart or root widget where you initialize NotificationService
 
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -73,11 +74,12 @@ class NotificationNavigationHandler {
 
     try {
       // Fetch escalation details
-      final escalationDoc = await FirebaseFirestore.instance
-          .collection('escalations')
-          .where('escalationId', isEqualTo: escalationId)
-          .limit(1)
-          .get();
+      final escalationDoc =
+          await FirebaseFirestore.instance
+              .collection('escalations')
+              .where('escalationId', isEqualTo: escalationId)
+              .limit(1)
+              .get();
 
       if (escalationDoc.docs.isEmpty) {
         _showErrorDialog(context, 'Escalation not found');
@@ -92,186 +94,187 @@ class NotificationNavigationHandler {
       // Show response dialog
       showDialog(
         context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Color(0xFF2E7D32).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.support_agent,
-                  color: Color(0xFF2E7D32),
-                  size: 24,
-                ),
+        builder:
+            (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              SizedBox(width: 12),
-              Expanded(
+              title: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF2E7D32).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.support_agent,
+                      color: Color(0xFF2E7D32),
+                      size: 24,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Staff Response',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (respondedAt != null)
+                          Text(
+                            formatTime(respondedAt),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.normal,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'Staff Response',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                    // Original question
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.question_answer,
+                                size: 16,
+                                color: Colors.grey.shade600,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Your Question',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            escalation['question'] ?? 'No question available',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    if (respondedAt != null)
-                      Text(
-                        _formatTimestamp(respondedAt.toDate()),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.normal,
+                    SizedBox(height: 16),
+                    // Staff response
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF2E7D32).withOpacity(0.1),
+                            Color(0xFF388E3C).withOpacity(0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Color(0xFF2E7D32).withOpacity(0.3),
                         ),
                       ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.support_agent,
+                                size: 16,
+                                color: Color(0xFF2E7D32),
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Response from $respondedBy',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF2E7D32),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            staffResponse,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade800,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Original question
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.question_answer,
-                            size: 16,
-                            color: Colors.grey.shade600,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'Your Question',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        escalation['question'] ?? 'No question available',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    'Close',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-                SizedBox(height: 16),
-                // Staff response
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF2E7D32).withOpacity(0.1),
-                        Color(0xFF388E3C).withOpacity(0.05),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Color(0xFF2E7D32).withOpacity(0.3),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    // Navigate to conversation
+                    final conversationId = escalation['conversationId'];
+                    if (conversationId != null) {
+                      Navigator.of(context).pushNamed(
+                        '/chat',
+                        arguments: {'conversationId': conversationId},
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF2E7D32),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.support_agent,
-                            size: 16,
-                            color: Color(0xFF2E7D32),
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'Response from $respondedBy',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF2E7D32),
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        staffResponse,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade800,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'View Chat',
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Close',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Navigate to conversation
-                final conversationId = escalation['conversationId'];
-                if (conversationId != null) {
-                  Navigator.of(context).pushNamed(
-                    '/chat',
-                    arguments: {'conversationId': conversationId},
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF2E7D32),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(
-                'View Chat',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
       );
     } catch (e) {
       print('❌ Error fetching escalation: $e');
@@ -304,49 +307,23 @@ class NotificationNavigationHandler {
   void _showErrorDialog(BuildContext context, String message) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.error_outline, color: Colors.red),
-            SizedBox(width: 12),
-            Text('Error'),
-          ],
-        ),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('OK'),
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red),
+                SizedBox(width: 12),
+                Text('Error'),
+              ],
+            ),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('OK'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
-
-  String _formatTimestamp(DateTime timestamp) {
-    final now = DateTime.now();
-    final difference = now.difference(timestamp);
-
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inHours < 1) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inDays < 1) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
-    }
-  }
 }
-
-// Usage in main.dart:
-// void main() {
-//   final navigatorKey = GlobalKey<NavigatorState>();
-//   
-//   runApp(MyApp(navigatorKey: navigatorKey));
-//   
-//   // After NotificationService().initialize()
-//   NotificationNavigationHandler(navigatorKey).setup();
-// }

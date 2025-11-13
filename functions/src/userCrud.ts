@@ -31,11 +31,11 @@ async function isAdmin(uid: string): Promise<boolean> {
   }
 }
 
-// ✅ CRITICAL FIX: Add proper CORS and region configuration
+
 export const createUser = onCall(
   {
-    region: 'us-central1', // ✅ Explicitly set region
-    cors: true, // ✅ Enable CORS
+    region: 'us-central1', 
+    cors: true, 
     invoker: 'private', // ✅ Only authenticated users can call
     timeoutSeconds: 60,
     memory: '256MiB',

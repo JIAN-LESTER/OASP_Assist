@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:capstone_project/colors.dart';
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/pages/admin_pages/buttons/upload_document_button.dart';
 import 'package:capstone_project/modal_pages/ib_edit.dart';
@@ -347,8 +347,6 @@ Widget _buildHeader(
               UploadDocumentButton(),
             ],
           ),
-
-          const SizedBox(height: 20),
 
           // 🔹 Stat Cards Section
           Padding(

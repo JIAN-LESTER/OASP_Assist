@@ -1,3 +1,4 @@
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -54,89 +55,94 @@ class _NotificationModalState extends State<NotificationModal> {
   }
 
   Future<void> _clearAllNotifications() async {
-    if (currentUserId == null) return;
+  if (currentUserId == null) return;
 
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.delete_sweep, color: Colors.red.shade700, size: 28),
-            const SizedBox(width: 12),
-            const Text('Clear All Notifications'),
-          ],
-        ),
-        content: const Text(
-          'Are you sure you want to clear all notifications? This action cannot be undone.',
-          style: TextStyle(fontSize: 15, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: const Text('Clear All'),
-          ),
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      title: Row(
+        children: [
+          Icon(Icons.delete_sweep, color: Colors.red.shade700, size: 28),
+          const SizedBox(width: 12),
+          const Text('Clear All Notifications'),
         ],
       ),
-    );
-
-    if (result == true) {
-      try {
-        Query notificationsQuery = _firestore
-            .collection('notifications')
-            .where('targetRole', isEqualTo: widget.role);
-
-        final snapshot = await notificationsQuery.get();
-
-        final batch = _firestore.batch();
-        for (final doc in snapshot.docs) {
-          batch.delete(doc.reference);
-        }
-        await batch.commit();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white),
-                  SizedBox(width: 12),
-                  Text('All notifications cleared'),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+      content: const Text(
+        'Are you sure you want to clear all notifications? This action cannot be undone.',
+        style: TextStyle(fontSize: 15, height: 1.4),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text('Cancel', style: TextStyle(color: Colors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
             ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error clearing notifications: $e'),
-              backgroundColor: Colors.red,
+          ),
+          child: const Text('Clear All'),
+        ),
+      ],
+    ),
+  );
+
+  if (result == true) {
+    try {
+      // 🔹 Query only notifications for this user
+      Query notificationsQuery = _firestore
+          .collection('notifications')
+          .where('userId', isEqualTo: currentUserId);
+
+      // (Optional) also filter by role if needed:
+      // .where('targetRole', isEqualTo: widget.role);
+
+      final snapshot = await notificationsQuery.get();
+
+      final batch = _firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('All notifications cleared'),
+              ],
             ),
-          );
-        }
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error clearing notifications: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
+}
+
 
   bool _isRead(Map<String, dynamic> data) {
     if (currentUserId == null) return false;
@@ -144,93 +150,6 @@ class _NotificationModalState extends State<NotificationModal> {
     return readBy?.contains(currentUserId) ?? false;
   }
 
-  String _formatTime(Timestamp? timestamp) {
-    if (timestamp == null) return '';
-
-    final now = DateTime.now();
-    final date = timestamp.toDate();
-    final difference = now.difference(date);
-
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
-  }
-
-  String _formatDeadline(dynamic deadline) {
-    if (deadline == null) return '';
-    
-    try {
-      DateTime deadlineDate;
-      
-      if (deadline is Timestamp) {
-        deadlineDate = deadline.toDate();
-      } else if (deadline is String) {
-        if (deadline.contains(RegExp(r'^\d+$'))) {
-          deadlineDate = DateTime.fromMillisecondsSinceEpoch(int.parse(deadline));
-        } else {
-          deadlineDate = DateTime.parse(deadline);
-        }
-      } else {
-        return '';
-      }
-      
-      final now = DateTime.now();
-      final difference = deadlineDate.difference(now);
-      
-      if (difference.inDays < 0) {
-        return '${deadlineDate.day}/${deadlineDate.month}/${deadlineDate.year} (Passed)';
-      } else if (difference.inDays == 0) {
-        return 'Today!';
-      } else if (difference.inDays == 1) {
-        return 'Tomorrow';
-      } else if (difference.inDays <= 7) {
-        return 'In ${difference.inDays} days';
-      } else {
-        return '${deadlineDate.day}/${deadlineDate.month}/${deadlineDate.year}';
-      }
-    } catch (e) {
-      print('Error formatting deadline: $e');
-      return '';
-    }
-  }
-
-  IconData _getNotificationIcon(String? type) {
-    switch (type?.toLowerCase()) {
-      case 'announcement':
-        return Icons.campaign_rounded;
-      case 'deadline_reminder':
-        return Icons.alarm_on_rounded;
-      case 'escalation_reply':
-        return Icons.reply_rounded;
-      case 'new_escalation':
-        return Icons.help_rounded;
-      default:
-        return Icons.notifications_rounded;
-    }
-  }
-
-  Color _getNotificationColor(String? type) {
-    switch (type?.toLowerCase()) {
-      case 'announcement':
-        return const Color(0xFF2E7D32);
-      case 'deadline_reminder':
-        return const Color(0xFFFF6F00);
-      case 'escalation_reply':
-        return const Color(0xFF1976D2);
-      case 'new_escalation':
-        return const Color(0xFFF57C00);
-      default:
-        return const Color(0xFF2E7D32);
-    }
-  }
 
   Future<void> _handleNotificationTap(Map<String, dynamic> data) async {
     final type = data['type'] as String?;
@@ -547,7 +466,7 @@ class _NotificationModalState extends State<NotificationModal> {
                             Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
                             const SizedBox(width: 4),
                             Text(
-                              _formatTime(respondedAt),
+                              formatTime(respondedAt),
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.grey.shade600,
@@ -820,10 +739,10 @@ class _NotificationModalState extends State<NotificationModal> {
                     vertical: 7,
                   ),
                   decoration: BoxDecoration(
-                    color: _getNotificationColor(status).withOpacity(0.15),
+                    color: getNotificationColor(status).withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: _getNotificationColor(status).withOpacity(0.3),
+                      color: getNotificationColor(status).withOpacity(0.3),
                     ),
                   ),
                   child: Text(
@@ -831,7 +750,7 @@ class _NotificationModalState extends State<NotificationModal> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: _getNotificationColor(status),
+                      color: getNotificationColor(status),
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -870,7 +789,7 @@ class _NotificationModalState extends State<NotificationModal> {
                     const SizedBox(height: 14),
                     _buildInfoCard(
                       title: 'Created',
-                      content: _formatTime(createdAt),
+                      content: formatTime(createdAt),
                       icon: Icons.access_time_rounded,
                       color: Colors.grey,
                     ),
@@ -1237,14 +1156,14 @@ class _NotificationModalState extends State<NotificationModal> {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: _getNotificationColor(
+                                  color: getNotificationColor(
                                     notificationType,
                                   ).withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
-                                  _getNotificationIcon(notificationType),
-                                  color: _getNotificationColor(
+                                  getNotificationIcon(notificationType),
+                                  color: getNotificationColor(
                                     notificationType,
                                   ),
                                   size: 20,
@@ -1303,7 +1222,7 @@ class _NotificationModalState extends State<NotificationModal> {
                                       ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      _formatTime(
+                                      formatTime(
                                         data['createdAt'] as Timestamp?,
                                       ),
                                       style: TextStyle(

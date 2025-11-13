@@ -1,3 +1,4 @@
+import 'package:capstone_project/modal_pages/add_edit_placement.dart';
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:capstone_project/modal_pages/pl_info.dart';
@@ -559,9 +560,15 @@ Widget _buildPlacementRow({
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {
-              if (value == 'edit') {
-                showEditPlacementDialog(doc, context);
-              } else if (value == 'delete') {
+             if (value == 'edit') {
+      showDialog(
+        context: context,
+        builder: (context) => PlacementFormDialog(
+          doc: doc,
+          isEdit: true,
+        ),
+      );
+    } else if (value == 'delete') {
                 showDeleteConfirmation(
                   context,
                   doc,
@@ -640,10 +647,15 @@ Widget _buildHeader(
                   ),
                 ],
               ),
-              Row(children: [UploadDocumentButton()]),
+            Row(children: [
+  UploadDocumentButton(
+    formType: 'placement',
+
+  )
+]),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
+ 
                  Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: isMobile
@@ -651,48 +663,26 @@ Widget _buildHeader(
                     spacing: 16,
                     runSpacing: 16,
                     children: [
-                      buildStatCard('Total Users', '59', Colors.blue, Icons.message),
-                      buildStatCard('Active Users', '58', Colors.green, Icons.check_circle),
-                      buildStatCard('New Users (This Month)', '26', Colors.red, Icons.group),
-                      buildStatCard('Users Logged in Today', 'General', Colors.orange, Icons.help_outline),
+                      buildStatCard('Total Companies', '59', Colors.blue, Icons.message),
+                      buildStatCard('Companies Looking for Vacancy', '58', Colors.green, Icons.check_circle),
+                      buildStatCard('Approaching Deadline', '26', Colors.red, Icons.group),
+                    
                     ],
                   )
                 : Row(
                     children: [
                       Expanded(
-                        child: buildStatCard(
-                          'Total Users',
-                          '59',
-                          Colors.blue,
-                          Icons.message,
-                        ),
+                        child:  buildStatCard('Total Companies', '59', Colors.blue, Icons.message),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: buildStatCard(
-                          'Active Users',
-                          '58',
-                          Colors.green,
-                          Icons.check_circle,
-                        ),
+                        child:  buildStatCard('Companies Looking for Vacancy', '58', Colors.green, Icons.check_circle),
                       ),
                       const SizedBox(width: 16),
-                      Expanded(
-                        child: buildStatCard(
-                          'New Users (This Month)',
-                          '26',
-                          Colors.red,
-                          Icons.group,
-                        ),
-                      ),
+                      
                       const SizedBox(width: 16),
                       Expanded(
-                        child: buildStatCard(
-                          'Users Logged in Today',
-                          'General',
-                          Colors.orange,
-                          Icons.help_outline,
-                        ),
+                        child: buildStatCard('Approaching Deadline', '26', Colors.red, Icons.group),
                       ),
                     ],
                   ),

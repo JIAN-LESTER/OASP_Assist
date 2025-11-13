@@ -1,19 +1,20 @@
 import 'dart:async';
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/pages/admin_pages/admin_main_page.dart';
 import 'package:capstone_project/pages/staff_pages/human_escalation.dart';
 import 'package:capstone_project/pages/staff_pages/staff_main_page.dart';
-import 'package:flutter/foundation.dart';
+
 import 'package:flutter/services.dart';
 import 'package:capstone_project/auth_pages/auth_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:capstone_project/auth_pages/email_verification_page.dart';
+
 import 'package:capstone_project/onboarding/onboarding.dart';
 import 'package:capstone_project/onboarding/useronboarding.dart';
 import 'package:capstone_project/pages/admin_pages/information_bank_page.dart';
 import 'package:capstone_project/pages/user_pages/admission_info.dart';
 import 'package:capstone_project/pages/user_pages/chat_page.dart';
-import 'package:capstone_project/pages/user_pages/home.dart';
+
 import 'package:capstone_project/pages/user_pages/placement_info.dart';
 import 'package:capstone_project/pages/user_pages/scholarship_list.dart';
 import 'package:capstone_project/pages/user_pages/user_announcement.dart';
@@ -22,7 +23,7 @@ import 'package:capstone_project/provider/chat_provider.dart';
 import 'package:capstone_project/services/admin_functions.dart';
 import 'package:capstone_project/services/answer_retrieval.dart';
 import 'package:capstone_project/services/cohere_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'package:capstone_project/services/pinecone_service.dart';
 import 'package:capstone_project/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,16 +32,14 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 
-// ✅ Global navigator key - MUST be accessible everywhere
+
+
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// Global initialization flag
+
 bool _servicesInitialized = false;
 
-// ✅ Navigation Handler Class
-// ✅ Navigation Handler Class - FIXED VERSION
 class NotificationNavigationHandler {
   final GlobalKey<NavigatorState> navigatorKey;
 
@@ -185,7 +184,7 @@ class NotificationNavigationHandler {
                     const Text('Staff Response', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                     if (respondedAt != null)
                       Text(
-                        _formatTimestamp(respondedAt.toDate()),
+                        formatTime(respondedAt),
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.normal),
                       ),
                   ],
@@ -371,22 +370,7 @@ class NotificationNavigationHandler {
     );
   }
 
-  String _formatTimestamp(DateTime timestamp) {
-    final now = DateTime.now();
-    final difference = now.difference(timestamp);
 
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inHours < 1) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inDays < 1) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
-    }
-  }
 }
 
 Future<void> initializeServices() async {
@@ -413,19 +397,6 @@ Future<void> initializeServices() async {
       print('✅ Firebase Auth ready');
     } catch (e) {
       print('⚠️ Firebase Auth not ready: $e');
-    }
-    
-    // Step 3: Pre-initialize Cloud Functions (optional, for verification)
-    try {
-      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
-      print('✅ Cloud Functions instance available');
-      
-      // ✅ Test with a simple callable to ensure platform channel works
-      // This helps identify issues early
-      print('🔍 Testing Functions platform channel...');
-    } catch (e) {
-      print('⚠️ Cloud Functions test failed: $e');
-      // Don't fail initialization, just log the issue
     }
     
     // Step 4: Register background message handler
@@ -583,9 +554,6 @@ class MyApp extends StatelessWidget {
         '/informationBank': (context) => InformationBankPage(),
         '/announcements': (context) => const UserAnnouncementPage(),
         '/announcements/detail': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-          // You'll need to create AnnouncementDetailPage
-          // For now, navigate to announcements list
           return const UserAnnouncementPage();
         },
         '/admission': (context) => AdmissionInfo(),

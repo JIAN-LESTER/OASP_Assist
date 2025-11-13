@@ -1,6 +1,7 @@
+import 'package:capstone_project/modal_pages/add_edit_scholarship.dart';
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
+
 import 'package:capstone_project/modal_pages/admission_info.dart';
 import 'package:capstone_project/modal_pages/admission_edit.dart';
 
@@ -536,8 +537,14 @@ Widget _buildAdmissionRow({
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {
               if (value == 'edit') {
-                showEditADModal(context, doc);
-              } else if (value == 'delete') {
+      showDialog(
+        context: context,
+        builder: (context) => ScholarshipFormDialog(
+          doc: doc,
+          isEdit: true,
+        ),
+      );
+    }else if (value == 'delete') {
                 showDeleteConfirmation(
                   context,
                   doc,
@@ -617,10 +624,15 @@ Widget _buildHeader(
                   ),
                 ],
               ),
-              Row(children: [UploadDocumentButton()]),
+              Row(children: [
+  UploadDocumentButton(
+    formType: 'admission',
+    
+  )
+]),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
+  
                  Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: isMobile
@@ -628,17 +640,15 @@ Widget _buildHeader(
                     spacing: 16,
                     runSpacing: 16,
                     children: [
-                      buildStatCard('Total Users', '59', Colors.blue, Icons.message),
-                      buildStatCard('Active Users', '58', Colors.green, Icons.check_circle),
-                      buildStatCard('New Users (This Month)', '26', Colors.red, Icons.group),
-                      buildStatCard('Users Logged in Today', 'General', Colors.orange, Icons.help_outline),
+                      buildStatCard('Latest Admission Academic Year', '59', Colors.blue, Icons.message),
+                      buildStatCard('Total Admission Documents', '58', Colors.green, Icons.check_circle),
                     ],
                   )
                 : Row(
                     children: [
                       Expanded(
                         child: buildStatCard(
-                          'Total Users',
+                          'Latest Admission Academic Year',
                           '59',
                           Colors.blue,
                           Icons.message,
@@ -647,28 +657,10 @@ Widget _buildHeader(
                       const SizedBox(width: 16),
                       Expanded(
                         child: buildStatCard(
-                          'Active Users',
+                          'Total Admission Documents',
                           '58',
                           Colors.green,
                           Icons.check_circle,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: buildStatCard(
-                          'New Users (This Month)',
-                          '26',
-                          Colors.red,
-                          Icons.group,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: buildStatCard(
-                          'Users Logged in Today',
-                          'General',
-                          Colors.orange,
-                          Icons.help_outline,
                         ),
                       ),
                     ],

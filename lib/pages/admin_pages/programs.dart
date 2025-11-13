@@ -589,7 +589,6 @@ Widget _buildHeader(
               ),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: isMobile
@@ -597,49 +596,21 @@ Widget _buildHeader(
                     spacing: 16,
                     runSpacing: 16,
                     children: [
-                      buildStatCard('Total Messages', '59', Colors.blue, Icons.message),
-                      buildStatCard('Answered Messages', '58', Colors.green, Icons.check_circle),
-                      buildStatCard('Total Users', '26', Colors.red, Icons.group),
-                      buildStatCard('Most Frequent Category', 'General', Colors.orange, Icons.help_outline),
+                      buildStatCard('Total Programs', '59', Colors.blue, Icons.message),
+                      buildStatCard('Programs with Most Students Registered', '58', Colors.green, Icons.check_circle),
+                    
                     ],
                   )
                 : Row(
                     children: [
                       Expanded(
-                        child: buildStatCard(
-                          'Total Messages',
-                          '59',
-                          Colors.blue,
-                          Icons.message,
-                        ),
+                        child:  buildStatCard('Total Programs', '59', Colors.blue, Icons.message)
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: buildStatCard(
-                          'Answered Messages',
-                          '58',
-                          Colors.green,
-                          Icons.check_circle,
-                        ),
+                        child:  buildStatCard('Programs with Most Students Registered', '58', Colors.green, Icons.check_circle)
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: buildStatCard(
-                          'Total Users',
-                          '26',
-                          Colors.red,
-                          Icons.group,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: buildStatCard(
-                          'Most Frequent Category',
-                          'General',
-                          Colors.orange,
-                          Icons.help_outline,
-                        ),
-                      ),
+                    
                     ],
                   ),
           ),

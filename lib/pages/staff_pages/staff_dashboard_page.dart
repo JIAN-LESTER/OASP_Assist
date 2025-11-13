@@ -1,8 +1,12 @@
+import 'package:capstone_project/pages/data/chatbot_usage_data.dart';
+import 'package:capstone_project/pages/data/inquiry_trends_charts.dart';
+import 'package:capstone_project/pages/data/inquiry_trends_data.dart';
+import 'package:capstone_project/pages/data/user_demographics_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'package:capstone_project/colors.dart';
+import 'package:capstone_project/icon_and_color.dart';
 
 import 'package:capstone_project/pages/admin_pages/widgets/custom_dropdown_button.dart';
 import 'package:capstone_project/pages/data/charts.dart';

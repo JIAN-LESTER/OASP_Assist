@@ -513,10 +513,11 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   Future<void> _setupConversation() async {
     try {
       String conversationId;
+         final user = FirebaseAuth.instance.currentUser;
 
       if (widget.conversationId.isEmpty) {
         if (widget.initialMessage != null) {
-          conversationId = await UserConstant.createNewConversation();
+          conversationId = await UserConstant.createNewConversation(user!.uid);
         } else {
           conversationId = widget.conversationId;
         }

@@ -929,7 +929,21 @@ class _RegisterPageState extends State<RegisterPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(height: largeSpacing),
-            Icon(Icons.person_add, size: iconSize, color: primaryColor),
+            SizedBox(
+              width: 120,
+              height: 120,
+              child: Image.asset(
+                'lib/images/oasp.png',
+                fit: BoxFit.contain, // or BoxFit.cover / BoxFit.fitWidth
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(
+                    Icons.smart_toy_outlined,
+                    color: Color(0xFF2E7D32),
+                    size: 100, // optional smaller icon size
+                  );
+                },
+              ),
+            ),
             SizedBox(height: sectionSpacing),
             Text(
               "Create Account",

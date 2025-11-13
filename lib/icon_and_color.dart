@@ -1,5 +1,6 @@
-  import 'package:flutter/material.dart';
+  import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+
 
 class CategoryStyle {
   final String displayName;
@@ -113,6 +114,57 @@ IconData getCategoryIcon(String? category) {
         return Colors.green;
       default:
         return Colors.green;
+    }
+  }
+
+
+  String formatTime(Timestamp? timestamp) {
+    if (timestamp == null) return '';
+
+    final now = DateTime.now();
+    final date = timestamp.toDate();
+    final difference = now.difference(date);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
+  }
+
+  IconData getNotificationIcon(String? type) {
+    switch (type?.toLowerCase()) {
+      case 'announcement':
+        return Icons.campaign_rounded;
+      case 'deadline_reminder':
+        return Icons.alarm_on_rounded;
+      case 'escalation_reply':
+        return Icons.reply_rounded;
+      case 'new_escalation':
+        return Icons.help_rounded;
+      default:
+        return Icons.notifications_rounded;
+    }
+  }
+
+  Color getNotificationColor(String? type) {
+    switch (type?.toLowerCase()) {
+      case 'announcement':
+        return const Color(0xFF2E7D32);
+      case 'deadline_reminder':
+        return const Color(0xFFFF6F00);
+      case 'escalation_reply':
+        return const Color(0xFF1976D2);
+      case 'new_escalation':
+        return const Color(0xFFF57C00);
+      default:
+        return const Color(0xFF2E7D32);
     }
   }
 

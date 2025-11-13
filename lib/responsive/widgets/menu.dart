@@ -286,7 +286,7 @@ static Widget buildPersistentDrawer({
               index: 4,
             ),
                     MenuItem(
-              icon: Icons.announcement_outlined,
+              icon: Icons.people,
               title: 'Human Escalation',
               index: 5,
             ),

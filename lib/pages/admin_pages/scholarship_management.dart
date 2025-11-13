@@ -1,3 +1,4 @@
+import 'package:capstone_project/modal_pages/add_edit_scholarship.dart';
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -568,8 +569,14 @@ Widget _buildScholarshipRow({
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {
               if (value == 'edit') {
-                showEditSCModal(context, doc);
-              } else if (value == 'delete') {
+      showDialog(
+        context: context,
+        builder: (context) => ScholarshipFormDialog(
+          doc: doc,
+          isEdit: true,
+        ),
+      );
+    }else if (value == 'delete') {
                 showDeleteConfirmation(
                   context,
                   doc,
@@ -649,10 +656,15 @@ Widget _buildHeader(
                   ),
                 ],
               ),
-              Row(children: [UploadDocumentButton()]),
+             Row(children: [
+  UploadDocumentButton(
+    formType: 'scholarship',
+   
+  )
+]),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
+
                  Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: isMobile
@@ -661,7 +673,8 @@ Widget _buildHeader(
                     runSpacing: 16,
                     children: [
                       buildStatCard('Total Scholarships', '59', Colors.blue, Icons.message),
-                      buildStatCard('New Scholarship', '58', Colors.green, Icons.check_circle),
+                    
+                      buildStatCard('Approaching Deadline', '58', Colors.green, Icons.check_circle),
     
                     ],
                   )
@@ -679,6 +692,14 @@ Widget _buildHeader(
                       Expanded(
                         child: buildStatCard(
                           'New Scholarship',
+                          '58',
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                      ),
+                      Expanded(
+                        child: buildStatCard(
+                          'Approaching Deadline',
                           '58',
                           Colors.green,
                           Icons.check_circle,

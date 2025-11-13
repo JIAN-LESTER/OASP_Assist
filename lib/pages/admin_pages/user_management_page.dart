@@ -1,13 +1,12 @@
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:capstone_project/crud/delete/delete.dart';
 
 import 'package:capstone_project/pages/admin_pages/buttons/add_user_button.dart';
 import 'package:capstone_project/modal_pages/edit_user_modal.dart';
 import 'package:capstone_project/modal_pages/user_info.dart';
-import 'package:capstone_project/pages/admin_pages/buttons/affiliation.dart';
-import 'package:capstone_project/pages/admin_pages/buttons/program.dart';
+
 import 'package:capstone_project/pages/admin_pages/widgets/pagination.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/role_dropdown_button.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/search_field.dart';
@@ -654,7 +653,7 @@ Widget _buildHeader(
               ),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
+ 
            // 🔹 Stat Cards Section
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),

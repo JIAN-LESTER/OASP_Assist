@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:capstone_project/colors.dart';
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/modal_pages/msg_logs_info.dart';
 import 'package:capstone_project/models/message_logs.dart';

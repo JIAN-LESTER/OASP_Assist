@@ -7,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:capstone_project/pages/user_pages/home.dart';
-import 'package:capstone_project/pages/user_pages/user_dashboard.dart';
+
 import 'package:provider/provider.dart';
 
 import 'package:capstone_project/pages/user_pages/admission_info.dart';
@@ -492,44 +492,89 @@ Future<void> _initializeConversationId() async {
 
  void _onNewChatPressed() async {
   print('🆕 New Chat button pressed');
-  print('   - Current index: $_selectedIndex');
   
   HapticFeedback.mediumImpact();
 
-  // ✅ STEP 1: Navigate to chat tab FIRST
+  // ✅ STEP 1: Clear UI immediately - show blank state
+  if (mounted) {
+    setState(() {
+      _conversationId = null; // Clear conversation ID first
+      _pendingConversationId = null;
+      _showFAQs = false; // Hide FAQs temporarily during transition
+    });
+  }
+
+  // Small delay to let UI update
+  await Future.delayed(Duration(milliseconds: 100));
+
+  // ✅ STEP 2: Navigate to chat tab if needed
   if (_selectedIndex != 1) {
     setState(() {
       _selectedIndex = 1;
       _tabController.index = 1;
     });
-    
-    // Small delay to ensure UI updates
-    await Future.delayed(Duration(milliseconds: 100));
+    await Future.delayed(Duration(milliseconds: 200));
   }
 
-  // ✅ STEP 2: Clear and create new chat
-  if (mounted) {
-    // Clear current state
-    setState(() {
-      _showFAQs = true; // Show FAQs immediately
-      _conversationId = null;
-      _pendingConversationId = null;
-    });
+  // ✅ STEP 3: Clear messages in provider BEFORE creating new conversation
+  try {
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    
+    if (userId == null) {
+      _showErrorSnackBar('Please log in to start a chat');
+      return;
+    }
 
-    // Create new chat
-    await UserConstant.startNewChat(context, null, false);
-
-    // Update with the new conversation ID
-    final newId = UserConstant.selectedConversationId;
-    if (newId != null && mounted) {
+    print('🧹 Clearing messages immediately...');
+    chatProvider.clearMessages(); // Clear FIRST
+    
+    print('📝 Ending all active conversations...');
+    await UserConstant.endAllActiveConversations(userId);
+    
+    print('✨ Creating new conversation...');
+    final newConversationId = await UserConstant.createNewConversation(userId);
+    
+    print('🔧 Setting up conversation: $newConversationId');
+    await chatProvider.setConversationId(newConversationId);
+    await UserConstant.setSelectedConversation(newConversationId);
+    
+    // ✅ STEP 4: Update UI with new conversation and FAQs
+    if (mounted) {
       setState(() {
-        _conversationId = newId;
-        _pendingConversationId = newId;
-        _showFAQs = true; // Ensure FAQs stay visible
+        _conversationId = newConversationId;
+        _pendingConversationId = newConversationId;
+        _showFAQs = true; // Show FAQs for new chat
       });
-      print('✅ New chat created: $newId with FAQs visible');
+    }
+    
+    print('✅ New chat created: $newConversationId');
+  } catch (e) {
+    print('❌ Error creating new chat: $e');
+    if (mounted) {
+      _showErrorSnackBar('Failed to create new chat: ${e.toString()}');
+      setState(() {
+        _showFAQs = true; // Show FAQs on error
+      });
     }
   }
+}
+
+void _showErrorSnackBar(String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          Icon(Icons.error_outline, color: Colors.white, size: 20),
+          SizedBox(width: 12),
+          Expanded(child: Text(message)),
+        ],
+      ),
+      backgroundColor: Colors.red.shade400,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+  );
 }
 
 
@@ -539,7 +584,7 @@ Future<void> _initializeConversationId() async {
       if (user == null) return;
 
       if (_conversationId == null) {
-        final newConversationId = await UserConstant.createNewConversation();
+        final newConversationId = await UserConstant.createNewConversation(user.uid);
         setState(() {
           _conversationId = newConversationId;
         });
@@ -612,13 +657,14 @@ Future<void> _initializeConversationId() async {
           );
         }
 
-       final List<Widget> _pages = [
+      final List<Widget> _pages = [
   const HomeDashboard(),
+  // ✅ Use ObjectKey to force complete rebuild
   ChatPage(
+    key: ObjectKey(_conversationId ?? 'new_chat_${DateTime.now().millisecondsSinceEpoch}'),
     conversationId: _conversationId ?? _pendingConversationId ?? '',
     showFAQs: _showFAQs,
     onFAQToggle: _toggleFAQs,
-    key: ValueKey(_conversationId ?? _pendingConversationId), // ✅ Force rebuild when conversation changes
   ),
   const UserAnnouncementPage(),
   const AdmissionInfo(),

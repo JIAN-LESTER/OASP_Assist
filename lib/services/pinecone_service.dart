@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'package:http/http.dart' as http;
 
 class PineconeCloudService {
@@ -371,24 +371,6 @@ class PineconeCloudService {
     } catch (e) {
       print('❌ Error fetching vectors: $e');
       return null;
-    }
-  }
-
-  /// Test connection to Pinecone
-  Future<bool> testConnection() async {
-    try {
-      print('🧪 Testing Pinecone connection...');
-
-      final isHealthy = await this.isHealthy();
-      if (!isHealthy) {
-        return false;
-      }
-
-      print('✅ Pinecone connection test successful');
-      return true;
-    } catch (e) {
-      print('❌ Pinecone connection test failed: $e');
-      return false;
     }
   }
 

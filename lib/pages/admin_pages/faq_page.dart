@@ -2,7 +2,7 @@ import 'package:capstone_project/pages/data/charts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:capstone_project/colors.dart';
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/pages/admin_pages/buttons/add_faq_button.dart';
 import 'package:capstone_project/modal_pages/faq_edit.dart'
@@ -340,7 +340,7 @@ Widget _buildHeader(
               AddFaqButton(),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
+       
            // 🔹 Stat Cards Section
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),

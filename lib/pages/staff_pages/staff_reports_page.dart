@@ -1,7 +1,13 @@
+
+import 'package:capstone_project/pages/data/chatbot_usage_data.dart';
+import 'package:capstone_project/pages/data/inquiry_trends_charts.dart';
+import 'package:capstone_project/pages/data/inquiry_trends_data.dart';
+import 'package:capstone_project/pages/data/user_demographics_data.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:capstone_project/colors.dart';
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/custom_dropdown_button.dart';
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:capstone_project/pages/data/reports.dart';
@@ -374,16 +380,6 @@ class ReportsHelper {
     switch (reportType) {
       case 'Inquiry Trends':
         return buildInquiryTrendsReport(inq, isDesktop: isDesktop);
-      case 'Chatbot Usage':
-        return buildChatbotUsageReport(
-          cb,
-          startDate,
-          timeCategoryCounts,
-          timeFrame,
-          isDesktop: isDesktop,
-        );
-      case 'User Demographics':
-        return buildUserDemographicsReport(ud, isDesktop: isDesktop);
       default:
         return buildInquiryTrendsReport(inq, isDesktop: isDesktop);
     }
@@ -476,11 +472,7 @@ List<Widget> buildInquiryTrendsReport(
       height: 400,
       child: Row(
         children: [
-          Expanded(
-            child: buildResponseDistributionCard(
-              data?.responseDistribution ?? {},
-            ),
-          ),
+        
           const SizedBox(width: 20),
           Expanded(child: buildSeasonalTrendsCard(data?.seasonalTrends ?? {})),
         ],
@@ -488,269 +480,10 @@ List<Widget> buildInquiryTrendsReport(
     ),
 
     const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-          Expanded(
-            child: buildTop5UnansweredCard(data?.top5UnansweredInquiries ?? []),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: buildTop5EscalatedCard(data?.top5EscalatedInquiries ?? []),
-          ),
-        ],
-      ),
-    ),
+    
   ];
 }
 
-List<Widget> buildChatbotUsageReport(
-  ChatbotUsageReportsData? data,
-  DateTime start,
-  Map<String, Map<String, int>> timeCategoryCounts,
-  String timeFrame, {
-  bool isDesktop = false,
-}) {
-  // Safe way to get trend data with null checks
-  List<ChartData> getConversationTrendData() {
-    if (data == null) return <ChartData>[];
-
-    switch (timeFrame) {
-      case 'Today':
-        return data.dailySessions ?? <ChartData>[];
-      case 'This Week':
-        return data.weeklySessions ?? <ChartData>[];
-      case 'This Month':
-        return data.monthlySessions ?? <ChartData>[];
-      case 'This Year':
-        return data.monthlySessions ?? <ChartData>[];
-      default:
-        return data.dailySessions ?? <ChartData>[];
-    }
-  }
-
-  final conversationTrend = getConversationTrendData(
-    // start,
-    // timeFrame,
-    // timeCategoryCounts,
-  );
-
-  return [
-  
-
-    // Usage Stats
-    SizedBox(
-      height: 120,
-      child: Row(
-        children: [
-          Expanded(
-            child: buildStatCard(
-              'Average Response Time',
-              '${(data?.averageResponseTime ?? 0).toStringAsFixed(2)}s',
-              Colors.blue,
-              Icons.timer,
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: buildStatCard(
-              'Total Sessions',
-              '${data?.totalSessions ?? 0}',
-              Colors.green,
-              Icons.chat,
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: buildStatCard(
-              'Avg Messages/User',
-              '${(data?.averageMessagesPerUser ?? 0).toStringAsFixed(1)}',
-              Colors.orange,
-              Icons.person,
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: buildStatCard(
-              'Avg Session Length',
-              '${(data?.averageSessionLength ?? 0).toStringAsFixed(0)}s',
-              Colors.purple,
-              Icons.trending_up,
-            ),
-          ),
-        ],
-      ),
-    ),
-    const SizedBox(height: 32),
-
-    // Usage Patterns
-  
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-          Expanded(
-            child: buildConversationsOverTimeCard(conversationTrend, timeFrame),
-          ),
-         
-        ],
-      ),
-    ),
-
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 350,
-      child: Row(
-        children: [
-              Expanded(child: buildUsersByCourseCard(data?.usersByCourse ?? <String, int>{})),
-          const SizedBox(width: 20),
-          Expanded(child: buildPeakUsageHoursCard(data?.peakUsageByHour ?? <int, int>{})),
-        ],
-      ),
-    ),
-
-  
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-          Expanded(
-            child: buildTop10ActiveUsersCard(data?.top10ActiveUsers ?? <MapEntry<String, int>>[]),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: buildUsersByYearLevelCard(data?.usersByYearLevel ?? <String, int>{}),
-          ),
-        ],
-      ),
-    ),
-
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-
-          Expanded(
-            child: buildResponseTimeTrendCard(data?.responseTimeTrend ?? <ChartData>[]), // Fixed null issue
-          ),
-        ],
-      ),
-    ),
-  ];
-}
-
-List<Widget> buildUserDemographicsReport(
-  UserDemographicsReportsData? data, {
-  bool isDesktop = false,
-}) {
-  return [
-    
-
-    // Demographics Stats
-    SizedBox(
-      height: 120,
-      child: Row(
-        children: [
-          Expanded(
-            child: buildStatCard(
-              'Total Users',
-              '${data?.totalUsers ?? 0}',
-              Colors.blue,
-              Icons.people,
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: buildStatCard(
-              'Enrolled Users',
-              '${data?.activeUsers ?? 0}',
-              Colors.green,
-              Icons.person_outline,
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: buildStatCard(
-              'Users with Scholarships',
-              '${data?.newlyRegisteredUsers ?? 0}',
-              Colors.orange,
-              Icons.person_add,
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: buildStatCard(
-              'Affiliated Users',
-              '${data?.affiliatedUsers ?? 0}',
-              Colors.purple,
-              Icons.business,
-            ),
-          ),
-        ],
-      ),
-    ),
-    const SizedBox(height: 16),
-
-
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-          Expanded(
-            child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
-          ),
-        ],
-      ),
-    ),
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-          Expanded(child: buildUsersByYearCard(data?.usersByYear ?? {})),
-          const SizedBox(width: 20),
-    
-        ],
-      ),
-    ),
-
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-      //  Expanded(
-      //       child: buildEnrollmentStatusCard(data?.enrollmentStatus ?? {}),
-      //     ),
-      //     const SizedBox(width: 20),
-      //    Expanded(
-      //       child: buildScholarshipStatusCard(data?.scholarshipStatus ?? {}),
-      //     ),
-            Expanded(child: buildUsersByProgramCard(data?.usersByProgram ?? {})),
-        ],
-      ),
-    ),
-
-    
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-       
-      
-          Expanded(
-            child: buildScholarshipTypesCard(data?.scholarshipTypes ?? {}),
-          ),
-        ],
-      ),
-    ),
-  ];
-}
 
 
 

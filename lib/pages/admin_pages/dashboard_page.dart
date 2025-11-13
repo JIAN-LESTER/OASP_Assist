@@ -1,3 +1,9 @@
+
+import 'package:capstone_project/pages/data/chatbot_usage_data.dart';
+import 'package:capstone_project/pages/data/inquiry_trends_charts.dart';
+import 'package:capstone_project/pages/data/inquiry_trends_data.dart';
+import 'package:capstone_project/pages/data/user_demographics_data.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 

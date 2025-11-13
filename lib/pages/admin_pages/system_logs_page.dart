@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:intl/intl.dart';
-import 'package:capstone_project/colors.dart';
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/modal_pages/log_info.dart';
 import 'package:capstone_project/models/logs.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/date_range_filter.dart';

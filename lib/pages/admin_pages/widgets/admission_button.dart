@@ -1,6 +1,3 @@
-import 'package:capstone_project/modal_pages/add_edit_admission.dart';
-import 'package:capstone_project/modal_pages/add_edit_placement.dart';
-import 'package:capstone_project/modal_pages/add_edit_scholarship.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9,14 +6,10 @@ import '../../../modal_pages/upload_document_modal.dart';
 class UploadDocumentButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final VoidCallback? onUploadComplete;
-  final String? formType; // 'admission', 'scholarship', 'placement', or null for general upload
+  
 
-  const UploadDocumentButton({
-    Key? key, 
-    this.onPressed, 
-    this.onUploadComplete,
-    this.formType,
-  }) : super(key: key);
+  const UploadDocumentButton({Key? key, this.onPressed, this.onUploadComplete})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -55,8 +48,8 @@ class UploadDocumentButton extends StatelessWidget {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-           borderRadius: BorderRadius.circular(borderRadius),
-          onTap: onPressed ?? () => _showOptionsModal(context),
+              borderRadius: BorderRadius.circular(borderRadius),
+              onTap: onPressed ?? () => _showUploadDocumentModal(context),
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                 child: Row(
@@ -87,52 +80,19 @@ class UploadDocumentButton extends StatelessWidget {
     );
   }
 
-   void _showOptionsModal(BuildContext context) {
+  void _showUploadDocumentModal(BuildContext context) {
     HapticFeedback.mediumImpact();
-
-    if (formType != null) {
-      // Show specific form dialog
-      _showFormDialog(context, formType!);
-    } else {
-      // Show the general upload document modal
-      showDialog(
-        context: context,
-        barrierDismissible: true,
-        barrierColor: Colors.black.withOpacity(0.5),
-        builder: (BuildContext context) {
-          return const UploadDocumentModal();
-        },
-      ).then((result) {
-        if (result == true && onUploadComplete != null) {
-          onUploadComplete!();
-        }
-      });
-    }
-  }
-
-    void _showFormDialog(BuildContext context, String type) {
-    Widget dialog;
-    
-    switch (type) {
-      case 'admission':
-        dialog = AdmissionFormDialog(isEdit: false);
-        break;
-      case 'scholarship':
-        dialog = ScholarshipFormDialog(isEdit: false);
-        break;
-      case 'placement':
-        dialog = PlacementFormDialog(isEdit: false);
-        break;
-      default:
-        return;
-    }
 
     showDialog(
       context: context,
       barrierDismissible: true,
       barrierColor: Colors.black.withOpacity(0.5),
-      builder: (BuildContext context) => dialog,
+      builder: (BuildContext context) {
+        // Use UploadDocumentModal instead of UploadDocumentContent
+        return const UploadDocumentModal();
+      },
     ).then((result) {
+      // Call the callback if upload was successful
       if (result == true && onUploadComplete != null) {
         onUploadComplete!();
       }

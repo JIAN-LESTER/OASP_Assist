@@ -99,18 +99,29 @@ bool _isCreatingMessage = false;
   final String _apiKey = "IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
 
   Future<void> setConversationId(String id) async {
-    conversationId = id;
-    _messages.clear();
-     _processedMessages.clear(); 
-  _streamingContent.clear(); 
-    currentConversation = null;
+  print('🔧 Setting conversation ID: $id');
+  
+  // Clear everything first
+  _messages.clear();
+  _processedMessages.clear(); 
+  _streamingContent.clear();
+  
+  conversationId = id;
+  currentConversation = null;
+  
+  // Notify immediately with cleared state
+  notifyListeners();
+  
+  // Then load the conversation info
+  await loadConversationInfo();
+  await loadExistingMessages();
 
-    await loadConversationInfo();
-    await loadExistingMessages();
-
-    _messagesSubscription?.cancel();
-    listenToMessages();
-  }
+  // Cancel old subscription and start new one
+  _messagesSubscription?.cancel();
+  listenToMessages();
+  
+  print('✅ Conversation setup complete. Messages: ${_messages.length}');
+}
 
   Future<void> loadConversationInfo() async {
     if (conversationId == null) return;
@@ -480,34 +491,36 @@ Future<void> askQuestionWithStreaming(BuildContext context, String question) asy
     print('⚡ Total response time: ${responseTime.toStringAsFixed(2)}s');
 
     // ✅ Save to Firestore with verified content
-    try {
-      final batch = _firestore.batch();
-      
-      final botMessageRef = _firestore
-          .collection('conversations')
-          .doc(conversationId!)
-          .collection('messages')
-          .doc(botMessageId);
-      
-      final finalBotMessage = _messages.firstWhere((m) => m.id == botMessageId);
-      
-      print('💾 Saving to Firestore: ${finalBotMessage.content.length} chars');
-      
-      batch.set(botMessageRef, _messageToMap(finalBotMessage));
-      
-      batch.update(userMessageRef, {
-        'isAnswered': true,
-        'answeredAt': Timestamp.now(),
-        'responseTime': responseTime,
-      });
-      
-      await batch.commit();
-      print('✅ Saved to Firestore successfully');
-      
-    } catch (saveError) {
-      print('❌ Error saving to Firestore: $saveError');
-    }
-
+  try {
+  final batch = _firestore.batch();
+  
+  final botMessageRef = _firestore
+      .collection('conversations')
+      .doc(conversationId!)
+      .collection('messages')
+      .doc(botMessageId);
+  
+  final finalBotMessage = _messages.firstWhere((m) => m.id == botMessageId);
+  
+  print('💾 Saving to Firestore: ${finalBotMessage.content.length} chars');
+  
+  batch.set(botMessageRef, _messageToMap(finalBotMessage));
+  
+  batch.update(userMessageRef, {
+    'isAnswered': true,
+    'answeredAt': Timestamp.now(),
+    'responseTime': responseTime,
+  });
+  
+  await batch.commit();
+  print('✅ Saved to Firestore successfully');
+  
+  // ✅ ADD THIS: Update conversation title after first message
+  await _updateConversationTitleIfNeeded(question);
+  
+} catch (saveError) {
+  print('❌ Error saving to Firestore: $saveError');
+}
     unawaited(_handlePostResponseTasks(
       context,
       question, 
@@ -720,24 +733,25 @@ Future<List<double>> _generateEmbeddingCached(String text) async {
     }
   }
 
-  Future<void> _handlePostResponseTasks(
-    BuildContext context,
-    String question,
-    String answerText,
-    List<double> currentEmbedding,
-    String category,
-    String? userId,
-  ) async {
-    try {
-      await Future.wait([
-        _logMessageAction(question, answerText),
-        checkEscalation(context, answerText, userId, question),
-        _checkAndPromoteToFAQOptimized(question, currentEmbedding, answerText, category),
-      ]);
-    } catch (e) {
-      print('Error in post-response tasks: $e');
-    }
+ Future<void> _handlePostResponseTasks(
+  BuildContext context,
+  String question,
+  String answerText,
+  List<double> currentEmbedding,
+  String category,
+  String? userId,
+) async {
+  try {
+    await Future.wait([
+      _logMessageAction(question, answerText),
+      checkEscalation(context, answerText, userId, question),
+      _checkAndPromoteToFAQOptimized(question, currentEmbedding, answerText, category),
+      _updateConversationTitleIfNeeded(question), // ✅ ADD THIS LINE
+    ]);
+  } catch (e) {
+    print('Error in post-response tasks: $e');
   }
+}
 
 
 
@@ -1305,11 +1319,15 @@ $question
     return denominator == 0 ? 0.0 : dotProduct / denominator;
   }
 
- void clearMessages() {
+void clearMessages() {
+  print('🧹 CLEARING ALL MESSAGES');
   _messages.clear();
   _processedMessages.clear(); 
-  _streamingContent.clear(); 
-  notifyListeners();
+  _streamingContent.clear();
+  conversationId = null; // ✅ Also clear conversation ID
+  currentConversation = null; // ✅ Clear conversation object
+  notifyListeners(); // ✅ Notify listeners immediately
+  print('✅ Messages cleared. Count: ${_messages.length}');
 }
 
   @override

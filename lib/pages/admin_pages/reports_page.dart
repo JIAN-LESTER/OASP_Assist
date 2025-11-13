@@ -1,7 +1,14 @@
+import 'package:capstone_project/pages/data/chatbot_usage_charts.dart';
+import 'package:capstone_project/pages/data/chatbot_usage_data.dart';
+
+import 'package:capstone_project/pages/data/inquiry_trends_charts.dart';
+import 'package:capstone_project/pages/data/inquiry_trends_data.dart';
+
+import 'package:capstone_project/pages/data/user_demographics_charts.dart';
+import 'package:capstone_project/pages/data/user_demographics_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:capstone_project/colors.dart';
+
 import 'package:capstone_project/pages/admin_pages/widgets/custom_dropdown_button.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/refresh_button.dart';
 import 'package:capstone_project/pages/data/charts.dart';
@@ -542,28 +549,8 @@ List<Widget> buildInquiryTrendsReport(
       height: 400,
       child: Row(
         children: [
-          Expanded(
-            child: buildResponseDistributionCard(
-              data?.responseDistribution ?? {},
-            ),
-          ),
-          const SizedBox(width: 20),
+        
           Expanded(child: buildSeasonalTrendsCard(data?.seasonalTrends ?? {})),
-        ],
-      ),
-    ),
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-          Expanded(
-            child: buildTop5UnansweredCard(data?.top5UnansweredInquiries ?? []),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: buildTop5EscalatedCard(data?.top5EscalatedInquiries ?? []),
-          ),
         ],
       ),
     ),
@@ -656,12 +643,7 @@ List<Widget> buildChatbotUsageReport(
       height: 350,
       child: Row(
         children: [
-          Expanded(
-            child: buildUsersByCourseCard(
-              data?.usersByCourse ?? <String, int>{},
-            ),
-          ),
-          const SizedBox(width: 20),
+         
           Expanded(
             child: buildPeakUsageHoursCard(
               data?.peakUsageByHour ?? <int, int>{},
@@ -675,9 +657,9 @@ List<Widget> buildChatbotUsageReport(
       height: 400,
       child: Row(
         children: [
-          Expanded(
-            child: buildTop10ActiveUsersCard(
-              data?.top10ActiveUsers ?? <MapEntry<String, int>>[],
+           Expanded(
+            child: buildUsersByCourseCard(
+              data?.usersByCourse ?? <String, int>{},
             ),
           ),
           const SizedBox(width: 20),

@@ -5,6 +5,7 @@ class Placement {
   final String partnerCompany;
   final List<String> contacts;
   final List<String> positions;
+  final bool isRecruiting;
   final DateTime createdAt;
 
   Placement({
@@ -12,6 +13,7 @@ class Placement {
     required this.partnerCompany,
     required this.positions,
     required this.contacts,
+    required this.isRecruiting,
     required this.createdAt,
   });
 
@@ -19,6 +21,7 @@ class Placement {
     return Placement(
       placementID: json['placementID'],
       partnerCompany: json['partnerCompany'],
+      isRecruiting: json['isRecruiting'],
       contacts:
           json['contacts'] is List
               ? List<String>.from(json['contacts'].map((e) => e.toString()))
@@ -41,6 +44,7 @@ class Placement {
     return {
       'placementID': placementID,
       'partnerCompany': partnerCompany,
+      'isRecruiting': isRecruiting,
       'contacts': contacts,
       'positions': positions,
       'createdAt': createdAt.toIso8601String(),

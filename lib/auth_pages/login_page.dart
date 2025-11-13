@@ -381,8 +381,21 @@ class _LoginPageState extends State<LoginPage> {
             // Top spacing (flexible)
             SizedBox(height: largeSpacing),
 
-            Icon(Icons.lock, size: iconSize, color: primaryColor),
-
+            SizedBox(
+              width: 120,
+              height: 120,
+              child: Image.asset(
+                'lib/images/oasp.png',
+                fit: BoxFit.contain, // or BoxFit.cover / BoxFit.fitWidth
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(
+                    Icons.smart_toy_outlined,
+                    color: Color(0xFF2E7D32),
+                    size: 100, // optional smaller icon size
+                  );
+                },
+              ),
+            ),
             SizedBox(height: sectionSpacing),
 
             Text(

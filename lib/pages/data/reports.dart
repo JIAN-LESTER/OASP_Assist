@@ -1,123 +1,7 @@
+import 'package:capstone_project/pages/data/chatbot_usage_data.dart';
+import 'package:capstone_project/pages/data/inquiry_trends_data.dart';
+import 'package:capstone_project/pages/data/user_demographics_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-class InquiryReportsData {
-  final int totalMessages;
-  final int answeredMessages;
-  final int unAnsweredMessages;
-  final int escalatedMessages;
-  final String mostFrequentCategory;
-  final Map<String, int> categoryDistribution;
-  final List<ChartData> inquiryTrend;
-  final Map<String, int> highestFAQs;
-
-  final List<SystemLog> recentLogs;
-  final List<MessageLogs> msgLogs;
-  final int totalLikes;
-  final int totalDislikes;
-  final int totalNeutral;
-  final double satisfactionScore;
-  final double growthRate;
-  final List<String> top5UnansweredInquiries;
-  final List<String> top5EscalatedInquiries;
-  final Map<String, double> responseDistribution;
-  final Map<String, int> seasonalTrends;
-
-  const InquiryReportsData({
-    required this.totalMessages,
-    required this.answeredMessages,
-    required this.unAnsweredMessages,
-    required this.escalatedMessages,
-    required this.mostFrequentCategory,
-    required this.categoryDistribution,
-    required this.inquiryTrend,
-    required this.highestFAQs,
-
-    required this.recentLogs,
-    required this.msgLogs,
-    required this.totalLikes,
-    required this.totalDislikes,
-    required this.totalNeutral,
-    required this.satisfactionScore,
-    required this.growthRate,
-    required this.top5UnansweredInquiries,
-    required this.top5EscalatedInquiries,
-    required this.responseDistribution,
-    required this.seasonalTrends,
-  });
-}
-
-// Chatbot usage-specific reports data
-class ChatbotUsageReportsData {
-  final int totalSessions;
-  final double averageResponseTime;
-  final List<ChartData>? usageTrendByTimeOfDay;
-  final Map<String, int>? sessionTypes;
-  final double botAccuracyRate;
-  final Map<int, int> peakUsageByHour;
-  final double averageMessagesPerUser;
-  final double averageSessionLength;
-  final List<ChartData>? dailySessions;
-  final List<ChartData>? weeklySessions;
-  final List<ChartData>? monthlySessions;
-
-  // NEW FIELDS
-  final List<MapEntry<String, int>>? top10ActiveUsers;
-  final Map<String, int>? usersByYearLevel;
-  final Map<String, int>? usersByCourse;
-  final List<ChartData>? responseTimeTrend;
-
-  const ChatbotUsageReportsData({
-    required this.totalSessions,
-    required this.averageResponseTime,
-    required this.usageTrendByTimeOfDay,
-    required this.sessionTypes,
-    required this.botAccuracyRate,
-    required this.peakUsageByHour,
-    required this.averageMessagesPerUser,
-    required this.averageSessionLength,
-    required this.dailySessions,
-    required this.weeklySessions,
-    required this.monthlySessions,
-
-    // NEW FIELDS
-    required this.top10ActiveUsers,
-    required this.usersByYearLevel,
-    required this.usersByCourse,
-    required this.responseTimeTrend,
-  });
-}
-
-// User demographics-specific reports data
-class UserDemographicsReportsData {
-  final int activeUsers;
-  final int newlyRegisteredUsers;
-  final int affiliatedUsers;
-  final int totalUsers;
-  final Map<String, int> usersByYear;
-  final Map<String, int> usersByProgram;
-  final Map<String, int>? userAffiliations;
-
-  // NEW FIELDS
-  final Map<String, int>?
-  scholarshipStatus; // "Has Scholarship" vs "No Scholarship"
-  final Map<String, int>?
-  scholarshipTypes; // Academic, Athletic, Government, Private
-  final Map<String, int>? enrollmentStatus; // "Enrolled" vs "Not Enrolled"
-
-  const UserDemographicsReportsData({
-    required this.activeUsers,
-    required this.newlyRegisteredUsers,
-    required this.affiliatedUsers,
-    required this.totalUsers,
-    required this.usersByYear,
-    required this.usersByProgram,
-    required this.userAffiliations,
-    // NEW FIELDS
-    required this.scholarshipStatus,
-    required this.scholarshipTypes,
-    required this.enrollmentStatus,
-  });
-}
 
 class ChartData {
   final String date;
@@ -164,7 +48,12 @@ class MessageLogs {
   final String message;
   final String reply;
 
-  MessageLogs({required this.user, required this.time, required this.message, required this.reply});
+  MessageLogs({
+    required this.user,
+    required this.time,
+    required this.message,
+    required this.reply,
+  });
 
   factory MessageLogs.fromMap(Map<String, dynamic> map) {
     return MessageLogs(
@@ -176,7 +65,6 @@ class MessageLogs {
   }
 }
 
-
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -184,8 +72,6 @@ class FirebaseService {
   static final Map<String, ChatbotUsageReportsData> _chatbotCache = {};
   static final Map<String, UserDemographicsReportsData> _demographicsCache = {};
 
-  // Cache for frequently accessed data
-  static final Map<String, dynamic> _cache = {};
   static DateTime? _lastCacheTime;
 
   Future<InquiryReportsData> getInquiryReportsData(String timeFrame) async {
@@ -207,7 +93,7 @@ class FirebaseService {
         _getLogs(),
         _getEscalatedMessages(),
         _getUnansweredMessages(),
-        _getMessageLogs()
+        _getMessageLogs(),
       ]);
 
       final data = _processInquiryReportsData(
@@ -227,11 +113,10 @@ class FirebaseService {
       return data;
     } catch (e) {
       print('Error fetching inquiry data: $e');
-      return _getEmptyInquiryReportsData();
+      return getEmptyInquiryReportsData();
     }
   }
 
-  
   Future<ChatbotUsageReportsData> getChatbotUsageReportsData(
     String timeFrame,
   ) async {
@@ -248,7 +133,7 @@ class FirebaseService {
       final startDate = _getStartDate(timeFrame);
 
       final futures = await Future.wait([
-        _getConversations(startDate), // Pass startDate to filter conversations
+        _getConversations(startDate),
         _getMessages(startDate),
       ]);
 
@@ -265,51 +150,50 @@ class FirebaseService {
       return data;
     } catch (e) {
       print('Error fetching chatbot usage data: $e');
-      return _getEmptyChatbotUsageReportsData();
+      return getEmptyChatbotUsageReportsData();
     }
   }
 
-Future<UserDemographicsReportsData> getUserDemographicsReportsData(
-  String timeFrame,
-) async {
-  final cacheKey = 'demographics_$timeFrame';
-  final now = DateTime.now();
+  Future<UserDemographicsReportsData> getUserDemographicsReportsData(
+    String timeFrame,
+  ) async {
+    final cacheKey = 'demographics_$timeFrame';
+    final now = DateTime.now();
 
-  if (_demographicsCache.containsKey(cacheKey) &&
-      _lastCacheTime != null &&
-      now.difference(_lastCacheTime!).inMinutes < 5) {
-    return _demographicsCache[cacheKey]!;
+    if (_demographicsCache.containsKey(cacheKey) &&
+        _lastCacheTime != null &&
+        now.difference(_lastCacheTime!).inMinutes < 5) {
+      return _demographicsCache[cacheKey]!;
+    }
+
+    try {
+      final startDate = _getStartDate(timeFrame);
+
+      final futures = await Future.wait([
+        _getUsers(),
+        _getActiveUsers(),
+        _getNewUsers(timeFrame),
+        _getMessages(startDate),
+
+        _getConversations(),
+      ]);
+
+      final data = _processUserDemographicsReportsData(
+        users: futures[0] as QuerySnapshot,
+        activeUsers: futures[1] as List<QueryDocumentSnapshot>,
+        newUsers: futures[2] as List<QueryDocumentSnapshot>,
+        messages: futures[3] as List<QueryDocumentSnapshot>,
+      );
+
+      _demographicsCache[cacheKey] = data;
+      _lastCacheTime = now;
+
+      return data;
+    } catch (e) {
+      print('Error fetching user demographics data: $e');
+      return getEmptyUserDemographicsReportsData();
+    }
   }
-
-  try {
-    final startDate = _getStartDate(timeFrame);
-
-    final futures = await Future.wait([
-      _getUsers(),
-      _getActiveUsers(),
-      _getNewUsers(timeFrame),
-      _getMessages(startDate),
-   
-      _getConversations(),
-    ]);
-
-    final data = _processUserDemographicsReportsData(
-      users: futures[0] as QuerySnapshot,
-      activeUsers: futures[1] as List<QueryDocumentSnapshot>,
-      newUsers: futures[2] as List<QueryDocumentSnapshot>,
-      messages: futures[3] as List<QueryDocumentSnapshot>,
-
-    );
-
-    _demographicsCache[cacheKey] = data;
-    _lastCacheTime = now;
-
-    return data;
-  } catch (e) {
-    print('Error fetching user demographics data: $e');
-    return _getEmptyUserDemographicsReportsData();
-  }
-}
 
   Future<List<QueryDocumentSnapshot>> _getMessages(DateTime startDate) async {
     final snapshot =
@@ -322,7 +206,7 @@ Future<UserDemographicsReportsData> getUserDemographicsReportsData(
     return snapshot.docs;
   }
 
- Future<List<QueryDocumentSnapshot>> _getLogs() async {
+  Future<List<QueryDocumentSnapshot>> _getLogs() async {
     final snapshot =
         await _firestore
             .collection('logs')
@@ -332,9 +216,7 @@ Future<UserDemographicsReportsData> getUserDemographicsReportsData(
     return snapshot.docs;
   }
 
-
-
- Future<List<QueryDocumentSnapshot>> _getMessageLogs() async {
+  Future<List<QueryDocumentSnapshot>> _getMessageLogs() async {
     final snapshot =
         await _firestore
             .collection('message_logs')
@@ -344,10 +226,9 @@ Future<UserDemographicsReportsData> getUserDemographicsReportsData(
     return snapshot.docs;
   }
 
-
- Future<QuerySnapshot> _getUsers() async {
-  return await _firestore.collection('users').get();
-}
+  Future<QuerySnapshot> _getUsers() async {
+    return await _firestore.collection('users').get();
+  }
 
   Future<List<QueryDocumentSnapshot>> _getConversations([
     DateTime? startDate,
@@ -375,32 +256,31 @@ Future<UserDemographicsReportsData> getUserDemographicsReportsData(
         .get();
   }
 
+  Future<List<QueryDocumentSnapshot>> _getActiveUsers() async {
+    final snapshot =
+        await _firestore
+            .collection('users')
+            .where('isActive', isEqualTo: true)
+            .get();
 
-Future<List<QueryDocumentSnapshot>> _getActiveUsers() async {
+    return snapshot.docs;
+  }
 
-  
-  final snapshot = await _firestore
-      .collection('users')
-      .where('isActive', isEqualTo: true)
-      .get();
+  Future<List<QueryDocumentSnapshot>> _getNewUsers(String timeFrame) async {
+    final startDate = _getStartDate(timeFrame);
 
-  return snapshot.docs;
-}
+    final snapshot =
+        await _firestore
+            .collection('users')
+            .where(
+              'createdAt',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+            )
+            .orderBy('createdAt', descending: true)
+            .get();
 
-Future<List<QueryDocumentSnapshot>> _getNewUsers(String timeFrame) async {
-  final startDate = _getStartDate(timeFrame);
-  
-  final snapshot = await _firestore
-      .collection('users')
-      .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
-      .orderBy('createdAt', descending: true)
-      .get();
-
-  return snapshot.docs;
-}
-
-
-
+    return snapshot.docs;
+  }
 
   Future<List<QueryDocumentSnapshot>> _getUnansweredMessages() async {
     final snapshot =
@@ -440,13 +320,17 @@ Future<List<QueryDocumentSnapshot>> _getNewUsers(String timeFrame) async {
     };
   }
 
-   DateTime _getStartOfWeek(DateTime date) {
+  DateTime _getStartOfWeek(DateTime date) {
     // Get Monday as start of week (weekday 1 = Monday, 7 = Sunday)
     final daysFromMonday = date.weekday - 1;
-    return DateTime(date.year, date.month, date.day).subtract(Duration(days: daysFromMonday));
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).subtract(Duration(days: daysFromMonday));
   }
 
-   InquiryReportsData _processInquiryReportsData({
+  InquiryReportsData _processInquiryReportsData({
     required List<QueryDocumentSnapshot> messages,
     required QuerySnapshot faqs,
     required List<QueryDocumentSnapshot> logs,
@@ -462,13 +346,9 @@ Future<List<QueryDocumentSnapshot>> _getNewUsers(String timeFrame) async {
     final seasonalTrends = <String, int>{};
     int answeredMessages = 0;
     int unAnsweredMessages = 0;
-    int totalLikes = 0;
-    int totalDislikes = 0;
-    int totalNeutral = 0;
 
     for (final doc in messages) {
       final data = doc.data() as Map<String, dynamic>;
-      final feedback = data['feedback'] ?? 'neutral';
 
       if (data['isAnswered'] == true) answeredMessages++;
       if (data['isAnswered'] == false) unAnsweredMessages++;
@@ -483,22 +363,8 @@ Future<List<QueryDocumentSnapshot>> _getNewUsers(String timeFrame) async {
         final season = _getSeason(month);
         seasonalTrends[season] = (seasonalTrends[season] ?? 0) + 1;
       }
-
-      if (feedback == 'like') {
-        totalLikes++;
-      } else if (feedback == 'dislike') {
-        totalDislikes++;
-      } else {
-        totalNeutral++;
-      }
     }
 
-    final satisfactionScore =
-        (totalLikes + totalDislikes) == 0
-            ? 0
-            : (totalLikes / (totalLikes + totalDislikes)) * 100;
-
-    // Process FAQs
     final highestFAQs = <String, int>{};
     for (final doc in faqs.docs) {
       final data = doc.data() as Map<String, dynamic>;
@@ -507,7 +373,6 @@ Future<List<QueryDocumentSnapshot>> _getNewUsers(String timeFrame) async {
       highestFAQs[question] = count;
     }
 
-    // Process logs
     final recentLogs = <SystemLog>[];
     for (final doc in logs) {
       final data = doc.data() as Map<String, dynamic>;
@@ -521,8 +386,8 @@ Future<List<QueryDocumentSnapshot>> _getNewUsers(String timeFrame) async {
       recentLogs.add(SystemLog(user: user, time: time, action: action));
     }
 
-        final messageLogs = <MessageLogs>[];
-        
+    final messageLogs = <MessageLogs>[];
+
     for (final doc in msgLogs) {
       final data = doc.data() as Map<String, dynamic>;
       final user = data['user'] as String? ?? 'Unknown';
@@ -533,38 +398,10 @@ Future<List<QueryDocumentSnapshot>> _getNewUsers(String timeFrame) async {
       final message = data['message'] as String? ?? 'Unknown';
       final reply = data['reply'] as String? ?? 'Unknown';
 
-      messageLogs.add(MessageLogs(user: user, time: time, message: message, reply: reply));
+      messageLogs.add(
+        MessageLogs(user: user, time: time, message: message, reply: reply),
+      );
     }
-
-
-    // Process top unanswered inquiries
-    final top5UnansweredInquiries = <String>[];
-    for (final doc in unanswered) {
-      final data = doc.data() as Map<String, dynamic>;
-      final message = data['message'] as String? ?? 'Unknown';
-      top5UnansweredInquiries.add(message);
-    }
-
-    // Process top escalated inquiries
-    final top5EscalatedInquiries = <String>[];
-    for (final doc in escalations) {
-      final data = doc.data() as Map<String, dynamic>;
-      final message = data['question'] ?? 'Unknown';
-      if (top5EscalatedInquiries.length < 5) {
-        top5EscalatedInquiries.add(message);
-      }
-    }
-
-    // Calculate response distribution percentages
-    final total = messages.length;
-    final responseDistribution = <String, double>{
-      'Answered': total > 0 ? (answeredMessages / total) * 100 : 0,
-      'Unanswered': total > 0 ? (unAnsweredMessages / total) * 100 : 0,
-      'Escalated': total > 0 ? (escalations.length / total) * 100 : 0,
-    };
-
-    // Calculate growth rate (simplified - would need historical data)
-    final growthRate = 0.0; // Placeholder
 
     return InquiryReportsData(
       totalMessages: messages.length,
@@ -574,285 +411,251 @@ Future<List<QueryDocumentSnapshot>> _getNewUsers(String timeFrame) async {
       mostFrequentCategory: _getMostFrequentCategory(categoryDistribution),
       categoryDistribution: categoryDistribution,
       inquiryTrend: generateInquiryTrend(messages, startDate, timeFrame),
-
       highestFAQs: highestFAQs,
       recentLogs: recentLogs,
       msgLogs: messageLogs,
-      totalLikes: totalLikes,
-      totalDislikes: totalDislikes,
-      totalNeutral: totalNeutral,
-      satisfactionScore: satisfactionScore.toDouble(),
-      growthRate: growthRate,
-      top5UnansweredInquiries: top5UnansweredInquiries,
-      top5EscalatedInquiries: top5EscalatedInquiries,
-      responseDistribution: responseDistribution,
       seasonalTrends: seasonalTrends,
     );
   }
 
   ChatbotUsageReportsData _processChatbotUsageReportsData({
-  required List<QueryDocumentSnapshot> sessions,
-  required List<QueryDocumentSnapshot> messages,
-  required DateTime startDate,
-  required String timeFrame,
-}) {
-  // Process sessions (conversations)
-  final sessionTypes = <String, int>{'Single-turn': 0, 'Multi-turn': 0};
-  double totalSessionDuration = 0;
-  int completedSessionsCount = 0;
-  final userSessionCounts = <String, int>{};
-  final userYearLevels = <String, int>{};
-  final userPrograms = <String, int>{};
+    required List<QueryDocumentSnapshot> sessions,
+    required List<QueryDocumentSnapshot> messages,
+    required DateTime startDate,
+    required String timeFrame,
+  }) {
+    // Process sessions (conversations)
+    double totalSessionDuration = 0;
+    int completedSessionsCount = 0;
+    final userSessionCounts = <String, int>{};
+    final userYearLevels = <String, int>{};
+    final userPrograms = <String, int>{};
 
-  for (final doc in sessions) {
-    final data = doc.data() as Map<String, dynamic>;
-    final messageCount = data['messageCount'] as int? ?? 1;
-    final userId = data['userId'] as String? ?? 'unknown';
-    final createdAt = data['createdAt'] as Timestamp?;
-    final endedAt = data['endedAt'] as Timestamp?;
-    final status = data['status'] as String? ?? 'unknown';
+    for (final doc in sessions) {
+      final data = doc.data() as Map<String, dynamic>;
+      final userId = data['userId'] as String? ?? 'unknown';
+      final createdAt = data['createdAt'] as Timestamp?;
+      final endedAt = data['endedAt'] as Timestamp?;
+      final status = data['status'] as String? ?? 'unknown';
 
-    // Get user info from session data
-    final userYear = data['year'] as String? ?? 'Unknown';
-    final userProgram = data['program'] as String? ?? 'Unknown';
+      // Get user info from session data
+      final userYear = data['year'] as String? ?? 'Unknown';
+      final userProgram = data['program'] as String? ?? 'Unknown';
 
-    if (messageCount > 2) {
-      sessionTypes['Multi-turn'] = (sessionTypes['Multi-turn'] ?? 0) + 1;
-    } else {
-      sessionTypes['Single-turn'] = (sessionTypes['Single-turn'] ?? 0) + 1;
+  
+
+      if (createdAt != null && endedAt != null && status == 'ended') {
+        final duration = endedAt.toDate().difference(createdAt.toDate());
+        totalSessionDuration += duration.inSeconds.toDouble();
+        completedSessionsCount++;
+      }
+
+      userSessionCounts[userId] = (userSessionCounts[userId] ?? 0) + 1;
+      userYearLevels[userYear] = (userYearLevels[userYear] ?? 0) + 1;
+      userPrograms[userProgram] = (userPrograms[userProgram] ?? 0) + 1;
     }
 
-    if (createdAt != null && endedAt != null && status == 'ended') {
-      final duration = endedAt.toDate().difference(createdAt.toDate());
-      totalSessionDuration += duration.inSeconds.toDouble();
-      completedSessionsCount++;
-    }
+    // Calculate averages
+    final averageSessionLength =
+        completedSessionsCount > 0
+            ? totalSessionDuration / completedSessionsCount
+            : 0.0;
 
-    userSessionCounts[userId] = (userSessionCounts[userId] ?? 0) + 1;
-    userYearLevels[userYear] = (userYearLevels[userYear] ?? 0) + 1;
-    userPrograms[userProgram] = (userPrograms[userProgram] ?? 0) + 1;
-  }
+    final averageMessagesPerUser =
+        userSessionCounts.isNotEmpty
+            ? sessions.length / userSessionCounts.length.toDouble()
+            : 0.0;
 
-  // Calculate averages
-  final averageSessionLength =
-      completedSessionsCount > 0
-          ? totalSessionDuration / completedSessionsCount
-          : 0.0;
+    // Process messages for bot accuracy, response time, and user demographics
+    double totalResponseTime = 0;
+    int responseTimeCount = 0;
+    final yearMessageCounts = <String, int>{};
+    final programMessageCounts = <String, int>{};
+    final responseTimeData = <String, List<double>>{};
 
-  final averageMessagesPerUser =
-      userSessionCounts.isNotEmpty
-          ? sessions.length / userSessionCounts.length.toDouble()
-          : 0.0;
+    for (final doc in messages) {
+      final data = doc.data() as Map<String, dynamic>;
 
-  // Process messages for bot accuracy, response time, and user demographics
-  int answeredCount = 0;
-  double totalResponseTime = 0;
-  int responseTimeCount = 0;
-  final yearMessageCounts = <String, int>{};
-  final programMessageCounts = <String, int>{};
-  final responseTimeData = <String, List<double>>{};
+      // Response time calculation and trend - FIXED
+      final responseTimeMs = data['responseTimeMs'] as num?;
+      final sentAt = data['sent_at'] as Timestamp?;
 
-  for (final doc in messages) {
-    final data = doc.data() as Map<String, dynamic>;
+      if (responseTimeMs != null && responseTimeMs > 0) {
+        final responseTimeSeconds = responseTimeMs.toDouble() / 1000;
+        totalResponseTime += responseTimeSeconds;
+        responseTimeCount++;
 
-    // Bot accuracy calculation
-    if (data['isAnswered'] == true) answeredCount++;
+        // Group response times for trend analysis
+        if (sentAt != null) {
+          final timeKey = _getTimeKey(sentAt.toDate(), timeFrame);
+          responseTimeData.putIfAbsent(timeKey, () => []);
+          responseTimeData[timeKey]!.add(responseTimeSeconds);
+        }
+      }
 
-    // Response time calculation and trend - FIXED
-    final responseTimeMs = data['responseTimeMs'] as num?;
-    final sentAt = data['sent_at'] as Timestamp?;
+      // User demographics from messages
+      final userId = data['userID'] as String?;
+      if (userId != null) {
+        final year = data['year'] as String? ?? 'Unknown';
+        final program = data['program'] as String? ?? 'Unknown';
 
-    if (responseTimeMs != null && responseTimeMs > 0) {
-      final responseTimeSeconds = responseTimeMs.toDouble() / 1000;
-      totalResponseTime += responseTimeSeconds;
-      responseTimeCount++;
-
-      // Group response times for trend analysis
-      if (sentAt != null) {
-        final timeKey = _getTimeKey(sentAt.toDate(), timeFrame);
-        responseTimeData.putIfAbsent(timeKey, () => []);
-        responseTimeData[timeKey]!.add(responseTimeSeconds);
+        yearMessageCounts[year] = (yearMessageCounts[year] ?? 0) + 1;
+        programMessageCounts[program] =
+            (programMessageCounts[program] ?? 0) + 1;
       }
     }
 
-    // User demographics from messages
-    final userId = data['userID'] as String?;
-    if (userId != null) {
-      final year = data['year'] as String? ?? 'Unknown';
-      final program = data['program'] as String? ?? 'Unknown';
+    final averageResponseTime =
+        responseTimeCount > 0 ? totalResponseTime / responseTimeCount : 0.0;
 
-      yearMessageCounts[year] = (yearMessageCounts[year] ?? 0) + 1;
-      programMessageCounts[program] = (programMessageCounts[program] ?? 0) + 1;
+    // Generate response time trend
+    final responseTimeTrend =
+        _generateResponseTimeTrend(responseTimeData, timeFrame) ??
+        <ChartData>[];
+
+    // Generate trend data
+    final usageTrendByTimeOfDay =
+        _generateHourlyUsageTrend(sessions) ?? <ChartData>[];
+    final dailySessions =
+        _generateDailySessionTrend(sessions, timeFrame) ?? <ChartData>[];
+    final weeklySessions =
+        _generateWeeklySessionTrend(sessions, timeFrame) ?? <ChartData>[];
+    final monthlySessions =
+        _generateMonthlySessionTrend(sessions, timeFrame) ?? <ChartData>[];
+    final peakUsageByHour = _generatePeakUsageByHour(sessions);
+
+    return ChatbotUsageReportsData(
+      totalSessions: sessions.length,
+      averageResponseTime: averageResponseTime,
+      averageMessagesPerUser: averageMessagesPerUser,
+      averageSessionLength: averageSessionLength,
+      usageTrendByTimeOfDay: usageTrendByTimeOfDay,
+      dailySessions: dailySessions,
+      weeklySessions: weeklySessions,
+      monthlySessions: monthlySessions,
+      responseTimeTrend: responseTimeTrend,
+      peakUsageByHour:
+          peakUsageByHour.isNotEmpty ? peakUsageByHour : <int, int>{},
+
+      usersByYearLevel:
+          userYearLevels.isNotEmpty ? userYearLevels : <String, int>{},
+      usersByCourse: userPrograms.isNotEmpty ? userPrograms : <String, int>{},
+    );
+  }
+
+  UserDemographicsReportsData _processUserDemographicsReportsData({
+    required QuerySnapshot users,
+    required List<QueryDocumentSnapshot> activeUsers,
+    required List<QueryDocumentSnapshot> newUsers,
+    required List<QueryDocumentSnapshot> messages,
+  }) {
+    print('Processing ${users.docs.length} users');
+
+    final usersByYear = <String, int>{};
+    final usersByProgram = <String, int>{};
+    final enrollmentStatus = <String, int>{'Enrolled': 0, 'Not Enrolled': 0};
+    final scholarshipTypes = <String, int>{};
+    final affiliationTypes = <String, int>{};
+
+    int affiliatedCount = 0;
+
+    // Process each user
+    for (final doc in users.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+
+      print('Processing user: ${data['name']} with data: $data');
+
+      final year = data['year']?.toString() ?? 'Unknown';
+      final program = data['program']?.toString() ?? 'Unknown';
+      final affiliationValue = data['affiliation']?.toString();
+      final scholarshipValue = data['scholarship']?.toString();
+      final isEnrolled = data['isEnrolled'];
+
+      usersByYear[year] = (usersByYear[year] ?? 0) + 1;
+      usersByProgram[program] = (usersByProgram[program] ?? 0) + 1;
+
+      if (affiliationValue != null &&
+          affiliationValue.isNotEmpty &&
+          affiliationValue != 'null' &&
+          affiliationValue.toLowerCase() != 'null') {
+        print('Found affiliation: $affiliationValue');
+        affiliatedCount++;
+        affiliationTypes[affiliationValue] =
+            (affiliationTypes[affiliationValue] ?? 0) + 1;
+      }
+
+      // Process scholarship
+      if (scholarshipValue != null &&
+          scholarshipValue.isNotEmpty &&
+          scholarshipValue != 'null' &&
+          scholarshipValue.toLowerCase() != 'null') {
+        print('Found scholarship: $scholarshipValue');
+
+        scholarshipTypes[scholarshipValue] =
+            (scholarshipTypes[scholarshipValue] ?? 0) + 1;
+      }
+
+      if (isEnrolled == true) {
+        enrollmentStatus['Enrolled'] = (enrollmentStatus['Enrolled'] ?? 0) + 1;
+      } else {
+        enrollmentStatus['Not Enrolled'] =
+            (enrollmentStatus['Not Enrolled'] ?? 0) + 1;
+      }
+    }
+    return UserDemographicsReportsData(
+      activeUsers: activeUsers.length,
+      newlyRegisteredUsers: newUsers.length,
+      affiliatedUsers: affiliatedCount,
+      totalUsers: users.docs.length,
+      usersByYear: usersByYear,
+      usersByProgram: usersByProgram,
+      userAffiliations: affiliationTypes,
+      scholarshipTypes: scholarshipTypes,
+      enrollmentStatus: enrollmentStatus,
+    );
+  }
+
+  List<ChartData>? _generateResponseTimeTrend(
+    Map<String, List<double>> responseTimeData,
+    String timeFrame,
+  ) {
+    try {
+      return _generateTrendDataFromAverages(responseTimeData, timeFrame);
+    } catch (e) {
+      print('Error generating response time trend: $e');
+      return <ChartData>[];
     }
   }
 
-  final botAccuracyRate =
-      messages.isNotEmpty ? (answeredCount / messages.length) * 100 : 0.0;
+  // Fix the _generateTrendDataFromAverages method
+  List<ChartData> _generateTrendDataFromAverages(
+    Map<String, List<double>> data,
+    String timeFrame,
+  ) {
+    final trendData = <ChartData>[];
+    final sortedKeys = data.keys.toList()..sort();
 
-  final averageResponseTime =
-      responseTimeCount > 0 ? totalResponseTime / responseTimeCount : 0.0;
-
-  // Generate top 10 active users
-  final top10ActiveUsers = userSessionCounts.entries.toList()
-    ..sort((a, b) => b.value.compareTo(a.value));
-  final top10 = top10ActiveUsers.take(10).toList();
-
-  // Generate response time trend
-  final responseTimeTrend = _generateResponseTimeTrend(responseTimeData, timeFrame) ?? <ChartData>[];
-
-  // Generate trend data
-  final usageTrendByTimeOfDay = _generateHourlyUsageTrend(sessions) ?? <ChartData>[];
-  final dailySessions = _generateDailySessionTrend(sessions, timeFrame) ?? <ChartData>[];
-  final weeklySessions = _generateWeeklySessionTrend(sessions, timeFrame) ?? <ChartData>[];
-  final monthlySessions = _generateMonthlySessionTrend(sessions, timeFrame) ?? <ChartData>[];
-  final peakUsageByHour = _generatePeakUsageByHour(sessions);
-
-  return ChatbotUsageReportsData(
-    totalSessions: sessions.length,
-    averageResponseTime: averageResponseTime,
-    sessionTypes: sessionTypes.isNotEmpty ? sessionTypes : <String, int>{},
-    botAccuracyRate: botAccuracyRate,
-    averageMessagesPerUser: averageMessagesPerUser,
-    averageSessionLength: averageSessionLength,
-    usageTrendByTimeOfDay: usageTrendByTimeOfDay,
-    dailySessions: dailySessions,
-    weeklySessions: weeklySessions,
-    monthlySessions: monthlySessions,
-    responseTimeTrend: responseTimeTrend,
-    peakUsageByHour: peakUsageByHour.isNotEmpty ? peakUsageByHour : <int, int>{},
-    top10ActiveUsers: top10,
-    usersByYearLevel: userYearLevels.isNotEmpty ? userYearLevels : <String, int>{},
-    usersByCourse: userPrograms.isNotEmpty ? userPrograms : <String, int>{},
-  );
-}
-
-UserDemographicsReportsData _processUserDemographicsReportsData({
-  required QuerySnapshot users,
-  required List<QueryDocumentSnapshot> activeUsers,
-  required List<QueryDocumentSnapshot> newUsers,
-  required List<QueryDocumentSnapshot> messages,
-}) {
-  print('Processing ${users.docs.length} users');
-  
-  // Initialize data structures
-  final usersByYear = <String, int>{};
-  final usersByProgram = <String, int>{};
-  final scholarshipStatus = <String, int>{
-    'Has Scholarship': 0,
-    'No Scholarship': 0,
-  };
-  final enrollmentStatus = <String, int>{'Enrolled': 0, 'Not Enrolled': 0};
-  final scholarshipTypes = <String, int>{};
-  final affiliationTypes = <String, int>{};
-  
-  int affiliatedCount = 0;
-
-  // Process each user
-  for (final doc in users.docs) {
-    final data = doc.data() as Map<String, dynamic>;
-    
-    print('Processing user: ${data['name']} with data: $data');
-    
-    final year = data['year']?.toString() ?? 'Unknown';
-    final program = data['program']?.toString() ?? 'Unknown';
-    final affiliationValue = data['affiliation']?.toString();
-    final scholarshipValue = data['scholarship']?.toString();
-final isEnrolled = data['isEnrolled'];
-
-    // Users by year/program
-    usersByYear[year] = (usersByYear[year] ?? 0) + 1;
-    usersByProgram[program] = (usersByProgram[program] ?? 0) + 1;
-
-    // Process affiliation
-    if (affiliationValue != null && 
-        affiliationValue.isNotEmpty && 
-        affiliationValue != 'null' && 
-        affiliationValue.toLowerCase() != 'null') {
-      print('Found affiliation: $affiliationValue');
-      affiliatedCount++;
-      affiliationTypes[affiliationValue] = (affiliationTypes[affiliationValue] ?? 0) + 1;
+    for (final key in sortedKeys) {
+      final values = data[key]!;
+      final average =
+          values.isNotEmpty
+              ? values.reduce((a, b) => a + b) / values.length
+              : 0.0;
+      trendData.add(ChartData(date: key, count: average.round()));
     }
 
-    // Process scholarship
-    if (scholarshipValue != null && 
-        scholarshipValue.isNotEmpty && 
-        scholarshipValue != 'null' && 
-        scholarshipValue.toLowerCase() != 'null') {
-      print('Found scholarship: $scholarshipValue');
-      scholarshipStatus['Has Scholarship'] = (scholarshipStatus['Has Scholarship'] ?? 0) + 1;
-      scholarshipTypes[scholarshipValue] = (scholarshipTypes[scholarshipValue] ?? 0) + 1;
-    } else {
-      scholarshipStatus['No Scholarship'] = (scholarshipStatus['No Scholarship'] ?? 0) + 1;
-    }
-
-    // Enrollment status
-if (isEnrolled == true) {
-  // Explicitly enrolled
-  enrollmentStatus['Enrolled'] = (enrollmentStatus['Enrolled'] ?? 0) + 1;
-} else {
-  // Either false or missing → count as Not Enrolled
-  enrollmentStatus['Not Enrolled'] = (enrollmentStatus['Not Enrolled'] ?? 0) + 1;
-}
+    return trendData;
   }
-
-  print('Final results:');
-  print('- Affiliation types: $affiliationTypes');
-  print('- Scholarship types: $scholarshipTypes');
-  print('- Scholarship status: $scholarshipStatus');
-  print('- Enrollment status: $enrollmentStatus');
-
-  return UserDemographicsReportsData(
-    activeUsers: activeUsers.length,
-    newlyRegisteredUsers: newUsers.length,
-    affiliatedUsers: affiliatedCount,
-    totalUsers: users.docs.length,
-    usersByYear: usersByYear,
-    usersByProgram: usersByProgram,
-    userAffiliations: affiliationTypes,
-    scholarshipStatus: scholarshipStatus,
-    scholarshipTypes: scholarshipTypes,
-    enrollmentStatus: enrollmentStatus,
-  );
-}
-
-List<ChartData>? _generateResponseTimeTrend(
-  Map<String, List<double>> responseTimeData,
-  String timeFrame,
-) {
-  try {
-    return _generateTrendDataFromAverages(responseTimeData, timeFrame);
-  } catch (e) {
-    print('Error generating response time trend: $e');
-    return <ChartData>[];
-  }
-}
-
-// Fix the _generateTrendDataFromAverages method
-List<ChartData> _generateTrendDataFromAverages(
-  Map<String, List<double>> data,
-  String timeFrame,
-) {
-  final trendData = <ChartData>[];
-  final sortedKeys = data.keys.toList()..sort();
-
-  for (final key in sortedKeys) {
-    final values = data[key]!;
-    final average = values.isNotEmpty ? values.reduce((a, b) => a + b) / values.length : 0.0;
-    trendData.add(ChartData(date: key, count: average.round()));
-  }
-
-  return trendData;
-}
-
 
   String _getSeason(int month) {
-    if (month >= 3 && month <= 5) return 'CMUCAT Admission and Scholarship Application';
+    if (month >= 3 && month <= 5)
+      return 'CMUCAT Admission and Scholarship Application';
     if (month >= 6 && month <= 8) return 'Enrollment';
     if (month >= 9 && month <= 11) return 'Regular Classes';
     return 'Christmas';
   }
 
- List<ChartData>? _generateHourlyUsageTrend(
+  List<ChartData>? _generateHourlyUsageTrend(
     List<QueryDocumentSnapshot> sessions,
   ) {
     try {
@@ -940,8 +743,6 @@ List<ChartData> _generateTrendDataFromAverages(
           // Show last 365 days for 'This Year' or any other case
           return List.generate(12, (i) {
             final month = DateTime(now.year, now.month - (11 - i));
-            final monthKey =
-                "${month.year}-${month.month.toString().padLeft(2, '0')}";
 
             // Sum all days in this month
             int monthCount = 0;
@@ -977,7 +778,6 @@ List<ChartData> _generateTrendDataFromAverages(
       return <ChartData>[];
     }
   }
-
 
   List<ChartData>? _generateWeeklySessionTrend(
     List<QueryDocumentSnapshot> sessions,
@@ -1127,68 +927,7 @@ List<ChartData> _generateTrendDataFromAverages(
       return <ChartData>[];
     }
   }
-
-  // Empty data methods
-InquiryReportsData _getEmptyInquiryReportsData() {
-    return const InquiryReportsData(
-      totalMessages: 0,
-      answeredMessages: 0,
-      unAnsweredMessages: 0,
-      escalatedMessages: 0,
-      mostFrequentCategory: 'Unknown',
-      categoryDistribution: {},
-      inquiryTrend: [],
-      highestFAQs: {},
-      recentLogs: [],
-      msgLogs: [],
-      totalLikes: 0,
-      totalDislikes: 0,
-      totalNeutral: 0,
-      satisfactionScore: 0.0,
-      growthRate: 0.0,
-      top5UnansweredInquiries: [],
-      top5EscalatedInquiries: [],
-      responseDistribution: {},
-      seasonalTrends: {},
-    );
-  }
-
-  ChatbotUsageReportsData _getEmptyChatbotUsageReportsData() {
-    return ChatbotUsageReportsData(
-      totalSessions: 0,
-      averageResponseTime: 0.0,
-      usageTrendByTimeOfDay: <ChartData>[],
-      sessionTypes: <String, int>{},
-      botAccuracyRate: 0.0,
-      averageMessagesPerUser: 0.0,
-      averageSessionLength: 0.0,
-      dailySessions: <ChartData>[],
-      weeklySessions: <ChartData>[],
-      monthlySessions: <ChartData>[],
-      peakUsageByHour: <int, int>{},
-      top10ActiveUsers: [],
-      usersByYearLevel: <String, int>{},
-      usersByCourse: <String, int>{},
-      responseTimeTrend: <ChartData>[],
-    );
-  }
-
-UserDemographicsReportsData _getEmptyUserDemographicsReportsData() {
-  return const UserDemographicsReportsData(
-    activeUsers: 0,
-    newlyRegisteredUsers: 0,
-    affiliatedUsers: 0,
-    totalUsers: 0,
-    usersByYear: {},
-    usersByProgram: {},
-    userAffiliations: {},
-    scholarshipStatus: {'Has Scholarship': 0, 'No Scholarship': 0},
-    scholarshipTypes: {},
-    enrollmentStatus: {'Enrolled': 0, 'Not Enrolled': 0},
-  );
 }
-}
-
 
 String _getMostFrequentCategory(Map<String, int> categories) {
   if (categories.isEmpty) return 'Unknown';

@@ -1,3 +1,4 @@
+import 'package:capstone_project/modal_pages/add_edit_admission.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -5,7 +6,7 @@ import 'package:capstone_project/modal_pages/admission_info.dart';
 
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 
-void showEditADModal(
+void showEditAdmissionDialog(
   BuildContext context,
   DocumentSnapshot userDoc, {
   String? previousModal,
@@ -33,123 +34,20 @@ void showEditADModal(
           .where((s) => s.isNotEmpty)
           .toList() ?? [];
 
-  showGeneralDialog(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'Edit Admission Details',
-    barrierColor: Colors.black.withOpacity(0.5),
-    transitionDuration: const Duration(milliseconds: 300),
-    pageBuilder: (context, animation, secondaryAnimation) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          final screenWidth = MediaQuery.of(context).size.width;
-          final screenHeight = MediaQuery.of(context).size.height;
-          final isMobile = screenWidth < 600;
-          final isTablet = screenWidth >= 600 && screenWidth < 1024;
-
-          return Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: EdgeInsets.all(isMobile ? 16 : 24),
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: isMobile ? screenWidth * 0.95 : 650,
-                maxHeight: screenHeight * 0.9,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 32,
-                    offset: const Offset(0, 16),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Column(
-                  children: [
-                    // Header (fixed at top)
-                    _buildHeader(
-                      context,
-                      userDoc,
-                      previousModal,
-                      isMobile,
-                    ),
-                    
-                    // Scrollable content (fills remaining space)
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: EdgeInsets.fromLTRB(
-                          isMobile ? 20 : 24,
-                          isMobile ? 20 : 24,
-                          isMobile ? 20 : 24,
-                          0, // No bottom padding since buttons are fixed
-                        ),
-                        child: _buildScrollableContent(
-                          userData: userData,
-                          contactList: contactList,
-                          stepsList: stepsList,
-                          isMobile: isMobile,
-                          titleController: titleController,
-                          sourceController: sourceController,
-                          academicYearController: academicYearController,
-                        ),
-                      ),
-                    ),
-                    
-                    // Fixed action buttons at bottom
-                    Container(
-                      padding: EdgeInsets.all(isMobile ? 20 : 24),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        border: Border(
-                          top: BorderSide(
-                            color: Color(0xFFE2E8F0),
-                            width: 1,
-                          ),
-                        ),
-                      ),
-                      child: _buildActionButtons(
-                        context,
-                        userDoc,
-                        titleController,
-                        sourceController,
-                        academicYearController,
-                        previousModal,
-                        isMobile,
-                        isTablet,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      );
-    },
-    transitionBuilder: (context, animation, secondaryAnimation, child) {
-      return SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.1),
-          end: Offset.zero,
-        ).animate(
-          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-        ),
-        child: FadeTransition(
-          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-          child: child,
-        ),
-      );
-    },
-  );
+  showDialog(
+      context: context,
+    barrierDismissible: false,
+    builder: (context) => AdmissionFormDialog(
+      doc: userDoc,
+      isEdit: true,
+    ),
+  ).then((result) {
+    if (result == true) {
+      // Refresh the list if needed
+      // You can call setState here or trigger a refresh
+    }
+  });
+  
 }
 
 Widget _buildHeader(
@@ -874,7 +772,7 @@ Widget _buildFullContentActionButtons(
               Navigator.of(context).pop();
               Future.delayed(
                 const Duration(milliseconds: 200),
-                () => showEditADModal(context, doc, previousModal: 'fullContent'),
+                () => showEditAdmissionDialog(context, doc, previousModal: 'fullContent'),
               );
             },
             icon: const Icon(Icons.edit_outlined, size: 18),
