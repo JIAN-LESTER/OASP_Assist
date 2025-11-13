@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/modal_pages/ib_info.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 void showEditIBModal(
   BuildContext context,
@@ -182,12 +183,7 @@ void showEditIBModal(
                                 fontWeight: FontWeight.w500,
                               ),
                               decoration: InputDecoration(
-                                // labelText: 'Title',
                                 hintText: 'Enter document title',
-                                // prefixIcon: const Icon(
-                                //   Icons.title,
-                                //   color: Color(0xFF2E7D32),
-                                // ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: const BorderSide(
@@ -264,11 +260,6 @@ void showEditIBModal(
                                 color: Color(0xFF334155),
                               ),
                               decoration: InputDecoration(
-                                // labelText: 'Category',
-                                // prefixIcon: const Icon(
-                                //   Icons.category_outlined,
-                                //   color: Color(0xFF2E7D32),
-                                // ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: const BorderSide(
@@ -329,7 +320,7 @@ void showEditIBModal(
 
                             const SizedBox(height: 32),
 
-                            // Action Buttons - Updated to match upload modal
+                            // Action Buttons
                             _buildActionButtons(
                               context,
                               userDoc,
@@ -379,7 +370,6 @@ Widget _buildActionButtons(
   bool isTablet,
   bool isDesktop,
 ) {
-  // Professional button sizing - matching upload document modal
   double buttonHeight =
       isMobile
           ? 40
@@ -648,7 +638,7 @@ void _showFullContentModal(
 
                         const SizedBox(height: 20),
 
-                        // Action Buttons - Updated to match upload modal
+                        // Action Buttons
                         _buildFullContentActionButtons(
                           context,
                           doc,
@@ -688,7 +678,6 @@ Widget _buildFullContentActionButtons(
   bool isMobile,
   bool isTablet,
 ) {
-  // Professional button sizing - matching upload document modal
   double buttonHeight =
       isMobile
           ? 40
@@ -733,8 +722,6 @@ Widget _buildFullContentActionButtons(
   );
 }
 
-
-
 Color _getCategoryColor(String category) {
   switch (category) {
     case 'Admission':
@@ -757,12 +744,7 @@ Future<void> _handleSaveChanges(
   String? previousModal,
 ) async {
   if (title.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Please enter a document title'),
-        backgroundColor: Colors.red,
-      ),
-    );
+    SnackbarUtil.showError(context, 'Please enter a document title');
     return;
   }
 
@@ -832,38 +814,12 @@ Future<void> _handleSaveChanges(
         }
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              const Text('Document updated successfully'),
-            ],
-          ),
-          backgroundColor: const Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      SnackbarUtil.showSuccess(context, 'Document updated successfully');
     }
   } catch (e) {
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Text('Failed to update: ${e.toString()}'),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      SnackbarUtil.showError(context, 'Failed to update document');
     }
   }
 }

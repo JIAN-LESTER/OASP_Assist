@@ -1,13 +1,10 @@
-
 import 'dart:io';
-
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
-import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 
 import 'package:capstone_project/models/admissions.dart';
 import 'package:capstone_project/models/placement.dart';
@@ -16,6 +13,7 @@ import 'package:capstone_project/services/cohere_service.dart';
 import 'package:capstone_project/services/file_service2.dart';
 import 'package:uuid/uuid.dart';
 import 'package:capstone_project/models/info_bank.dart';
+import 'package:capstone_project/utils/snackbar_util.dart'; // Add this import
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
 
@@ -168,7 +166,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
     super.dispose();
   }
 
-
   Future<void> _pickFile() async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -185,7 +182,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
         setState(() {
           _selectedFile = file;
           _selectedFileName = fileName;
-
         });
 
         String extractedText;
@@ -203,30 +199,30 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
             _titleController.text = fileName.split('.').first;
           }
         });
-
-        _showTopRightAlert('File processed successfully!', AlertType.success);
       }
     } catch (e) {
-      _showTopRightAlert('Error processing file: $e', AlertType.error);
+      if (mounted) {
+        SnackbarUtil.showError(
+          context,
+          'Error processing file: ${e.toString()}',
+        );
+      }
     }
   }
 
   Future<void> _uploadDocument() async {
     if (_selectedFile == null || _extractedText == null) {
-      _showTopRightAlert('Please select a file first', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Please select a file first');
       return;
     }
 
     if (_titleController.text.trim().isEmpty) {
-      _showTopRightAlert('Please enter a title', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Please enter a title');
       return;
     }
 
     if (_categoryController.text.trim().isEmpty) {
-      _showTopRightAlert(
-        'Please select or enter a category',
-        AlertType.warning,
-      );
+      SnackbarUtil.showWarning(context, 'Please select or enter a category');
       return;
     }
 
@@ -249,7 +245,8 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
       await _fileService.saveToInformationBank(informationBank);
 
-      Navigator.of(context).pop(true);
+      // Store context for later use
+      final savedContext = context;
 
       switch (_categoryController.text.trim()) {
         case 'Admission':
@@ -337,9 +334,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
                 "📝 Preparing scholarship ${i + 1}/${scholarshipDataList.length} with ID: $scholarshipId",
               );
 
-              // Parse deadline string to DateTime
-              
-
               final scholarship = Scholarship(
                 scholarshipID: scholarshipId,
                 sourceId: scholarshipId,
@@ -350,8 +344,8 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
                 scholarshipProvider:
                     scholarshipData['scholarshipProvider'] ??
                     'Unknown Provider',
-       
-                eligibilityRequirements: scholarshipData['eligibilityRequirements'] ?? <String>[],
+                eligibilityRequirements:
+                    scholarshipData['eligibilityRequirements'] ?? <String>[],
                 privileges: scholarshipData['privileges'] ?? <String>[],
                 deadline: scholarshipCohere['deadline'],
                 applicationLink: scholarshipData['application_link'] ?? '',
@@ -364,78 +358,91 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
             // Batch save all scholarships
             await _fileService.saveMultipleScholarships(scholarships);
 
-            _showTopRightAlert(
-              'Found and saved ${scholarships.length} scholarship(s)!',
-              AlertType.success,
-            );
+            if (mounted) {
+              SnackbarUtil.showSuccess(
+                context,
+                'Found and saved ${scholarships.length} scholarship(s)',
+              );
+            }
           } else {
             print("⚠️ No scholarships found in the document");
-            _showTopRightAlert(
-              'No scholarships found in the document',
-              AlertType.warning,
-            );
+            if (mounted) {
+              SnackbarUtil.showWarning(
+                context,
+                'No scholarships found in the document',
+              );
+            }
           }
           break;
-      case 'Placement':
-  print("🔍 Analyzing placement document...");
-  final placementCohere = await _cohereService.analyzePlacement(
-    _extractedText!,
-  );
 
-  print("📋 Placement analysis result: $placementCohere");
+        case 'Placement':
+          print("🔍 Analyzing placement document...");
+          final placementCohere = await _cohereService.analyzePlacement(
+            _extractedText!,
+          );
 
-  if (placementCohere['placements'] is List &&
-      placementCohere['placements'].isNotEmpty) {
-    List<dynamic> placementDataList = placementCohere['placements'];
-    print("📚 Found ${placementDataList.length} placement(s)");
+          print("📋 Placement analysis result: $placementCohere");
 
-    // Prepare list of placement objects for batch saving
-    List<Placement> placements = [];
+          if (placementCohere['placements'] is List &&
+              placementCohere['placements'].isNotEmpty) {
+            List<dynamic> placementDataList = placementCohere['placements'];
+            print("📚 Found ${placementDataList.length} placement(s)");
 
-    for (int i = 0; i < placementDataList.length; i++) {
-      final placementData = placementDataList[i];
-      final placementId = i == 0 ? documentId : '${documentId}_$i';
+            // Prepare list of placement objects for batch saving
+            List<Placement> placements = [];
 
-      print(
-        "📝 Preparing placement ${i + 1}/${placementDataList.length} with ID: $placementId",
-      );
+            for (int i = 0; i < placementDataList.length; i++) {
+              final placementData = placementDataList[i];
+              final placementId = i == 0 ? documentId : '${documentId}_$i';
 
-      // Build Placement object based on your new model
-      final placement = Placement(
-        placementID: placementId,
-        partnerCompany:
-            placementData['partnerCompany'] ?? 'Unnamed Placement',
-        contacts: placementData['contacts'] is List
-            ? List<String>.from(
-                placementData['contacts'].map((e) => e.toString()))
-            : <String>[],
-        positions: placementData['positions'] is List
-            ? List<String>.from(
-                placementData['positions'].map((e) => e.toString()))
-            : <String>[],
-        createdAt: DateTime.tryParse(placementData['createdAt'] ?? '') ??
-            DateTime.now(),
-      );
+              print(
+                "📝 Preparing placement ${i + 1}/${placementDataList.length} with ID: $placementId",
+              );
 
-      placements.add(placement);
-    }
+              // Build Placement object based on your new model
+              final placement = Placement(
+                placementID: placementId,
+                partnerCompany:
+                    placementData['partnerCompany'] ?? 'Unnamed Placement',
+                contacts:
+                    placementData['contacts'] is List
+                        ? List<String>.from(
+                          placementData['contacts'].map((e) => e.toString()),
+                        )
+                        : <String>[],
+                positions:
+                    placementData['positions'] is List
+                        ? List<String>.from(
+                          placementData['positions'].map((e) => e.toString()),
+                        )
+                        : <String>[],
+                createdAt:
+                    DateTime.tryParse(placementData['createdAt'] ?? '') ??
+                    DateTime.now(),
+              );
 
-    // Batch save all placements
-    await _fileService.saveMultiplePlacements(placements);
+              placements.add(placement);
+            }
 
-    _showTopRightAlert(
-      'Found and saved ${placements.length} placement(s)!',
-      AlertType.success,
-    );
-  } else {
-    print("⚠️ No placements found in the document");
-    _showTopRightAlert(
-      'No placements found in the document',
-      AlertType.warning,
-    );
-  }
-  break;
+            // Batch save all placements
+            await _fileService.saveMultiplePlacements(placements);
 
+            if (mounted) {
+              SnackbarUtil.showSuccess(
+                context,
+                'Found and saved ${placements.length} placement(s)',
+              );
+            }
+          } else {
+            print("⚠️ No placements found in the document");
+            if (mounted) {
+              SnackbarUtil.showWarning(
+                context,
+                'No placements found in the document',
+              );
+            }
+          }
+          break;
 
         default:
           print(
@@ -447,15 +454,20 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
       // Log the upload action
       await _logUploadAction();
 
-      _showTopRightAlert('Document uploaded successfully!', AlertType.success);
-      Navigator.of(context).pop(true);
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
     } catch (e) {
       print("❌ Upload error: $e");
-      _showTopRightAlert('Upload failed: $e', AlertType.error);
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Upload failed: ${e.toString()}');
+      }
     } finally {
-      setState(() {
-        _isUploading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
     }
   }
 
@@ -486,33 +498,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
     } catch (e) {
       print('Failed to log action: $e');
     }
-  }
-
-  void _showTopRightAlert(String message, AlertType type) {
-    if (!mounted) return;
-
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
-
-    overlayEntry = OverlayEntry(
-      builder:
-          (context) => TopRightAlert(
-            message: message,
-            type: type,
-            onDismiss: () => overlayEntry.remove(),
-            isMobile: widget.isMobile,
-            isTablet: widget.isTablet,
-          ),
-    );
-
-    overlay.insert(overlayEntry);
-
-    // Auto dismiss after 4 seconds
-    Future.delayed(const Duration(seconds: 4), () {
-      if (overlayEntry.mounted) {
-        overlayEntry.remove();
-      }
-    });
   }
 
   @override
@@ -608,7 +593,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
                   // Title Input
                   buildTextField(
-                     isMobile: false,
+                    isMobile: false,
                     controller: _titleController,
                     label: 'Document Title',
                     hint: 'Enter a descriptive title',
@@ -804,7 +789,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
         const SizedBox(height: 16),
         buildTextField(
           controller: _categoryController,
-           isMobile: false,
+          isMobile: false,
           label: 'Custom Category',
           hint: 'Or enter a custom category',
           icon: Icons.category_outlined,
@@ -814,7 +799,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
   }
 
   Widget _buildActionButtons() {
-    // Professional button sizing - more refined and proportional
     double buttonHeight =
         widget.isMobile
             ? 40
