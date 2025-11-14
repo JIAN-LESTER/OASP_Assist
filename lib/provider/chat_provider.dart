@@ -60,6 +60,8 @@ class ChatProvider extends ChangeNotifier {
   int count = 1;
 bool _isCreatingMessage = false;
   
+  VoidCallback? _onMessageAdded;
+
 
   ChatProvider(this._retriever);
 
@@ -94,34 +96,87 @@ bool _isCreatingMessage = false;
     "recommend speaking with",
   ];
 
+  void setScrollCallback(VoidCallback callback) {
+  _onMessageAdded = callback;
+}
+
+void clearScrollCallback() {
+  _onMessageAdded = null;
+}
+
+
   StreamSubscription<QuerySnapshot>? _messagesSubscription;
 
   final String _apiKey = "IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
 
-  Future<void> setConversationId(String id) async {
-  print('🔧 Setting conversation ID: $id');
-  
-  // Clear everything first
-  _messages.clear();
-  _processedMessages.clear(); 
-  _streamingContent.clear();
-  
-  conversationId = id;
-  currentConversation = null;
-  
-  // Notify immediately with cleared state
-  notifyListeners();
-  
-  // Then load the conversation info
-  await loadConversationInfo();
-  await loadExistingMessages();
+  bool _isSettingConversation = false;
 
-  // Cancel old subscription and start new one
-  _messagesSubscription?.cancel();
-  listenToMessages();
+Future<void> setConversationId(String id) async {
+  print('🔧 ChatProvider.setConversationId: $id');
   
-  print('✅ Conversation setup complete. Messages: ${_messages.length}');
+  // ✅ FIX 1: Prevent duplicate calls
+  if (_isSettingConversation) {
+    print('⚠️ Already setting conversation, ignoring duplicate call');
+    return;
+  }
+  
+  // ✅ FIX 2: If already set to this ID, skip
+  if (conversationId == id && _messagesSubscription != null) {
+    print('ℹ️ Already set to conversation $id with active subscription');
+    return;
+  }
+  
+  _isSettingConversation = true;
+  
+  try {
+    // ✅ STEP 1: Cancel old subscription
+    _messagesSubscription?.cancel();
+    _messagesSubscription = null;
+    
+    // ✅ STEP 2: Clear all state
+    _messages.clear();
+    _processedMessages.clear(); 
+    _streamingContent.clear();
+    _pendingRatingsCache.clear();
+    
+    // ✅ STEP 3: Reset loading flags
+    _isLoading = false;
+    _isCreatingMessage = false;
+    
+    // ✅ STEP 4: Set new conversation ID
+    conversationId = id;
+    currentConversation = null;
+    
+    // ✅ STEP 5: Schedule notification after build completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
+    
+    // ✅ STEP 6: Small delay to ensure UI updates
+    await Future.delayed(Duration(milliseconds: 100));
+    
+    // ✅ STEP 7: Load conversation info
+    await loadConversationInfo();
+    
+    // ✅ STEP 8: Load messages
+    await loadExistingMessages();
+
+    // ✅ STEP 9: Start new subscription
+    listenToMessages();
+    
+    // ✅ STEP 10: Final delay for stability
+    await Future.delayed(Duration(milliseconds: 100));
+    
+    print('✅ ChatProvider setup complete');
+    print('   - Conversation ID: $conversationId');
+    print('   - Messages: ${_messages.length}');
+    print('   - Subscription active: ${_messagesSubscription != null}');
+  } finally {
+    _isSettingConversation = false;
+  }
 }
+
+
 
   Future<void> loadConversationInfo() async {
     if (conversationId == null) return;
@@ -136,11 +191,16 @@ bool _isCreatingMessage = false;
       } else {
         currentConversation = null;
       }
-      notifyListeners();
+      
+      // ✅ CRITICAL FIX: Schedule notification after build completes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
     } catch (e) {
       print('Error loading conversation info: $e');
     }
   }
+
 
   Map<String, dynamic> _messageToMap(Message message) {
     return {
@@ -196,7 +256,7 @@ Future<void> loadExistingMessages() async {
         final data = doc.data();
         final message = Message.fromJson(data);
         _messages.add(message);
-          _processedMessages.add(message.id);
+        _processedMessages.add(message.id);
         
         // Pre-populate local ratings cache
         if (message.rating != null && message.rating!.isNotEmpty) {
@@ -204,11 +264,15 @@ Future<void> loadExistingMessages() async {
         }
       }
 
-      notifyListeners();
+      // ✅ CRITICAL FIX: Schedule notification after build completes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
     } catch (e) {
       print('Error loading existing messages: $e');
     }
   }
+
 
 void listenToMessages() {
   if (conversationId == null) return;
@@ -245,7 +309,7 @@ void listenToMessages() {
             _processedMessages.add(message.id);
             changed = true;
           } else {
-            print('⏭️ Skipping duplicate: ${message.id} (inList: ${index != -1}, processed: ${_processedMessages.contains(message.id)}, streaming: $isCurrentlyStreaming)');
+            print('⏭️ Skipping duplicate: ${message.id}');
           }
         } else if (change.type == DocumentChangeType.modified) {
           if (index != -1 && !_streamingContent.containsKey(message.id)) {
@@ -265,7 +329,11 @@ void listenToMessages() {
 
       if (changed) {
         _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
-        notifyListeners();
+        
+        // ✅ CRITICAL FIX: Schedule notification after build completes
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
       }
     },
     onError: (error) {
@@ -333,6 +401,9 @@ Future<void> askQuestionWithStreaming(BuildContext context, String question) asy
     _processedMessages.add(userMessage.id);
     _messages.add(userMessage);
     notifyListeners();
+    
+    // ✅ Trigger scroll after user message added
+    _onMessageAdded?.call();
 
     await userMessageRef.set(_messageToMap(userMessage));
 
@@ -385,6 +456,9 @@ Future<void> askQuestionWithStreaming(BuildContext context, String question) asy
       print('✅ Added bot message to local list: $botMessageId');
     }
     notifyListeners();
+    
+    // ✅ Trigger scroll after bot message placeholder added
+    _onMessageAdded?.call();
 
     String finalAnswer = '';
 
@@ -398,16 +472,21 @@ Future<void> askQuestionWithStreaming(BuildContext context, String question) asy
         final chunk = answer.substring(i, end);
         _streamingContent[botMessageId] = _streamingContent[botMessageId]! + chunk;
         notifyListeners();
+        
+        // ✅ Trigger scroll during streaming (every few chunks)
+        if (i % 30 == 0) {
+          _onMessageAdded?.call();
+        }
+        
         await Future.delayed(Duration(milliseconds: 30));
       }
       
-      finalAnswer = answer;  // ✅ Use the original answer, not accumulated
+      finalAnswer = answer;
       unawaited(_incrementFAQSimilarityCountAsync(existingFAQ['question'] as String));
     } else {
       print('🔍 Generating streaming answer from knowledge base...');
       
       int chunkCount = 0;
-      // ✅ The stream yields accumulated text, so just take the last value
       await for (final streamedText in _retriever.generateAnswerStream(
         question,
         conversationHistory: recentHistory,
@@ -416,65 +495,44 @@ Future<void> askQuestionWithStreaming(BuildContext context, String question) asy
         chunkCount++;
         print('🔄 Stream iteration $chunkCount: received ${streamedText.length} chars');
         
-        // Update the streaming content for real-time display
         _streamingContent[botMessageId] = streamedText;
         notifyListeners();
         
-        // Store the latest as final answer
+        // ✅ Trigger scroll during streaming (every few chunks)
+        if (chunkCount % 3 == 0) {
+          _onMessageAdded?.call();
+        }
+        
         finalAnswer = streamedText;
       }
       
       print('✅ Stream ended after $chunkCount iterations');
-      print('✅ Final answer length: ${finalAnswer.length} chars');
-      print('✅ First 100 chars: ${finalAnswer.substring(0, min(100, finalAnswer.length))}');
-      if (finalAnswer.length > 100) {
-        print('✅ Last 100 chars: ${finalAnswer.substring(finalAnswer.length - 100)}');
-      }
     }
 
-    // ✅ CRITICAL: Clear streaming state BEFORE verification
+    // Clear streaming state
     _streamingContent.remove(botMessageId);
     
-    // ✅ VERIFICATION: Check for actual duplication
+    // Verification for duplication
     String verifiedAnswer = finalAnswer;
     if (finalAnswer.length > 100) {
       final half = finalAnswer.length ~/ 2;
       final firstHalf = finalAnswer.substring(0, half);
       final secondHalf = finalAnswer.substring(half);
       
-      // Check if the two halves are exactly the same
       if (firstHalf == secondHalf) {
-        print('❌❌❌ EXACT DUPLICATION DETECTED!');
-        print('First half: ${firstHalf.substring(0, min(100, firstHalf.length))}...');
-        print('Second half: ${secondHalf.substring(0, min(100, secondHalf.length))}...');
+        print('❌ EXACT DUPLICATION DETECTED!');
         verifiedAnswer = firstHalf;
         print('✅ Fixed by removing duplicate - new length: ${verifiedAnswer.length} chars');
-      } else {
-        // Check for partial duplication at the boundary
-        final quarter = finalAnswer.length ~/ 4;
-        if (quarter > 50) {
-          final firstQuarter = finalAnswer.substring(0, quarter);
-          final thirdQuarter = finalAnswer.substring(half, half + quarter);
-          
-          if (firstQuarter == thirdQuarter) {
-            print('❌ PARTIAL DUPLICATION DETECTED at midpoint!');
-            print('Duplicate section: ${firstQuarter.substring(0, min(100, firstQuarter.length))}...');
-            verifiedAnswer = finalAnswer.substring(0, half);
-            print('✅ Fixed by taking first half - new length: ${verifiedAnswer.length} chars');
-          }
-        }
       }
     }
     
-    print('🔍 Verification complete - Final length: ${verifiedAnswer.length} chars');
-    
-    // ✅ Update message with verified content
+    // Update message with verified content
     final messageIndex = _messages.indexWhere((m) => m.id == botMessageId);
     if (messageIndex >= 0) {
       _messages[messageIndex] = Message(
         id: botMessageId,
         conversationId: conversationId!,
-        content: verifiedAnswer,  // ✅ Use verified answer
+        content: verifiedAnswer,
         sender: 'bot',
         status: 'sent',
         type: 'text',
@@ -485,46 +543,48 @@ Future<void> askQuestionWithStreaming(BuildContext context, String question) asy
     }
     
     notifyListeners();
+    
+    // ✅ Final scroll after completion
+    await Future.delayed(Duration(milliseconds: 100));
+    _onMessageAdded?.call();
 
     final totalResponseTime = DateTime.now().difference(startTime).inMilliseconds;
     final responseTime = totalResponseTime / 1000;
     print('⚡ Total response time: ${responseTime.toStringAsFixed(2)}s');
 
-    // ✅ Save to Firestore with verified content
-  try {
-  final batch = _firestore.batch();
-  
-  final botMessageRef = _firestore
-      .collection('conversations')
-      .doc(conversationId!)
-      .collection('messages')
-      .doc(botMessageId);
-  
-  final finalBotMessage = _messages.firstWhere((m) => m.id == botMessageId);
-  
-  print('💾 Saving to Firestore: ${finalBotMessage.content.length} chars');
-  
-  batch.set(botMessageRef, _messageToMap(finalBotMessage));
-  
-  batch.update(userMessageRef, {
-    'isAnswered': true,
-    'answeredAt': Timestamp.now(),
-    'responseTime': responseTime,
-  });
-  
-  await batch.commit();
-  print('✅ Saved to Firestore successfully');
-  
-  // ✅ ADD THIS: Update conversation title after first message
-  await _updateConversationTitleIfNeeded(question);
-  
-} catch (saveError) {
-  print('❌ Error saving to Firestore: $saveError');
-}
+    // Save to Firestore
+    try {
+      final batch = _firestore.batch();
+      
+      final botMessageRef = _firestore
+          .collection('conversations')
+          .doc(conversationId!)
+          .collection('messages')
+          .doc(botMessageId);
+      
+      final finalBotMessage = _messages.firstWhere((m) => m.id == botMessageId);
+      
+      batch.set(botMessageRef, _messageToMap(finalBotMessage));
+      
+      batch.update(userMessageRef, {
+        'isAnswered': true,
+        'answeredAt': Timestamp.now(),
+        'responseTime': responseTime,
+      });
+      
+      await batch.commit();
+      print('✅ Saved to Firestore successfully');
+      
+      await _updateConversationTitleIfNeeded(question);
+      
+    } catch (saveError) {
+      print('❌ Error saving to Firestore: $saveError');
+    }
+
     unawaited(_handlePostResponseTasks(
       context,
       question, 
-      verifiedAnswer,  // ✅ Use verified answer
+      verifiedAnswer,
       currentEmbedding, 
       classifiedCategory, 
       userId
@@ -537,11 +597,13 @@ Future<void> askQuestionWithStreaming(BuildContext context, String question) asy
   } finally {
     _isLoading = false;
     notifyListeners();
+    
+    // ✅ Final scroll
+    _onMessageAdded?.call();
   }
 }
 
 
-  // ⚡ OPTIMIZATION 4: Async save to Firebase (non-blocking)
   
 
     Future<String> _classifyQuestionCategoryFast(String question) async {
@@ -1320,14 +1382,34 @@ $question
   }
 
 void clearMessages() {
-  print('🧹 CLEARING ALL MESSAGES');
+  print('🧹 ChatProvider.clearMessages called');
+  
+  // Cancel subscription
+  _messagesSubscription?.cancel();
+  _messagesSubscription = null;
+  
+  // Clear all data structures
   _messages.clear();
   _processedMessages.clear(); 
   _streamingContent.clear();
-  conversationId = null; // ✅ Also clear conversation ID
-  currentConversation = null; // ✅ Clear conversation object
-  notifyListeners(); // ✅ Notify listeners immediately
-  print('✅ Messages cleared. Count: ${_messages.length}');
+  _pendingRatingsCache.clear();
+  
+  // Clear conversation references
+  conversationId = null;
+  currentConversation = null;
+  
+  // Reset all flags
+  _isLoading = false;
+  _isCreatingMessage = false;
+  
+  // ✅ CRITICAL FIX: Schedule notification after build completes
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    notifyListeners();
+  });
+  
+  print('✅ ChatProvider cleared');
+  print('   - Messages: ${_messages.length}');
+  print('   - Subscription: ${_messagesSubscription != null}');
 }
 
   @override

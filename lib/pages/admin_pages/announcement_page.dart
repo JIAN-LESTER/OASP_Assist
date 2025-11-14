@@ -132,286 +132,553 @@ Future<void> _showTokenInputModal() async {
     barrierDismissible: false,
     builder: (context) => StatefulBuilder(
       builder: (context, setDialogState) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
+        return Dialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
           ),
-          titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
-          title: Row(
-            children: const [
-              Icon(Icons.facebook, color: Color(0xFF2E7D32), size: 28),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Configure Facebook Token',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2E7D32),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-          content: SizedBox(
-            width: 520,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 🧭 Instruction Box
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Color(0xFF2E7D32).withOpacity(0.3)),
+          elevation: 8,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with gradient
+                Container(
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                         Colors.green,
+                        Colors.green
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Row(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.facebook,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.info_outline,
-                                color: Color(0xFF2E7D32), size: 20),
-                            SizedBox(width: 6),
                             Text(
-                              'How to Get Your Facebook Access Token:',
+                              'Facebook Integration',
                               style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF1B5E20),
-                                fontSize: 15,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Connect your Facebook Page',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white70,
                               ),
                             ),
                           ],
                         ),
-                        SizedBox(height: 10),
-                        Text.rich(
-                          TextSpan(
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              color: Color(0xFF2E7D32),
-                              height: 1.55,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Content
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(28),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Instructions Card
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.green.shade100,
+                                Colors.green.shade100,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.green.withOpacity(0.2),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              TextSpan(text: '1. Visit '),
-                              TextSpan(
-                                text: 'https://developers.facebook.com/',
-                                style: TextStyle(
-                                  color: Colors.blueAccent,
-                                  decoration: TextDecoration.underline,
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.lightbulb_outline,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'How to Get Your Access Token',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              
+                              // Step-by-step instructions
+                              _buildInstructionStep(
+                                number: '1',
+                                text: 'Visit ',
+                                link: 'developers.facebook.com',
+                                suffix: ' and log in with your Facebook account',
+                              ),
+                              const SizedBox(height: 12),
+                              
+                              _buildInstructionStep(
+                                number: '2',
+                                text: 'Click "My Apps" → "Create App" from the top navigation',
+                              ),
+                              const SizedBox(height: 12),
+                              
+                              _buildInstructionStep(
+                                number: '3',
+                                text: 'Select "Manage everything on your Page" → Choose "Business" app type',
+                                isHighlight: true,
+                              ),
+                              const SizedBox(height: 12),
+                              
+                              _buildInstructionStep(
+                                number: '4',
+                                text: 'Fill in app details:\n   • Display Name: OASP Assist\n   • Contact Email: your official email',
+                              ),
+                              const SizedBox(height: 12),
+                              
+                              _buildInstructionStep(
+                                number: '5',
+                                text: 'In "Use Cases", enable these permissions:',
+                              ),
+                              
+                              // Permissions box
+                              Container(
+                                margin: const EdgeInsets.only(left: 32, top: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.green.withOpacity(0.3),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildPermissionItem('pages_read_engagement'),
+                                    _buildPermissionItem('pages_manage_posts'),
+                                    _buildPermissionItem('pages_show_list'),
+                                    _buildPermissionItem('pages_read_user_content'),
+                                    _buildPermissionItem('pages_manage_metadata'),
+                                  ],
                                 ),
                               ),
-                              TextSpan(
-                                  text:
-                                      ' and log in using your Facebook account.\n'),
-                              TextSpan(
-                                  text:
-                                      '2. On the top bar, click “My Apps” → “Create App”.\n'),
-                              TextSpan(
-                                text:
-                                    '3. Choose "Manage everything on your Page" as the use case, and select "Business" as the App Type.',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                              const SizedBox(height: 12),
+                              
+                              _buildInstructionStep(
+                                number: '6',
+                                text: 'Go to "Tools" → "Graph API Explorer"',
                               ),
-                              TextSpan(
-                                  text:
-                                      '\n4. Fill out the following details:\n   • App Display Name: OASP Assist\n   • Contact Email: your official email\n   • Business Account: Optional\n'),
-                              TextSpan(text: '5. Click “Create App”.\n\n'),
-                              TextSpan(
-                                  text:
-                                      '6. In the left sidebar, open “Use Cases” and select your created app.\n'),
-                              TextSpan(
-                                  text:
-                                      '7. Under “Manage everything on your Page”, enable:\n   '),
-                              TextSpan(
-                                text:
-                                    '✅ pages_read_engagement\n   ✅ pages_manage_posts\n   ✅ pages_show_list\n   ✅ pages_read_user_content\n   ✅ pages_manage_metadata\n',
-                                style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  color: Color(0xFF1B5E20),
+                              const SizedBox(height: 12),
+                              
+                              _buildInstructionStep(
+                                number: '7',
+                                text: 'Select your app, verify permissions, then "Generate Access Token"',
+                              ),
+                              
+                              const SizedBox(height: 16),
+                              
+                              // Tip box
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.amber.shade200,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.tips_and_updates,
+                                      color: Colors.amber.shade700,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Pro Tip: Use a Business App for better Page access',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.amber.shade900,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              TextSpan(
-                                  text:
-                                      '8. Go to “Tools” → “Graph API Explorer”.\n9. Select your app and check the same permissions.\n10. Click “Generate Access Token” and copy it below.'),
                             ],
                           ),
                         ),
-                        SizedBox(height: 10),
-                        Divider(color: Color(0xFFBDBDBD)),
-                        Text(
-                          '💡 Tip: Use a Business App to access Page posts and insights effectively.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF2E7D32),
+
+                        const SizedBox(height: 24),
+
+                        // Token Input Section
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.vpn_key,
+                              size: 20,
+                              color: Colors.grey.shade700,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Your Access Token',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey.shade800,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        
+                        TextField(
+                          controller: tokenController,
+                          maxLines: 3,
+                          enabled: !isExchanging,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: InputDecoration(
+                            hintText: 'Paste your Facebook access token here...',
+                            hintStyle: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: 14,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: Colors.green,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            contentPadding: const EdgeInsets.all(16),
+                            prefixIcon: Icon(
+                              Icons.lock_outline,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Paste Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: isExchanging
+                                ? null
+                                : () async {
+                                    final data =
+                                        await Clipboard.getData('text/plain');
+                                    if (data?.text != null) {
+                                      tokenController.text = data!.text!;
+                                      _showSuccessSnackBar(
+                                          '✅ Token pasted from clipboard');
+                                    }
+                                  },
+                            icon: const Icon(
+                              Icons.content_paste_rounded,
+                              size: 18,
+                            ),
+                            label: const Text(
+                              'Paste from Clipboard',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.green,
+                              side: BorderSide(
+                                color: isExchanging
+                                    ? Colors.grey.shade300
+                                    : Colors.green,
+                                width: 1.5,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
+                ),
 
-                  const SizedBox(height: 20),
+                // Action Buttons
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(24),
+                      bottomRight: Radius.circular(24),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: isExchanging ? null : () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 14,
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: isExchanging
+                            ? null
+                            : () async {
+                                final token = tokenController.text.trim();
 
-                  // 🔑 Token Input
-                  const Text(
-                    'Facebook Access Token',
-                    style: TextStyle(
+                                if (token.isEmpty) {
+                                  _showErrorSnackBar('Please enter a token');
+                                  return;
+                                }
+
+                                if (token.length < 50) {
+                                  _showErrorSnackBar('Token seems too short');
+                                  return;
+                                }
+
+                                setDialogState(() => isExchanging = true);
+
+                                try {
+                                  print('🔄 Exchanging token...');
+                                  final result =
+                                      await FacebookSyncService.exchangeToken(token);
+
+                                  if (result['success'] == true ||
+                                      result['ok'] == true) {
+                                    final expiresIn = result['expires_in'] ?? 0;
+                                    final daysValid = (expiresIn / 86400).round();
+
+                                    Navigator.pop(context);
+                                    _showSuccessSnackBar(
+                                        '✅ Token saved! Valid for ~$daysValid days.');
+                                    await _autoSyncAfterTokenSave();
+                                    return;
+                                  }
+
+                                  throw Exception(result['message'] ?? result['error']);
+                                } catch (e) {
+                                  print('❌ Error: $e');
+                                  setDialogState(() => isExchanging = false);
+                                  final errorMessage =
+                                      FacebookSyncService.parseErrorMessage(e);
+                                  _showErrorSnackBar(
+                                      'Failed to save token: $errorMessage');
+                                }
+                              },
+                        icon: isExchanging
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Icon(Icons.check_circle, size: 18),
+                        label: Text(
+                          isExchanging ? 'Saving Token...' : 'Save & Connect',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.grey.shade400,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 28,
+                            vertical: 14,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+Widget _buildInstructionStep({
+  required String number,
+  required String text,
+  String? link,
+  String? suffix,
+  bool isHighlight = false,
+}) {
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: isHighlight ? Colors.green : Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.green,
+            width: 2,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            number,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isHighlight ? Colors.white : Colors.green,
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: RichText(
+            text: TextSpan(
+              style: TextStyle(
+                fontSize: 14,
+                color: const Color(0xFF0D47A1),
+                height: 1.5,
+                fontWeight: isHighlight ? FontWeight.w600 : FontWeight.normal,
+              ),
+              children: [
+                TextSpan(text: text),
+                if (link != null) ...[
+                  TextSpan(
+                    text: link,
+                    style: const TextStyle(
+                      color: Colors.green,
+                      decoration: TextDecoration.underline,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1B5E20),
-                      fontSize: 14.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: tokenController,
-                    maxLines: 3,
-                    enabled: !isExchanging,
-                    style: const TextStyle(fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: 'Paste your token here...',
-                      hintStyle: const TextStyle(color: Colors.grey),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            const BorderSide(color: Color(0xFF2E7D32), width: 1),
-                      ),
-                      focusedBorder: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                        borderSide: BorderSide(
-                          color: Color(0xFF2E7D32),
-                          width: 2,
-                        ),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                      contentPadding: const EdgeInsets.all(12),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // 📋 Paste Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: isExchanging
-                          ? null
-                          : () async {
-                              final data =
-                                  await Clipboard.getData('text/plain');
-                              if (data?.text != null) {
-                                tokenController.text = data!.text!;
-                                _showSuccessSnackBar(
-                                    '✅ Token pasted from clipboard');
-                              }
-                            },
-                      icon: const Icon(Icons.content_paste_rounded,
-                          color: Color(0xFF2E7D32), size: 18),
-                      label: const Text(
-                        'Paste from Clipboard',
-                        style: TextStyle(
-                          color: Color(0xFF2E7D32),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFF2E7D32), width: 1.5),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
                     ),
                   ),
                 ],
-              ),
+                if (suffix != null) TextSpan(text: suffix),
+              ],
             ),
           ),
+        ),
+      ),
+    ],
+  );
+}
 
-          // 🟢 Action Buttons
-          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          actions: [
-            TextButton(
-              onPressed: isExchanging ? null : () => Navigator.pop(context),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: isExchanging
-                  ? null
-                  : () async {
-                      final token = tokenController.text.trim();
-
-                      if (token.isEmpty) {
-                        _showErrorSnackBar('Please enter a token');
-                        return;
-                      }
-
-                      if (token.length < 50) {
-                        _showErrorSnackBar('Token seems too short');
-                        return;
-                      }
-
-                      setDialogState(() => isExchanging = true);
-
-                      try {
-                        print('🔄 Exchanging token...');
-                        final result =
-                            await FacebookSyncService.exchangeToken(token);
-
-                        if (result['success'] == true ||
-                            result['ok'] == true) {
-                          final expiresIn = result['expires_in'] ?? 0;
-                          final daysValid = (expiresIn / 86400).round();
-
-                          Navigator.pop(context);
-                          _showSuccessSnackBar(
-                              '✅ Token saved! Valid for ~$daysValid days.');
-                          await _autoSyncAfterTokenSave();
-                          return;
-                        }
-
-                        throw Exception(result['message'] ?? result['error']);
-                      } catch (e) {
-                        print('❌ Error: $e');
-                        setDialogState(() => isExchanging = false);
-                        final errorMessage =
-                            FacebookSyncService.parseErrorMessage(e);
-                        _showErrorSnackBar(
-                            'Failed to save token: $errorMessage');
-                      }
-                    },
-              icon: isExchanging
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.save, size: 18),
-              label: Text(isExchanging ? 'Saving...' : 'Save Token'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E7D32),
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 2,
-              ),
-            ),
-          ],
-        );
-      },
+Widget _buildPermissionItem(String permission) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        const Icon(
+          Icons.check_circle,
+          color: Color(0xFF4CAF50),
+          size: 16,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          permission,
+          style: const TextStyle(
+            fontSize: 13,
+            fontFamily: 'monospace',
+            color: Color(0xFF0D47A1),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -555,7 +822,7 @@ void _showSyncErrorDialog(String errorMessage) {
           icon: Icon(Icons.refresh),
           label: Text('Retry Sync'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue[700],
+            backgroundColor: Colors.green[700],
             foregroundColor: Colors.white,
           ),
         ),

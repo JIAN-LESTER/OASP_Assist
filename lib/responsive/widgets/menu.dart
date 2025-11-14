@@ -422,8 +422,7 @@ static Widget buildPersistentDrawer({
         );
     }
   }
-
- static Widget _buildDrawerHeader(
+static Widget _buildDrawerHeader(
   BuildContext context,
   UserRole userRole, {
   VoidCallback? onNewChat,
@@ -446,12 +445,17 @@ static Widget buildPersistentDrawer({
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
+              onPressed: () async {
                 HapticFeedback.mediumImpact();
-                Navigator.of(context).pop(); // Close drawer
+                Navigator.of(context).pop(); // Close drawer first
                 
-                // ✅ FIX: Just call the callback
-                onNewChat();
+                // ✅ FIX: Wait for drawer to close
+                await Future.delayed(Duration(milliseconds: 300));
+                
+                // ✅ Then call the callback
+                if (context.mounted) {
+                  onNewChat();
+                }
               },
               icon: const Icon(Icons.add_comment_rounded, size: 20),
               label: const Text(
@@ -489,6 +493,7 @@ static Widget buildPersistentDrawer({
     ),
   );
 }
+
 
   static Widget _buildPersistentDrawerHeader() {
     return Container(
@@ -721,17 +726,15 @@ static Widget _buildNewChatAndHistorySection(
                 onPressed: () async {
                   Navigator.of(context).pop(); // Close drawer
                   
-                  // Small delay for drawer close animation
-                  await Future.delayed(Duration(milliseconds: 100));
+                  // ✅ FIX: Wait for drawer animation
+                  await Future.delayed(Duration(milliseconds: 300));
                   
-                  // ✅ FIX: Find the parent state and call its method
                   if (context.mounted) {
-                    // This assumes the parent is UserMainPage
-                    // The callback will handle navigation + new chat
-                    final parentContext = context.findAncestorStateOfType<State>();
-                    if (parentContext != null && parentContext is dynamic) {
-                      if (parentContext.widget.runtimeType.toString() == '_UserMainPageState') {
-                        (parentContext as dynamic)._onNewChatPressed();
+                    // ✅ Find parent state and call method
+                    final parentState = context.findAncestorStateOfType<State>();
+                    if (parentState != null && parentState is dynamic) {
+                      if (parentState.widget.runtimeType.toString() == '_UserMainPageState') {
+                        await (parentState as dynamic)._onNewChatPressed();
                       }
                     }
                   }
@@ -754,7 +757,7 @@ static Widget _buildNewChatAndHistorySection(
             ),
           ),
 
-          // Rest of the chat history section stays the same...
+          // ... rest of chat history section (keep existing code)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             child: Theme(
@@ -1186,7 +1189,7 @@ static Widget _buildPersistentNewChatAndHistory(
   BuildContext context,
   bool isExpanded, {
   Function(BuildContext, String?)? onConversationSelected,
-  VoidCallback? onNewChat, // ✅ ADD THIS PARAMETER
+  VoidCallback? onNewChat,
 }) {
   return StatefulBuilder(
     builder: (context, setState) {
@@ -1206,12 +1209,9 @@ static Widget _buildPersistentNewChatAndHistory(
                   onPressed: () async {
                     HapticFeedback.mediumImpact();
                     
-                    // ✅ FIX: Call the callback if provided
-                    if (onNewChat != null) {
+                    // ✅ FIX: Call the callback with proper async handling
+                    if (onNewChat != null && context.mounted) {
                       onNewChat();
-                    } else {
-                      // Fallback
-                      await UserConstant.startNewChat(context);
                     }
                   },
                   icon: const Icon(Icons.add, size: 18),
@@ -1311,7 +1311,7 @@ static Widget _buildPersistentNewChatAndHistory(
             ),
 
           // Collapsed state icon
-          if (!isExpanded)
+           if (!isExpanded)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               child: Tooltip(
@@ -1323,11 +1323,10 @@ static Widget _buildPersistentNewChatAndHistory(
                     borderRadius: BorderRadius.circular(8),
                     onTap: () async {
                       HapticFeedback.mediumImpact();
-                      // ✅ FIX: Use callback for collapsed state too
-                      if (onNewChat != null) {
+                      
+                      // ✅ FIX: Use callback for collapsed state
+                      if (onNewChat != null && context.mounted) {
                         onNewChat();
-                      } else {
-                        await UserConstant.startNewChat(context);
                       }
                     },
                     child: Container(

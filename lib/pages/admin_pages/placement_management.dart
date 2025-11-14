@@ -680,7 +680,7 @@ Widget _buildHeader(
                       ),
                       const SizedBox(width: 16),
                       
-                      const SizedBox(width: 16),
+            
                       Expanded(
                         child: buildStatCard('Approaching Deadline', '26', Colors.red, Icons.group),
                       ),

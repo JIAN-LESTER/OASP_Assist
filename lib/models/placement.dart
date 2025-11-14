@@ -19,9 +19,9 @@ class Placement {
 
   factory Placement.fromJson(Map<String, dynamic> json) {
     return Placement(
-      placementID: json['placementID'],
-      partnerCompany: json['partnerCompany'],
-      isRecruiting: json['isRecruiting'],
+      placementID: json['placementID'] ?? '',
+      partnerCompany: json['partnerCompany'] ?? '',
+      isRecruiting: json['isRecruiting'] ?? true, 
       contacts:
           json['contacts'] is List
               ? List<String>.from(json['contacts'].map((e) => e.toString()))
@@ -30,7 +30,6 @@ class Placement {
           json['positions'] is List
               ? List<String>.from(json['positions'].map((e) => e.toString()))
               : <String>[],
-
       createdAt:
           json['createdAt'] is String
               ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()

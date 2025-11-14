@@ -697,6 +697,7 @@ Widget _buildHeader(
                           Icons.check_circle,
                         ),
                       ),
+                      SizedBox(width: 16,),
                       Expanded(
                         child: buildStatCard(
                           'Approaching Deadline',

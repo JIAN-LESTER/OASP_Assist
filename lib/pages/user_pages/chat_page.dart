@@ -57,6 +57,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
   String? actualConversationId;
   bool isLoading = true;
+  
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -86,11 +87,135 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   bool _showAttachmentOptions = false;
   bool _showFAQs = false;
 
-  bool _isLoadingConversation = false;
+  bool _isLoadingConversation = true;
 
-  @override
+   String? _currentLoadedConversationId;
+  bool _isInitialized = false;
+  bool _isSettingUpConversation = false;
+
+  Future<void> _initializeConversation() async {
+  if (_isSettingUpConversation) {
+    print('⚠️ Already setting up conversation');
+    return;
+  }
+
+  _isSettingUpConversation = true;
+
+  try {
+    print('🚀 Initializing conversation: ${widget.conversationId}');
+
+    // ✅ Keep loading state ON during initialization
+    if (mounted) {
+      setState(() {
+        _isLoadingConversation = true;
+      });
+    }
+
+    if (widget.conversationId.isEmpty) {
+      // No conversation - show FAQs after clearing loading
+      chatProvider.clearMessages();
+      if (mounted) {
+        setState(() {
+          _showFAQs = true;
+          _isLoadingConversation = false;
+          _currentLoadedConversationId = null;
+        });
+      }
+      return;
+    }
+
+    // ✅ Check if already loaded
+    if (_currentLoadedConversationId == widget.conversationId) {
+      print('ℹ️ Conversation already loaded: ${widget.conversationId}');
+      if (mounted) {
+        setState(() {
+          _isLoadingConversation = false;
+        });
+      }
+      _isSettingUpConversation = false;
+      return;
+    }
+
+    // ✅ Set conversation ID ONCE
+    await chatProvider.setConversationId(widget.conversationId);
+
+    // ✅ Wait for messages to fully load
+    await Future.delayed(Duration(milliseconds: 800));
+
+    // Mark all loaded messages as initial
+    _initialMessageIds.clear();
+    for (var message in chatProvider.messages) {
+      _initialMessageIds.add(message.id);
+    }
+
+    final hasMessages = chatProvider.messages.isNotEmpty;
+
+    if (mounted) {
+      setState(() {
+        _selectedConversationId = widget.conversationId;
+        _currentLoadedConversationId = widget.conversationId;
+        _showFAQs = !hasMessages;
+        _isLoadingConversation = false; // ✅ Clear loading AFTER messages loaded
+      });
+    }
+
+    // ✅ Check escalations only once
+    if (!hasMessages) {
+      await _checkAndLoadEscalationResponses();
+    }
+
+    // ✅ Scroll to bottom after loading
+    if (hasMessages) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottomSmooth();
+      });
+    }
+
+    print('✅ Conversation initialized: ${widget.conversationId}');
+    print('   - Messages: ${chatProvider.messages.length}');
+    print('   - Show FAQs: $_showFAQs');
+  } catch (e) {
+    print('❌ Error initializing conversation: $e');
+    if (mounted) {
+      setState(() {
+        _isLoadingConversation = false;
+        _showFAQs = true;
+      });
+    }
+  } finally {
+    _isSettingUpConversation = false;
+  }
+}
+
+void _scrollToBottomSmooth() {
+  if (!_scrollController.hasClients) return;
+  
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  });
+}
+
+void _scrollToBottomInstant() {
+  if (!_scrollController.hasClients) return;
+  
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    }
+  });
+}
+
+    @override
   void initState() {
     super.initState();
+
+    print('📄 ChatPage initState: ${widget.conversationId}');
 
     _micAnimationController = AnimationController(
       duration: Duration(milliseconds: 200),
@@ -108,10 +233,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       ),
     );
 
-    _attachmentRotationAnimation = Tween<double>(
-      begin: 0.0,
-      end: 0.125,
-    ).animate(
+    _attachmentRotationAnimation = Tween<double>(begin: 0.0, end: 0.125).animate(
       CurvedAnimation(
         parent: _attachmentAnimationController,
         curve: Curves.easeInOut,
@@ -121,83 +243,55 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     _showFAQs = widget.showFAQs;
 
     _initChatSpeechToText();
-    _setupConversation();
-
     chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    // ✅ FIX: Only initialize once in postFrameCallback
+   WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!_isInitialized) {
+      _initializeConversation();
+      _isInitialized = true;
+    }
+  });
 
-      if (widget.conversationId.isNotEmpty) {
-        setState(() {
-          _isLoadingConversation = true;
-        });
-
-        try {
-          await chatProvider.setConversationId(widget.conversationId);
-
-          // ✅ IMPORTANT: Wait for messages to load
-          await Future.delayed(Duration(milliseconds: 800));
-
-          // Mark all loaded messages as initial (don't typewrite them)
-          for (var message in chatProvider.messages) {
-            _initialMessageIds.add(message.id);
-          }
-
-          final hasMessages = chatProvider.messages.isNotEmpty;
-
-          if (mounted) {
-            setState(() {
-              _selectedConversationId = widget.conversationId;
-              _showFAQs = !hasMessages;
-              _isLoadingConversation = false;
-            });
-
-            // ✅ NEW: Check for any escalation responses
-            await _checkAndLoadEscalationResponses();
-          }
-
-          print(
-            'DEBUG: ChatPage loaded. Messages: ${chatProvider.messages.length}, Show FAQs: $_showFAQs',
-          );
-        } catch (e) {
-          print('DEBUG: Error loading conversation: $e');
-          if (mounted) {
-            setState(() {
-              _isLoadingConversation = false;
-            });
-          }
-        }
-      } else {
-        chatProvider.clearMessages();
-        setState(() {
-          _showFAQs = true;
-          _isLoadingConversation = false;
-        });
-      }
-    });
+  chatProvider.setScrollCallback(() {
+    if (mounted && !_showFAQs) {
+      _scrollToBottomSmooth();
+    }
+  });
+  
+  // ✅ FIX: Start in loading state
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!_isInitialized) {
+      _initializeConversation();
+      _isInitialized = true;
+    }
+  });
   }
 
-  Future<void> _checkAndLoadEscalationResponses() async {
+ Future<void> _checkAndLoadEscalationResponses() async {
     if (widget.conversationId.isEmpty) return;
 
+    // ✅ FIX: Check if already checked for this conversation
+    final cacheKey = 'escalation_checked_${widget.conversationId}';
+    if (_escalationChecked.contains(cacheKey)) {
+      print('ℹ️ Escalations already checked for this conversation');
+      return;
+    }
+
     try {
-      print(
-        '🔍 Checking for escalation responses in conversation: ${widget.conversationId}',
-      );
+      print('🔍 Checking for escalation responses: ${widget.conversationId}');
 
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-      // Query escalations for this conversation that have staff responses
-      final escalationsSnapshot =
-          await _firestore
-              .collection('escalations')
-              .where('conversationId', isEqualTo: widget.conversationId)
-              .where('status', isEqualTo: 'resolved')
-              .get();
+      final escalationsSnapshot = await _firestore
+          .collection('escalations')
+          .where('conversationId', isEqualTo: widget.conversationId)
+          .where('status', isEqualTo: 'resolved')
+          .get();
 
       if (escalationsSnapshot.docs.isEmpty) {
         print('ℹ️ No resolved escalations found');
+        _escalationChecked.add(cacheKey);
         return;
       }
 
@@ -212,49 +306,38 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
         if (staffResponse == null || staffResponse.isEmpty) continue;
 
-        // ✅ CRITICAL FIX: Check if staff response already exists in Firestore
-        final existingStaffMessages =
-            await _firestore
-                .collection('conversations')
-                .doc(widget.conversationId)
-                .collection('messages')
-                .where('sender', isEqualTo: 'staff')
-                .where(
-                  'content',
-                  isEqualTo:
-                      '**Staff Response from $respondedBy:**\n\n$staffResponse',
-                )
-                .limit(1)
-                .get();
+        // Check if staff response already exists
+        final existingStaffMessages = await _firestore
+            .collection('conversations')
+            .doc(widget.conversationId)
+            .collection('messages')
+            .where('sender', isEqualTo: 'staff')
+            .where('content', isEqualTo: '**Staff Response from $respondedBy:**\n\n$staffResponse')
+            .limit(1)
+            .get();
 
         if (existingStaffMessages.docs.isNotEmpty) {
-          print(
-            'ℹ️ Staff response already exists in Firestore for escalation $escalationId',
-          );
+          print('ℹ️ Staff response already exists for escalation $escalationId');
           continue;
         }
 
-        // Also check in-memory messages
+        // Also check in-memory
         final existingInMemory = chatProvider.messages.any(
           (msg) => msg.content.contains(staffResponse) && msg.sender == 'staff',
         );
 
         if (existingInMemory) {
-          print(
-            'ℹ️ Staff response already exists in memory for escalation $escalationId',
-          );
+          print('ℹ️ Staff response already in memory for escalation $escalationId');
           continue;
         }
 
-        print('📝 Adding staff response to chat for escalation $escalationId');
+        print('📝 Adding staff response for escalation $escalationId');
 
-        // Create a staff message
-        final staffMessageRef =
-            _firestore
-                .collection('conversations')
-                .doc(widget.conversationId)
-                .collection('messages')
-                .doc();
+        final staffMessageRef = _firestore
+            .collection('conversations')
+            .doc(widget.conversationId)
+            .collection('messages')
+            .doc();
 
         final staffMessage = Message(
           id: staffMessageRef.id,
@@ -266,13 +349,9 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
           sentAt: DateTime.now(),
         );
 
-        // Save to Firestore
-        await chatProvider.saveMessageToFirebase(
-          widget.conversationId,
-          staffMessage,
-        );
+        await chatProvider.saveMessageToFirebase(widget.conversationId, staffMessage);
 
-        // Update the original escalated message
+        // Update original message
         if (messageId != null && messageId.isNotEmpty) {
           try {
             await _firestore
@@ -281,21 +360,21 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                 .collection('messages')
                 .doc(messageId)
                 .update({
-                  'escalationResolved': true,
-                  'escalationResponse': staffResponse,
-                  'escalationRespondedBy': respondedBy,
-                  'escalationRespondedAt': Timestamp.now(),
-                  'escalationId': escalationId,
-                });
-
-            print(
-              '✅ Updated original message $messageId with escalation response',
-            );
+              'escalationResolved': true,
+              'escalationResponse': staffResponse,
+              'escalationRespondedBy': respondedBy,
+              'escalationRespondedAt': Timestamp.now(),
+              'escalationId': escalationId,
+            });
+            print('✅ Updated original message $messageId');
           } catch (e) {
             print('⚠️ Could not update original message: $e');
           }
         }
       }
+
+      // Mark as checked
+      _escalationChecked.add(cacheKey);
 
       // Refresh messages
       await chatProvider.loadExistingMessages();
@@ -303,6 +382,9 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       print('❌ Error checking escalation responses: $e');
     }
   }
+
+  static final Set<String> _escalationChecked = {};
+
 
   Future<void> _initChatSpeechToText() async {
     _speechToText = stt.SpeechToText();
@@ -391,124 +473,42 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
   }
 
-  @override
-  void didUpdateWidget(ChatPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
+@override
+void didUpdateWidget(ChatPage oldWidget) {
+  super.didUpdateWidget(oldWidget);
 
-    if (widget.conversationId != oldWidget.conversationId) {
-      setState(() {
-        _isLoadingConversation = true;
-      });
+  // Only react to actual conversation changes
+  if (widget.conversationId != oldWidget.conversationId) {
+    print('📄 ChatPage conversation changed:');
+    print('   - Old: ${oldWidget.conversationId}');
+    print('   - New: ${widget.conversationId}');
 
-      print(
-        'DEBUG: Conversation changing from ${oldWidget.conversationId} to ${widget.conversationId}',
-      );
-
-      if (widget.conversationId.isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          try {
-            final chatProvider = Provider.of<ChatProvider>(
-              context,
-              listen: false,
-            );
-            await chatProvider.setConversationId(widget.conversationId);
-
-            await Future.delayed(Duration(milliseconds: 500));
-
-            // Mark all loaded messages as initial (don't typewrite them)
-            _initialMessageIds.clear();
-            for (var message in chatProvider.messages) {
-              _initialMessageIds.add(message.id);
-            }
-
-            final hasMessages = chatProvider.messages.isNotEmpty;
-
-            if (mounted) {
-              setState(() {
-                _showFAQs = !hasMessages;
-                _isLoadingConversation = false;
-              });
-            }
-
-            print(
-              'DEBUG: Conversation changed. Messages: ${chatProvider.messages.length}, Show FAQs: $_showFAQs',
-            );
-          } catch (e) {
-            print('DEBUG: Error updating conversation: $e');
-            if (mounted) {
-              setState(() {
-                _isLoadingConversation = false;
-              });
-            }
-          }
-        });
-      } else {
-        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-        chatProvider.clearMessages();
-
-        if (mounted) {
-          setState(() {
-            _showFAQs = true;
-            _isLoadingConversation = false;
-          });
+    // Only reinitialize if it's a different conversation
+    if (_currentLoadedConversationId != widget.conversationId) {
+      _isInitialized = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_isInitialized) {
+          _initializeConversation();
+          _isInitialized = true;
         }
-      }
-      return;
+      });
     }
+    return;
+  }
 
-    if (widget.showFAQs != oldWidget.showFAQs) {
+  // React to FAQ visibility changes
+  if (widget.showFAQs != oldWidget.showFAQs) {
+    if (mounted) {
       setState(() {
         _showFAQs = widget.showFAQs;
       });
-      print('DEBUG: ChatPage received FAQ state update: $_showFAQs');
     }
+    print('📄 ChatPage FAQ visibility changed: $_showFAQs');
   }
+}
 
-  Widget _buildLoadingIndicator() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 20,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
-                strokeWidth: 3,
-              ),
-            ),
-          ),
-          SizedBox(height: 24),
-          Text(
-            'Loading chat...',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-              letterSpacing: 0.3,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Please wait a moment',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-          ),
-        ],
-      ),
-    );
-  }
+ 
+
 
   Future<void> _setupConversation() async {
     try {
@@ -1155,403 +1155,939 @@ Widget _buildTypingCursor() {
     );
   }
 
-  Future<void> _handleLikeDislike(
-    String messageId,
-    bool isLike, [
-    Message? message,
-  ]) async {
-    if (!mounted) return;
+ Future<void> _handleLikeDislike(
+  String messageId,
+  bool isLike, [
+  Message? message,
+]) async {
+  if (!mounted) return;
 
-    if (widget.conversationId.isEmpty) {
-      print('Error: No conversation ID available');
-      if (mounted) {
-        _showSnackBar('Unable to rate message', Icons.error);
-      }
-      return;
+  if (widget.conversationId.isEmpty) {
+    print('Error: No conversation ID available');
+    if (mounted) {
+      _showSnackBar('Unable to rate message', Icons.error);
     }
-
-    setState(() {
-      _localRatings[messageId] = isLike ? 'like' : 'dislike';
-    });
-
-    try {
-      await Provider.of<ChatProvider>(
-        context,
-        listen: false,
-      ).rateMessage(messageId, isLike, widget.conversationId);
-    } catch (e) {
-      print('Error rating message: $e');
-      if (mounted) {
-        setState(() {
-          _localRatings.remove(messageId);
-        });
-        _showSnackBar('Failed to save rating', Icons.error);
-      }
-      return;
-    }
-
-    if (!isLike && message != null && mounted) {
-      final bool? escalate = await showDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: [
-                Icon(
-                  Icons.report_problem_outlined,
-                  color: Colors.orange.shade600,
-                  size: 24,
-                ),
-                SizedBox(width: 12),
-                Text(
-                  'Escalate to Staff?',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade800,
-                  ),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "This response wasn't helpful. Would you like to escalate this message to staff for human assistance?",
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.grey.shade700,
-                    height: 1.4,
-                  ),
-                ),
-                SizedBox(height: 12),
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Text(
-                    "A staff member will review your conversation and provide personalized assistance.",
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(
-                  'Not Now',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF2E7D32),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  'Yes, Escalate',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          );
-        },
-      );
-
-      if (escalate == true && mounted) {
-        await _processManualEscalation(message);
-      }
-    }
+    return;
   }
 
-  Future<void> _processManualEscalation(Message message) async {
-    final reasonController = TextEditingController();
-    String selectedReason = 'Bot response not accurate';
+  setState(() {
+    _localRatings[messageId] = isLike ? 'like' : 'dislike';
+  });
 
-    try {
-      final bool? shouldEscalate = await showDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder: (BuildContext context) {
-          return StatefulBuilder(
-            builder:
-                (context, setState) => AlertDialog(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+  try {
+    await Provider.of<ChatProvider>(
+      context,
+      listen: false,
+    ).rateMessage(messageId, isLike, widget.conversationId);
+  } catch (e) {
+    print('Error rating message: $e');
+    if (mounted) {
+      setState(() {
+        _localRatings.remove(messageId);
+      });
+      _showSnackBar('Failed to save rating', Icons.error);
+    }
+    return;
+  }
+
+  if (!isLike && message != null && mounted) {
+    final bool? escalate = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 8,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 450),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.green.shade600,
+                        Colors.green.shade400,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
                   ),
-                  title: Row(
+                  child: Row(
                     children: [
-                      Icon(
-                        Icons.report_problem_outlined,
-                        color: Colors.orange.shade600,
-                        size: 24,
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.feedback_outlined,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Escalate to Staff?',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
-                          ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Need Better Help?',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Let our staff team assist you',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "This response wasn't helpful. Would you like to escalate this message to staff for human assistance?",
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: Colors.grey.shade700,
-                            height: 1.4,
+                ),
+                
+                // Content
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "This response wasn't helpful. Would you like to escalate this to our staff for personalized assistance?",
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.grey.shade800,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.green.shade100,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          child: Text(
-                            "A staff member will review your conversation and provide personalized assistance.",
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          'Select a reason:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Column(
+                        child: Row(
                           children: [
-                            RadioListTile<String>(
-                              title: const Text('Bot response not accurate'),
-                              value: 'Bot response not accurate',
-                              groupValue: selectedReason,
-                              onChanged:
-                                  (val) =>
-                                      setState(() => selectedReason = val!),
-                              dense: true,
+                            Icon(
+                              Icons.info_outline,
+                              color: Colors.grey.shade700,
+                              size: 20,
                             ),
-                            RadioListTile<String>(
-                              title: const Text(
-                                'Bot did not understand my question',
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'A staff member will review your question and respond within 3 business days.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade900,
+                                  height: 1.4,
+                                ),
                               ),
-                              value: 'Bot did not understand my question',
-                              groupValue: selectedReason,
-                              onChanged:
-                                  (val) =>
-                                      setState(() => selectedReason = val!),
-                              dense: true,
-                            ),
-                            RadioListTile<String>(
-                              title: const Text(
-                                'Need clarification from staff',
-                              ),
-                              value: 'Need clarification from staff',
-                              groupValue: selectedReason,
-                              onChanged:
-                                  (val) =>
-                                      setState(() => selectedReason = val!),
-                              dense: true,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
-                        Text(
-                          'Additional details (optional)',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Actions
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(20),
+                      bottomRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: reasonController,
-                          maxLines: 3,
-                          maxLength: 200,
-                          decoration: InputDecoration(
-                            hintText:
-                                'e.g., "I need more specific information about scholarship deadlines"',
-                            hintStyle: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade400,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.grey.shade300,
+                        child: Text(
+                          'Not Now',
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E7D32),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 28,
+                            vertical: 14,
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.support_agent, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Yes, Escalate',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
                               ),
                             ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF2E7D32),
-                                width: 2,
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (escalate == true && mounted) {
+      await _processManualEscalation(message);
+    }
+  }
+}
+
+ Future<void> _processManualEscalation(Message message) async {
+  final reasonController = TextEditingController();
+  String selectedReason = 'Bot response not accurate';
+
+  try {
+    final bool? shouldEscalate = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            elevation: 8,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 500),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header with gradient
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF2E7D32),
+                          const Color(0xFF43A047),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.support_agent,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Request Staff Assistance',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            contentPadding: const EdgeInsets.all(12),
-                            counterStyle: const TextStyle(fontSize: 11),
+                              SizedBox(height: 4),
+                              Text(
+                                'Get personalized help from our team',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      child: Text(
-                        'Not Now',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
+                  
+                  // Content
+                  SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Info card
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.blue.shade100,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.blue.shade700,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'A staff member will review your conversation and provide detailed assistance within 3 business days.',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.blue.shade900,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 24),
+                          
+                          // Reason selection
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.flag_outlined,
+                                size: 20,
+                                color: Colors.grey.shade700,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'What went wrong?',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              children: [
+                                _buildReasonTile(
+                                  context: context,
+                                  title: 'Bot response not accurate',
+                                  icon: Icons.error_outline,
+                                  value: 'Bot response not accurate',
+                                  groupValue: selectedReason,
+                                  onChanged: (val) =>
+                                      setState(() => selectedReason = val!),
+                                  isFirst: true,
+                                ),
+                                Divider(height: 1, color: Colors.grey.shade300),
+                                _buildReasonTile(
+                                  context: context,
+                                  title: 'Bot did not understand my question',
+                                  icon: Icons.help_outline,
+                                  value: 'Bot did not understand my question',
+                                  groupValue: selectedReason,
+                                  onChanged: (val) =>
+                                      setState(() => selectedReason = val!),
+                                ),
+                                Divider(height: 1, color: Colors.grey.shade300),
+                                _buildReasonTile(
+                                  context: context,
+                                  title: 'Need clarification from staff',
+                                  icon: Icons.contact_support_outlined,
+                                  value: 'Need clarification from staff',
+                                  groupValue: selectedReason,
+                                  onChanged: (val) =>
+                                      setState(() => selectedReason = val!),
+                                  isLast: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 24),
+                          
+                          // Additional details
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.edit_note,
+                                size: 20,
+                                color: Colors.grey.shade700,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Additional details (optional)',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          TextField(
+                            controller: reasonController,
+                            maxLines: 3,
+                            maxLength: 200,
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Tell us more about what you need help with...',
+                              hintStyle: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade400,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF2E7D32),
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              contentPadding: const EdgeInsets.all(16),
+                              counterStyle: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // Actions
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                          ),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E7D32),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 28,
+                              vertical: 14,
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.send, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'Submit Request',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (shouldEscalate != true || !mounted) return;
+
+    final userReason = reasonController.text.trim();
+    final fullReason =
+        userReason.isNotEmpty ? '$selectedReason — $userReason' : selectedReason;
+
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final messages = chatProvider.messages;
+
+    String userQuestion = 'No question found';
+
+    final botMessageIndex = messages.indexWhere((m) => m.id == message.id);
+
+    if (botMessageIndex > 0) {
+      for (int i = botMessageIndex - 1; i >= 0; i--) {
+        if (messages[i].sender == 'user') {
+          userQuestion = messages[i].content;
+          break;
+        }
+      }
+    }
+
+    final escalationRef = _firestore.collection('escalations').doc();
+    final escalationId = escalationRef.id;
+
+    final escalatedData = {
+      'escalationId': escalationId,
+      'userId': FirebaseAuth.instance.currentUser?.uid,
+      'conversationId': message.conversationId,
+      'question': userQuestion,
+      'botAnswer':
+          message.sender == 'bot'
+              ? message.content
+              : 'No bot response available',
+      'status': 'pending',
+      'reason': fullReason,
+      'createdAt': Timestamp.now(),
+      'messageId': message.id,
+    };
+
+    await escalationRef.set(escalatedData);
+
+    print('✅ Manual escalation created with ID: $escalationId');
+    print('📝 User question: $userQuestion');
+
+    // Show success confirmation dialog
+    if (mounted) {
+      await _showEscalationSuccessDialog();
+    }
+  } catch (e) {
+    print('❌ Error creating manual escalation: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('Failed to escalate: $e'),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
+  } finally {
+    reasonController.dispose();
+  }
+}
+
+Widget _buildReasonTile({
+  required BuildContext context,
+  required String title,
+  required IconData icon,
+  required String value,
+  required String groupValue,
+  required Function(String?) onChanged,
+  bool isFirst = false,
+  bool isLast = false,
+}) {
+  final isSelected = value == groupValue;
+  
+  return InkWell(
+    onTap: () => onChanged(value),
+    borderRadius: BorderRadius.vertical(
+      top: isFirst ? const Radius.circular(12) : Radius.zero,
+      bottom: isLast ? const Radius.circular(12) : Radius.zero,
+    ),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFF2E7D32).withOpacity(0.05) : null,
+        borderRadius: BorderRadius.vertical(
+          top: isFirst ? const Radius.circular(12) : Radius.zero,
+          bottom: isLast ? const Radius.circular(12) : Radius.zero,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 20,
+            color: isSelected ? const Color(0xFF2E7D32) : Colors.grey.shade600,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? const Color(0xFF2E7D32) : Colors.grey.shade800,
+              ),
+            ),
+          ),
+          Radio<String>(
+            value: value,
+            groupValue: groupValue,
+            onChanged: onChanged,
+            activeColor: const Color(0xFF2E7D32),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showEscalationSuccessDialog() async {
+  await showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        elevation: 8,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Success animation area
+              Container(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2E7D32).withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF2E7D32),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 48,
                         ),
                       ),
                     ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Request Submitted!',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2E7D32),
                       ),
-                      child: const Text(
-                        'Yes, Escalate',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Your request has been escalated to our staff team.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade700,
+                        height: 1.4,
                       ),
                     ),
                   ],
                 ),
-          );
-        },
-      );
-
-      if (shouldEscalate != true || !mounted) return;
-
-      final userReason = reasonController.text.trim();
-      final fullReason =
-          userReason.isNotEmpty
-              ? '$selectedReason — $userReason'
-              : selectedReason;
-
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      final messages = chatProvider.messages;
-
-      String userQuestion = 'No question found';
-
-      final botMessageIndex = messages.indexWhere((m) => m.id == message.id);
-
-      if (botMessageIndex > 0) {
-        for (int i = botMessageIndex - 1; i >= 0; i--) {
-          if (messages[i].sender == 'user') {
-            userQuestion = messages[i].content;
-            break;
-          }
-        }
-      }
-
-      final escalationRef = _firestore.collection('escalations').doc();
-      final escalationId = escalationRef.id;
-
-      final escalatedData = {
-        'escalationId': escalationId,
-        'userId': FirebaseAuth.instance.currentUser?.uid,
-        'conversationId': message.conversationId,
-        'question': userQuestion,
-        'botAnswer':
-            message.sender == 'bot'
-                ? message.content
-                : 'No bot response available',
-        'status': 'pending',
-        'reason': fullReason,
-        'createdAt': Timestamp.now(),
-        'messageId': message.id,
-      };
-
-      await escalationRef.set(escalatedData);
-
-      print('✅ Manual escalation created with ID: $escalationId');
-      print('📝 User question: $userQuestion');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: const [
-                Icon(Icons.check_circle, color: Colors.white, size: 20),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Your request has been escalated to staff. We\'ll get back to you soon!',
-                    style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              
+              // Info section
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  border: Border(
+                    top: BorderSide(color: Colors.blue.shade100),
+                    bottom: BorderSide(color: Colors.blue.shade100),
                   ),
                 ),
-              ],
-            ),
-            backgroundColor: const Color(0xFF2E7D32),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            duration: const Duration(seconds: 4),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.schedule,
+                            color: Colors.blue.shade700,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Expected Response Time',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue.shade900,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Within 3 business days',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.notifications_active_outlined,
+                            color: Colors.blue.shade700,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'You\'ll receive a notification when a staff member responds',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.blue.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // What happens next
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'What happens next?',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildNextStepItem(
+                      icon: Icons.person_search,
+                      text: 'A staff member will review your conversation',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildNextStepItem(
+                      icon: Icons.chat_bubble_outline,
+                      text: 'They\'ll provide personalized assistance',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildNextStepItem(
+                      icon: Icons.email_outlined,
+                      text: 'You\'ll be notified via device notification and in-app',
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Close button
+              Container(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E7D32),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Text(
+                      'Got it, thanks!',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        );
-      }
-    } catch (e) {
-      print('❌ Error creating manual escalation: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to escalate: $e'),
-            backgroundColor: Colors.red,
+        ),
+      );
+    },
+  );
+}
+
+Widget _buildNextStepItem({required IconData icon, required String text}) {
+  return Row(
+    children: [
+      Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2E7D32).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: const Color(0xFF2E7D32),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey.shade700,
           ),
-        );
-      }
-    } finally {
-      reasonController.dispose();
-    }
-  }
+        ),
+      ),
+    ],
+  );
+}
 
   Future<String?> _getUserAvatarUrl() async {
     try {
@@ -1734,10 +2270,10 @@ void _sendMessage(ChatProvider chatProvider) async {
   final text = _controller.text.trim();
   if (text.isEmpty || chatProvider.isLoading) return;
 
-  // ✅ Clear the input immediately
+  // Clear the input immediately
   _controller.clear();
 
-  // ✅ Close FAQs when sending a message
+  // Close FAQs when sending a message
   if (_showFAQs && mounted) {
     setState(() {
       _showFAQs = false;
@@ -1747,12 +2283,9 @@ void _sendMessage(ChatProvider chatProvider) async {
   try {
     await chatProvider.askQuestionWithStreaming(context, text);
     
-    // ✅ Scroll to bottom after sending
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_showFAQs) {
-        _scrollToBottom();
-      }
-    });
+    // ✅ Improved: Scroll after message is added
+    await Future.delayed(Duration(milliseconds: 200));
+    _scrollToBottomSmooth();
   } catch (e) {
     debugPrint('Error sending message: $e');
     if (mounted) {
@@ -1760,25 +2293,16 @@ void _sendMessage(ChatProvider chatProvider) async {
         SnackBar(
           content: Row(
             children: [
-              Icon(
-                Icons.error_outline_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
+              Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
               SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  'Error sending message: ${e.toString()}',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
+                child: Text('Error sending message: ${e.toString()}'),
               ),
             ],
           ),
           backgroundColor: Colors.red.shade400,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: EdgeInsets.all(16),
         ),
       );
@@ -1786,64 +2310,78 @@ void _sendMessage(ChatProvider chatProvider) async {
   }
 }
 
-
-@override
-void dispose() {
-  print('🧹 ChatPage disposing...');
-  _controller.dispose();
-  _scrollController.dispose();
-  _conversationsSubscription?.cancel();
-  _micAnimationController.dispose();
-  _attachmentAnimationController.dispose();
-  super.dispose();
-}
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      body: Consumer<ChatProvider>(
-        builder: (context, chatProvider, child) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!_showFAQs && !_isLoadingConversation) _scrollToBottom();
-          });
-
-          final messages = chatProvider.messages;
-
-          return Column(
-            children: [
-              Expanded(
-                child:
-                    _isLoadingConversation
-                        ? _buildLoadingIndicator()
-                        : (_showFAQs
-                            ? FAQSection(
-                              key: _faqSectionKey,
-                              onFAQSelected: _onFAQSelected,
-                              messageController: _controller,
-                            )
-                            : (messages.isEmpty
-                                ? _buildEmptyChatState()
-                                : _buildMessagesList(messages, chatProvider))),
-              ),
-              FAQInputSection(
-                controller: _controller,
-                showFAQs: _showFAQs,
-                isLoading: chatProvider.isLoading || _isLoadingConversation,
-                onFAQToggle: _toggleFAQsDisplay,
-                onSendMessage: () => _sendMessage(chatProvider),
-                onMicrophoneTap: _handleMicrophoneTap,
-                isListening:
-                    _showFAQs
-                        ? (_faqSectionKey.currentState?.isListening ?? false)
-                        : _isListening,
-              ),
-            ],
-          );
-        },
-      ),
-    );
+ @override
+  void dispose() {
+    print('🧹 ChatPage disposing...');
+    _controller.dispose();
+    _scrollController.dispose();
+    _conversationsSubscription?.cancel();
+    _micAnimationController.dispose();
+    _attachmentAnimationController.dispose();
+    
+    // ✅ Clear current conversation tracking
+    _currentLoadedConversationId = null;
+    _isInitialized = false;
+    
+    super.dispose();
   }
+
+
+ @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.grey.shade50,
+    body: Consumer<ChatProvider>(
+      builder: (context, chatProvider, child) {
+        // ✅ Auto-scroll when new messages arrive
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_showFAQs && 
+              !_isLoadingConversation && 
+              _scrollController.hasClients) {
+            
+            // Only scroll if near bottom (user isn't scrolling up to read)
+            final isNearBottom = _scrollController.position.pixels >= 
+                _scrollController.position.maxScrollExtent - 200;
+            
+            if (isNearBottom) {
+              _scrollToBottomSmooth();
+            }
+          }
+        });
+
+        final messages = chatProvider.messages;
+
+        return Column(
+          children: [
+            Expanded(
+              child: _showFAQs
+    ? FAQSection(
+        key: _faqSectionKey,
+        onFAQSelected: _onFAQSelected,
+        messageController: _controller,
+      )
+    : (messages.isEmpty
+        ? _buildEmptyChatState()
+        : _buildMessagesList(messages, chatProvider)),
+
+            ),
+            FAQInputSection(
+              controller: _controller,
+              showFAQs: _showFAQs,
+              isLoading: chatProvider.isLoading || _isLoadingConversation,
+              onFAQToggle: _toggleFAQsDisplay,
+              onSendMessage: () => _sendMessage(chatProvider),
+              onMicrophoneTap: _handleMicrophoneTap,
+              isListening: _showFAQs
+                  ? (_faqSectionKey.currentState?.isListening ?? false)
+                  : _isListening,
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
 
   Widget _buildEmptyChatState() {
     return Center(
@@ -1890,28 +2428,31 @@ void dispose() {
     );
   }
 
-  Widget _buildMessagesList(List<Message> messages, ChatProvider chatProvider) {
-  // ✅ FIX: Check if we have any streaming messages
-  final hasStreamingMessage = messages.any((msg) => 
-    chatProvider.getStreamingContent(msg.id) != null
-  );
-  print("Current message IDs: ${chatProvider.messages.map((m) => m.id).toList()}");
-
+// ✅ IMPROVED: Messages list with better scroll behavior
+Widget _buildMessagesList(List<Message> messages, ChatProvider chatProvider) {
   return ListView.builder(
     controller: _scrollController,
     shrinkWrap: true,
-    physics: BouncingScrollPhysics(),
-    // ✅ FIX: Don't add extra loading indicator if we're streaming
+    physics: AlwaysScrollableScrollPhysics(), // ✅ Better scroll physics
     itemCount: messages.length,
-    padding: EdgeInsets.symmetric(vertical: 20),
+    padding: EdgeInsets.symmetric(vertical: 20, horizontal: 8),
     itemBuilder: (context, index) {
       final Message message = messages[index];
       final bool isUser = message.sender == 'user';
+
+      // ✅ Add extra padding to last message for better visibility
+      if (index == messages.length - 1) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: 20),
+          child: _buildMessageBubble(message, isUser),
+        );
+      }
 
       return _buildMessageBubble(message, isUser);
     },
   );
 }
+
   Widget _buildTypingIndicator() {
     return Align(
       alignment: Alignment.centerLeft,

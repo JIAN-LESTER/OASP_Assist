@@ -570,7 +570,10 @@ static Future<String?> startNewChat(
 ]) async {
   print('🆕 Starting new chat...');
 
-  if (!context.mounted) return null;
+  if (!context.mounted) {
+    print('❌ Context not mounted');
+    return null;
+  }
 
   final userId = FirebaseAuth.instance.currentUser?.uid;
   if (userId == null) {
@@ -581,31 +584,38 @@ static Future<String?> startNewChat(
   try {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-    // ✅ Step 1: End ALL active conversations
-    print('📝 Ending all active conversations...');
+    // Step 1: End all active conversations
+    print('📝 Step 1: Ending all active conversations...');
     await endAllActiveConversations(userId);
-
-    // ✅ Step 2: Clear messages immediately
-    print('🧹 Clearing messages...');
+    
+    // Step 2: Clear messages and reset state
+    print('🧹 Step 2: Clearing all state...');
     chatProvider.clearMessages();
-
-    // ✅ Step 3: Create new conversation
-    print('✨ Creating new conversation...');
+    _selectedConversationId = null;
+    shouldShowFAQs = true;
+    
+    // Step 3: Wait for state to settle
+    await Future.delayed(Duration(milliseconds: 200));
+    
+    // Step 4: Create new conversation
+    print('✨ Step 3: Creating new conversation...');
     final newConversationId = await createNewConversation(userId);
-
-    // ✅ Step 4: Set up the new conversation in provider
-    print('🔧 Setting up conversation: $newConversationId');
+    
+    // Step 5: Set up the new conversation
+    print('🔧 Step 4: Setting up conversation in provider...');
     await chatProvider.setConversationId(newConversationId);
-
-    // ✅ Step 5: Update the static variable
+    
+    // Step 6: Update static variables
+    print('📌 Step 5: Updating static variables...');
     _selectedConversationId = newConversationId;
     
-    // ✅ Step 6: Set flag to show FAQs
-    shouldShowFAQs = true;
-
+    // ✅ FIX: Force refresh the conversation list
+    print('🔄 Step 6: Refreshing conversation list...');
+    // The listener should pick this up automatically, but we can force a check
+    await Future.delayed(Duration(milliseconds: 500));
+    
     print('✅ New chat created successfully: $newConversationId');
     
-    // ✅ Return the conversation ID so caller can use it
     return newConversationId;
     
   } catch (e) {
@@ -619,7 +629,6 @@ static Future<String?> startNewChat(
     return null;
   }
 }
-
 
  static Future<void> endAllActiveConversations(String userId) async {
   try {
@@ -636,6 +645,8 @@ static Future<String?> startNewChat(
       return;
     }
 
+    print('📝 Found ${activeQuery.docs.length} active conversation(s)');
+
     final batch = FirebaseFirestore.instance.batch();
 
     for (final doc in activeQuery.docs) {
@@ -643,10 +654,14 @@ static Future<String?> startNewChat(
         'status': 'ended',
         'endedAt': FieldValue.serverTimestamp(),
       });
-      print('📝 Marking conversation ${doc.id} as ended');
+      print('   - Marking conversation ${doc.id} as ended');
     }
 
     await batch.commit();
+    
+    // ✅ Wait for Firestore to propagate changes
+    await Future.delayed(Duration(milliseconds: 100));
+    
     print('✅ Successfully ended ${activeQuery.docs.length} conversations');
   } catch (e) {
     print('❌ Error ending active conversations: $e');
@@ -668,6 +683,12 @@ static Future<String?> startNewChat(
       'messageCount': 0,
     });
 
+    // ✅ Wait for Firestore to confirm write
+    final doc = await conversationRef.get();
+    if (!doc.exists) {
+      throw Exception('Failed to create conversation');
+    }
+
     print('✅ Created new conversation: ${conversationRef.id}');
     return conversationRef.id;
   } catch (e) {
@@ -675,6 +696,7 @@ static Future<String?> startNewChat(
     rethrow;
   }
 }
+
 
   // NEW: Navigate to chat page without creating conversation
   // FIXED: Navigate to chat without auto-creating
