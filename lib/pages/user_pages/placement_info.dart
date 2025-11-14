@@ -121,7 +121,7 @@ class _PlacementInfoState extends State<PlacementInfo>
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildSearchAndFilters(isMobile: true)),
-          _buildPlacementsList(crossAxisCount: 1),
+          _buildPlacementsList(crossAxisCount: 1, isDesktop: false),
         ],
       ),
     );
@@ -133,7 +133,7 @@ class _PlacementInfoState extends State<PlacementInfo>
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildSearchAndFilters(isMobile: false)),
-          _buildPlacementsList(crossAxisCount: 2),
+          _buildPlacementsList(crossAxisCount: 2, isDesktop: false),
         ],
       ),
     );
@@ -145,7 +145,7 @@ class _PlacementInfoState extends State<PlacementInfo>
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildSearchAndFilters(isMobile: false)),
-          _buildPlacementsList(crossAxisCount: 3),
+          _buildPlacementsList(crossAxisCount: 3, isDesktop: true),
         ],
       ),
     );
@@ -349,7 +349,10 @@ class _PlacementInfoState extends State<PlacementInfo>
     );
   }
 
-  Widget _buildPlacementsList({required int crossAxisCount}) {
+  Widget _buildPlacementsList({
+    required int crossAxisCount,
+    required bool isDesktop,
+  }) {
     if (isLoading) {
       return SliverToBoxAdapter(
         child: Container(
@@ -408,14 +411,23 @@ class _PlacementInfoState extends State<PlacementInfo>
       sliver: SliverGrid(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
-          childAspectRatio: crossAxisCount == 1 ? 0.91 : 0.95,
+          childAspectRatio:
+              crossAxisCount == 1
+                  ? 1.8 // Mobile
+                  : crossAxisCount == 2
+                  ? 1.8 // Tablet
+                  : 1.95, // Desktop
           crossAxisSpacing: 20,
           mainAxisSpacing: 20,
         ),
         delegate: SliverChildBuilderDelegate((context, index) {
           return FadeTransition(
             opacity: _fadeAnimation,
-            child: _buildPlacementCard(filteredPlacements[index], index),
+            child: _buildPlacementCard(
+              filteredPlacements[index],
+              index,
+              isDesktop,
+            ),
           );
         }, childCount: filteredPlacements.length),
       ),
@@ -462,7 +474,7 @@ class _PlacementInfoState extends State<PlacementInfo>
     return filtered;
   }
 
-  Widget _buildPlacementCard(Placement placement, int index) {
+  Widget _buildPlacementCard(Placement placement, int index, bool isDesktop) {
     final daysAgo = DateTime.now().difference(placement.createdAt).inDays;
     final isNew = daysAgo <= 3;
 
@@ -494,15 +506,16 @@ class _PlacementInfoState extends State<PlacementInfo>
         child: InkWell(
           onTap: () => _showPlacementDetails(placement),
           borderRadius: BorderRadius.circular(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Section
-              Padding(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Header Section with Icon and Click/Tap
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -533,236 +546,180 @@ class _PlacementInfoState extends State<PlacementInfo>
                           ),
                         ),
                         const Spacer(),
-                        if (isNew)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.blue.withOpacity(0.3),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.fiber_new_rounded,
-                                  size: 14,
-                                  color: Colors.blue[700],
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'NEW',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.blue[800],
-                                    letterSpacing: 0.3,
-                                  ),
-                                ),
-                              ],
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: primaryGreen.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: primaryGreen.withOpacity(0.2),
+                              width: 1,
                             ),
                           ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isDesktop
+                                    ? Icons.mouse_rounded
+                                    : Icons.touch_app_rounded,
+                                color: primaryGreen,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                isDesktop ? 'Click' : 'Tap',
+                                style: TextStyle(
+                                  color: primaryGreen,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
+
                     const SizedBox(height: 16),
+
+                    // Company Name
                     Text(
                       placement.partnerCompany,
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
                         color: Colors.grey[900],
                         height: 1.3,
                         letterSpacing: -0.3,
                       ),
-                      maxLines: 2,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _formatDate(placement.createdAt),
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
 
-              // const SizedBox(height: 24),
-              // const Spacer(),
+                    const SizedBox(height: 16),
 
-              // Positions Preview
-              if (placement.positions.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Available Positions',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
+                    // Bottom Section: Date and Info
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Divider
+                        Divider(
+                          height: 24,
+                          thickness: 1,
+                          color: Colors.grey[200],
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        placement.positions.take(2).join(', '),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                          height: 1.5,
-                          letterSpacing: 0.1,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
 
-              // const SizedBox(height: 16),
-              const Spacer(),
-
-              // Info Chips
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: Colors.green.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.work_rounded,
-                            size: 14,
-                            color: Colors.green[700],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${placement.positions.length} Positions',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.green[700],
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (placement.contacts.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: Colors.orange.withOpacity(0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                        // Date Posted
+                        Row(
                           children: [
                             Icon(
-                              Icons.contact_mail_rounded,
-                              size: 14,
-                              color: Colors.orange[700],
+                              Icons.calendar_today_rounded,
+                              size: 16,
+                              color: Colors.grey[500],
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${placement.contacts.length} Contacts',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.orange[700],
-                                letterSpacing: 0.3,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _formatDate(placement.createdAt),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
-                      ),
+
+                        const SizedBox(height: 12),
+
+                        // Status Badges
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (isNew)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.blue[300]!,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.fiber_new_rounded,
+                                      color: Colors.blue[700],
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'New',
+                                      style: TextStyle(
+                                        color: Colors.blue[700],
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: primaryGreen.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: primaryGreen.withOpacity(0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.work_rounded,
+                                    color: primaryGreen,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '${placement.positions.length} position${placement.positions.length == 1 ? '' : 's'}',
+                                    style: TextStyle(
+                                      color: primaryGreen,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-
-              // const Spacer(),
-
-              // Action Button
-              Container(
-                margin: const EdgeInsets.all(20),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _showPlacementDetails(placement),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.green[600]!, Colors.green[700]!],
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.green[600]!.withOpacity(0.4),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(
-                            Icons.visibility_rounded,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'View Details',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -804,326 +761,260 @@ class _PlacementInfoState extends State<PlacementInfo>
   }
 
   void _showPlacementDetails(Placement placement) {
-    showModalBottomSheet(
+    final daysAgo = DateTime.now().difference(placement.createdAt).inDays;
+
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.5),
       builder:
-          (context) => DraggableScrollableSheet(
-            initialChildSize: 0.8,
-            minChildSize: 0.5,
-            maxChildSize: 0.95,
-            builder:
-                (context, scrollController) => Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(24),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      // Drag Handle
-                      Container(
-                        margin: const EdgeInsets.only(top: 12, bottom: 8),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-
-                      // Header
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    primaryGreen.withOpacity(0.9),
-                                    primaryGreen,
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: primaryGreen.withOpacity(0.3),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.business_rounded,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    placement.partnerCompany,
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.grey[900],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _formatDate(placement.createdAt),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.close_rounded),
-                              style: IconButton.styleFrom(
-                                backgroundColor: Colors.grey[100],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Content
-                      Expanded(
-                        child: SingleChildScrollView(
-                          controller: scrollController,
-                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Positions Section
-                              if (placement.positions.isNotEmpty) ...[
-                                _buildListSection(
-                                  'Available Positions',
-                                  placement.positions,
-                                  Icons.work_rounded,
-                                  Colors.green,
-                                ),
-                                const SizedBox(height: 20),
-                              ],
-
-                              // Contact Section
-                              if (placement.contacts.isNotEmpty)
-                                _buildContactSection(placement.contacts),
-
-                              const SizedBox(height: 24),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-          ),
-    );
-  }
-
-  Widget _buildListSection(
-    String title,
-    List<String> items,
-    IconData icon,
-    Color color,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
+          (context) => Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 24,
+            ),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 500),
               decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
-              child: Icon(icon, color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey[800],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [color.withOpacity(0.08), color.withOpacity(0.05)],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.2), width: 1.5),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children:
-                items.map((item) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.all(20),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          margin: const EdgeInsets.only(top: 6),
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            item,
+                            'Placement Details',
                             style: TextStyle(
-                              fontSize: 15,
-                              height: 1.5,
-                              color: Colors.grey[700],
-                              letterSpacing: 0.1,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[900],
                             ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: Icon(
+                            Icons.close_rounded,
+                            color: Colors.grey[600],
+                          ),
+                          style: IconButton.styleFrom(
+                            padding: const EdgeInsets.all(8),
                           ),
                         ),
                       ],
                     ),
-                  );
-                }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
+                  ),
 
-  Widget _buildContactSection(List<String> contacts) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.contact_mail_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Contact Information',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey[800],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Column(
-          children:
-              contacts.map((contact) {
-                IconData iconData;
-                Color iconColor;
-
-                if (contact.contains('@')) {
-                  iconData = Icons.email_rounded;
-                  iconColor = Colors.red;
-                } else if (contact.startsWith('+') || contact.length >= 10) {
-                  iconData = Icons.phone_rounded;
-                  iconColor = Colors.green;
-                } else {
-                  iconData = Icons.link_rounded;
-                  iconColor = Colors.blue;
-                }
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => _launchContact(contact),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              iconColor.withOpacity(0.08),
-                              iconColor.withOpacity(0.05),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: iconColor.withOpacity(0.2),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: iconColor,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                iconData,
-                                color: Colors.white,
-                                size: 18,
-                              ),
+                  // Content
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Company Name Section
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                contact,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w500,
-                                  letterSpacing: 0.1,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'PARTNER COMPANY',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[500],
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  placement.partnerCompany,
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.grey[900],
+                                    height: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _formatDate(placement.createdAt),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (daysAgo <= 3) ...[
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'New',
+                                          style: TextStyle(
+                                            color: Colors.blue[700],
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+
+                          // Available Positions
+                          if (placement.positions.isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            Text(
+                              'AVAILABLE POSITIONS',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[500],
+                                letterSpacing: 0.5,
                               ),
                             ),
-                            Icon(
-                              Icons.open_in_new_rounded,
-                              size: 18,
-                              color: iconColor,
+                            const SizedBox(height: 12),
+                            ...placement.positions.map((position) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.only(top: 7),
+                                      width: 5,
+                                      height: 5,
+                                      decoration: BoxDecoration(
+                                        color: primaryGreen,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        position,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          height: 1.5,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ],
+
+                          // Contact Information
+                          if (placement.contacts.isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            Text(
+                              'CONTACT INFORMATION',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[500],
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children:
+                                    placement.contacts.map((contact) {
+                                      IconData iconData;
+
+                                      if (contact.contains('@')) {
+                                        iconData = Icons.email_rounded;
+                                      } else if (contact.startsWith('+') ||
+                                          contact.length >= 10) {
+                                        iconData = Icons.phone_rounded;
+                                      } else {
+                                        iconData = Icons.link_rounded;
+                                      }
+
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 12,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              iconData,
+                                              color: Colors.grey[600],
+                                              size: 18,
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                contact,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[700],
+                                                  fontWeight: FontWeight.w500,
+                                                  height: 1.5,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                              ),
                             ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
                   ),
-                );
-              }).toList(),
-        ),
-      ],
+                ],
+              ),
+            ),
+          ),
     );
   }
 

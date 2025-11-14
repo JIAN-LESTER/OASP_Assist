@@ -16,7 +16,7 @@ class StaffAnnouncementPage extends StatefulWidget {
 
 class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
   List<DocumentSnapshot> announcements = [];
-   bool isLoading = true;
+  bool isLoading = true;
   bool isRefreshing = false;
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
@@ -27,7 +27,6 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
     _loadAnnouncements();
   }
 
-  
   Future<void> _loadAnnouncements() async {
     try {
       final QuerySnapshot querySnapshot =
@@ -86,226 +85,215 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
   }
 
   // Manual refresh button (keep as is for manual sync)
-Future<void> _refreshFromFacebook() async {
-  if (isRefreshing) {
-    print('⚠️ Sync already in progress');
-    return;
-  }
+  Future<void> _refreshFromFacebook() async {
+    if (isRefreshing) {
+      print('⚠️ Sync already in progress');
+      return;
+    }
 
-  setState(() => isRefreshing = true);
+    setState(() => isRefreshing = true);
 
-  try {
-    print('🔄 Manual Facebook sync triggered...');
-    
-    final result = await FacebookSyncService.syncPosts();
-    
-    print('📦 Sync result: $result');
-    
-    if (result['success'] == true) {
-      await Future.delayed(Duration(milliseconds: 500));
-      await _loadAnnouncements();
-      
-      final count = result['count'] ?? 0;
-      final failed = result['failed'] ?? 0;
-      
-      if (mounted) {
-        _showSuccessSnackBar(
-          '✅ Synced $count posts' + (failed > 0 ? ' ($failed failed)' : '')
-        );
+    try {
+      print('🔄 Manual Facebook sync triggered...');
+
+      final result = await FacebookSyncService.syncPosts();
+
+      print('📦 Sync result: $result');
+
+      if (result['success'] == true) {
+        await Future.delayed(Duration(milliseconds: 500));
+        await _loadAnnouncements();
+
+        final count = result['count'] ?? 0;
+        final failed = result['failed'] ?? 0;
+
+        if (mounted) {
+          _showSuccessSnackBar(
+            '✅ Synced $count posts' + (failed > 0 ? ' ($failed failed)' : ''),
+          );
+        }
+      } else {
+        final errorMsg = result['error'] ?? result['message'] ?? 'Sync failed';
+        throw Exception(errorMsg);
       }
-    } else {
-      final errorMsg = result['error'] ?? result['message'] ?? 'Sync failed';
-      throw Exception(errorMsg);
-    }
-    
-  } catch (e) {
-    print('❌ Sync error: $e');
-    
-    if (mounted) {
-      final errorMessage = FacebookSyncService.parseErrorMessage(e);
-      _showErrorSnackBar(errorMessage);
-    }
-  } finally {
-    if (mounted) {
-      setState(() => isRefreshing = false);
+    } catch (e) {
+      print('❌ Sync error: $e');
+
+      if (mounted) {
+        final errorMessage = FacebookSyncService.parseErrorMessage(e);
+        _showErrorSnackBar(errorMessage);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isRefreshing = false);
+      }
     }
   }
-}
 
-void _showSyncErrorDialog(String errorMessage) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      title: Row(
-        children: [
-          Icon(Icons.error, color: Colors.red[700], size: 28),
-          SizedBox(width: 12),
-          Text('Sync Failed'),
-        ],
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            errorMessage,
-            style: TextStyle(fontSize: 15),
-          ),
-          SizedBox(height: 16),
-          Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
+  void _showSyncErrorDialog(String errorMessage) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Row(
+            title: Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: Colors.grey[700]),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'You can manually sync later using the refresh button',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[700],
-                    ),
+                Icon(Icons.error, color: Colors.red[700], size: 28),
+                SizedBox(width: 12),
+                Text('Sync Failed'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(errorMessage, style: TextStyle(fontSize: 15)),
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: Colors.grey[700],
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'You can manually sync later using the refresh button',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _refreshFromFacebook(); // Trigger manual sync
+                },
+                icon: Icon(Icons.refresh),
+                label: Text('Retry Sync'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue[700],
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Cancel'),
-        ),
-        ElevatedButton.icon(
-          onPressed: () {
-            Navigator.pop(context);
-            _refreshFromFacebook(); // Trigger manual sync
-          },
-          icon: Icon(Icons.refresh),
-          label: Text('Retry Sync'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue[700],
-            foregroundColor: Colors.white,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-void _showSuccessSnackBar(String message) {
-  if (!mounted) return;
-  
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Row(
-        children: [
-          Icon(Icons.check_circle, color: Colors.white, size: 20),
-          SizedBox(width: 8),
-          Expanded(child: Text(message)),
-        ],
-      ),
-      backgroundColor: Colors.green[600],
-      behavior: SnackBarBehavior.floating,
-      duration: Duration(seconds: 4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-    ),
-  );
-}
+    );
+  }
 
-void _showErrorSnackBar(String message) {
-  if (!mounted) return;
-  
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Row(
-        children: [
-          Icon(Icons.error, color: Colors.white, size: 20),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(fontSize: 13),
+  void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.green[600],
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.error, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Expanded(child: Text(message, style: TextStyle(fontSize: 13))),
+          ],
+        ),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  // Update your refresh button row to include the test button:
+  Widget _buildRefreshButton({required bool isDesktop}) {
+    return Row(
+      children: [
+        // Test button
+        SizedBox(width: 8),
+
+        // Facebook Token Config Button
+        SizedBox(width: 8),
+
+        // Manual Sync Button
+        Container(
+          decoration: BoxDecoration(
+            color: isRefreshing ? Colors.grey[100] : Colors.green[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isRefreshing ? Colors.grey[300]! : Colors.green[200]!,
             ),
           ),
-        ],
-      ),
-      backgroundColor: Colors.red,
-      behavior: SnackBarBehavior.floating,
-      duration: Duration(seconds: 5),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-    ),
-  );
-}
-
-
-// Update your refresh button row to include the test button:
-Widget _buildRefreshButton({required bool isDesktop}) {
-  return Row(
-    children: [
-      // Test button
-
-      SizedBox(width: 8),
-      
-      // Facebook Token Config Button
-    
-      SizedBox(width: 8),
-      
-      // Manual Sync Button
-      Container(
-        decoration: BoxDecoration(
-          color: isRefreshing ? Colors.grey[100] : Colors.green[50],
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isRefreshing ? Colors.grey[300]! : Colors.green[200]!,
-          ),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: isRefreshing ? null : _refreshFromFacebook,
-            child: Tooltip(
-              message: 'Manual Sync Facebook Posts',
-              child: Padding(
-                padding: EdgeInsets.all(isDesktop ? 12 : 10),
-                child: isRefreshing
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.grey[600]!,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: isRefreshing ? null : _refreshFromFacebook,
+              child: Tooltip(
+                message: 'Manual Sync Facebook Posts',
+                child: Padding(
+                  padding: EdgeInsets.all(isDesktop ? 12 : 10),
+                  child:
+                      isRefreshing
+                          ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.grey[600]!,
+                              ),
+                            ),
+                          )
+                          : Icon(
+                            Icons.sync_rounded,
+                            color: Colors.green[700],
+                            size: isDesktop ? 24 : 20,
                           ),
-                        ),
-                      )
-                    : Icon(
-                        Icons.sync_rounded,
-                        color: Colors.green[700],
-                        size: isDesktop ? 24 : 20,
-                      ),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    ],
-  );
-}
-
-
+      ],
+    );
+  }
 
   String _sentenceCase(String input) {
     if (input.isEmpty) return input;
@@ -337,7 +325,7 @@ Widget _buildRefreshButton({required bool isDesktop}) {
                   padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
                   child: Center(
                     child: Container(
-                      constraints: const BoxConstraints(maxWidth: 800),
+                      constraints: const BoxConstraints(maxWidth: 1100),
                       child: Row(
                         children: [
                           // Search field
@@ -351,12 +339,11 @@ Widget _buildRefreshButton({required bool isDesktop}) {
                             child: CategoryDropdownButton(
                               initialValue: selectedCategory,
                               onChanged:
-                                  (value) => setState(
-                                    () => selectedCategory = value,
-                                  ),
+                                  (value) =>
+                                      setState(() => selectedCategory = value),
                             ),
                           ),
-                          _buildRefreshButton(isDesktop: true)
+                          _buildRefreshButton(isDesktop: true),
                         ],
                       ),
                     ),
@@ -418,60 +405,61 @@ Widget _buildRefreshButton({required bool isDesktop}) {
   }
 
   Widget _buildMobileLayout() {
-  return Scaffold(
-    backgroundColor: const Color(0xFFF8FFFE),
-    body: Column(
-      children: [
-        // Fixed header
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              _buildSearchField(),
-              const SizedBox(height: 12),
-              
-              // ✅ Row for dropdown + refresh button
-              Row(
-                children: [
-                  // Dropdown takes most space
-                  Expanded(
-                    child: CategoryDropdownButton(
-                      initialValue: selectedCategory,
-                      onChanged: (value) => setState(() => selectedCategory = value),
-                    ),
-                  ),
-                  
-                  const SizedBox(width: 8),
-                  
-                  // Refresh button fixed width
-                  _buildRefreshButton(isDesktop: false),
-                ],
-              ),
-            ],
-          ),
-        ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FFFE),
+      body: Column(
+        children: [
+          // Fixed header
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                _buildSearchField(),
+                const SizedBox(height: 12),
 
-        // Content area
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: _buildMainContent(isDesktop: false),
+                //  Row for dropdown + refresh button
+                Row(
+                  children: [
+                    // Dropdown takes most space
+                    Expanded(
+                      child: CategoryDropdownButton(
+                        initialValue: selectedCategory,
+                        onChanged:
+                            (value) => setState(() => selectedCategory = value),
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    // Refresh button fixed width
+                    _buildRefreshButton(isDesktop: false),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+
+          // Content area
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _buildMainContent(isDesktop: false),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   // SEARCH FIELD
   Widget _buildSearchField() {
@@ -598,7 +586,7 @@ Widget _buildRefreshButton({required bool isDesktop}) {
           return Center(
             child: Container(
               constraints:
-                  isDesktop ? const BoxConstraints(maxWidth: 800) : null,
+                  isDesktop ? const BoxConstraints(maxWidth: 1100) : null,
               padding: EdgeInsets.only(bottom: isDesktop ? 24 : 16),
               child: AnnouncementCard(
                 announcement: displayedAnnouncements[index],
@@ -958,81 +946,81 @@ class AnnouncementCard extends StatelessWidget {
             ),
           ),
 
-           // Deadline notice
-if (deadline != null)
-  Container(
-    margin: EdgeInsets.fromLTRB(
-      isDesktop ? 24 : 20,
-      0,
-      isDesktop ? 24 : 20,
-      isDesktop ? 20 : 16,
-    ),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          Colors.orange[50]!,
-          Colors.orange[100]!.withOpacity(0.3),
-        ],
-      ),
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: Colors.orange[300]!, width: 1.5),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.orange[100]!.withOpacity(0.5),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    ),
-    child: Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.orange[600],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(
-            Icons.schedule_rounded,
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'DEADLINE',
-                style: TextStyle(
-                  color: Colors.orange[800],
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                ),
+          // Deadline notice
+          if (deadline != null)
+            Container(
+              margin: EdgeInsets.fromLTRB(
+                isDesktop ? 24 : 20,
+                0,
+                isDesktop ? 24 : 20,
+                isDesktop ? 20 : 16,
               ),
-              const SizedBox(height: 2),
+              // padding: const EdgeInsets.all(16),
+              // decoration: BoxDecoration(
+              //   gradient: LinearGradient(
+              //     colors: [
+              //       Colors.orange[50]!,
+              //       Colors.orange[100]!.withOpacity(0.3),
+              //     ],
+              //   ),
+              //   borderRadius: BorderRadius.circular(8),
+              //   border: Border.all(color: Colors.orange[300]!, width: 1.5),
+              //   boxShadow: [
+              //     BoxShadow(
+              //       color: Colors.orange[100]!.withOpacity(0.5),
+              //       blurRadius: 8,
+              //       offset: const Offset(0, 2),
+              //     ),
+              //   ],
+              // ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange[600],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.schedule_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'DEADLINE',
+                          style: TextStyle(
+                            color: Colors.orange[800],
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
 
-              // ✅ Format the Firestore Timestamp into readable text
-              Text(
-                DateFormat('MMMM d, yyyy').format(
-                  (deadline as Timestamp).toDate(),
-                ),
-                style: TextStyle(
-                  color: Colors.orange[900],
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                  letterSpacing: -0.2,
-                ),
+                        // ✅ Format the Firestore Timestamp into readable text
+                        Text(
+                          DateFormat(
+                            'MMMM d, yyyy',
+                          ).format((deadline as Timestamp).toDate()),
+                          style: TextStyle(
+                            color: Colors.orange[900],
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  ),
+            ),
 
           // Message content
           if (message.isNotEmpty)
@@ -1154,8 +1142,9 @@ if (deadline != null)
               ),
             ),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Expanded(
+                Flexible(
                   child: _buildActionButton(
                     icon: Icons.open_in_new_rounded,
                     label: 'View on Facebook',
@@ -1177,54 +1166,57 @@ if (deadline != null)
     required VoidCallback onTap,
     required bool isPrimary,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-          decoration: BoxDecoration(
-            gradient:
-                isPrimary
-                    ? LinearGradient(
-                      colors: [Colors.green[600]!, Colors.green[700]!],
-                    )
-                    : null,
-            color: isPrimary ? null : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isPrimary ? Colors.green[700]! : Colors.grey[300]!,
-              width: isPrimary ? 0 : 1.5,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 200, maxWidth: 240),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+            decoration: BoxDecoration(
+              gradient:
+                  isPrimary
+                      ? LinearGradient(
+                        colors: [Colors.green[600]!, Colors.green[700]!],
+                      )
+                      : null,
+              color: isPrimary ? null : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isPrimary ? Colors.green[700]! : Colors.grey[300]!,
+                width: isPrimary ? 0 : 1.5,
+              ),
+              boxShadow: [
+                if (isPrimary)
+                  BoxShadow(
+                    color: Colors.green[600]!.withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+              ],
             ),
-            boxShadow: [
-              if (isPrimary)
-                BoxShadow(
-                  color: Colors.green[600]!.withOpacity(0.4),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: isPrimary ? Colors.white : Colors.grey[700],
-              ),
-              const SizedBox(width: 10),
-              Text(
-                label,
-                style: TextStyle(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
                   color: isPrimary ? Colors.white : Colors.grey[700],
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isPrimary ? Colors.white : Colors.grey[700],
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
