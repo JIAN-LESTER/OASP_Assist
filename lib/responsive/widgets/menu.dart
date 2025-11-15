@@ -212,56 +212,55 @@ class UniversalUIComponents {
       ),
     );
   }
+static Widget buildPersistentDrawer({
+  required BuildContext context,
+  required UserRole userRole,
+  required int selectedIndex,
+  required Function(int) onItemTap,
+  required bool isExpanded,
+  Function(BuildContext, String?)? onConversationSelected,
+  VoidCallback? onNewChat, // ✅ ADD THIS PARAMETER
+}) {
+  final menuConfig = _getMenuConfig(userRole);
 
-  static Widget buildPersistentDrawer({
-    required BuildContext context,
-    required UserRole userRole,
-    required int selectedIndex,
-    required Function(int) onItemTap,
-    required bool isExpanded,
-    Function(BuildContext, String?)?
-    onConversationSelected, // Optional parameter
-  }) {
-    final menuConfig = _getMenuConfig(userRole);
-
-    return Container(
-      width: isExpanded ? 250 : 80,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(right: BorderSide(color: Colors.grey[300]!, width: 1)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(2, 0),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildPersistentDrawerHeader(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                children: _buildPersistentMenuItems(
-                  context,
-                  userRole,
-                  menuConfig,
-                  selectedIndex,
-                  onItemTap,
-                  isExpanded,
-                  onConversationSelected:
-                      onConversationSelected, // Pass it down (can be null)
-                ),
+  return Container(
+    width: isExpanded ? 250 : 80,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border(right: BorderSide(color: Colors.grey[300]!, width: 1)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 8,
+          offset: const Offset(2, 0),
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        _buildPersistentDrawerHeader(),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              children: _buildPersistentMenuItems(
+                context,
+                userRole,
+                menuConfig,
+                selectedIndex,
+                onItemTap,
+                isExpanded,
+                onConversationSelected: onConversationSelected,
+                onNewChat: onNewChat, // ✅ PASS IT HERE
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   // Private helper methods
   static MenuConfig _getMenuConfig(UserRole userRole) {
@@ -286,15 +285,22 @@ class UniversalUIComponents {
               title: 'Announcement',
               index: 4,
             ),
+                    MenuItem(
+              icon: Icons.people,
+              title: 'Human Escalation',
+              index: 5,
+            ),
+            
+
             MenuItem(
               icon: Icons.person_outline,
               title: 'User Management',
               index: -1,
               isExpandable: true,
               subItems: [
-                MenuItem(icon: Icons.person, title: "Users", index: 5),
-                MenuItem(icon: Icons.book, title: "Affiliations", index: 11),
-                MenuItem(icon: Icons.book, title: "Programs", index: 12),
+                MenuItem(icon: Icons.person, title: "Users", index: 6),
+                MenuItem(icon: Icons.book, title: "Affiliations", index: 12),
+                MenuItem(icon: Icons.book, title: "Programs", index: 13),
               ],
             ),
             MenuItem(
@@ -306,17 +312,17 @@ class UniversalUIComponents {
                 MenuItem(
                   icon: Icons.school_outlined,
                   title: 'Admission',
-                  index: 8,
+                  index: 9,
                 ),
                 MenuItem(
                   icon: Icons.card_giftcard_outlined,
                   title: 'Scholarship',
-                  index: 9,
+                  index: 10,
                 ),
                 MenuItem(
                   icon: Icons.work_outline,
                   title: 'Placement',
-                  index: 10,
+                  index: 11,
                 ),
               ],
             ),
@@ -329,12 +335,12 @@ class UniversalUIComponents {
                 MenuItem(
                   icon: Icons.history_outlined,
                   title: 'System Activity Logs',
-                  index: 6,
+                  index: 7,
                 ),
                 MenuItem(
                   icon: Icons.chat_bubble_outline,
                   title: 'Message Logs',
-                  index: 7,
+                  index: 8,
                 ),
               ],
             ),
@@ -416,75 +422,78 @@ class UniversalUIComponents {
         );
     }
   }
-
-  static Widget _buildDrawerHeader(
-    BuildContext context,
-    UserRole userRole, {
-    VoidCallback? onNewChat,
-    Function(int)? onItemTap,
-    int? selectedIndex,
-  }) {
-    if (userRole == UserRole.user && onNewChat != null) {
-      return DrawerHeader(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            bottom: BorderSide(color: Colors.grey[300]!, width: 1),
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.favorite, color: Colors.grey[300], size: 28),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  HapticFeedback.mediumImpact();
-                  Navigator.of(context).pop();
-                  if (selectedIndex != 1) {
-                    onItemTap?.call(1);
-                  } else {
-                    onNewChat();
-                  }
-                },
-                icon: const Icon(Icons.add_comment_rounded, size: 20),
-                label: const Text(
-                  'New Chat',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryGreen,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
+static Widget _buildDrawerHeader(
+  BuildContext context,
+  UserRole userRole, {
+  VoidCallback? onNewChat,
+  Function(int)? onItemTap,
+  int? selectedIndex,
+}) {
+  if (userRole == UserRole.user && onNewChat != null) {
     return DrawerHeader(
       decoration: BoxDecoration(
         color: Colors.white,
-        border:
-            userRole == UserRole.staff
-                ? null
-                : Border(
-                  bottom: BorderSide(color: Colors.grey[300]!, width: 1),
-                ),
+        border: Border(
+          bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+        ),
       ),
-      child: Center(
-        child: Icon(Icons.favorite, color: Colors.grey[300], size: 28),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.favorite, color: Colors.grey[300], size: 28),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                HapticFeedback.mediumImpact();
+                Navigator.of(context).pop(); // Close drawer first
+                
+                // ✅ FIX: Wait for drawer to close
+                await Future.delayed(Duration(milliseconds: 300));
+                
+                // ✅ Then call the callback
+                if (context.mounted) {
+                  onNewChat();
+                }
+              },
+              icon: const Icon(Icons.add_comment_rounded, size: 20),
+              label: const Text(
+                'New Chat',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryGreen,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  return DrawerHeader(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border:
+          userRole == UserRole.staff
+              ? null
+              : Border(
+                bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+              ),
+    ),
+    child: Center(
+      child: Icon(Icons.favorite, color: Colors.grey[300], size: 28),
+    ),
+  );
+}
+
 
   static Widget _buildPersistentDrawerHeader() {
     return Container(
@@ -694,131 +703,143 @@ class UniversalUIComponents {
     );
   }
 
-  static Widget _buildNewChatAndHistorySection(
-    BuildContext context,
-    List<Map<String, dynamic>> recentConversations,
-    String? selectedConversationId,
-    Function(BuildContext, String?)? onConversationSelected,
-    StateSetter? setDrawerState,
-  ) {
-    bool isExpanded = UserConstant.isOASPAssistExpanded;
+static Widget _buildNewChatAndHistorySection(
+  BuildContext context,
+  List<Map<String, dynamic>> recentConversations,
+  String? selectedConversationId,
+  Function(BuildContext, String?)? onConversationSelected,
+  StateSetter? setDrawerState,
+) {
+  bool isExpanded = UserConstant.isOASPAssistExpanded;
 
-    return StatefulBuilder(
-      builder: (context, setLocalState) {
-        return Column(
-          children: [
-            // New Chat Button
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              height: 44,
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    Navigator.of(context).pop();
-                    await UserConstant.startNewChat(context);
-                  },
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text(
-                    'New Chat',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+  return StatefulBuilder(
+    builder: (context, setLocalState) {
+      return Column(
+        children: [
+          // New Chat Button
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            height: 44,
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.of(context).pop(); // Close drawer
+                  
+                  // ✅ FIX: Wait for drawer animation
+                  await Future.delayed(Duration(milliseconds: 300));
+                  
+                  if (context.mounted) {
+                    // ✅ Find parent state and call method
+                    final parentState = context.findAncestorStateOfType<State>();
+                    if (parentState != null && parentState is dynamic) {
+                      if (parentState.widget.runtimeType.toString() == '_UserMainPageState') {
+                        await (parentState as dynamic)._onNewChatPressed();
+                      }
+                    }
+                  }
+                },
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text(
+                  'New Chat',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: UniversalUIComponents.primaryGreen,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: UniversalUIComponents.primaryGreen,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 0,
-                  ),
+                  elevation: 0,
                 ),
               ),
             ),
+          ),
 
-            // Chat History Dropdown
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  dividerColor: Colors.transparent,
-                  expansionTileTheme: ExpansionTileThemeData(
-                    backgroundColor: Colors.transparent,
-                    collapsedBackgroundColor: Colors.transparent,
+          // ... rest of chat history section (keep existing code)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                dividerColor: Colors.transparent,
+                expansionTileTheme: ExpansionTileThemeData(
+                  backgroundColor: Colors.transparent,
+                  collapsedBackgroundColor: Colors.transparent,
+                  tilePadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 0,
+                  ),
+                  childrenPadding: const EdgeInsets.only(left: 0, top: 4),
+                  iconColor: Colors.grey[600],
+                  collapsedIconColor: Colors.grey[600],
+                  textColor: Colors.grey[700],
+                  collapsedTextColor: Colors.grey[700],
+                  expansionAnimationStyle: AnimationStyle(
+                    duration: Duration.zero,
+                  ),
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: ExpansionTile(
+                    minTileHeight: 44,
                     tilePadding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 0,
                     ),
-                    childrenPadding: const EdgeInsets.only(left: 0, top: 4),
-                    iconColor: Colors.grey[600],
-                    collapsedIconColor: Colors.grey[600],
-                    textColor: Colors.grey[700],
-                    collapsedTextColor: Colors.grey[700],
-                    expansionAnimationStyle: AnimationStyle(
-                      duration: Duration.zero,
+                    leading: Container(
+                      width: 20,
+                      height: 20,
+                      margin: const EdgeInsets.only(left: 12),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.history,
+                        color: Colors.grey[600],
+                        size: 20,
+                      ),
                     ),
-                  ),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: ExpansionTile(
-                      minTileHeight: 44,
-                      tilePadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 0,
-                      ),
-                      leading: Container(
-                        width: 20,
-                        height: 20,
-                        margin: const EdgeInsets.only(left: 12),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Icons.history,
-                          color: Colors.grey[600],
-                          size: 20,
+                    title: Container(
+                      margin: const EdgeInsets.only(left: 4),
+                      child: Text(
+                        'Chat History',
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w400,
+                          fontSize: 14,
                         ),
                       ),
-                      title: Container(
-                        margin: const EdgeInsets.only(left: 4),
-                        child: Text(
-                          'Chat History',
-                          style: TextStyle(
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.w400,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      initiallyExpanded: isExpanded,
-                      onExpansionChanged: (expanded) {
-                        setDrawerState?.call(() {
-                          UserConstant.isOASPAssistExpanded = expanded;
-                        });
-                        setLocalState(() {
-                          isExpanded = expanded;
-                        });
-                      },
-                      children: [
-                        _buildChatHistoryList(
-                          context,
-                          recentConversations,
-                          selectedConversationId,
-                          onConversationSelected,
-                        ),
-                      ],
                     ),
+                    initiallyExpanded: isExpanded,
+                    onExpansionChanged: (expanded) {
+                      setDrawerState?.call(() {
+                        UserConstant.isOASPAssistExpanded = expanded;
+                      });
+                      setLocalState(() {
+                        isExpanded = expanded;
+                      });
+                    },
+                    children: [
+                      _buildChatHistoryList(
+                        context,
+                        recentConversations,
+                        selectedConversationId,
+                        onConversationSelected,
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
-        );
-      },
-    );
-  }
+          ),
+        ],
+      );
+    },
+  );
+}
 
   static Widget _buildChatHistoryList(
     BuildContext context,
@@ -1073,333 +1094,262 @@ class UniversalUIComponents {
       ),
     );
   }
+static List<Widget> _buildPersistentMenuItems(
+  BuildContext context,
+  UserRole userRole,
+  MenuConfig menuConfig,
+  int selectedIndex,
+  Function(int) onItemTap,
+  bool isExpanded, {
+  Function(BuildContext, String?)? onConversationSelected,
+  VoidCallback? onNewChat, // ✅ ADD THIS PARAMETER
+}) {
+  List<Widget> items = [];
 
-  static List<Widget> _buildPersistentMenuItems(
-    BuildContext context,
-    UserRole userRole,
-    MenuConfig menuConfig,
-    int selectedIndex,
-    Function(int) onItemTap,
-    bool isExpanded, {
-    Function(BuildContext, String?)? onConversationSelected,
-  }) {
-    List<Widget> items = [];
-
-    for (final menuItem in menuConfig.items) {
-      // Handle expandable items (Services, Logs)
-      if (menuItem.isExpandable && menuItem.subItems != null) {
-        items.add(
-          buildPersistentDrawerGroup(
-            context: context,
-            icon: menuItem.icon,
-            title: menuItem.title,
-            groupIndex: menuItem.index, // -1 for Services, -2 for Logs
-            selectedIndex: selectedIndex,
-            onTap: onItemTap,
-            isExpanded: isExpanded,
-            isServicesExpanded: PersistentDrawerState.getExpansionState(
-              menuItem.index,
-            ),
-            children:
-                menuItem.subItems!.map((subItem) {
-                  return buildPersistentDrawerItem(
-                    context: context,
-                    icon: subItem.icon,
-                    title: subItem.title,
-                    index: subItem.index,
-                    selectedIndex: selectedIndex,
-                    onTap: onItemTap,
-                    isExpanded: isExpanded,
-                    isSubItem: true, // Add this to indicate it's a sub-item
-                  );
-                }).toList(),
+  for (final menuItem in menuConfig.items) {
+    // Handle expandable items (Services, Logs)
+    if (menuItem.isExpandable && menuItem.subItems != null) {
+      items.add(
+        buildPersistentDrawerGroup(
+          context: context,
+          icon: menuItem.icon,
+          title: menuItem.title,
+          groupIndex: menuItem.index,
+          selectedIndex: selectedIndex,
+          onTap: onItemTap,
+          isExpanded: isExpanded,
+          isServicesExpanded: PersistentDrawerState.getExpansionState(
+            menuItem.index,
           ),
-        );
+          children:
+              menuItem.subItems!.map((subItem) {
+                return buildPersistentDrawerItem(
+                  context: context,
+                  icon: subItem.icon,
+                  title: subItem.title,
+                  index: subItem.index,
+                  selectedIndex: selectedIndex,
+                  onTap: onItemTap,
+                  isExpanded: isExpanded,
+                  isSubItem: true,
+                );
+              }).toList(),
+        ),
+      );
 
-        // Add New Chat and History section after Services for user role
-        if (userRole == UserRole.user && menuItem.title == 'Services') {
-          if (isExpanded) {
-            items.add(
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: Divider(
-                  color: Colors.grey[300],
-                  thickness: 1,
-                  height: 1,
-                ),
-              ),
-            );
-          }
-
+      // Add New Chat and History section after Services for user role
+      if (userRole == UserRole.user && menuItem.title == 'Services') {
+        if (isExpanded) {
           items.add(
-            _buildPersistentNewChatAndHistory(
-              context,
-              isExpanded,
-              onConversationSelected:
-                  onConversationSelected, // Can be null, that's OK
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+              child: Divider(
+                color: Colors.grey[300],
+                thickness: 1,
+                height: 1,
+              ),
             ),
           );
         }
-      } else {
-        // Handle regular (non-expandable) items
+
         items.add(
-          buildPersistentDrawerItem(
-            context: context,
-            icon: menuItem.icon,
-            title: menuItem.title,
-            index: menuItem.index,
-            selectedIndex: selectedIndex,
-            onTap: onItemTap,
-            isExpanded: isExpanded,
+          _buildPersistentNewChatAndHistory(
+            context,
+            isExpanded,
+            onConversationSelected: onConversationSelected,
+            onNewChat: onNewChat, // ✅ PASS IT HERE
           ),
         );
       }
+    } else {
+      // Handle regular (non-expandable) items
+      items.add(
+        buildPersistentDrawerItem(
+          context: context,
+          icon: menuItem.icon,
+          title: menuItem.title,
+          index: menuItem.index,
+          selectedIndex: selectedIndex,
+          onTap: onItemTap,
+          isExpanded: isExpanded,
+        ),
+      );
     }
-
-    return items;
   }
 
-  // // Persistent chat menu item
-  // static Widget _buildPersistentChatMenuItem({
-  //   required BuildContext context,
-  //   required MenuItem menuItem,
-  //   required int selectedIndex,
-  //   required Function(int) onItemTap,
-  //   required bool isExpanded,
-  // }) {
-  //   final isSelected = selectedIndex == menuItem.index;
+  return items;
+}
 
-  //   return Container(
-  //     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-  //     constraints: const BoxConstraints(minHeight: 44),
-  //     child: Material(
-  //       color: isSelected ? Colors.green[50] : Colors.transparent,
-  //       borderRadius: BorderRadius.circular(8),
-  //       child: InkWell(
-  //         borderRadius: BorderRadius.circular(8),
-  //         onTap: () => onItemTap(menuItem.index),
-  //         child: Container(
-  //           width: double.infinity,
-  //           constraints: const BoxConstraints(minHeight: 44),
-  //           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-  //           child: Row(
-  //             crossAxisAlignment: CrossAxisAlignment.center,
-  //             children: [
-  //               // Green vertical line
-  //               Container(
-  //                 width: 3,
-  //                 height: 20,
-  //                 margin: const EdgeInsets.only(left: 4, right: 8),
-  //                 decoration: BoxDecoration(
-  //                   color: isSelected ? Colors.green[700] : Colors.transparent,
-  //                   borderRadius: BorderRadius.circular(1.5),
-  //                 ),
-  //               ),
-  //               // Icon
-  //               Container(
-  //                 width: 20,
-  //                 height: 20,
-  //                 margin: const EdgeInsets.only(right: 8),
-  //                 child: Icon(
-  //                   menuItem.icon,
-  //                   color: isSelected ? Colors.green[700] : Colors.grey[600],
-  //                   size: 20,
-  //                 ),
-  //               ),
-  //               // Text
-  //               if (isExpanded)
-  //                 Expanded(
-  //                   child: Container(
-  //                     padding: const EdgeInsets.only(left: 8),
-  //                     child: Text(
-  //                       menuItem.title,
-  //                       style: TextStyle(
-  //                         color:
-  //                             isSelected ? Colors.green[700] : Colors.grey[700],
-  //                         fontWeight:
-  //                             isSelected ? FontWeight.w600 : FontWeight.w400,
-  //                         fontSize: 14,
-  //                       ),
-  //                       softWrap: true,
-  //                       overflow: TextOverflow.visible,
-  //                       maxLines: null,
-  //                     ),
-  //                   ),
-  //                 ),
-  //               if (!isExpanded)
-  //                 Expanded(
-  //                   child: Tooltip(
-  //                     message: menuItem.title,
-  //                     child: Container(height: 44),
-  //                   ),
-  //                 ),
-  //             ],
-  //           ),
-  //         ),
-  //       ),
-  //     ),
-  //   );
-  // }
 
   // Persistent New Chat and Chat History Section
-  static Widget _buildPersistentNewChatAndHistory(
-    BuildContext context,
-    bool isExpanded, {
-    Function(BuildContext, String?)? onConversationSelected,
-  }) {
-    return StatefulBuilder(
-      builder: (context, setState) {
-        bool isChatHistoryExpanded = UserConstant.isOASPAssistExpanded;
+static Widget _buildPersistentNewChatAndHistory(
+  BuildContext context,
+  bool isExpanded, {
+  Function(BuildContext, String?)? onConversationSelected,
+  VoidCallback? onNewChat,
+}) {
+  return StatefulBuilder(
+    builder: (context, setState) {
+      bool isChatHistoryExpanded = UserConstant.isOASPAssistExpanded;
 
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // New Chat Button (existing code stays the same)
-            if (isExpanded)
-              Container(
-                margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                height: 44,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      HapticFeedback.mediumImpact();
-                      await UserConstant.startNewChat(context);
-                    },
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text(
-                      'New Chat',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // New Chat Button (expanded state)
+          if (isExpanded)
+            Container(
+              margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+              height: 44,
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    HapticFeedback.mediumImpact();
+                    
+                    // ✅ FIX: Call the callback with proper async handling
+                    if (onNewChat != null && context.mounted) {
+                      onNewChat();
+                    }
+                  },
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text(
+                    'New Chat',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryGreen,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryGreen,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
+                    elevation: 0,
                   ),
                 ),
               ),
+            ),
 
-            // Chat History with callback
-            if (isExpanded)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                child: Theme(
-                  data: Theme.of(context).copyWith(
-                    dividerColor: Colors.transparent,
-                    expansionTileTheme: ExpansionTileThemeData(
-                      backgroundColor: Colors.transparent,
-                      collapsedBackgroundColor: Colors.transparent,
+          // Chat History section
+         if (isExpanded)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  dividerColor: Colors.transparent,
+                  expansionTileTheme: ExpansionTileThemeData(
+                    backgroundColor: Colors.transparent,
+                    collapsedBackgroundColor: Colors.transparent,
+                    tilePadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 0,
+                    ),
+                    childrenPadding: const EdgeInsets.only(left: 0, top: 4),
+                    iconColor: Colors.grey[600],
+                    collapsedIconColor: Colors.grey[600],
+                    textColor: Colors.grey[700],
+                    collapsedTextColor: Colors.grey[700],
+                    expansionAnimationStyle: AnimationStyle(
+                      duration: Duration.zero,
+                    ),
+                  ),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: ExpansionTile(
+                      minTileHeight: 44,
                       tilePadding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 0,
                       ),
-                      childrenPadding: const EdgeInsets.only(left: 0, top: 4),
-                      iconColor: Colors.grey[600],
-                      collapsedIconColor: Colors.grey[600],
-                      textColor: Colors.grey[700],
-                      collapsedTextColor: Colors.grey[700],
-                      expansionAnimationStyle: AnimationStyle(
-                        duration: Duration.zero,
+                      leading: Container(
+                        width: 20,
+                        height: 20,
+                        margin: const EdgeInsets.only(left: 12),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.history,
+                          color: Colors.grey[600],
+                          size: 20,
+                        ),
                       ),
-                    ),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: ExpansionTile(
-                        minTileHeight: 44,
-                        tilePadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 0,
-                        ),
-                        leading: Container(
-                          width: 20,
-                          height: 20,
-                          margin: const EdgeInsets.only(left: 12),
-                          alignment: Alignment.center,
-                          child: Icon(
-                            Icons.history,
-                            color: Colors.grey[600],
-                            size: 20,
+                      title: Container(
+                        margin: const EdgeInsets.only(left: 4),
+                        child: Text(
+                          'Chat History',
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14,
                           ),
                         ),
-                        title: Container(
-                          margin: const EdgeInsets.only(left: 4),
-                          child: Text(
-                            'Chat History',
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w400,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                        initiallyExpanded: isChatHistoryExpanded,
-                        onExpansionChanged: (expanded) {
-                          setState(() {
-                            UserConstant.isOASPAssistExpanded = expanded;
-                          });
-                        },
-                        children: [
-                          _buildPersistentChatHistoryList(
-                            context,
-                            onConversationSelected: onConversationSelected,
-                          ),
-                        ],
                       ),
-                    ),
-                  ),
-                ),
-              ),
-
-            // Collapsed state icon
-            if (!isExpanded)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                child: Tooltip(
-                  message: 'New Chat',
-                  child: Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () async {
-                        HapticFeedback.mediumImpact();
-                        await UserConstant.startNewChat(context);
+                      initiallyExpanded: isChatHistoryExpanded,
+                      onExpansionChanged: (expanded) {
+                        setState(() {
+                          UserConstant.isOASPAssistExpanded = expanded;
+                        });
                       },
-                      child: Container(
-                        width: double.infinity,
-                        height: 44,
-                        child: Center(
-                          child: Icon(
-                            Icons.add_comment_rounded,
-                            color: primaryGreen,
-                            size: 20,
-                          ),
+                      children: [
+                        _buildPersistentChatHistoryList(
+                          context,
+                          onConversationSelected: onConversationSelected,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // Collapsed state icon
+           if (!isExpanded)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: Tooltip(
+                message: 'New Chat',
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () async {
+                      HapticFeedback.mediumImpact();
+                      
+                      // ✅ FIX: Use callback for collapsed state
+                      if (onNewChat != null && context.mounted) {
+                        onNewChat();
+                      }
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      height: 44,
+                      child: Center(
+                        child: Icon(
+                          Icons.add_comment_rounded,
+                          color: primaryGreen,
+                          size: 20,
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-          ],
-        );
-      },
-    );
-  }
+            ),
+        ],
+      );
+    },
+  );
+}
+
 
   static Widget _buildPersistentChatHistoryList(
     BuildContext context, {

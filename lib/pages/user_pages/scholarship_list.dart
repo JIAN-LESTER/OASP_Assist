@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ScholarshipList extends StatefulWidget {
   const ScholarshipList({super.key});
@@ -59,7 +60,7 @@ class _ScholarshipListState extends State<ScholarshipList>
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildSearchAndFilters(isMobile: true)),
-          _buildScholarshipsList(crossAxisCount: 1),
+          _buildScholarshipsList(crossAxisCount: 1, isDesktop: false),
         ],
       ),
     );
@@ -71,7 +72,7 @@ class _ScholarshipListState extends State<ScholarshipList>
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildSearchAndFilters(isMobile: false)),
-          _buildScholarshipsList(crossAxisCount: 2),
+          _buildScholarshipsList(crossAxisCount: 2, isDesktop: false),
         ],
       ),
     );
@@ -83,7 +84,7 @@ class _ScholarshipListState extends State<ScholarshipList>
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildSearchAndFilters(isMobile: false)),
-          _buildScholarshipsList(crossAxisCount: 3),
+          _buildScholarshipsList(crossAxisCount: 3, isDesktop: true),
         ],
       ),
     );
@@ -293,7 +294,10 @@ class _ScholarshipListState extends State<ScholarshipList>
     );
   }
 
-  Widget _buildScholarshipsList({required int crossAxisCount}) {
+  Widget _buildScholarshipsList({
+    required int crossAxisCount,
+    required bool isDesktop,
+  }) {
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore.collection('scholarships').snapshots(),
       builder: (context, snapshot) {
@@ -361,10 +365,10 @@ class _ScholarshipListState extends State<ScholarshipList>
               crossAxisCount: crossAxisCount,
               childAspectRatio:
                   crossAxisCount == 1
-                      ? 0.65 // Mobile 1 column
+                      ? 1.8 // Mobile
                       : crossAxisCount == 2
-                      ? 0.78 // Tablet 2 columns
-                      : 0.88, // Desktop 3 columns
+                      ? 1.8 // Tablet
+                      : 1.95, // Desktop
               crossAxisSpacing: 20,
               mainAxisSpacing: 20,
             ),
@@ -374,6 +378,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                 child: _buildScholarshipCard(
                   filteredScholarships[index].data() as Map<String, dynamic>,
                   index,
+                  isDesktop,
                 ),
               );
             }, childCount: filteredScholarships.length),
@@ -440,7 +445,11 @@ class _ScholarshipListState extends State<ScholarshipList>
     return scholarships;
   }
 
-  Widget _buildScholarshipCard(Map<String, dynamic> data, int index) {
+  Widget _buildScholarshipCard(
+    Map<String, dynamic> data,
+    int index,
+    bool isDesktop,
+  ) {
     final deadline = data['deadline'] as Timestamp?;
     final daysLeft =
         deadline != null
@@ -448,16 +457,6 @@ class _ScholarshipListState extends State<ScholarshipList>
             : null;
     final isUrgent = daysLeft != null && daysLeft <= 7 && daysLeft >= 0;
     final isExpired = daysLeft != null && daysLeft < 0;
-
-    // Get eligibility and privileges lists
-    final eligibilityList =
-        data['eligibilityRequirements'] is List
-            ? List<String>.from(data['eligibilityRequirements'])
-            : <String>[];
-    final privilegesList =
-        data['privileges'] is List
-            ? List<String>.from(data['privileges'])
-            : <String>[];
 
     return Container(
       decoration: BoxDecoration(
@@ -492,15 +491,16 @@ class _ScholarshipListState extends State<ScholarshipList>
         child: InkWell(
           onTap: () => _showScholarshipDetails(data),
           borderRadius: BorderRadius.circular(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Section
-              Padding(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Header Section with Icon and Click/Tap
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -531,263 +531,200 @@ class _ScholarshipListState extends State<ScholarshipList>
                           ),
                         ),
                         const Spacer(),
-                        if (deadline != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: primaryGreen.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: primaryGreen.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isDesktop
+                                    ? Icons.mouse_rounded
+                                    : Icons.touch_app_rounded,
+                                color: primaryGreen,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                isDesktop ? 'Click' : 'Tap',
+                                style: TextStyle(
+                                  color: primaryGreen,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Scholarship Name
+                    Text(
+                      data['name'] ?? 'Unnamed Scholarship',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey[900],
+                        height: 1.3,
+                        letterSpacing: -0.3,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Bottom Section: Provider and Deadline
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Divider
+                        Divider(
+                          height: 24,
+                          thickness: 1,
+                          color: Colors.grey[200],
+                        ),
+
+                        // Provider
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.business_rounded,
+                              size: 16,
+                              color: Colors.grey[500],
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                data['scholarshipProvider'] ??
+                                    'Unknown Provider',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Deadline Badge
+                        if (daysLeft != null)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
+                              horizontal: 12,
+                              vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: (isExpired
-                                      ? Colors.red
+                              color:
+                                  isExpired
+                                      ? Colors.red[50]
                                       : isUrgent
-                                      ? Colors.orange
-                                      : Colors.green)
-                                  .withOpacity(0.15),
+                                      ? Colors.orange[50]
+                                      : primaryGreen.withOpacity(0.08),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: (isExpired
-                                        ? Colors.red
+                                color:
+                                    isExpired
+                                        ? Colors.red[300]!
                                         : isUrgent
-                                        ? Colors.orange
-                                        : Colors.green)
-                                    .withOpacity(0.3),
-                                width: 1.5,
+                                        ? Colors.orange[300]!
+                                        : primaryGreen.withOpacity(0.2),
+                                width: 1,
                               ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  Icons.schedule_rounded,
-                                  size: 14,
+                                  isExpired
+                                      ? Icons.event_busy_rounded
+                                      : Icons.event_available_rounded,
                                   color:
                                       isExpired
                                           ? Colors.red[700]
                                           : isUrgent
                                           ? Colors.orange[700]
-                                          : Colors.green[700],
+                                          : primaryGreen,
+                                  size: 16,
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 6),
                                 Text(
-                                  daysLeft! > 0
-                                      ? '$daysLeft days'
-                                      : daysLeft == 0
-                                      ? 'Today'
-                                      : 'Expired',
+                                  isExpired
+                                      ? 'Expired'
+                                      : '$daysLeft day${daysLeft == 1 ? '' : 's'} left',
                                   style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
                                     color:
                                         isExpired
-                                            ? Colors.red[800]
+                                            ? Colors.red[700]
                                             : isUrgent
-                                            ? Colors.orange[800]
-                                            : Colors.green[800],
-                                    letterSpacing: 0.3,
+                                            ? Colors.orange[700]
+                                            : primaryGreen,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.grey[300]!,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.event_note_rounded,
+                                  color: Colors.grey[600],
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'No deadline set',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ],
                             ),
                           ),
                       ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      data['name'] ?? 'Unnamed Scholarship',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.grey[900],
-                        height: 1.3,
-                        letterSpacing: -0.3,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      data['scholarshipProvider'] ?? 'Unknown Provider',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w600,
-                      ),
                     ),
                   ],
                 ),
               ),
-
-              // Middle Content Section - Details
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Eligibility Requirements
-                      if (eligibilityList.isNotEmpty) ...[
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.check_circle_outline_rounded,
-                              size: 16,
-                              color: primaryGreen,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Eligibility',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.grey[700],
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        ...eligibilityList.take(2).map((requirement) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  margin: const EdgeInsets.only(top: 6),
-                                  width: 4,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: primaryGreen,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    requirement,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                      height: 1.4,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                        if (eligibilityList.length > 2)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 12, top: 4),
-                            child: Text(
-                              '+${eligibilityList.length - 2} more',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: primaryGreen,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: 12),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Bottom Section - Benefits Count
-              if (privilegesList.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.purple.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.purple.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.star_rounded,
-                          size: 14,
-                          color: Colors.purple[700],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${privilegesList.length} Benefits',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.purple[700],
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-              const SizedBox(height: 16),
-
-              // Action Button
-              Container(
-                margin: const EdgeInsets.all(20),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _showScholarshipDetails(data),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.green[600]!, Colors.green[700]!],
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.green[600]!.withOpacity(0.4),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(
-                            Icons.visibility_rounded,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'View Details',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -866,414 +803,473 @@ class _ScholarshipListState extends State<ScholarshipList>
   }
 
   void _showScholarshipDetails(Map<String, dynamic> data) {
-    showModalBottomSheet(
+    final deadline = data['deadline'] as Timestamp?;
+    final daysLeft =
+        deadline != null
+            ? deadline.toDate().difference(DateTime.now()).inDays
+            : null;
+
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.5),
       builder:
-          (context) => DraggableScrollableSheet(
-            initialChildSize: 0.8,
-            minChildSize: 0.5,
-            maxChildSize: 0.95,
-            builder:
-                (context, scrollController) => Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(24),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      // Drag Handle
-                      Container(
-                        margin: const EdgeInsets.only(top: 12, bottom: 8),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-
-                      // Header
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    primaryGreen.withOpacity(0.9),
-                                    primaryGreen,
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: primaryGreen.withOpacity(0.3),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.card_giftcard_rounded,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    data['name'] ?? 'Unnamed Scholarship',
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.grey[900],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    data['scholarshipProvider'] ??
-                                        'Unknown Provider',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.close_rounded),
-                              style: IconButton.styleFrom(
-                                backgroundColor: Colors.grey[100],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Content
-                      Expanded(
-                        child: SingleChildScrollView(
-                          controller: scrollController,
-                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Key Information Cards
-                              if (data['deadline'] != null)
-                                _buildDetailCard(
-                                  Icons.schedule_rounded,
-                                  'Application Deadline',
-                                  DateFormat('MMM dd, yyyy').format(
-                                    (data['deadline'] as Timestamp).toDate(),
-                                  ),
-                                  Colors.red,
-                                ),
-
-                              const SizedBox(height: 16),
-
-                              // Description Section
-                              if (data['description'] != null &&
-                                  data['description'].toString().isNotEmpty)
-                                _buildSection(
-                                  'Description',
-                                  data['description'],
-                                  Icons.description_rounded,
-                                ),
-
-                              // Eligibility Section
-                              if (data['eligibilityRequirements'] != null &&
-                                  data['eligibilityRequirements'] is List) ...[
-                                const SizedBox(height: 20),
-                                _buildListSection(
-                                  'Eligibility Requirements',
-                                  List<String>.from(
-                                    data['eligibilityRequirements'],
-                                  ),
-                                  Icons.person_outline_rounded,
-                                  primaryGreen,
-                                ),
-                              ],
-
-                              // Privileges Section
-                              if (data['privileges'] != null &&
-                                  data['privileges'] is List) ...[
-                                const SizedBox(height: 20),
-                                _buildListSection(
-                                  'Privileges & Benefits',
-                                  List<String>.from(data['privileges']),
-                                  Icons.star_rounded,
-                                  Colors.purple,
-                                ),
-                              ],
-
-                              const SizedBox(height: 24),
-
-                              // Application Button
-                              if (data['applicationLink'] != null &&
-                                  data['applicationLink'].toString().isNotEmpty)
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      onTap: () {
-                                        // Handle application link opening
-                                        // You can use url_launcher package here
-                                      },
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              Colors.green[600]!,
-                                              Colors.green[700]!,
-                                            ],
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.green[600]!
-                                                  .withOpacity(0.4),
-                                              blurRadius: 12,
-                                              offset: const Offset(0, 4),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: const [
-                                            Icon(
-                                              Icons.open_in_new_rounded,
-                                              size: 20,
-                                              color: Colors.white,
-                                            ),
-                                            SizedBox(width: 8),
-                                            Text(
-                                              'Apply Now',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w700,
-                                                color: Colors.white,
-                                                letterSpacing: 0.2,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-          ),
-    );
-  }
-
-  Widget _buildDetailCard(
-    IconData icon,
-    String title,
-    String value,
-    Color color,
-  ) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.15), color.withOpacity(0.08)],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: Colors.white, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: color.withOpacity(0.9),
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Colors.grey[900],
-              letterSpacing: -0.2,
+          (context) => Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 24,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSection(String title, String content, IconData icon) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: Colors.grey[600], size: 20),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey[800],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.grey[50],
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[200]!),
-          ),
-          child: Text(
-            content,
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.6,
-              color: Colors.grey[700],
-              letterSpacing: 0.1,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildListSection(
-    String title,
-    List<String> items,
-    IconData icon,
-    Color color,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 500),
               decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
-              child: Icon(icon, color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey[800],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [color.withOpacity(0.08), color.withOpacity(0.05)],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.2), width: 1.5),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children:
-                items.map((item) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.all(20),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          margin: const EdgeInsets.only(top: 6),
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            item,
+                            'Scholarship Details',
                             style: TextStyle(
-                              fontSize: 15,
-                              height: 1.5,
-                              color: Colors.grey[700],
-                              letterSpacing: 0.1,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[900],
                             ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: Icon(
+                            Icons.close_rounded,
+                            color: Colors.grey[600],
+                          ),
+                          style: IconButton.styleFrom(
+                            padding: const EdgeInsets.all(8),
                           ),
                         ),
                       ],
                     ),
-                  );
-                }).toList(),
+                  ),
+
+                  // Content
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Scholarship Name Section
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'SCHOLARSHIP NAME',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[500],
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  data['name'] ?? 'Unnamed Scholarship',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.grey[900],
+                                    height: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  data['scholarshipProvider'] ??
+                                      'Unknown Provider',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (daysLeft != null) ...[
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              daysLeft >= 0
+                                                  ? primaryGreen.withOpacity(
+                                                    0.1,
+                                                  )
+                                                  : Colors.red.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          daysLeft >= 0 ? 'Active' : 'Expired',
+                                          style: TextStyle(
+                                            color:
+                                                daysLeft >= 0
+                                                    ? primaryGreen
+                                                    : Colors.red[700],
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+
+                          // Deadline & Duration Section
+                          if (deadline != null || data['duration'] != null) ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Column(
+                                children: [
+                                  if (deadline != null) ...[
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Application Deadline',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey[600],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          DateFormat(
+                                            'dd MMM yyyy',
+                                          ).format(deadline.toDate()),
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey[900],
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                  if (deadline != null &&
+                                      data['duration'] != null)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      child: Divider(
+                                        height: 1,
+                                        color: Colors.grey[300],
+                                      ),
+                                    ),
+                                  if (data['duration'] != null)
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Duration',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey[600],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          data['duration'].toString(),
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey[900],
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          // Description
+                          if (data['description'] != null &&
+                              data['description']
+                                  .toString()
+                                  .trim()
+                                  .isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            Text(
+                              'DESCRIPTION',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[500],
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              data['description'],
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.6,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
+
+                          // Eligibility Requirements
+                          if (data['eligibilityRequirements'] != null &&
+                              data['eligibilityRequirements'] is List &&
+                              (data['eligibilityRequirements'] as List)
+                                  .isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            Text(
+                              'ELIGIBILITY REQUIREMENTS',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[500],
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            ...List<String>.from(
+                              data['eligibilityRequirements'],
+                            ).map((requirement) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.only(top: 7),
+                                      width: 5,
+                                      height: 5,
+                                      decoration: BoxDecoration(
+                                        color: primaryGreen,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        requirement,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          height: 1.5,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ],
+
+                          // Privileges
+                          if (data['privileges'] != null &&
+                              data['privileges'] is List &&
+                              (data['privileges'] as List).isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            Text(
+                              'PRIVILEGES & BENEFITS',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[500],
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            ...List<String>.from(data['privileges']).map((
+                              privilege,
+                            ) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.only(top: 7),
+                                      width: 5,
+                                      height: 5,
+                                      decoration: BoxDecoration(
+                                        color: Colors.purple[600],
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        privilege,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          height: 1.5,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ],
+
+                          const SizedBox(height: 24),
+
+                          // Apply Now Button
+                          if (data['applicationLink'] != null &&
+                              data['applicationLink']
+                                  .toString()
+                                  .trim()
+                                  .isNotEmpty)
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  // Handle application link opening
+                                  // You can use url_launcher package here
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryGreen,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Apply Now',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 15,
+            color: Colors.grey[900],
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: Colors.grey[900],
+      ),
+    );
+  }
+
+  Widget _buildBulletList(List<String> items, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children:
+          items.map((item) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 7),
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.5,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
     );
   }
 }

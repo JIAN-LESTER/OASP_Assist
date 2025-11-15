@@ -10,6 +10,7 @@ class Notifications {
   final String targetRole;    // 'user' or 'staff'
   final bool read;
   final Timestamp createdAt;
+  final Map<String, dynamic>? data; // ✅ New field for additional data
 
   Notifications({
     required this.notificationId,
@@ -21,6 +22,7 @@ class Notifications {
     required this.targetRole,
     this.read = false,
     required this.createdAt,
+    this.data,
   });
 
   // Convert Firestore document to model
@@ -35,6 +37,7 @@ class Notifications {
       targetRole: map['targetRole'] ?? 'user',
       read: map['read'] ?? false,
       createdAt: map['createdAt'] ?? Timestamp.now(),
+      data: Map<String, dynamic>.from(map['data'] ?? {}), // ✅ Safely handle null
     );
   }
 
@@ -50,6 +53,7 @@ class Notifications {
       'targetRole': targetRole,
       'read': read,
       'createdAt': createdAt,
+      'data': data, // ✅ Include in Firestore document
     };
   }
 }

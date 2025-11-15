@@ -1339,35 +1339,35 @@ class _HomeDashboardState extends State<HomeDashboard>
     );
   }
 
-  void _navigateToTab(BuildContext context, int tabIndex) {
+ void _navigateToTab(BuildContext context, int tabIndex) {
+
+  
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute(
+      builder: (context) => UserMainPage(initialTabIndex: tabIndex),
+    ),
+  );
+}
+
+  void _navigateToChatTab(BuildContext context, bool hasConversation) {
+  if (hasConversation && _currentConversationId != null) {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => UserMainPage(initialTabIndex: tabIndex),
+        builder: (context) => UserMainPage(
+          initialTabIndex: 1, // Chat is always index 1
+          conversationId: _currentConversationId,
+        ),
+      ),
+    );
+  } else {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => UserMainPage(initialTabIndex: 1),
       ),
     );
   }
+}
 
-
-  void _navigateToChatTab(BuildContext context, bool hasConversation) {
-    if (hasConversation && _currentConversationId != null) {
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => UserMainPage(
-            initialTabIndex: 1,
-            conversationId: _currentConversationId, 
-          ),
-        ),
-      );
-    } else {
-      // Start new conversation
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => UserMainPage(initialTabIndex: 1),
-        ),
-      );
-    }
-  }
 
 void _showContactInfo(BuildContext context) {
   final isMobile = MediaQuery.of(context).size.width < 600;

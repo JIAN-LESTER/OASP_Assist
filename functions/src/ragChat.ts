@@ -1,7 +1,7 @@
-import {onRequest} from "firebase-functions/v2/https";
-import {defineSecret} from "firebase-functions/params";
+import { onRequest } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
-import {Pinecone} from "@pinecone-database/pinecone";
+import { Pinecone } from "@pinecone-database/pinecone";
 import axios from "axios";
 
 // Secrets
@@ -10,7 +10,6 @@ const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
 
 // Firestore reference
 const db = admin.firestore();
-
 
 export async function generateCohereEmbedding(
   text: string,
@@ -27,7 +26,7 @@ export async function generateCohereEmbedding(
       },
       {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         timeout: 30000,
@@ -38,7 +37,7 @@ export async function generateCohereEmbedding(
       throw new Error(`Cohere Embed API error: ${response.statusText}`);
     }
 
-    const data = response.data as {embeddings: number[][]};
+    const data = response.data as { embeddings: number[][] };
     return data.embeddings[0];
   } catch (error) {
     console.error("Error generating Cohere embedding:", error);
@@ -46,6 +45,117 @@ export async function generateCohereEmbedding(
   }
 }
 
+async function* generateCohereResponseStream(
+  prompt: string,
+  apiKey: string
+): AsyncGenerator<string, void, unknown> {
+  try {
+    const response = await fetch("https://api.cohere.ai/v1/chat", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "command-a-03-2025",
+        message: prompt,
+        max_tokens: 1024,
+        temperature: 0.3,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Cohere Chat API error: ${response.statusText}`);
+    }
+
+    if (!response.body) {
+      throw new Error("Response body is null");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+
+      // Keep the last incomplete line in buffer
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+
+        // Skip empty lines and comments
+        if (!trimmedLine || trimmedLine.startsWith(":")) continue;
+
+        // Remove "data: " prefix
+        const jsonStr = trimmedLine.startsWith("data: ")
+          ? trimmedLine.substring(6).trim()
+          : trimmedLine;
+
+        // Skip DONE signal or empty data
+        if (jsonStr === "[DONE]" || !jsonStr) continue;
+
+        try {
+          const data = JSON.parse(jsonStr);
+
+          console.log("📦 Stream event:", data.event_type || data.type);
+
+          // Handle different Cohere streaming event types
+          if (data.event_type === "text-generation" && data.text) {
+            yield data.text;
+          } else if (data.event_type === "stream-start") {
+            console.log("🌊 Stream started");
+          } else if (data.event_type === "search-queries-generation") {
+            console.log("🔍 Search queries generated");
+          } else if (data.event_type === "search-results") {
+            console.log("📚 Search results received");
+          } else if (data.event_type === "stream-end") {
+            console.log("✅ Stream ended");
+            if (data.response && data.response.text) {
+              // Some models return final text in stream-end
+              yield data.response.text;
+            }
+            break;
+          }
+          // Handle alternative format (some Cohere versions use 'type' instead of 'event_type')
+          else if (
+            data.type === "content-delta" &&
+            data.delta?.message?.content?.text
+          ) {
+            yield data.delta.message.content.text;
+          } else if (data.type === "message-end") {
+            console.log("✅ Message ended");
+            break;
+          }
+          // Handle error events
+          else if (data.event_type === "error" || data.error) {
+            throw new Error(data.error || "Stream error occurred");
+          }
+        } catch (parseError) {
+          console.error("⚠️ Error parsing streaming chunk:", parseError);
+          console.error("⚠️ Problematic line:", trimmedLine);
+          // Continue processing other chunks instead of breaking
+          continue;
+        }
+      }
+    }
+
+    console.log("✅ Streaming complete");
+  } catch (error) {
+    console.error("❌ Error generating Cohere streaming response:", error);
+    throw error;
+  }
+}
+
+/**
+ * Non-streaming version (kept for backward compatibility)
+ */
 export async function generateCohereResponse(
   prompt: string,
   apiKey: string
@@ -54,14 +164,14 @@ export async function generateCohereResponse(
     const response = await axios.post(
       "https://api.cohere.ai/v1/chat",
       {
-        model: "command-r-08-2024",
+        model: "command-a-03-2025",
         message: prompt,
         max_tokens: 1024,
         temperature: 0.3,
       },
       {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         timeout: 30000,
@@ -72,7 +182,7 @@ export async function generateCohereResponse(
       throw new Error(`Cohere Chat API error: ${response.statusText}`);
     }
 
-    const data = response.data as {text?: string};
+    const data = response.data as { text?: string };
     return data.text || "";
   } catch (error) {
     console.error("Error generating Cohere response:", error);
@@ -87,7 +197,10 @@ export async function generateCohereResponse(
 function getContextualContent(chunks: any[], bestChunk: any): string {
   try {
     console.log(`📝 Processing ${chunks.length} chunk(s)`);
-    console.log("📝 Best chunk metadata keys:", Object.keys(bestChunk.metadata || {}));
+    console.log(
+      "📝 Best chunk metadata keys:",
+      Object.keys(bestChunk.metadata || {})
+    );
 
     if (chunks.length === 1) {
       const text =
@@ -99,7 +212,10 @@ function getContextualContent(chunks: any[], bestChunk: any): string {
 
       if (!text || text.trim().length === 0) {
         console.log("⚠️ Warning: No text content found in metadata");
-        console.log("📝 Metadata keys available:", Object.keys(bestChunk.metadata || {}));
+        console.log(
+          "📝 Metadata keys available:",
+          Object.keys(bestChunk.metadata || {})
+        );
       }
 
       const cleanText = text.trim();
@@ -115,11 +231,12 @@ function getContextualContent(chunks: any[], bestChunk: any): string {
           (b.metadata?.chunkIndex ?? b.metadata?.chunk_index ?? 0)
       );
 
-    const bestChunkIndex = bestChunk.metadata?.chunkIndex ??
-                          bestChunk.metadata?.chunk_index ?? 0;
+    const bestChunkIndex =
+      bestChunk.metadata?.chunkIndex ?? bestChunk.metadata?.chunk_index ?? 0;
 
     const contextChunks = sortedChunks.filter((chunk) => {
-      const chunkIndex = chunk.metadata?.chunkIndex ?? chunk.metadata?.chunk_index ?? 0;
+      const chunkIndex =
+        chunk.metadata?.chunkIndex ?? chunk.metadata?.chunk_index ?? 0;
       return Math.abs(chunkIndex - bestChunkIndex) <= 1;
     });
 
@@ -142,23 +259,28 @@ function getContextualContent(chunks: any[], bestChunk: any): string {
       if (cleanContent.length > 0) {
         contentParts.push(cleanContent);
       } else {
-        console.log(`⚠️ Empty content in chunk index ${chunk.metadata?.chunkIndex}`);
+        console.log(
+          `⚠️ Empty content in chunk index ${chunk.metadata?.chunkIndex}`
+        );
       }
     }
 
     if (contentParts.length === 0) {
-      console.log(`❌ No content parts found across ${contextChunks.length} chunks`);
+      console.log(
+        `❌ No content parts found across ${contextChunks.length} chunks`
+      );
       return "";
     }
 
     const result = contentParts.join("\n\n").trim();
-    console.log(`📝 Combined content length: ${result.length} from ${contentParts.length} chunks`);
+    console.log(
+      `📝 Combined content length: ${result.length} from ${contentParts.length} chunks`
+    );
     return result;
   } catch (error) {
     console.error("Error getting contextual content:", error);
-    const fallback = bestChunk.metadata?.text ||
-                     bestChunk.metadata?.content ||
-                     "";
+    const fallback =
+      bestChunk.metadata?.text || bestChunk.metadata?.content || "";
     console.log(`📝 Using fallback, length: ${fallback.length}`);
     return fallback;
   }
@@ -194,9 +316,9 @@ function buildConversationContext(
   for (const message of recentHistory) {
     const role = message.sender === "user" ? "User" : "Assistant";
     const content =
-      message.content.length > 500 ?
-        message.content.substring(0, 500) + "..." :
-        message.content;
+      message.content.length > 500
+        ? message.content.substring(0, 500) + "..."
+        : message.content;
     contextParts.push(`${role}: ${content}`);
   }
 
@@ -289,7 +411,7 @@ async function findMatchingFAQ(
   query: string,
   queryEmbedding: number[],
   cohereApiKey: string,
-  similarityThreshold = 0.90
+  similarityThreshold = 0.9
 ): Promise<{ question: string; answer: string; similarity: number } | null> {
   try {
     const faqSnapshot = await db
@@ -321,7 +443,7 @@ async function findMatchingFAQ(
           "search_document"
         );
 
-        await doc.ref.update({embedding: faqEmbedding});
+        await doc.ref.update({ embedding: faqEmbedding });
       }
 
       const similarity = cosineSimilarity(queryEmbedding, faqEmbedding);
@@ -338,7 +460,9 @@ async function findMatchingFAQ(
 
     if (bestMatch) {
       console.log(
-        `Found FAQ match: "${bestMatch.question}" (similarity: ${bestMatch.similarity.toFixed(3)})`
+        `Found FAQ match: "${
+          bestMatch.question
+        }" (similarity: ${bestMatch.similarity.toFixed(3)})`
       );
 
       const faqDoc = faqSnapshot.docs.find(
@@ -387,11 +511,14 @@ async function retrieveRelevantDocuments(
       includeMetadata: true,
     });
 
-    console.log("📊 Pinecone response:", JSON.stringify({
-      matchCount: similarChunks.matches?.length || 0,
-      hasMatches: !!similarChunks.matches,
-      namespace: similarChunks.namespace,
-    }));
+    console.log(
+      "📊 Pinecone response:",
+      JSON.stringify({
+        matchCount: similarChunks.matches?.length || 0,
+        hasMatches: !!similarChunks.matches,
+        namespace: similarChunks.namespace,
+      })
+    );
 
     if (!similarChunks.matches || similarChunks.matches.length === 0) {
       console.log("❌ No similar document chunks found in Pinecone");
@@ -404,18 +531,27 @@ async function retrieveRelevantDocuments(
     if (similarChunks.matches.length > 0) {
       const firstMatch = similarChunks.matches[0];
       console.log(`📝 First match score: ${firstMatch.score}`);
-      console.log("📝 First match metadata keys:", Object.keys(firstMatch.metadata || {}));
+      console.log(
+        "📝 First match metadata keys:",
+        Object.keys(firstMatch.metadata || {})
+      );
     }
 
     const filteredChunks = similarChunks.matches.filter(
       (chunk: any) => (chunk.score || 0) >= minSimilarityScore
     );
 
-    console.log(`✅ Filtered chunks: ${filteredChunks.length} (threshold: ${minSimilarityScore})`);
+    console.log(
+      `✅ Filtered chunks: ${filteredChunks.length} (threshold: ${minSimilarityScore})`
+    );
 
     if (filteredChunks.length === 0) {
-      console.log(`❌ No chunks meet minimum similarity threshold of ${minSimilarityScore}`);
-      console.log(`⚠️ Best score found: ${similarChunks.matches[0]?.score || 0}`);
+      console.log(
+        `❌ No chunks meet minimum similarity threshold of ${minSimilarityScore}`
+      );
+      console.log(
+        `⚠️ Best score found: ${similarChunks.matches[0]?.score || 0}`
+      );
       return [];
     }
 
@@ -431,7 +567,9 @@ async function retrieveRelevantDocuments(
         metadata.id ||
         chunk.id?.split("_chunk_")[0];
 
-      console.log(`📝 Chunk ${chunk.id}: docId = ${originalDocId}, score = ${chunk.score}`);
+      console.log(
+        `📝 Chunk ${chunk.id}: docId = ${originalDocId}, score = ${chunk.score}`
+      );
 
       if (originalDocId) {
         if (!documentChunks[originalDocId]) {
@@ -446,7 +584,9 @@ async function retrieveRelevantDocuments(
       }
     }
 
-    console.log(`📄 Grouped chunks into ${Object.keys(documentChunks).length} documents`);
+    console.log(
+      `📄 Grouped chunks into ${Object.keys(documentChunks).length} documents`
+    );
 
     const results: Array<{
       ibID: string;
@@ -469,7 +609,9 @@ async function retrieveRelevantDocuments(
       const contextualContent = getContextualContent(chunks, bestChunk);
 
       if (!contextualContent || contextualContent.trim().length === 0) {
-        console.log(`⚠️ Empty contextual content for document ${docId}, skipping`);
+        console.log(
+          `⚠️ Empty contextual content for document ${docId}, skipping`
+        );
         continue;
       }
 
@@ -498,7 +640,10 @@ async function retrieveRelevantDocuments(
         similarity_score: bestScore,
         chunk_info: {
           total_chunks_found: chunks.length,
-          best_chunk_index: bestChunk.metadata?.chunkIndex || bestChunk.metadata?.chunk_index || 0,
+          best_chunk_index:
+            bestChunk.metadata?.chunkIndex ||
+            bestChunk.metadata?.chunk_index ||
+            0,
           is_chunked_document: chunks.length > 1,
         },
       };
@@ -524,10 +669,7 @@ async function retrieveRelevantDocuments(
 async function getDocumentMetadata(docId: string): Promise<any> {
   try {
     const safeDocId = docId.replace(/[/\\]/g, "-");
-    const doc = await db
-      .collection("information_bank")
-      .doc(safeDocId)
-      .get();
+    const doc = await db.collection("information_bank").doc(safeDocId).get();
 
     if (doc.exists) {
       return doc.data();
@@ -567,6 +709,7 @@ export const generateAnswer = onRequest(
         conversationHistory = [],
         topK = 5,
         minSimilarityScore = 0.3,
+        stream = true, // New parameter for streaming
       } = req.body;
 
       if (!query || typeof query !== "string" || query.trim().length === 0) {
@@ -577,12 +720,14 @@ export const generateAnswer = onRequest(
         return;
       }
 
-      console.log(`🤖 Generating answer for: "${query}"`);
+      console.log(
+        `🤖 Generating answer for: "${query}" (streaming: ${stream})`
+      );
 
       const pineconeKey = PINECONE_API_KEY.value();
       const cohereKey = COHERE_API_KEY.value();
 
-      const pineconeClient = new Pinecone({apiKey: pineconeKey});
+      const pineconeClient = new Pinecone({ apiKey: pineconeKey });
       const pineconeIndex = pineconeClient.Index("oasp-assist");
 
       const contextHistory = buildConversationContext(conversationHistory);
@@ -593,27 +738,65 @@ export const generateAnswer = onRequest(
         "search_query"
       );
 
-      console.log(`✅ Generated embedding with ${queryEmbedding.length} dimensions`);
+      console.log(
+        `✅ Generated embedding with ${queryEmbedding.length} dimensions`
+      );
 
-      const faqMatch = await findMatchingFAQ(query, queryEmbedding, cohereKey, 0.90);
+      // Check FAQ first
+      const faqMatch = await findMatchingFAQ(
+        query,
+        queryEmbedding,
+        cohereKey,
+        0.9
+      );
 
       if (faqMatch) {
         console.log("✅ Using FAQ answer");
-        res.json({
-          answer: faqMatch.answer,
-          source: "faq",
-          similarity: faqMatch.similarity,
-        });
+
+        if (stream) {
+          // For FAQ, simulate streaming by sending the answer in chunks
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+
+          const answer = faqMatch.answer;
+          const chunkSize = 10; // characters per chunk
+
+          for (let i = 0; i < answer.length; i += chunkSize) {
+            const chunk = answer.substring(
+              i,
+              Math.min(i + chunkSize, answer.length)
+            );
+            res.write(
+              `data: ${JSON.stringify({
+                type: "content-delta",
+                delta: { message: { content: { text: chunk } } },
+              })}\n\n`
+            );
+
+            // Small delay to simulate streaming
+            await new Promise((resolve) => setTimeout(resolve, 30));
+          }
+
+          res.write(`data: ${JSON.stringify({ type: "message-end" })}\n\n`);
+          res.write("data: [DONE]\n\n");
+          res.end();
+        } else {
+          res.json({
+            answer: faqMatch.answer,
+            source: "faq",
+            similarity: faqMatch.similarity,
+          });
+        }
         return;
       }
 
+      // Retrieve documents
       const contextualQuery = await enhanceQueryWithContext(
         query,
         contextHistory,
         cohereKey
       );
-
-      console.log(`🔍 Contextual query: "${contextualQuery}"`);
 
       const results = await retrieveRelevantDocuments(
         contextualQuery,
@@ -625,61 +808,164 @@ export const generateAnswer = onRequest(
 
       if (results.length === 0) {
         console.log("❌ No relevant documents found");
-        res.json({
-          answer:
-            "Sorry, I couldn't find relevant information about that topic. Please contact OASP staff for assistance.",
-          source: "no_documents",
-          debug: {
-            message: "Pinecone query returned no results",
-            embeddingDimensions: queryEmbedding.length,
-            minSimilarityScore: minSimilarityScore,
-          },
-        });
+        const errorMsg =
+          "Sorry, I couldn't find relevant information about that topic. Please contact OASP staff for assistance.";
+
+        if (stream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.write(
+            `data: ${JSON.stringify({
+              type: "content-delta",
+              delta: { message: { content: { text: errorMsg } } },
+            })}\n\n`
+          );
+          res.write(`data: ${JSON.stringify({ type: "message-end" })}\n\n`);
+          res.write("data: [DONE]\n\n");
+          res.end();
+        } else {
+          res.json({
+            answer: errorMsg,
+            source: "no_documents",
+          });
+        }
         return;
       }
 
       console.log(`📚 Using ${results.length} documents for context`);
 
       const documentContext = buildDocumentContext(results);
-
       const prompt = buildContextAwarePrompt(
         query,
         documentContext,
         contextHistory
       );
 
-      const answer = await generateCohereResponse(prompt, cohereKey);
+      // Generate response (streaming or non-streaming)
+      if (stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
 
-      if (!answer || answer.trim().length === 0) {
-        console.log("❌ Cohere returned empty response");
+        console.log("🌊 Starting streaming response...");
+
+        let hasContent = false;
+        let fullResponse = "";
+
+        try {
+          for await (const chunk of generateCohereResponseStream(
+            prompt,
+            cohereKey
+          )) {
+            if (chunk && chunk.length > 0) {
+              hasContent = true;
+              fullResponse += chunk;
+
+              res.write(
+                `data: ${JSON.stringify({
+                  type: "content-delta",
+                  delta: { message: { content: { text: chunk } } },
+                })}\n\n`
+              );
+            }
+          }
+
+          // If no content was streamed, provide fallback
+          if (!hasContent) {
+            console.log("⚠️ No content streamed, sending fallback message");
+            const fallbackMsg =
+              "I'm having trouble processing your question right now. Please try again or contact OASP staff for assistance.";
+            res.write(
+              `data: ${JSON.stringify({
+                type: "content-delta",
+                delta: { message: { content: { text: fallbackMsg } } },
+              })}\n\n`
+            );
+          }
+
+          // Send metadata and end signal
+          res.write(
+            `data: ${JSON.stringify({
+              type: "message-end",
+              metadata: {
+                documentsUsed: results.length,
+                documentTitles: results.map((r) => r.ib_title),
+                responseLength: fullResponse.length,
+              },
+            })}\n\n`
+          );
+          res.write("data: [DONE]\n\n");
+          res.end();
+
+          console.log(`✅ Streaming complete (${fullResponse.length} chars)`);
+        } catch (streamError) {
+          console.error("❌ Streaming error:", streamError);
+
+          // Send error message to client
+          const errorMsg =
+            "An error occurred while generating the response. Please try again.";
+          res.write(
+            `data: ${JSON.stringify({
+              type: "content-delta",
+              delta: { message: { content: { text: errorMsg } } },
+            })}\n\n`
+          );
+          res.write(
+            `data: ${JSON.stringify({
+              type: "error",
+              error:
+                streamError instanceof Error
+                  ? streamError.message
+                  : "Unknown error",
+            })}\n\n`
+          );
+          res.write("data: [DONE]\n\n");
+          res.end();
+        }
+      } else {
+        // Non-streaming response
+        const answer = await generateCohereResponse(prompt, cohereKey);
+
+        if (!answer || answer.trim().length === 0) {
+          console.log("❌ Cohere returned empty response");
+          res.json({
+            answer:
+              "I'm having trouble processing your question right now. Please try again or contact OASP staff for assistance.",
+            source: "empty_response",
+          });
+          return;
+        }
+
+        console.log("✅ Generated contextual answer");
         res.json({
-          answer:
-            "I'm having trouble processing your question right now. Please try again or contact OASP staff for assistance.",
-          source: "empty_response",
+          answer: answer.trim(),
+          source: "knowledge_base",
+          documentsUsed: results.length,
+          documentTitles: results.map((r) => r.ib_title),
         });
-        return;
       }
-
-      console.log("✅ Generated contextual answer");
-      res.json({
-        answer: answer.trim(),
-        source: "knowledge_base",
-        documentsUsed: results.length,
-        documentTitles: results.map((r) => r.ib_title),
-      });
     } catch (error) {
       console.error("❌ Error in generateAnswer:", error);
 
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      console.error("Detailed error:", errorMessage);
 
-      res.status(500).json({
-        answer:
-          "I encountered an error while processing your question. Please try again or contact OASP staff for assistance.",
-        source: "error",
-        error: errorMessage,
-      });
+      if (req.body.stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.write(
+          `data: ${JSON.stringify({
+            error: errorMessage,
+          })}\n\n`
+        );
+        res.end();
+      } else {
+        res.status(500).json({
+          answer:
+            "I encountered an error while processing your question. Please try again or contact OASP staff for assistance.",
+          source: "error",
+          error: errorMessage,
+        });
+      }
     }
   }
 );

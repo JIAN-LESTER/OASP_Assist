@@ -1,3 +1,5 @@
+import 'package:capstone_project/pages/data/charts.dart';
+import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
@@ -26,10 +28,41 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
   int currentPage = 1;
   int itemsPerPage = 10;
 
+  bool isLoading = true;
+  final StatDataManagement statData = StatDataManagement();
+  ProgramData? program;
+
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    loadStatData();
+  }
+
+  Future<void> loadStatData() async {
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Call the getInformationBankData() method
+      final data = await statData.getProgramData();
+
+      if (!mounted) return;
+
+      setState(() {
+        program = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading information bank data: $e");
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   @override
@@ -60,6 +93,9 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return ResponsiveLayout(
       mobileBody: MobileProgramManagement(
         searchController: _searchController,
@@ -67,6 +103,7 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        program: program,
       ),
       tabletBody: TabletProgramManagement(
         searchController: _searchController,
@@ -74,6 +111,7 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        program: program,
       ),
       desktopBody: DesktopProgramManagement(
         searchController: _searchController,
@@ -81,6 +119,7 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        program: program,
       ),
     );
   }
@@ -93,6 +132,7 @@ class DesktopProgramManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final ProgramData? program;
 
   const DesktopProgramManagement({
     super.key,
@@ -101,6 +141,7 @@ class DesktopProgramManagement extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.program,
   });
 
   @override
@@ -113,6 +154,7 @@ class DesktopProgramManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       24.0,
+      program,
     );
   }
 }
@@ -124,6 +166,7 @@ class TabletProgramManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final ProgramData? program;
 
   const TabletProgramManagement({
     super.key,
@@ -132,6 +175,7 @@ class TabletProgramManagement extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.program,
   });
 
   @override
@@ -144,6 +188,7 @@ class TabletProgramManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       20.0,
+      program,
     );
   }
 }
@@ -155,6 +200,7 @@ class MobileProgramManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final ProgramData? program;
 
   const MobileProgramManagement({
     super.key,
@@ -163,6 +209,7 @@ class MobileProgramManagement extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.program,
   });
 
   @override
@@ -175,6 +222,7 @@ class MobileProgramManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       16.0,
+      program,
     );
   }
 }
@@ -187,66 +235,75 @@ Widget mainContent(
   final ValueChanged<int> onPageChanged,
   final ValueChanged<int> onItemsPerPageChanged,
   final double padding,
+  final ProgramData? program,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
-    body: SingleChildScrollView(
+    body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(searchController, context),
+          _buildHeader(searchController, context, program),
           const SizedBox(height: 16),
-          Container(
-            height: MediaQuery.of(context).size.height - 200,
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                _buildTableHeader(),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('programs')
-                        .orderBy('name')
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      }
-
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return buildEmptyState(false, false, "programs");
-                      }
-
-                      return _buildProgramList(
-                        allPrograms: snapshot.data!.docs,
-                        searchQuery: searchController.text,
-                        currentPage: currentPage,
-                        itemsPerPage: itemsPerPage,
-                        onPageChanged: onPageChanged,
-                        onItemsPerPageChanged: onItemsPerPageChanged,
-                      );
-                    },
+          Expanded(
+            child: Container(
+              height: MediaQuery.of(context).size.height - 200,
+              padding: EdgeInsets.all(padding),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Column(
+                children: [
+                  _buildTableHeader(),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream:
+                          FirebaseFirestore.instance
+                              .collection('programs')
+                              .orderBy('name')
+                              .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Text('Error: ${snapshot.error}'),
+                          );
+                        }
+
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return buildEmptyState(false, false, "programs");
+                        }
+
+                        return _buildProgramList(
+                          allPrograms: snapshot.data!.docs,
+                          searchQuery: searchController.text,
+                          currentPage: currentPage,
+                          itemsPerPage: itemsPerPage,
+                          onPageChanged: onPageChanged,
+                          onItemsPerPageChanged: onItemsPerPageChanged,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -264,15 +321,17 @@ Widget _buildProgramList({
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
   // Filtering
-  final filtered = allPrograms.where((doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final name = (data['name'] ?? '').toString().toLowerCase();
+  final filtered =
+      allPrograms.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final name = (data['name'] ?? '').toString().toLowerCase();
 
-    // Search filter
-    bool matchesSearch = searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
+        // Search filter
+        bool matchesSearch =
+            searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
 
-    return matchesSearch;
-  }).toList();
+        return matchesSearch;
+      }).toList();
 
   // Calculate pagination
   final totalItems = filtered.length;
@@ -291,25 +350,27 @@ Widget _buildProgramList({
     children: [
       // Program List
       Expanded(
-        child: currentPagePrograms.isEmpty
-            ? const Center(
-                child: Text('No programs match your search criteria.'),
-              )
-            : ListView.separated(
-                itemCount: currentPagePrograms.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final doc = currentPagePrograms[index];
-                  final data = doc.data() as Map<String, dynamic>;
+        child:
+            currentPagePrograms.isEmpty
+                ? const Center(
+                  child: Text('No programs match your search criteria.'),
+                )
+                : ListView.separated(
+                  itemCount: currentPagePrograms.length,
+                  separatorBuilder:
+                      (context, index) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final doc = currentPagePrograms[index];
+                    final data = doc.data() as Map<String, dynamic>;
 
-                  return _buildProgramRow(
-                    context: context,
-                    doc: doc,
-                    name: data['name'] ?? 'N/A',
-                    description: data['description'] ?? '-',
-                  );
-                },
-              ),
+                    return _buildProgramRow(
+                      context: context,
+                      doc: doc,
+                      name: data['name'] ?? 'N/A',
+                      description: data['description'] ?? '-',
+                    );
+                  },
+                ),
       ),
       // Pagination
       if (totalItems > 0)
@@ -390,37 +451,37 @@ Widget _buildProgramRow({
             if (value == 'edit') {
               showDialog(
                 context: context,
-                builder: (context) => AddEditProgramDialog(
-                  program: doc,
-                  onSaved: () {},
-                ),
+                builder:
+                    (context) =>
+                        AddEditProgramDialog(program: doc, onSaved: () {}),
               );
             } else if (value == 'delete') {
               _showDeleteConfirmation(context, doc);
             }
           },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit, size: 18),
-                  SizedBox(width: 8),
-                  Text('Edit'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, size: 18, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: Colors.red)),
-                ],
-              ),
-            ),
-          ],
+          itemBuilder:
+              (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
         ),
       ],
     ),
@@ -432,99 +493,106 @@ void _showDeleteConfirmation(BuildContext context, DocumentSnapshot program) {
 
   showDialog(
     context: context,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      title: Row(
-        children: [
-          Icon(Icons.warning, color: const Color(0xFFDC2626), size: 24),
-          const SizedBox(width: 12),
-          const Text(
-            'Delete Program',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+    builder:
+        (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-        ],
-      ),
-      content: Text(
-        'Are you sure you want to delete "${data['name']}"?\n\nThis action cannot be undone.',
-        style: const TextStyle(fontSize: 14, height: 1.5),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          style: TextButton.styleFrom(
-            foregroundColor: const Color(0xFF6B7280),
+          title: Row(
+            children: [
+              Icon(Icons.warning, color: const Color(0xFFDC2626), size: 24),
+              const SizedBox(width: 12),
+              const Text(
+                'Delete Program',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+            ],
           ),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            try {
-              Navigator.of(context).pop(); // Close confirmation dialog
-
-              await FirebaseFirestore.instance
-                  .collection('programs')
-                  .doc(program.id)
-                  .delete();
-
-              // Log the action
-              final currentUser = FirebaseAuth.instance.currentUser;
-              String actorName = 'Unknown';
-
-              if (currentUser != null) {
-                final userDoc = await FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(currentUser.uid)
-                    .get();
-
-                if (userDoc.exists) {
-                  final userData = userDoc.data() as Map<String, dynamic>;
-                  actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
-                }
-              }
-
-              final logRef = FirebaseFirestore.instance.collection('logs').doc();
-              await logRef.set({
-                'logId': logRef.id,
-                'user': actorName,
-                'action': 'Deleted program: ${data['name']}',
-                'time': Timestamp.now(),
-              });
-
-              // Show success message
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Program deleted successfully')),
-                );
-              }
-            } catch (e) {
-              // Show error message
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to delete program: $e')),
-                );
-              }
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFDC2626),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+          content: Text(
+            'Are you sure you want to delete "${data['name']}"?\n\nThis action cannot be undone.',
+            style: const TextStyle(fontSize: 14, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF6B7280),
+              ),
+              child: const Text('Cancel'),
             ),
-          ),
-          child: const Text('Delete'),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  Navigator.of(context).pop(); // Close confirmation dialog
+
+                  await FirebaseFirestore.instance
+                      .collection('programs')
+                      .doc(program.id)
+                      .delete();
+
+                  // Log the action
+                  final currentUser = FirebaseAuth.instance.currentUser;
+                  String actorName = 'Unknown';
+
+                  if (currentUser != null) {
+                    final userDoc =
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(currentUser.uid)
+                            .get();
+
+                    if (userDoc.exists) {
+                      final userData = userDoc.data() as Map<String, dynamic>;
+                      actorName =
+                          userData['name'] ?? currentUser.email ?? 'Unknown';
+                    }
+                  }
+
+                  final logRef =
+                      FirebaseFirestore.instance.collection('logs').doc();
+                  await logRef.set({
+                    'logId': logRef.id,
+                    'user': actorName,
+                    'action': 'Deleted program: ${data['name']}',
+                    'time': Timestamp.now(),
+                  });
+
+                  // Show success message
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Program deleted successfully'),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  // Show error message
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to delete program: $e')),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
         ),
-      ],
-    ),
   );
 }
 
 Widget _buildHeader(
   TextEditingController searchController,
   BuildContext context,
+  ProgramData? program,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -564,9 +632,7 @@ Widget _buildHeader(
                 onPressed: () {
                   showDialog(
                     context: context,
-                    builder: (context) => AddEditProgramDialog(
-                      onSaved: () {},
-                    ),
+                    builder: (context) => AddEditProgramDialog(onSaved: () {}),
                   );
                 },
                 icon: const Icon(Icons.add, size: 18),
@@ -586,7 +652,50 @@ Widget _buildHeader(
               ),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child:
+                isMobile
+                    ? Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        buildStatCard(
+                          'Total Programs',
+                          '${program?.totalProgram}',
+                          Colors.blue,
+                          Icons.message,
+                        ),
+                        buildStatCard(
+                          'Programs with Most Students Registered',
+                          '${program?.dominantProgram}',
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                      ],
+                    )
+                    : Row(
+                      children: [
+                        Expanded(
+                          child: buildStatCard(
+                            'Total Programs',
+                            '${program?.totalProgram}',
+                            Colors.blue,
+                            Icons.message,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'Programs with Most Students Registered',
+                            '${program?.dominantProgram}',
+                            Colors.green,
+                            Icons.check_circle,
+                          ),
+                        ),
+                      ],
+                    ),
+          ),
 
           // Search Row
           buildSearchField('Search programs by name', searchController),
@@ -645,7 +754,7 @@ class AddEditProgramDialog extends StatelessWidget {
   final VoidCallback onSaved;
 
   const AddEditProgramDialog({Key? key, this.program, required this.onSaved})
-      : super(key: key);
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -795,7 +904,9 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
             .update(programData);
       } else {
         programData['createdAt'] = Timestamp.now();
-        await FirebaseFirestore.instance.collection('programs').add(programData);
+        await FirebaseFirestore.instance
+            .collection('programs')
+            .add(programData);
       }
 
       // Log the action
@@ -803,10 +914,11 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
       String actorName = 'Unknown';
 
       if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
 
         if (userDoc.exists) {
           final userData = userDoc.data() as Map<String, dynamic>;
@@ -828,8 +940,9 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text('Program ${isEditing ? 'updated' : 'created'} successfully!'),
+            content: Text(
+              'Program ${isEditing ? 'updated' : 'created'} successfully!',
+            ),
           ),
         );
         Navigator.of(context).pop();
@@ -838,8 +951,9 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text('Failed to ${isEditing ? 'update' : 'create'} program: $e'),
+            content: Text(
+              'Failed to ${isEditing ? 'update' : 'create'} program: $e',
+            ),
           ),
         );
       }
@@ -949,7 +1063,8 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
                       controller: _nameController,
                       decoration: InputDecoration(
                         labelText: 'Program Name',
-                        hintText: 'e.g., Bachelor of Science in Information Technology',
+                        hintText:
+                            'e.g., Bachelor of Science in Information Technology',
                         prefixIcon: const Icon(Icons.school_outlined),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -987,10 +1102,15 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
                         Expanded(
                           child: OutlinedButton(
                             onPressed:
-                                _isSubmitting ? null : () => Navigator.of(context).pop(),
+                                _isSubmitting
+                                    ? null
+                                    : () => Navigator.of(context).pop(),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF6B7280),
-                              side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+                              side: const BorderSide(
+                                color: Color(0xFFD1D5DB),
+                                width: 1.5,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -1019,37 +1139,42 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
-                            child: _isSubmitting
-                                ? const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                            Colors.white,
+                            child:
+                                _isSubmitting
+                                    ? const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Colors.white,
+                                                ),
                                           ),
                                         ),
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Saving...',
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Saving...',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
+                                      ],
+                                    )
+                                    : Text(
+                                      isEditing
+                                          ? 'Update Program'
+                                          : 'Create Program',
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
                                       ),
-                                    ],
-                                  )
-                                : Text(
-                                    isEditing ? 'Update Program' : 'Create Program',
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
                                     ),
-                                  ),
                           ),
                         ),
                       ],

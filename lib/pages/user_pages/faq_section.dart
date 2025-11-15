@@ -263,29 +263,7 @@ class FAQSectionState extends State<FAQSection>
     }
   }
 
-  /// Builds loading state
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
-            strokeWidth: 3,
-          ),
-          SizedBox(height: 20),
-          Text(
-            'Loading FAQs...',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   /// Builds desktop category card (always expanded with scrollable list)
   Widget _buildDesktopCategoryCard(String category) {
@@ -869,9 +847,7 @@ class FAQSectionState extends State<FAQSection>
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoadingFAQs) {
-      return _buildLoadingState();
-    }
+   
 
     if (_isDesktop(context)) {
       return _buildDesktopView();

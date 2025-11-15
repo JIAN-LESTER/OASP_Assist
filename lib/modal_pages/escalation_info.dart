@@ -1,7 +1,10 @@
+// Fixed escalation_info.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:capstone_project/models/notification.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class EscalationDetailModal extends StatefulWidget {
   final String escalationId;
@@ -51,7 +54,6 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
         return Colors.orange;
       case 'resolved':
         return Colors.green;
-     
       default:
         return Colors.grey;
     }
@@ -63,7 +65,6 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
         return Icons.pending_actions;
       case 'resolved':
         return Icons.check_circle;
-      
       default:
         return Icons.help_outline;
     }
@@ -81,58 +82,95 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
       return;
     }
 
-     final data = widget.escalationData;
+    final data = widget.escalationData;
     final question = data['question']?.toString() ?? 'unknown';
+    final userId = data['userId'] as String?;
+    final conversationId = data['conversationId'] as String?;
 
     setState(() => _isSending = true);
 
     try {
+      // ✅ Get current staff info
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final staffDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser?.uid)
+          .get();
+      
+      final staffName = staffDoc.data()?['name'] ?? 'Staff';
+
+      // ✅ Update escalation status
       await FirebaseFirestore.instance
           .collection('escalations')
           .doc(widget.escalationId)
           .update({
         'staffResponse': _replyController.text.trim(),
         'status': 'resolved',
-        'handledBy': 'Staff Name Here', // Replace with actual staff name/ID
-        'resolvedAt': Timestamp.now(),
+        'respondedBy': staffName,
+        'respondedAt': Timestamp.now(),
       });
 
-      final userNotification = Notifications(
-      notificationId: FirebaseFirestore.instance.collection('notifications').doc().id,
-      userId: null, // staff notifications don't have a specific user
-      title: 'Inquiry Escalation Handled',
-      body: 'A staff has replied to your escalated message ($question):' 
-            ' "${_replyController.text.trim()}"',
-      type: 'escalation',
-      relatedId: widget.escalationId,
-      targetRole: 'user',
-      read: false,
-      createdAt: Timestamp.now(),
-    );
+      print('✅ Escalation updated successfully');
 
-    await FirebaseFirestore.instance.collection('notifications').add(userNotification.toMap());
-    print('Notification created for staff');
+      // ✅ Create notification for the user
+      if (userId != null && userId.isNotEmpty) {
+        final notificationRef = FirebaseFirestore.instance.collection('notifications').doc();
+        
+        final userNotification = Notifications(
+          notificationId: notificationRef.id,
+          userId: userId,
+          title: 'Staff Response Received',
+          body: 'A staff member has responded to your escalated question: "$question"',
+          type: 'escalation_response',
+          relatedId: widget.escalationId,
+          targetRole: 'user',
+          read: false,
+          createdAt: Timestamp.now(),
+          data: {
+            'escalationId': widget.escalationId,
+            'conversationId': conversationId,
+            'staffResponse': _replyController.text.trim(),
+            'respondedBy': staffName,
+          },
+        );
 
-      _showSnackBar('Response sent successfully!', Colors.green);
-      
-      // Add haptic feedback
-      HapticFeedback.lightImpact();
-      
-      await Future.delayed(const Duration(milliseconds: 1500));
+        await notificationRef.set(userNotification.toMap());
+        print('✅ User notification created');
+      }
+
+      // ✅ Show success message
+      if (mounted) {
+        _showSnackBar('Response sent successfully!', Colors.green);
+        HapticFeedback.lightImpact();
+      }
+
+      // ✅ Wait briefly, then close modal
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      if (mounted) {
+        // Close with animation
+        await _animationController.reverse();
+        if (mounted) {
+          Navigator.of(context).pop(true); // Return true to indicate success
+        }
+      }
+    } catch (e, stackTrace) {
+      print('❌ Error sending response: $e');
+      print('Stack trace: $stackTrace');
       
       if (mounted) {
-        _animationController.reverse().then((_) {
-          Navigator.pop(context);
-        });
+        _showSnackBar('Failed to send response: ${e.toString()}', Colors.red);
       }
-    } catch (e) {
-      _showSnackBar('Failed to send response. Please try again.', Colors.red);
     } finally {
-      if (mounted) setState(() => _isSending = false);
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
     }
   }
 
   void _showSnackBar(String message, Color color) {
+    if (!mounted) return;
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -140,6 +178,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -359,6 +398,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                           child: TextField(
                             controller: _replyController,
                             maxLines: 5,
+                            enabled: !_isSending,
                             decoration: InputDecoration(
                               hintText: "Type your response to help resolve this escalation...",
                               hintStyle: TextStyle(color: Colors.grey.shade600),
@@ -388,10 +428,11 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: _isSending ? null : () {
-                        _animationController.reverse().then((_) {
+                      onPressed: _isSending ? null : () async {
+                        await _animationController.reverse();
+                        if (mounted) {
                           Navigator.pop(context);
-                        });
+                        }
                       },
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),

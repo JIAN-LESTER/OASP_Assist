@@ -1,7 +1,9 @@
+import 'package:capstone_project/pages/data/charts.dart';
+import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:capstone_project/colors.dart';
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/pages/admin_pages/buttons/add_faq_button.dart';
 import 'package:capstone_project/modal_pages/faq_edit.dart'
@@ -23,6 +25,11 @@ class FaqManagementPage extends StatefulWidget {
 class _FaqManagementPageState extends State<FaqManagementPage> {
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
+  bool isLoading = true;
+
+  final StatDataManagement statData = StatDataManagement();
+
+  FAQsData? faqData;
 
   void _onCategoryChanged(String newCategory) {
     setState(() {
@@ -38,6 +45,33 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    loadStatData();
+  }
+
+  Future<void> loadStatData() async {
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Call the getInformationBankData() method
+      final data = await statData.getFAQsData();
+
+      if (!mounted) return;
+
+      setState(() {
+        faqData = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading information bank data: $e");
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   @override
@@ -68,6 +102,9 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+     if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return ResponsiveLayout(
       mobileBody: MobileFaqManagement(
         selectedCategory: selectedCategory,
@@ -77,6 +114,7 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        faq: faqData,
       ),
       tabletBody: TabletFaqManagement(
         selectedCategory: selectedCategory,
@@ -86,6 +124,7 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+         faq: faqData,
       ),
       desktopBody: DesktopFaqManagement(
         selectedCategory: selectedCategory,
@@ -95,6 +134,7 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+         faq: faqData,
       ),
     );
   }
@@ -110,6 +150,7 @@ class DesktopFaqManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+    final FAQsData? faq;
 
   const DesktopFaqManagement({
     super.key,
@@ -120,6 +161,7 @@ class DesktopFaqManagement extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.faq,
   });
 
   @override
@@ -134,6 +176,7 @@ class DesktopFaqManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       24.0,
+      faq,
     );
   }
 }
@@ -148,6 +191,8 @@ class TabletFaqManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+      final FAQsData? faq;
+  
 
   const TabletFaqManagement({
     super.key,
@@ -158,6 +203,7 @@ class TabletFaqManagement extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.faq,
   });
 
   @override
@@ -172,6 +218,7 @@ class TabletFaqManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       20.0,
+      faq,
     );
   }
 }
@@ -181,6 +228,7 @@ class MobileFaqManagement extends StatelessWidget {
   final String selectedCategory;
   final ValueChanged<String> onCategoryChanged;
   final TextEditingController searchController;
+      final FAQsData? faq;
 
   final int currentPage;
   final int itemsPerPage;
@@ -196,6 +244,7 @@ class MobileFaqManagement extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.faq,
   });
   @override
   Widget build(BuildContext context) {
@@ -209,6 +258,7 @@ class MobileFaqManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       16.0,
+      faq,
     );
   }
 }
@@ -223,6 +273,7 @@ Widget mainContent(
   final ValueChanged<int> onPageChanged,
   final ValueChanged<int> onItemsPerPageChanged,
   final double padding,
+  final FAQsData? faq,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -231,7 +282,7 @@ Widget mainContent(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(selectedCategory, onCategoryChanged, searchController),
+          _buildHeader(selectedCategory, onCategoryChanged, searchController, faq),
           const SizedBox(height: 16),
 
           // Main container
@@ -258,16 +309,22 @@ Widget mainContent(
                   // FAQ list area
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('faqs')
-                          .snapshots(),
+                      stream:
+                          FirebaseFirestore.instance
+                              .collection('faqs')
+                              .snapshots(),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
                         }
 
                         if (snapshot.hasError) {
-                          return Center(child: Text('Error: ${snapshot.error}'));
+                          return Center(
+                            child: Text('Error: ${snapshot.error}'),
+                          );
                         }
 
                         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -296,11 +353,11 @@ Widget mainContent(
   );
 }
 
-
 Widget _buildHeader(
   String selectedCategory,
   ValueChanged<String> onCategoryChanged,
   TextEditingController searchController,
+  FAQsData? faq,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -339,7 +396,82 @@ Widget _buildHeader(
               AddFaqButton(),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
+
+          // 🔹 Stat Cards Section
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child:
+                isMobile
+                    ? Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        buildStatCard(
+                          'Total FAQs',
+                          '${faq?.totalFAQs}',
+                          Colors.blue,
+                          Icons.message,
+                        ),
+                        buildStatCard(
+                          'Most Frequent Category',
+                          faq?.mostFrequentCategory ?? "Unknown",
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                        buildStatCard(
+                          'Most Asked Question',
+                          faq?.mostAskedQuestion ?? 'Unknown',
+                          Colors.red,
+                          Icons.group,
+                        ),
+                        buildStatCard(
+                          'Latest FAQ',
+                          faq?.latestFAQ ?? "Unkown",
+                          Colors.orange,
+                          Icons.help_outline,
+                        ),
+                      ],
+                    )
+                    : Row(
+                      children: [
+                        Expanded(
+                          child:  buildStatCard(
+                          'Total FAQs',
+                          '${faq?.totalFAQs}',
+                          Colors.blue,
+                          Icons.message,
+                        ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child:  buildStatCard(
+                          'Most Frequent Category',
+                          faq?.mostFrequentCategory ?? "Unknown",
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                          'Most Asked Question',
+                          faq?.mostAskedQuestion ?? 'Unknown',
+                          Colors.red,
+                          Icons.group,
+                        ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child:  buildStatCard(
+                          'Latest FAQ',
+                          faq?.latestFAQ ?? "Unknown",
+                          Colors.orange,
+                          Icons.help_outline,
+                        ),
+                        ),
+                      ],
+                    ),
+          ),
 
           // Search and Filter Row
           isMobile
@@ -470,7 +602,6 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            
           ],
         ),
       );
@@ -522,7 +653,6 @@ Widget _buildFAQList({
 
   return Column(
     children: [
-
       Expanded(
         child:
             currentPageFAQs.isEmpty
@@ -536,7 +666,6 @@ Widget _buildFAQList({
                   itemBuilder: (context, index) {
                     final doc = currentPageFAQs[index];
                     final data = doc.data() as Map<String, dynamic>;
-                   
 
                     return _buildIBRow(
                       context: context,
@@ -544,7 +673,6 @@ Widget _buildFAQList({
                       question: data['question'] ?? 'N/A',
                       answer: data['answer'] ?? 'N/A',
                       category: data['category'] ?? 'General',
-                     
                     );
                   },
                 ),
@@ -570,7 +698,6 @@ Widget _buildIBRow({
   required String question,
   required String answer,
   required String category,
-
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
   bool isMobile = screenWidth < 600;
@@ -598,7 +725,7 @@ Widget _buildIBRow({
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
               softWrap: true,
               maxLines: 2,
-               textAlign: TextAlign.justify,
+              textAlign: TextAlign.justify,
             ),
           ),
           const SizedBox(width: 12),
@@ -611,8 +738,8 @@ Widget _buildIBRow({
               style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
               softWrap: true,
               maxLines: 2,
-               textAlign: TextAlign.justify,
-               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.justify,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 12),
@@ -640,8 +767,6 @@ Widget _buildIBRow({
             ),
           ),
           const SizedBox(width: 12),
-
-         
 
           const SizedBox(width: 12),
 

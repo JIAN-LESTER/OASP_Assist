@@ -8,7 +8,7 @@ class CohereService {
   // 🔐 Use environment variable in production
   final String apiKey ="IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
   final embedUrl = Uri.parse('https://api.cohere.ai/v1/embed');
-  final chatUrl = Uri.parse('https://api.cohere.ai/v1/chat'); // Updated to Chat API
+  final chatUrl = Uri.parse('https://api.cohere.ai/v1/chat'); 
 
   Future<List<double>> embedText(
     String text, {
@@ -296,8 +296,7 @@ Map<String, dynamic> _fallbackStepExtraction(String text) {
   List<String> links = <String>[];
   String academicYear = '';
 
-  // Extract steps...
-  // (keep your existing stepPatterns extraction code here)
+
 
   // Extract contacts
   final emailRegex = RegExp(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b');
@@ -553,70 +552,7 @@ Respond in valid JSON format only:
     }
   }
 
-  Future<Map<String, dynamic>> analyzeAnnouncement(String message) async {
-    try {
-      final prompt = '''
-Analyze this announcement and categorize it. Also extract any deadlines mentioned.
-
-Announcement: "$message"
-
-Categories:
-- Admission: enrollment, registration, application, requirements, class schedule, semester, subjects, programs, exams, clearance
-- Scholarship: scholarship, stipend, allowance, grantee, renewal, eligibility, screening, shortlisted, beneficiary, grant
-- Placement: placement, hiring, job, employment, employer, resume, cv, interview, company, opportunity, deployment
-- General: everything else
-
-Respond in JSON format:
-{
-  "category": "category_name",
-  "deadline": "extracted_date_or_null"
-}
-
-For deadlines, extract specific dates and times. Format them clearly. If no deadline found, use null.
-''';
-
-      final response = await http.post(
-        chatUrl,
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'model': 'command-r-08-2024',
-          'message': prompt,
-          'max_tokens': 200,
-          'temperature': 0.3,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final generatedText = data['text']?.toString().trim() ?? '';
-
-        try {
-          String cleanedResponse = _extractJsonFromResponse(generatedText);
-          final result = jsonDecode(cleanedResponse);
-          
-          String category = result['category']?.toString() ?? 'General';
-          String? deadline = result['deadline']?.toString();
-
-          category = _cleanCategory(category);
-          if (deadline != null && (deadline.toLowerCase() == 'null' || deadline.trim().isEmpty)) {
-            deadline = null;
-          }
-
-          return {'category': category, 'deadline': deadline};
-        } catch (e) {
-          return _fallbackAnalysis(message);
-        }
-      } else {
-        throw Exception('Cohere API error: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error analyzing announcement with Cohere: $e');
-      return _fallbackAnalysis(message);
-    }
-  }
+  
 
   String _cleanCategory(String category) {
     final cleanedCategory = category.toLowerCase().trim();
@@ -700,33 +636,5 @@ For deadlines, extract specific dates and times. Format them clearly. If no dead
     return extractedDates.length == 1 ? extractedDates.first : extractedDates.join(' & ');
   }
 
-  Future<void> reprocessExistingAnnouncements() async {
-    try {
-      final QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('announcements')
-          .where('processed_by_cohere', isEqualTo: false)
-          .get();
-
-      for (final doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        final message = data['message'] ?? '';
-
-        if (message.isNotEmpty) {
-          try {
-            final cohereResult = await analyzeAnnouncement(message);
-            await doc.reference.update({
-              'category': cohereResult['category'],
-              'deadline': cohereResult['deadline'],
-              'processed_by_cohere': true,
-              'reprocessed_at': FieldValue.serverTimestamp(),
-            });
-          } catch (e) {
-            print('Error reprocessing announcement ${doc.id}: $e');
-          }
-        }
-      }
-    } catch (e) {
-      print('Error reprocessing existing announcements: $e');
-    }
-  }
+  
 }

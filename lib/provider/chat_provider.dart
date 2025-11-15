@@ -4,24 +4,24 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'package:http/http.dart' as http;
 
 import 'package:capstone_project/models/conversations.dart';
 import 'package:capstone_project/models/message.dart';
-import 'package:capstone_project/models/notification.dart';
-import 'package:capstone_project/provider/embedding.dart';
+
+
 import 'package:capstone_project/services/answer_retrieval.dart';
 import 'package:capstone_project/services/cohere_service.dart';
-import 'package:capstone_project/services/answer_retrieval.dart';
+
 
 // Cache classes for better performance
 class FAQCache {
   static Map<String, Map<String, dynamic>> cache = {};
   static DateTime lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(0);
-  static const Duration cacheExpiry = Duration(hours: 1);
+  static const Duration cacheExpiry = Duration(hours: 2); // ⚡ Increased from 1 hour
   
   static bool get isExpired => 
     DateTime.now().difference(lastCacheUpdate) > cacheExpiry;
@@ -37,13 +37,12 @@ class FAQCache {
 
 class EmbeddingCache {
   static final Map<String, List<double>> _cache = {};
-  static const int maxSize = 500;
+  static const int maxSize = 1000; // ⚡ Increased from 500
   
   static List<double>? get(String key) => _cache[key];
   
   static void put(String key, List<double> value) {
     if (_cache.length >= maxSize) {
-      // Remove oldest entries
       final oldestKeys = _cache.keys.take(_cache.length - maxSize + 1);
       for (final oldKey in oldestKeys) {
         _cache.remove(oldKey);
@@ -59,6 +58,10 @@ class ChatProvider extends ChangeNotifier {
   CohereService? _cohere;
   bool isNowAddedToFAQ = false;
   int count = 1;
+bool _isCreatingMessage = false;
+  
+  VoidCallback? _onMessageAdded;
+
 
   ChatProvider(this._retriever);
 
@@ -93,21 +96,87 @@ class ChatProvider extends ChangeNotifier {
     "recommend speaking with",
   ];
 
+  void setScrollCallback(VoidCallback callback) {
+  _onMessageAdded = callback;
+}
+
+void clearScrollCallback() {
+  _onMessageAdded = null;
+}
+
+
   StreamSubscription<QuerySnapshot>? _messagesSubscription;
 
   final String _apiKey = "IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
 
-  Future<void> setConversationId(String id) async {
-    conversationId = id;
-    _messages.clear();
-    currentConversation = null;
+  bool _isSettingConversation = false;
 
+Future<void> setConversationId(String id) async {
+  print('🔧 ChatProvider.setConversationId: $id');
+  
+  // ✅ FIX 1: Prevent duplicate calls
+  if (_isSettingConversation) {
+    print('⚠️ Already setting conversation, ignoring duplicate call');
+    return;
+  }
+  
+  // ✅ FIX 2: If already set to this ID, skip
+  if (conversationId == id && _messagesSubscription != null) {
+    print('ℹ️ Already set to conversation $id with active subscription');
+    return;
+  }
+  
+  _isSettingConversation = true;
+  
+  try {
+    // ✅ STEP 1: Cancel old subscription
+    _messagesSubscription?.cancel();
+    _messagesSubscription = null;
+    
+    // ✅ STEP 2: Clear all state
+    _messages.clear();
+    _processedMessages.clear(); 
+    _streamingContent.clear();
+    _pendingRatingsCache.clear();
+    
+    // ✅ STEP 3: Reset loading flags
+    _isLoading = false;
+    _isCreatingMessage = false;
+    
+    // ✅ STEP 4: Set new conversation ID
+    conversationId = id;
+    currentConversation = null;
+    
+    // ✅ STEP 5: Schedule notification after build completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
+    
+    // ✅ STEP 6: Small delay to ensure UI updates
+    await Future.delayed(Duration(milliseconds: 100));
+    
+    // ✅ STEP 7: Load conversation info
     await loadConversationInfo();
+    
+    // ✅ STEP 8: Load messages
     await loadExistingMessages();
 
-    _messagesSubscription?.cancel();
+    // ✅ STEP 9: Start new subscription
     listenToMessages();
+    
+    // ✅ STEP 10: Final delay for stability
+    await Future.delayed(Duration(milliseconds: 100));
+    
+    print('✅ ChatProvider setup complete');
+    print('   - Conversation ID: $conversationId');
+    print('   - Messages: ${_messages.length}');
+    print('   - Subscription active: ${_messagesSubscription != null}');
+  } finally {
+    _isSettingConversation = false;
   }
+}
+
+
 
   Future<void> loadConversationInfo() async {
     if (conversationId == null) return;
@@ -122,11 +191,16 @@ class ChatProvider extends ChangeNotifier {
       } else {
         currentConversation = null;
       }
-      notifyListeners();
+      
+      // ✅ CRITICAL FIX: Schedule notification after build completes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
     } catch (e) {
       print('Error loading conversation info: $e');
     }
   }
+
 
   Map<String, dynamic> _messageToMap(Message message) {
     return {
@@ -176,11 +250,13 @@ Future<void> loadExistingMessages() async {
           .get();
 
       _messages.clear();
+      _processedMessages.clear(); 
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
         final message = Message.fromJson(data);
         _messages.add(message);
+        _processedMessages.add(message.id);
         
         // Pre-populate local ratings cache
         if (message.rating != null && message.rating!.isNotEmpty) {
@@ -188,201 +264,362 @@ Future<void> loadExistingMessages() async {
         }
       }
 
-      notifyListeners();
+      // ✅ CRITICAL FIX: Schedule notification after build completes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
     } catch (e) {
       print('Error loading existing messages: $e');
     }
   }
 
 
-  void listenToMessages() {
-    if (conversationId == null) return;
-    
-    _messagesSubscription = _firestore
+void listenToMessages() {
+  if (conversationId == null) return;
+
+  _messagesSubscription = _firestore
+      .collection('conversations')
+      .doc(conversationId!)
+      .collection('messages')
+      .orderBy('sent_at', descending: false)
+      .snapshots()
+      .listen(
+    (snapshot) {
+      // ✅ CRITICAL: Skip processing if we're currently creating a message
+      if (_isLoading) {
+        print('⏭️ Skipping listener update - message creation in progress');
+        return;
+      }
+      
+      bool changed = false;
+
+      for (var change in snapshot.docChanges) {
+        final data = change.doc.data() as Map<String, dynamic>?;
+        if (data == null) continue;
+
+        final message = Message.fromJson(data);
+        final index = _messages.indexWhere((m) => m.id == message.id);
+
+        if (change.type == DocumentChangeType.added) {
+          final isCurrentlyStreaming = _streamingContent.containsKey(message.id);
+          
+          if (index == -1 && !_processedMessages.contains(message.id) && !isCurrentlyStreaming) {
+            print('➕ Adding message from Firestore: ${message.id}');
+            _messages.add(message);
+            _processedMessages.add(message.id);
+            changed = true;
+          } else {
+            print('⏭️ Skipping duplicate: ${message.id}');
+          }
+        } else if (change.type == DocumentChangeType.modified) {
+          if (index != -1 && !_streamingContent.containsKey(message.id)) {
+            print('✏️ Updating message: ${message.id}');
+            _messages[index] = message;
+            changed = true;
+          }
+        } else if (change.type == DocumentChangeType.removed) {
+          if (index != -1) {
+            print('🗑️ Removing message: ${message.id}');
+            _messages.removeAt(index);
+            _processedMessages.remove(message.id);
+            changed = true;
+          }
+        }
+      } 
+
+      if (changed) {
+        _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+        
+        // ✅ CRITICAL FIX: Schedule notification after build completes
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+      }
+    },
+    onError: (error) {
+      print('Error listening to messages: $error');
+    },
+  );
+}
+
+void debugPrintMessageState(String context) {
+  print('=== DEBUG $context ===');
+  print('Messages in list: ${_messages.map((m) => m.id).join(", ")}');
+  print('Processed messages: ${_processedMessages.toList()}');
+  print('Streaming messages: ${_streamingContent.keys.toList()}');
+  print('Is loading: $_isLoading');
+  print('========================');
+}
+
+ // Add this method to your ChatProvider class
+
+final Map<String, String> _streamingContent = {};
+final Set<String> _processedMessages = {}; // NEW: Track processed messages
+
+String? getStreamingContent(String messageId) => _streamingContent[messageId];
+// In ChatProvider class, replace askQuestionWithStreaming method:
+
+// In ChatProvider class, replace askQuestionWithStreaming method:
+
+
+Future<void> askQuestionWithStreaming(BuildContext context, String question) async {
+  if (_isLoading || conversationId == null || conversationId!.isEmpty) {
+    return;
+  }
+
+  _isLoading = true;
+  notifyListeners();
+
+  final startTime = DateTime.now();
+
+  try {
+    _cohere ??= CohereService();
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
+    // Create user message
+    final userMessageRef = _firestore
         .collection('conversations')
         .doc(conversationId!)
         .collection('messages')
-        .orderBy('sent_at', descending: false)
-        .snapshots()
-        .listen(
-          (snapshot) {
-            bool changed = false;
-            for (var change in snapshot.docChanges) {
-              final data = change.doc.data() as Map<String, dynamic>?;
-              if (data == null) continue;
-              
-              final message = Message.fromJson(data);
-              final exists = _messages.any((m) => m.id == message.id);
-              
-              if (change.type == DocumentChangeType.added && !exists) {
-                _messages.add(message);
-                changed = true;
-              }
-            }
-            if (changed) {
-              _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
-              notifyListeners();
-            }
-          },
-          onError: (error) {
-            print('Error listening to messages: $error');
-          },
-        );
-  }
+        .doc();
 
-  Future<void> askQuestion(BuildContext context,String question) async {
-    if (_isLoading || conversationId == null || conversationId!.isEmpty) {
+    final userMessage = Message(
+      id: userMessageRef.id,
+      conversationId: conversationId!,
+      content: question,
+      userID: userId,
+      category: 'General',
+      sender: 'user',
+      status: 'sent',
+      isAnswered: false,
+      type: 'text',
+      sentAt: DateTime.now(),
+      count: count,
+    );
+
+    print('✅ Processing user message: ${userMessage.id}');
+    _processedMessages.add(userMessage.id);
+    _messages.add(userMessage);
+    notifyListeners();
+    
+    // ✅ Trigger scroll after user message added
+    _onMessageAdded?.call();
+
+    await userMessageRef.set(_messageToMap(userMessage));
+
+    final conversationHistory = _messages
+        .where((m) => m.conversationId == conversationId)
+        .toList()
+      ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    
+    final recentHistory = conversationHistory.length > 10 
+        ? conversationHistory.sublist(conversationHistory.length - 10)
+        : conversationHistory;
+
+    final futures = await Future.wait([
+      _generateEmbeddingCached(question),
+      _classifyQuestionCategoryFast(question),
+      _ensureFAQCacheLoaded(),
+    ]);
+
+    final currentEmbedding = futures[0] as List<double>;
+    final classifiedCategory = futures[1] as String;
+    final existingFAQ = _findBestFAQMatch(question, currentEmbedding);
+
+    final botMessageId = 'bot_${userMessageRef.id}';
+    
+    if (_processedMessages.contains(botMessageId)) {
+      print('⚠️ Bot message already processed, skipping: $botMessageId');
+      _isLoading = false;
+      notifyListeners();
       return;
     }
-
-    _isLoading = true;
+    
+    print('✅ Processing bot message: $botMessageId');
+    _processedMessages.add(botMessageId);
+    _streamingContent[botMessageId] = '';
+    
+    final botMessage = Message(
+      id: botMessageId,
+      conversationId: conversationId!,
+      content: '',
+      sender: 'bot',
+      status: 'sent',
+      type: 'text',
+      sentAt: DateTime.now(),
+      count: count,
+    );
+    
+    final existingIndex = _messages.indexWhere((m) => m.id == botMessageId);
+    if (existingIndex == -1) {
+      _messages.add(botMessage);
+      print('✅ Added bot message to local list: $botMessageId');
+    }
     notifyListeners();
+    
+    // ✅ Trigger scroll after bot message placeholder added
+    _onMessageAdded?.call();
 
-    final startTime = DateTime.now();
+    String finalAnswer = '';
 
-    try {
-      _cohere ??= CohereService();
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-
-      // Create user message
-      final userMessageRef = _firestore
-          .collection('conversations')
-          .doc(conversationId!)
-          .collection('messages')
-          .doc();
-
-      final userMessage = Message(
-        id: userMessageRef.id,
+    if (existingFAQ != null) {
+      final answer = existingFAQ['answer'] as String;
+      print('✅ Using FAQ answer (streaming)');
+      
+      final chunkSize = 10;
+      for (int i = 0; i < answer.length; i += chunkSize) {
+        final end = (i + chunkSize < answer.length) ? i + chunkSize : answer.length;
+        final chunk = answer.substring(i, end);
+        _streamingContent[botMessageId] = _streamingContent[botMessageId]! + chunk;
+        notifyListeners();
+        
+        // ✅ Trigger scroll during streaming (every few chunks)
+        if (i % 30 == 0) {
+          _onMessageAdded?.call();
+        }
+        
+        await Future.delayed(Duration(milliseconds: 30));
+      }
+      
+      finalAnswer = answer;
+      unawaited(_incrementFAQSimilarityCountAsync(existingFAQ['question'] as String));
+    } else {
+      print('🔍 Generating streaming answer from knowledge base...');
+      
+      int chunkCount = 0;
+      await for (final streamedText in _retriever.generateAnswerStream(
+        question,
+        conversationHistory: recentHistory,
         conversationId: conversationId!,
-        content: question,
-        userID: userId,
-        category: 'General',
-        sender: 'user',
+      )) {
+        chunkCount++;
+        print('🔄 Stream iteration $chunkCount: received ${streamedText.length} chars');
+        
+        _streamingContent[botMessageId] = streamedText;
+        notifyListeners();
+        
+        // ✅ Trigger scroll during streaming (every few chunks)
+        if (chunkCount % 3 == 0) {
+          _onMessageAdded?.call();
+        }
+        
+        finalAnswer = streamedText;
+      }
+      
+      print('✅ Stream ended after $chunkCount iterations');
+    }
+
+    // Clear streaming state
+    _streamingContent.remove(botMessageId);
+    
+    // Verification for duplication
+    String verifiedAnswer = finalAnswer;
+    if (finalAnswer.length > 100) {
+      final half = finalAnswer.length ~/ 2;
+      final firstHalf = finalAnswer.substring(0, half);
+      final secondHalf = finalAnswer.substring(half);
+      
+      if (firstHalf == secondHalf) {
+        print('❌ EXACT DUPLICATION DETECTED!');
+        verifiedAnswer = firstHalf;
+        print('✅ Fixed by removing duplicate - new length: ${verifiedAnswer.length} chars');
+      }
+    }
+    
+    // Update message with verified content
+    final messageIndex = _messages.indexWhere((m) => m.id == botMessageId);
+    if (messageIndex >= 0) {
+      _messages[messageIndex] = Message(
+        id: botMessageId,
+        conversationId: conversationId!,
+        content: verifiedAnswer,
+        sender: 'bot',
         status: 'sent',
-        isAnswered: false,
         type: 'text',
-        sentAt: DateTime.now(),
+        sentAt: _messages[messageIndex].sentAt,
         count: count,
       );
+      print('✅ Updated bot message with verified content (${verifiedAnswer.length} chars)');
+    }
+    
+    notifyListeners();
+    
+    // ✅ Final scroll after completion
+    await Future.delayed(Duration(milliseconds: 100));
+    _onMessageAdded?.call();
 
-      _messages.add(userMessage);
-      notifyListeners();
+    final totalResponseTime = DateTime.now().difference(startTime).inMilliseconds;
+    final responseTime = totalResponseTime / 1000;
+    print('⚡ Total response time: ${responseTime.toStringAsFixed(2)}s');
 
-      print('Starting question processing: "$question"');
-
-      // Get conversation history for context
-      final conversationHistory = _messages
-          .where((m) => m.conversationId == conversationId)
-          .toList()
-        ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    // Save to Firestore
+    try {
+      final batch = _firestore.batch();
       
-      final recentHistory = conversationHistory.length > 10 
-          ? conversationHistory.sublist(conversationHistory.length - 10)
-          : conversationHistory;
-
-      // Parallel execution for better performance
-      final futures = await Future.wait([
-        _generateEmbeddingCached(question),
-        _classifyQuestionCategory(question),
-        userMessageRef.set(_messageToMap(userMessage)),
-        _ensureFAQCacheLoaded(),
-      ]);
-
-      final currentEmbedding = futures[0] as List<double>;
-      final classifiedCategory = futures[1] as String;
-
-      print('Embedding generated, Category: $classifiedCategory');
-
-      // Update user message with category and embedding
-      await Future.wait([
-        userMessageRef.update({
-          'category': classifiedCategory,
-          'embedding': currentEmbedding,
-        }),
-        _updateConversationTitleIfNeeded(question),
-      ]);
-
-      // Try FAQ first
-      final existingFAQ = _findMatchingFAQWithContext(
-        question, 
-        currentEmbedding, 
-        recentHistory
-      );
-
-      String answerText;
-      if (existingFAQ != null) {
-        answerText = existingFAQ['answer'] as String;
-        print('Using FAQ answer');
-        // Async increment FAQ usage count
-        unawaited(_incrementFAQSimilarityCountAsync(existingFAQ['question'] as String));
-      } else {
-        print('Generating answer from knowledge base...');
-        answerText = await _retriever.generateAnswer(
-          question,
-          conversationHistory: recentHistory,
-          conversationId: conversationId!,
-        );
-      }
-
-      // Save bot reply
       final botMessageRef = _firestore
           .collection('conversations')
           .doc(conversationId!)
           .collection('messages')
-          .doc();
-
-      final botMessage = Message(
-        id: botMessageRef.id,
-        conversationId: conversationId!,
-        content: answerText,
-        sender: 'bot',
-        status: 'sent',
-        type: 'text',
-        sentAt: DateTime.now(),
-        count: count,
-      );
+          .doc(botMessageId);
       
-
-      final totalResponseTime = DateTime.now().difference(startTime).inMilliseconds;
-      final responseTime = totalResponseTime / 1000;
-
-      print('Total response time: ${responseTime.toStringAsFixed(2)}s');
-
-      // Save to database with batch write
-      final batch = _firestore.batch();
-      batch.set(botMessageRef, _messageToMap(botMessage));
+      final finalBotMessage = _messages.firstWhere((m) => m.id == botMessageId);
+      
+      batch.set(botMessageRef, _messageToMap(finalBotMessage));
+      
       batch.update(userMessageRef, {
-        'responded_at': Timestamp.fromDate(botMessage.sentAt),
         'isAnswered': true,
-        'responseTimeMs': responseTime,
+        'answeredAt': Timestamp.now(),
+        'responseTime': responseTime,
       });
-      batch.update(_firestore.collection('conversations').doc(conversationId!), {
-        'messageCount': FieldValue.increment(2),
-        'lastActivity': Timestamp.now(),
-      });
-
+      
       await batch.commit();
-
-      // Handle post-response tasks asynchronously
-      unawaited(_handlePostResponseTasks(
-        context,
-        question, 
-        answerText, 
-        currentEmbedding, 
-        classifiedCategory, 
-        userId
-      ));
-
-      print('Question processing completed successfully');
-
-    } catch (e, stackTrace) {
-      print('askQuestion error: $e');
-      print('Stack trace: $stackTrace');
-      await _handleError(e);
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+      print('✅ Saved to Firestore successfully');
+      
+      await _updateConversationTitleIfNeeded(question);
+      
+    } catch (saveError) {
+      print('❌ Error saving to Firestore: $saveError');
     }
+
+    unawaited(_handlePostResponseTasks(
+      context,
+      question, 
+      verifiedAnswer,
+      currentEmbedding, 
+      classifiedCategory, 
+      userId
+    ));
+
+  } catch (e, stackTrace) {
+    print('❌ askQuestionWithStreaming error: $e');
+    print('Stack trace: $stackTrace');
+    await _handleError(e);
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+    
+    // ✅ Final scroll
+    _onMessageAdded?.call();
+  }
+}
+
+
+  
+
+    Future<String> _classifyQuestionCategoryFast(String question) async {
+    final lowercaseQuestion = question.toLowerCase();
+    
+    // Use keyword matching first (instant)
+    if (lowercaseQuestion.contains(RegExp(r'\b(admission|admit|enroll|application|apply|entrance|entry|requirements?|eligibility|qualify)\b'))) {
+      return 'Admission';
+    } else if (lowercaseQuestion.contains(RegExp(r'\b(scholarship|grant|financial|aid|funding|stipend|allowance|discount|free)\b'))) {
+      return 'Scholarship';
+    } else if (lowercaseQuestion.contains(RegExp(r'\b(placement|job|career|internship|work|employment|company|companies|hiring)\b'))) {
+      return 'Placement';
+    }
+    
+    // If no keyword match, return General (skip LLM classification for speed)
+    return 'General';
   }
 
   Map<String, dynamic>? _findMatchingFAQWithContext(
@@ -423,12 +660,14 @@ Future<void> loadExistingMessages() async {
     
     return followUpPatterns.any((pattern) => pattern.hasMatch(question.trim()));
   }
-
-  Map<String, dynamic>? _findBestFAQMatch(
+Map<String, dynamic>? _findBestFAQMatch(
     String question,
     List<double> questionEmbedding,
   ) {
     try {
+      double highestSimilarity = 0.0;
+      Map<String, dynamic>? bestMatch;
+      
       for (var entry in FAQCache.cache.entries) {
         final data = entry.value;
         
@@ -437,13 +676,17 @@ Future<void> loadExistingMessages() async {
         final faqEmbedding = List<double>.from(data['embedding']);
         final similarity = cosineSimilarity(questionEmbedding, faqEmbedding);
 
-        if (similarity > 0.90) {
-          print('Found matching FAQ with similarity: $similarity');
-          return data;
+        if (similarity > 0.90 && similarity > highestSimilarity) {
+          highestSimilarity = similarity;
+          bestMatch = data;
         }
       }
       
-      return null;
+      if (bestMatch != null) {
+        print('✅ Found FAQ match with similarity: $highestSimilarity');
+      }
+      
+      return bestMatch;
     } catch (e) {
       print('Error finding FAQ match: $e');
       return null;
@@ -525,8 +768,7 @@ Category:''';
   }
 }
 
-
-  Future<List<double>> _generateEmbeddingCached(String text) async {
+Future<List<double>> _generateEmbeddingCached(String text) async {
     final cached = EmbeddingCache.get(text);
     if (cached != null) {
       return cached;
@@ -543,6 +785,7 @@ Category:''';
         final faqSnapshot = await _firestore
             .collection('faqs')
             .where('answer', isNotEqualTo: "")
+            .limit(100) // ⚡ Add limit
             .get();
         
         FAQCache.updateCache(faqSnapshot.docs);
@@ -552,24 +795,25 @@ Category:''';
     }
   }
 
-  Future<void> _handlePostResponseTasks(
-    BuildContext context,
-    String question,
-    String answerText,
-    List<double> currentEmbedding,
-    String category,
-    String? userId,
-  ) async {
-    try {
-      await Future.wait([
-        _logMessageAction(question, answerText),
-        checkEscalation(context, answerText, userId, question),
-        _checkAndPromoteToFAQOptimized(question, currentEmbedding, answerText, category),
-      ]);
-    } catch (e) {
-      print('Error in post-response tasks: $e');
-    }
+ Future<void> _handlePostResponseTasks(
+  BuildContext context,
+  String question,
+  String answerText,
+  List<double> currentEmbedding,
+  String category,
+  String? userId,
+) async {
+  try {
+    await Future.wait([
+      _logMessageAction(question, answerText),
+      checkEscalation(context, answerText, userId, question),
+      _checkAndPromoteToFAQOptimized(question, currentEmbedding, answerText, category),
+      _updateConversationTitleIfNeeded(question), // ✅ ADD THIS LINE
+    ]);
+  } catch (e) {
+    print('Error in post-response tasks: $e');
   }
+}
 
 
 
@@ -1137,10 +1381,36 @@ $question
     return denominator == 0 ? 0.0 : dotProduct / denominator;
   }
 
-  void clearMessages() {
-    _messages.clear();
+void clearMessages() {
+  print('🧹 ChatProvider.clearMessages called');
+  
+  // Cancel subscription
+  _messagesSubscription?.cancel();
+  _messagesSubscription = null;
+  
+  // Clear all data structures
+  _messages.clear();
+  _processedMessages.clear(); 
+  _streamingContent.clear();
+  _pendingRatingsCache.clear();
+  
+  // Clear conversation references
+  conversationId = null;
+  currentConversation = null;
+  
+  // Reset all flags
+  _isLoading = false;
+  _isCreatingMessage = false;
+  
+  // ✅ CRITICAL FIX: Schedule notification after build completes
+  WidgetsBinding.instance.addPostFrameCallback((_) {
     notifyListeners();
-  }
+  });
+  
+  print('✅ ChatProvider cleared');
+  print('   - Messages: ${_messages.length}');
+  print('   - Subscription: ${_messagesSubscription != null}');
+}
 
   @override
   void dispose() {

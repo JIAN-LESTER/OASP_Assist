@@ -39,21 +39,19 @@ class _LoginPageState extends State<LoginPage> {
   static const String primaryFontFamily = 'Poppins';
 
   //  font sizes
-  static const double baseTitleFontSize = 28.0; // Slightly smaller
-  static const double baseSubtitleFontSize = 16.0; // More readable
-  static const double baseButtonFontSize = 15.0; //  button text
-  static const double baseLinkFontSize = 14.0; // Consistent with inputs
-  static const double baseLabelFontSize = 13.0; // Subtle labels
-  static const double baseErrorFontSize = 12.0; // Clear error messages
+  static const double baseTitleFontSize = 28.0;
+  static const double baseSubtitleFontSize = 16.0;
+  static const double baseButtonFontSize = 15.0;
+  static const double baseLinkFontSize = 14.0;
+  static const double baseLabelFontSize = 13.0;
+  static const double baseErrorFontSize = 12.0;
 
   // font weights
-  static const FontWeight titleFontWeight =
-      FontWeight.w600; // Less bold, more refined
+  static const FontWeight titleFontWeight = FontWeight.w600;
   static const FontWeight subtitleFontWeight = FontWeight.w400;
-  static const FontWeight buttonFontWeight = FontWeight.w500; // Medium weight
+  static const FontWeight buttonFontWeight = FontWeight.w500;
   static const FontWeight linkFontWeight = FontWeight.w500;
   static const FontWeight labelFontWeight = FontWeight.w400;
-  // ======================================================
 
   // Color scheme
   static const Color primaryColor = Color.fromARGB(255, 8, 121, 11);
@@ -179,8 +177,9 @@ class _LoginPageState extends State<LoginPage> {
         await FirebaseAuth.instance.signOut();
         if (mounted) {
           setState(() => _isLoading = false);
-          _setVerificationError('Please verify your email before signing in');
-          _showVerificationRequiredDialog(user.email ?? '');
+          _setVerificationError(
+            'Please verify your email before signing in. Check your inbox or spam folder.',
+          );
         }
         return;
       }
@@ -368,9 +367,9 @@ class _LoginPageState extends State<LoginPage> {
     required double availableHeight,
   }) {
     // Calculate responsive spacing based on available height
-    final baseSpacing = availableHeight * 0.02; // 2% of screen height
-    final sectionSpacing = availableHeight * 0.025; // 2.5% of screen height
-    final largeSpacing = availableHeight * 0.04; // 4% of screen height
+    final baseSpacing = availableHeight * 0.02;
+    final sectionSpacing = availableHeight * 0.025;
+    final largeSpacing = availableHeight * 0.04;
 
     return Container(
       constraints: BoxConstraints(maxWidth: maxWidth),
@@ -382,8 +381,21 @@ class _LoginPageState extends State<LoginPage> {
             // Top spacing (flexible)
             SizedBox(height: largeSpacing),
 
-            Icon(Icons.lock, size: iconSize, color: primaryColor),
-
+            SizedBox(
+              width: 120,
+              height: 120,
+              child: Image.asset(
+                'lib/images/oasp.png',
+                fit: BoxFit.contain, // or BoxFit.cover / BoxFit.fitWidth
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(
+                    Icons.smart_toy_outlined,
+                    color: Color(0xFF2E7D32),
+                    size: 100, // optional smaller icon size
+                  );
+                },
+              ),
+            ),
             SizedBox(height: sectionSpacing),
 
             Text(
@@ -435,7 +447,7 @@ class _LoginPageState extends State<LoginPage> {
               controller: passwordController,
               hintText: "Password",
               obscureText: true,
-              isPasswordField: true, // This enables the eye icon
+              isPasswordField: true,
             ),
             _buildErrorText(_passwordError, fontSizeMultiplier),
 
@@ -556,7 +568,6 @@ class _LoginPageState extends State<LoginPage> {
             // Sign Up Link
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-
               children: [
                 Text(
                   "Don't have an account? ",
@@ -612,7 +623,7 @@ class _LoginPageState extends State<LoginPage> {
               child: IntrinsicHeight(
                 child: _buildLoginForm(
                   availableHeight: constraints.maxHeight,
-                  iconSize: constraints.maxHeight * 0.08, // 8% of screen height
+                  iconSize: constraints.maxHeight * 0.08,
                   fontSizeMultiplier: 0.95,
                   buttonPadding: 18,
                 ),
@@ -718,73 +729,6 @@ class _LoginPageState extends State<LoginPage> {
           );
         },
       ),
-    );
-  }
-
-  Future<bool> _checkEmailVerification(User user) async {
-    await user.reload(); // Refresh user data
-    final currentUser = FirebaseAuth.instance.currentUser;
-    return currentUser?.emailVerified ?? false;
-  }
-
-  void _showVerificationRequiredDialog(String email) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: [
-                Icon(Icons.email_outlined, color: primaryColor),
-                const SizedBox(width: 12),
-                const Text('Email Not Verified'),
-              ],
-            ),
-            content: Text(
-              'Please verify your email address before signing in. Check your inbox for the verification link.',
-              style: TextStyle(
-                fontFamily: primaryFontFamily,
-                fontSize: 15,
-                color: textSecondaryColor,
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(color: textSecondaryColor),
-                ),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                onPressed: () async {
-                  try {
-                    final user = FirebaseAuth.instance.currentUser;
-                    if (user != null) {
-                      await user.sendEmailVerification();
-                      Navigator.pop(context);
-                      _setGeneralError(
-                        'Verification email sent! Check your inbox.',
-                      );
-                    }
-                  } catch (e) {
-                    Navigator.pop(context);
-                    _setGeneralError('Failed to resend verification email');
-                  }
-                },
-                child: const Text('Resend Email'),
-              ),
-            ],
-          ),
     );
   }
 

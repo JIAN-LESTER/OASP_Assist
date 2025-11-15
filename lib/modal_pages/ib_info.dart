@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:capstone_project/modal_pages/ib_edit.dart';
 import 'package:http/http.dart' as http;
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
+import 'package:capstone_project/utils/snackbar_util.dart'; // Add this import
 
 void showIBInfoModal(
   BuildContext context,
@@ -264,7 +265,7 @@ void showIBInfoModal(
 
                         const SizedBox(height: 32),
 
-                        // Action Buttons - Updated to match upload modal
+                        // Action Buttons
                         _buildActionButtons(
                           context,
                           doc,
@@ -306,7 +307,6 @@ Widget _buildActionButtons(
   bool isTablet,
   bool isDesktop,
 ) {
-  // Professional button sizing - matching upload document modal
   double buttonHeight =
       isMobile
           ? 40
@@ -381,10 +381,8 @@ void _showFullContentModal(
   bool isTablet,
   DocumentSnapshot doc,
 ) {
-  // Close the current modal first to prevent stacking
   Navigator.of(context).pop();
 
-  // Add delay before showing new modal
   Future.delayed(const Duration(milliseconds: 200), () {
     showGeneralDialog(
       context: context,
@@ -430,7 +428,6 @@ void _showFullContentModal(
                             borderRadius: BorderRadius.circular(24),
                             onTap: () {
                               Navigator.of(context).pop();
-                              // Re-show the document info modal with delay
                               Future.delayed(
                                 const Duration(milliseconds: 200),
                                 () => showIBInfoModal(context, doc),
@@ -576,7 +573,7 @@ void _showFullContentModal(
 
                           const SizedBox(height: 20),
 
-                          // Action Buttons - Updated to match upload modal
+                          // Action Buttons
                           _buildFullContentActionButtons(
                             context,
                             doc,
@@ -617,7 +614,6 @@ Widget _buildFullContentActionButtons(
   bool isMobile,
   bool isTablet,
 ) {
-  // Professional button sizing - matching upload document modal
   double buttonHeight =
       isMobile
           ? 40
@@ -806,7 +802,7 @@ void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
                     ),
                     const SizedBox(height: 24),
 
-                    // Action Buttons - Updated to match upload modal
+                    // Action Buttons
                     _buildDeleteActionButtons(context, doc, isMobile),
                   ],
                 ),
@@ -835,7 +831,6 @@ Widget _buildDeleteActionButtons(
   DocumentSnapshot doc,
   bool isMobile,
 ) {
-  // Professional button sizing - matching upload document modal
   double buttonHeight = isMobile ? 40 : 46;
   double fontSize = isMobile ? 14 : 15;
   double borderRadius = 10;
@@ -868,7 +863,6 @@ Widget _buildDeleteActionButtons(
           height: buttonHeight,
           child: ElevatedButton(
             onPressed: () => _handleDeleteDocument(context, doc),
-           
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
@@ -908,10 +902,11 @@ Future<void> _handleDeleteDocument(
     String actorName = 'Unknown';
 
     if (currentUser != null) {
-      final currentUserDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      final currentUserDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
 
       if (currentUserDoc.exists) {
         final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
@@ -926,10 +921,11 @@ Future<void> _handleDeleteDocument(
     final firestore = FirebaseFirestore.instance;
 
     // Get related scholarships FIRST before deleting anything
-    final scholarshipsSnap = await firestore
-        .collection('scholarships')
-        .where('sourceId', isEqualTo: doc.id)
-        .get();
+    final scholarshipsSnap =
+        await firestore
+            .collection('scholarships')
+            .where('sourceId', isEqualTo: doc.id)
+            .get();
 
     print("Found ${scholarshipsSnap.docs.length} scholarships to delete");
 
@@ -950,7 +946,9 @@ Future<void> _handleDeleteDocument(
 
     // If any scholarship deletions failed, show warning but continue
     if (failedScholarshipDeletes.isNotEmpty) {
-      print("⚠️ Failed to delete ${failedScholarshipDeletes.length} scholarships");
+      print(
+        "⚠️ Failed to delete ${failedScholarshipDeletes.length} scholarships",
+      );
     }
 
     // Now delete main documents using WriteBatch
@@ -972,30 +970,19 @@ Future<void> _handleDeleteDocument(
       Navigator.of(context).pop(); // Close confirmation dialog
 
       // Show success message with warning if some scholarships failed
-      String message = 'Document deleted from Firestore';
-      if (failedScholarshipDeletes.isNotEmpty) {
-        message += ' (${failedScholarshipDeletes.length} related scholarships could not be deleted)';
+      if (failedScholarshipDeletes.isEmpty) {
+        SnackbarUtil.showSuccess(
+          context,
+          'Document deleted successfully',
+          duration: const Duration(seconds: 3),
+        );
+      } else {
+        SnackbarUtil.showWarning(
+          context,
+          'Document deleted but ${failedScholarshipDeletes.length} related scholarships could not be deleted',
+          duration: const Duration(seconds: 4),
+        );
       }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                failedScholarshipDeletes.isEmpty ? Icons.check_circle : Icons.warning,
-                color: Colors.white,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(child: Text(message)),
-            ],
-          ),
-          backgroundColor: const Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          duration: Duration(seconds: 4),
-        ),
-      );
     }
 
     // Log the action
@@ -1006,7 +993,8 @@ Future<void> _handleDeleteDocument(
         'user': actorName,
         'action': 'Deleted document: $deletedTitle',
         'time': Timestamp.now(),
-        'scholarships_deleted': scholarshipsSnap.docs.length - failedScholarshipDeletes.length,
+        'scholarships_deleted':
+            scholarshipsSnap.docs.length - failedScholarshipDeletes.length,
         'scholarships_failed': failedScholarshipDeletes.length,
       });
     } catch (e) {
@@ -1015,37 +1003,32 @@ Future<void> _handleDeleteDocument(
 
     // DELETE FROM WEAVIATE IN BACKGROUND (don't await to avoid blocking UI)
     _deleteFromWeaviateInBackground(docData, weaviateId);
-
   } catch (error) {
     print("❌ Delete operation failed: $error");
-    
+
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Flexible(child: Text('Delete failed: $error')),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
+      SnackbarUtil.showError(
+        context,
+        'Delete failed: ${error.toString()}',
+        duration: const Duration(seconds: 4),
       );
     }
   }
 }
 
 // Separate method for Weaviate deletion to avoid blocking the UI
-void _deleteFromWeaviateInBackground(Map<String, dynamic> docData, String? weaviateId) async {
+void _deleteFromWeaviateInBackground(
+  Map<String, dynamic> docData,
+  String? weaviateId,
+) async {
   try {
     final chunkIds = List<String>.from(docData['chunkIds'] ?? []);
-    final baseUrl = 'https://kvup5sldrowal8nc4qzyia.c0.us-west3.gcp.weaviate.cloud';
-    final apiKey = 'ZlRONE4zN1FMYkZJcStUeF9uYkxtTkFITGVWZHVmaEVKb3RIL2dlUmQrNEx4UDdxQTg2R3NYUVpnMWFvPV92MjAw';
+    final baseUrl =
+        'https://kvup5sldrowal8nc4qzyia.c0.us-west3.gcp.weaviate.cloud';
+    final apiKey =
+        'ZlRONE4zN1FMYkZJcStUeF9uYkxtTkFITGVWZHVmaEVKb3RIL2dlUmQrNEx4UDdxQTg2R3NYUVpnMWFvPV92MjAw';
     final authHeader = {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $apiKey',
@@ -1054,8 +1037,11 @@ void _deleteFromWeaviateInBackground(Map<String, dynamic> docData, String? weavi
     // Delete chunks with timeout
     for (final chunkId in chunkIds) {
       try {
-        final deleteChunkUrl = Uri.parse('$baseUrl/v1/objects/Document/$chunkId');
-        final res = await http.delete(deleteChunkUrl, headers: authHeader)
+        final deleteChunkUrl = Uri.parse(
+          '$baseUrl/v1/objects/Document/$chunkId',
+        );
+        final res = await http
+            .delete(deleteChunkUrl, headers: authHeader)
             .timeout(Duration(seconds: 10));
         print("Weaviate chunk $chunkId deleted → ${res.statusCode}");
       } catch (e) {
@@ -1066,8 +1052,11 @@ void _deleteFromWeaviateInBackground(Map<String, dynamic> docData, String? weavi
     // Delete parent document with timeout
     if (weaviateId != null && weaviateId.isNotEmpty) {
       try {
-        final deleteDocUrl = Uri.parse('$baseUrl/v1/objects/Document/$weaviateId');
-        final response = await http.delete(deleteDocUrl, headers: authHeader)
+        final deleteDocUrl = Uri.parse(
+          '$baseUrl/v1/objects/Document/$weaviateId',
+        );
+        final response = await http
+            .delete(deleteDocUrl, headers: authHeader)
             .timeout(Duration(seconds: 10));
         if (response.statusCode >= 400) {
           print("⚠️ Failed to delete parent Weaviate doc: ${response.body}");
@@ -1082,8 +1071,6 @@ void _deleteFromWeaviateInBackground(Map<String, dynamic> docData, String? weavi
     print("⚠️ Weaviate background deletion failed: $e");
   }
 }
-
-
 
 Widget _buildContentCard(String content) {
   return Container(

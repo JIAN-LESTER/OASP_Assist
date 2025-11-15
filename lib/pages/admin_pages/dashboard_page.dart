@@ -1,7 +1,14 @@
+
+import 'package:capstone_project/pages/data/chatbot_usage_data.dart';
+import 'package:capstone_project/pages/data/inquiry_trends_charts.dart';
+import 'package:capstone_project/pages/data/inquiry_trends_data.dart';
+import 'package:capstone_project/pages/data/user_demographics_data.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:capstone_project/pages/admin_pages/widgets/custom_dropdown_button.dart';
+import 'package:capstone_project/pages/admin_pages/widgets/refresh_button.dart';
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:capstone_project/pages/data/reports.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
@@ -18,76 +25,198 @@ class _DashboardPageState extends State<DashboardPage> {
   String selectedTimeFrame = 'This Month';
   final currentUser = FirebaseAuth.instance.currentUser;
   final FirebaseService _firebaseService = FirebaseService();
+
   InquiryReportsData? inq;
   ChatbotUsageReportsData? cb;
   UserDemographicsReportsData? ud;
+  String? userName;
 
   bool isLoading = true;
+  bool isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
-    _loadreportsData();
-    fetchUserName();
+    _loadAllData();
   }
 
-  String? userName;
-  bool isNameLoading = true;
+ 
+  Future<void> _loadAllData() async {
+    if (!mounted) return;
 
-  Future<void> fetchUserName() async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null) {
-      final userDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(currentUser.uid)
-              .get();
-      if (!mounted) return; 
-
-      if (userDoc.exists) {
-        setState(() {
-          userName = userDoc.data()?['name'] ?? 'User';
-          isNameLoading = false;
-        });
-      } else {
-        setState(() {
-          userName = 'User';
-          isNameLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _loadreportsData() async {
-    if (!mounted) return; 
     setState(() {
       isLoading = true;
     });
 
     try {
-      InquiryReportsData inqData = await _firebaseService.getInquiryReportsData(
-        selectedTimeFrame,
-      );
+      final results = await Future.wait([
+        _fetchUserName(),
+        _firebaseService.getInquiryReportsData(selectedTimeFrame),
+        _firebaseService.getChatbotUsageReportsData(selectedTimeFrame),
+        _firebaseService.getUserDemographicsReportsData(selectedTimeFrame),
+      ]);
 
-      ChatbotUsageReportsData cbData = await _firebaseService
-          .getChatbotUsageReportsData(selectedTimeFrame);
+      if (!mounted) return;
 
-      UserDemographicsReportsData udData = await _firebaseService
-          .getUserDemographicsReportsData(selectedTimeFrame);
-
-      if (!mounted) return; // <== ✅ safety check
       setState(() {
-        inq = inqData;
-        cb = cbData;
-        ud = udData;
+        userName = results[0] as String?;
+        inq = results[1] as InquiryReportsData;
+        cb = results[2] as ChatbotUsageReportsData;
+        ud = results[3] as UserDemographicsReportsData;
         isLoading = false;
       });
     } catch (e) {
       print('Error loading dashboard data: $e');
-      if (!mounted) return; // <== ✅ safety check
+      if (!mounted) return;
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  //  OPTIMIZED: Refresh function for the refresh button
+
+  Future<void> _refreshData() async {
+    if (!mounted || isRefreshing) return;
+
+    setState(() {
+      isRefreshing = true;
+    });
+
+    try {
+      final results = await Future.wait([
+        _firebaseService.getInquiryReportsData(selectedTimeFrame),
+        _firebaseService.getChatbotUsageReportsData(selectedTimeFrame),
+        _firebaseService.getUserDemographicsReportsData(selectedTimeFrame),
+      ]);
+
+      if (!mounted) return;
+
+      setState(() {
+        inq = results[0] as InquiryReportsData;
+        cb = results[1] as ChatbotUsageReportsData;
+        ud = results[2] as UserDemographicsReportsData;
+        isRefreshing = false;
+      });
+
+      // Show success feedback with responsive sizing
+      if (mounted) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isMobile = screenWidth < 600;
+        final isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.check_circle_outline_outlined,
+                  color: Colors.white,
+                  size: isMobile ? 20 : 24,
+                ),
+                SizedBox(width: isMobile ? 8 : 12),
+                Flexible(
+                  child: Text(
+                    'Dashboard refreshed successfully',
+                    style: TextStyle(
+                      fontSize: isMobile ? 15 : (isTablet ? 16 : 17),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 16 : 20,
+              vertical: isMobile ? 14 : 16,
+            ),
+            margin: EdgeInsets.only(
+              bottom: 20,
+              right: 20,
+              left: isMobile ? 20 : (screenWidth - (isTablet ? 380 : 420)),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+            elevation: 6,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error refreshing dashboard data: $e');
+      if (!mounted) return;
+      setState(() {
+        isRefreshing = false;
+      });
+
+      // Show error feedback with responsive sizing
+      if (mounted) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isMobile = screenWidth < 600;
+        final isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  color: Colors.white,
+                  size: isMobile ? 20 : 24,
+                ),
+                SizedBox(width: isMobile ? 8 : 12),
+                Flexible(
+                  child: Text(
+                    'Failed to refresh dashboard',
+                    style: TextStyle(
+                      fontSize: isMobile ? 15 : (isTablet ? 16 : 17),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red[600],
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 16 : 20,
+              vertical: isMobile ? 14 : 16,
+            ),
+            margin: EdgeInsets.only(
+              bottom: 20,
+              right: 20,
+              left: isMobile ? 20 : (screenWidth - (isTablet ? 380 : 420)),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(isMobile ? 10 : 12),
+            ),
+            elevation: 6,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<String?> _fetchUserName() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return 'User';
+
+    try {
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
+
+      return userDoc.exists ? (userDoc.data()?['name'] ?? 'User') : 'User';
+    } catch (e) {
+      print('Error fetching user name: $e');
+      return 'User';
     }
   }
 
@@ -95,12 +224,12 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       selectedTimeFrame = newValue;
     });
-    _loadreportsData();
+    _loadAllData();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading || isNameLoading || userName == null) {
+    if (isLoading || userName == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
@@ -108,29 +237,32 @@ class _DashboardPageState extends State<DashboardPage> {
       mobileBody: MobileDashboard(
         selectedTimeFrame: selectedTimeFrame,
         onTimeFrameChanged: _onTimeFrameChanged,
+        onRefresh: _refreshData,
+        isRefreshing: isRefreshing,
         inq: inq,
         cb: cb,
         ud: ud,
-
-        userName: userName!, // <- added
+        userName: userName!,
       ),
       tabletBody: TabletDashboard(
         selectedTimeFrame: selectedTimeFrame,
         onTimeFrameChanged: _onTimeFrameChanged,
+        onRefresh: _refreshData,
+        isRefreshing: isRefreshing,
         inq: inq,
         cb: cb,
         ud: ud,
-
-        userName: userName!, // <- added
+        userName: userName!,
       ),
       desktopBody: DesktopDashboard(
         selectedTimeFrame: selectedTimeFrame,
         onTimeFrameChanged: _onTimeFrameChanged,
+        onRefresh: _refreshData,
+        isRefreshing: isRefreshing,
         inq: inq,
         cb: cb,
         ud: ud,
-
-        userName: userName!, // <- added
+        userName: userName!,
       ),
     );
   }
@@ -140,6 +272,8 @@ class _DashboardPageState extends State<DashboardPage> {
 class DesktopDashboard extends StatelessWidget {
   final String selectedTimeFrame;
   final ValueChanged<String> onTimeFrameChanged;
+  final VoidCallback onRefresh;
+  final bool isRefreshing;
   final InquiryReportsData? inq;
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
@@ -149,11 +283,11 @@ class DesktopDashboard extends StatelessWidget {
     super.key,
     required this.selectedTimeFrame,
     required this.onTimeFrameChanged,
-
+    required this.onRefresh,
+    required this.isRefreshing,
     this.inq,
     this.cb,
     this.ud,
-
     required this.userName,
   });
 
@@ -162,6 +296,8 @@ class DesktopDashboard extends StatelessWidget {
     return dashboardContents(
       selectedTimeFrame,
       onTimeFrameChanged,
+      onRefresh,
+      isRefreshing,
       inq,
       cb,
       ud,
@@ -174,7 +310,8 @@ class DesktopDashboard extends StatelessWidget {
 class TabletDashboard extends StatelessWidget {
   final String selectedTimeFrame;
   final ValueChanged<String> onTimeFrameChanged;
-
+  final VoidCallback onRefresh;
+  final bool isRefreshing;
   final InquiryReportsData? inq;
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
@@ -184,10 +321,11 @@ class TabletDashboard extends StatelessWidget {
     super.key,
     required this.selectedTimeFrame,
     required this.onTimeFrameChanged,
+    required this.onRefresh,
+    required this.isRefreshing,
     this.inq,
     this.cb,
     this.ud,
-
     required this.userName,
   });
 
@@ -196,6 +334,8 @@ class TabletDashboard extends StatelessWidget {
     return dashboardContents(
       selectedTimeFrame,
       onTimeFrameChanged,
+      onRefresh,
+      isRefreshing,
       inq,
       cb,
       ud,
@@ -208,7 +348,8 @@ class TabletDashboard extends StatelessWidget {
 class MobileDashboard extends StatelessWidget {
   final String selectedTimeFrame;
   final ValueChanged<String> onTimeFrameChanged;
-
+  final VoidCallback onRefresh;
+  final bool isRefreshing;
   final InquiryReportsData? inq;
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
@@ -218,10 +359,11 @@ class MobileDashboard extends StatelessWidget {
     super.key,
     required this.selectedTimeFrame,
     required this.onTimeFrameChanged,
+    required this.onRefresh,
+    required this.isRefreshing,
     this.inq,
     this.cb,
     this.ud,
-
     required this.userName,
   });
 
@@ -230,6 +372,8 @@ class MobileDashboard extends StatelessWidget {
     return dashboardContents(
       selectedTimeFrame,
       onTimeFrameChanged,
+      onRefresh,
+      isRefreshing,
       inq,
       cb,
       ud,
@@ -241,6 +385,8 @@ class MobileDashboard extends StatelessWidget {
 Widget dashboardContents(
   final String selectedTimeFrame,
   final ValueChanged<String> onTimeFrameChanged,
+  final VoidCallback onRefresh,
+  final bool isRefreshing,
   final InquiryReportsData? inq,
   final ChatbotUsageReportsData? cb,
   final UserDemographicsReportsData? ud,
@@ -253,10 +399,26 @@ Widget dashboardContents(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(selectedTimeFrame, onTimeFrameChanged, userName),
+          _buildHeader(
+            selectedTimeFrame,
+            onTimeFrameChanged,
+            onRefresh,
+            isRefreshing,
+            userName,
+          ),
           const SizedBox(height: 32),
 
           // Top row with 4 stat cards
+         LayoutBuilder(
+  builder: (context, constraints) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1100;
+    
+    if (isMobile) {
+      // Mobile: 2 cards per row
+      return Column(
+        children: [
           Row(
             children: [
               Expanded(
@@ -267,7 +429,7 @@ Widget dashboardContents(
                   Icons.message,
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 12),
               Expanded(
                 child: buildStatCard(
                   'Answered Messages',
@@ -276,7 +438,11 @@ Widget dashboardContents(
                   Icons.check_circle,
                 ),
               ),
-              const SizedBox(width: 20),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
               Expanded(
                 child: buildStatCard(
                   'Total Users',
@@ -285,7 +451,7 @@ Widget dashboardContents(
                   Icons.people,
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 12),
               Expanded(
                 child: buildStatCard(
                   'Most Frequent Category',
@@ -296,6 +462,52 @@ Widget dashboardContents(
               ),
             ],
           ),
+        ],
+      );
+    } else {
+      // Tablet and Desktop: 4 cards in a row
+      return Row(
+        children: [
+          Expanded(
+            child: buildStatCard(
+              'Total Messages',
+              '${inq?.totalMessages ?? 0}',
+              Colors.blue,
+              Icons.message,
+            ),
+          ),
+          SizedBox(width: isTablet ? 12 : 20),
+          Expanded(
+            child: buildStatCard(
+              'Answered Messages',
+              '${inq?.answeredMessages ?? 0}',
+              Colors.green,
+              Icons.check_circle,
+            ),
+          ),
+          SizedBox(width: isTablet ? 12 : 20),
+          Expanded(
+            child: buildStatCard(
+              'Total Users',
+              '${ud?.totalUsers ?? 0}',
+              Colors.red,
+              Icons.people,
+            ),
+          ),
+          SizedBox(width: isTablet ? 12 : 20),
+          Expanded(
+            child: buildStatCard(
+              'Most Frequent Category',
+              inq?.mostFrequentCategory ?? 'Unknown',
+              Colors.orange,
+              Icons.help,
+            ),
+          ),
+        ],
+      );
+    }
+  },
+),
           const SizedBox(height: 32),
 
           // Second row with 2 larger boxes
@@ -309,7 +521,7 @@ Widget dashboardContents(
                   ),
                 ),
                 const SizedBox(width: 20),
-                Expanded(child: buildInquiryTrendCard(inq?.inquiryTrend ?? [])),
+                Expanded(child: buildInquiryTrendCard(inq?.inquiryTrend ?? [], selectedTimeFrame)),
               ],
             ),
           ),
@@ -326,6 +538,8 @@ Widget dashboardContents(
 Widget _buildHeader(
   String selectedTimeFrame,
   ValueChanged<String> onTimeFrameChanged,
+  VoidCallback onRefresh,
+  bool isRefreshing,
   String userName,
 ) {
   return LayoutBuilder(
@@ -349,16 +563,25 @@ Widget _buildHeader(
                     ),
                   ),
                   const SizedBox(height: 12),
-                  CustomDropdownButton(
-                    items: [
-                      'All',
-                      'Today',
-                      'This Week',
-                      'This Month',
-                      'This Year',
+                  Row(
+                    children: [
+                      CustomDropdownButton(
+                        items: [
+                          'All',
+                          'Today',
+                          'This Week',
+                          'This Month',
+                          'This Year',
+                        ],
+                        initialValue: selectedTimeFrame,
+                        onChanged: onTimeFrameChanged,
+                      ),
+                      const SizedBox(width: 12),
+                      RefreshButton(
+                        onRefresh: onRefresh,
+                        isRefreshing: isRefreshing,
+                      ),
                     ],
-                    initialValue: selectedTimeFrame,
-                    onChanged: onTimeFrameChanged,
                   ),
                 ],
               )
@@ -373,20 +596,28 @@ Widget _buildHeader(
                       color: Colors.green,
                     ),
                   ),
-                  CustomDropdownButton(
-                    items: [
-                      'All',
-                      'Today',
-                      'This Week',
-                      'This Month',
-                      'This Year',
+                  Row(
+                    children: [
+                      CustomDropdownButton(
+                        items: [
+                          'All',
+                          'Today',
+                          'This Week',
+                          'This Month',
+                          'This Year',
+                        ],
+                        initialValue: selectedTimeFrame,
+                        onChanged: onTimeFrameChanged,
+                      ),
+                      const SizedBox(width: 12),
+                      RefreshButton(
+                        onRefresh: onRefresh,
+                        isRefreshing: isRefreshing,
+                      ),
                     ],
-                    initialValue: selectedTimeFrame,
-                    onChanged: onTimeFrameChanged,
                   ),
                 ],
               ),
-
           SizedBox(height: isMobile ? 12 : 8),
           Text(
             "Here's an overview of recent student inquiries for $selectedTimeFrame.",

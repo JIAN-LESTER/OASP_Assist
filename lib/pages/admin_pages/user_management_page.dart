@@ -1,12 +1,13 @@
+import 'package:capstone_project/pages/data/charts.dart';
+import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:capstone_project/crud/delete/delete.dart';
 
 import 'package:capstone_project/pages/admin_pages/buttons/add_user_button.dart';
 import 'package:capstone_project/modal_pages/edit_user_modal.dart';
 import 'package:capstone_project/modal_pages/user_info.dart';
-import 'package:capstone_project/pages/admin_pages/buttons/affiliation.dart';
-import 'package:capstone_project/pages/admin_pages/buttons/program.dart';
+
 import 'package:capstone_project/pages/admin_pages/widgets/pagination.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/role_dropdown_button.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/search_field.dart';
@@ -15,7 +16,7 @@ import 'package:flutter/material.dart';
 
 class UserManagementPage extends StatefulWidget {
   final Function(int)? onNavigateToPage; // ✅ Add this parameter
-  
+
   const UserManagementPage({super.key, this.onNavigateToPage});
 
   @override
@@ -27,10 +28,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
   final TextEditingController _searchController = TextEditingController();
   int currentPage = 1;
   int itemsPerPage = 10;
+
+  bool isLoading = true;
+  final StatDataManagement statData = StatDataManagement();
+
+  UserData? user;
+
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    loadStatData();
   }
 
   @override
@@ -38,6 +46,32 @@ class _UserManagementPageState extends State<UserManagementPage> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> loadStatData() async {
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Call the getInformationBankData() method
+      final data = await statData.getUserData();
+
+      if (!mounted) return;
+
+      setState(() {
+        user = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading information bank data: $e");
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   void _onRoleChanged(String newRole) {
@@ -68,6 +102,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+     if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return ResponsiveLayout(
       mobileBody: MobileUserManagement(
         selectedRole: selectedRole,
@@ -77,7 +114,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
-          onNavigateToPage: widget.onNavigateToPage,
+        onNavigateToPage: widget.onNavigateToPage,
+        user: user,
       ),
       tabletBody: TabletUserManagement(
         selectedRole: selectedRole,
@@ -87,7 +125,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
-          onNavigateToPage: widget.onNavigateToPage,
+        onNavigateToPage: widget.onNavigateToPage,
+        user: user,
       ),
       desktopBody: DesktopUserManagement(
         selectedRole: selectedRole,
@@ -97,7 +136,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
-          onNavigateToPage: widget.onNavigateToPage,
+        onNavigateToPage: widget.onNavigateToPage,
+        user: user,
       ),
     );
   }
@@ -112,7 +152,8 @@ class DesktopUserManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-   final Function(int)? onNavigateToPage;
+  final Function(int)? onNavigateToPage;
+  final UserData? user;
 
   const DesktopUserManagement({
     super.key,
@@ -124,6 +165,7 @@ class DesktopUserManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.onNavigateToPage,
+    this.user,
   });
 
   @override
@@ -139,7 +181,7 @@ class DesktopUserManagement extends StatelessWidget {
       onItemsPerPageChanged,
       onNavigateToPage,
       24.0,
-      
+      user,
     );
   }
 }
@@ -153,7 +195,8 @@ class TabletUserManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-   final Function(int)? onNavigateToPage;
+  final Function(int)? onNavigateToPage;
+    final UserData? user;
 
   const TabletUserManagement({
     super.key,
@@ -165,11 +208,12 @@ class TabletUserManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.onNavigateToPage,
+    this.user,
   });
 
   @override
   Widget build(BuildContext context) {
-      return mainContent(
+    return mainContent(
       context,
       selectedRole,
       onRoleChanged,
@@ -180,6 +224,7 @@ class TabletUserManagement extends StatelessWidget {
       onItemsPerPageChanged,
       onNavigateToPage,
       20.0,
+      user,
     );
   }
 }
@@ -193,7 +238,8 @@ class MobileUserManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-   final Function(int)? onNavigateToPage;
+  final Function(int)? onNavigateToPage;
+    final UserData? user;
 
   const MobileUserManagement({
     super.key,
@@ -205,6 +251,7 @@ class MobileUserManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.onNavigateToPage,
+    this.user,
   });
 
   @override
@@ -220,6 +267,7 @@ class MobileUserManagement extends StatelessWidget {
       onItemsPerPageChanged,
       onNavigateToPage,
       16.0,
+      user,
     );
   }
 }
@@ -235,72 +283,83 @@ Widget mainContent(
   final ValueChanged<int> onItemsPerPageChanged,
   final Function(int)? onNavigateToPage, // ✅ Add this parameter
   final double padding,
+  final UserData? user
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
-    body: SingleChildScrollView(
+    body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(
-            selectedRole, 
-            onRoleChanged, 
+            selectedRole,
+            onRoleChanged,
             searchController,
             onNavigateToPage, // ✅ Pass it to header
+            user,
           ),
           const SizedBox(height: 16),
-          Container(
-            height: MediaQuery.of(context).size.height - 200,
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                _buildTableHeader(),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('users')
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      }
-
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return const Center(child: Text('No users found.'));
-                      }
-
-                      return _buildUserList(
-                        allUsers: snapshot.data!.docs,
-                        selectedRole: selectedRole,
-                        searchQuery: searchController.text,
-                        currentPage: currentPage,
-                        itemsPerPage: itemsPerPage,
-                        onPageChanged: onPageChanged,
-                        onItemsPerPageChanged: onItemsPerPageChanged,
-                        onNavigateToPage: onNavigateToPage, // ✅ Pass it to user list
-                      );
-                    },
+          Expanded(
+            child: Container(
+              height: MediaQuery.of(context).size.height - 200,
+              padding: EdgeInsets.all(padding),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Column(
+                children: [
+                  _buildTableHeader(),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream:
+                          FirebaseFirestore.instance
+                              .collection('users')
+                              .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Text('Error: ${snapshot.error}'),
+                          );
+                        }
+
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return const Center(child: Text('No users found.'));
+                        }
+
+                        return _buildUserList(
+                          allUsers: snapshot.data!.docs,
+                          selectedRole: selectedRole,
+                          searchQuery: searchController.text,
+                          currentPage: currentPage,
+                          itemsPerPage: itemsPerPage,
+                          onPageChanged: onPageChanged,
+                          onItemsPerPageChanged: onItemsPerPageChanged,
+                          onNavigateToPage:
+                              onNavigateToPage, // ✅ Pass it to user list
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -418,7 +477,7 @@ Widget _buildUserRow({
   required String year,
   required String program,
   required String status,
-    required Function(int)? onNavigateToPage,
+  required Function(int)? onNavigateToPage,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
   bool isMobile = screenWidth < 600;
@@ -435,6 +494,20 @@ Widget _buildUserRow({
       onTap: () => showUserInfoModal(context, doc),
       child: Row(
         children: [
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.person_outline,
+              size: 20,
+              color: Colors.grey[700],
+            ),
+          ),
+
+          const SizedBox(width: 12),
           // User Info (Name/Email)
           Expanded(
             flex: 3,
@@ -469,14 +542,24 @@ Widget _buildUserRow({
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: role == 'admin' ? Colors.red[50] : Colors.blue[50],
+                  color:
+                      role == 'Admin'
+                          ? Colors.red[700]
+                          : role == 'Staff'
+                          ? Colors.orange[700]
+                          : Colors.blue[700],
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   role,
                   style: TextStyle(
                     fontSize: 12,
-                    color: role == 'admin' ? Colors.red[700] : Colors.blue[700],
+                    color:
+                        role == 'Admin'
+                            ? Colors.red[50]
+                            : role == 'Staff'
+                            ? Colors.orange[50]
+                            : Colors.blue[50],
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -527,48 +610,49 @@ Widget _buildUserRow({
           ),
           // Actions
           SizedBox(width: isTablet ? 60 : 80),
-      PopupMenuButton<String>(
-  icon: const Icon(Icons.more_horiz),
-  onSelected: (value) {
-    if (value == 'edit') {
-      showEditUserModal(
-        context,
-        doc,
-        onNavigateToPage: onNavigateToPage, // Pass it through
-      );
-    } else if (value == 'delete') {
-      showDeleteConfirmation(
-        context,
-        doc,
-        DeleteConfigs.users,
-        'users',
-        customDeleteHandler: handleUserDelete,
-      );
-    }
-  },
-  itemBuilder: (context) => [
-    const PopupMenuItem(
-      value: 'edit',
-      child: Row(
-        children: [
-          Icon(Icons.edit, size: 18),
-          SizedBox(width: 8),
-          Text('Edit'),
-        ],
-      ),
-    ),
-    const PopupMenuItem(
-      value: 'delete',
-      child: Row(
-        children: [
-          Icon(Icons.delete, size: 18, color: Colors.red),
-          SizedBox(width: 8),
-          Text('Delete', style: TextStyle(color: Colors.red)),
-        ],
-      ),
-    ),
-  ],
-),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_horiz),
+            onSelected: (value) {
+              if (value == 'edit') {
+                showEditUserModal(
+                  context,
+                  doc,
+                  onNavigateToPage: onNavigateToPage, // Pass it through
+                );
+              } else if (value == 'delete') {
+                showDeleteConfirmation(
+                  context,
+                  doc,
+                  DeleteConfigs.users,
+                  'users',
+                  customDeleteHandler: handleUserDelete,
+                );
+              }
+            },
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+          ),
         ],
       ),
     ),
@@ -579,7 +663,8 @@ Widget _buildHeader(
   String selectedRole,
   ValueChanged<String> onRoleChanged,
   TextEditingController searchController,
-  Function(int)? onNavigateToPage
+  Function(int)? onNavigateToPage,
+  UserData? user,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -617,15 +702,90 @@ Widget _buildHeader(
               ),
               Row(
                 children: [
-                
                   AddUserButton(
-                    onNavigateToPage: onNavigateToPage, // ✅ Pass it to AddUserButton
+                    onNavigateToPage:
+                        onNavigateToPage, // ✅ Pass it to AddUserButton
                   ),
                 ],
               ),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
+
+          // 🔹 Stat Cards Section
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child:
+                isMobile
+                    ? Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        buildStatCard(
+                          'Total Users',
+                          '${user?.totalUsers}',
+                          Colors.blue,
+                          Icons.message,
+                        ),
+                        buildStatCard(
+                          'Active Users',
+                          '${user?.activeUsers}',
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                        buildStatCard(
+                          'New Users (This Month)',
+                          '${user?.newUsersThisMonth}',
+                          Colors.red,
+                          Icons.group,
+                        ),
+                        buildStatCard(
+                          'Users Logged in Today',
+                          '${user?.usersLoggedInToday}',
+                          Colors.orange,
+                          Icons.help_outline,
+                        ),
+                      ],
+                    )
+                    : Row(
+                      children: [
+                        Expanded(
+                          child: buildStatCard(
+                            'Total Users',
+                            '${user?.totalUsers}',
+                            Colors.blue,
+                            Icons.message,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'Active Users',
+                            '${user?.activeUsers}',
+                            Colors.green,
+                            Icons.check_circle,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'New Users (This Month)',
+                            '${user?.newUsersThisMonth}',
+                            Colors.red,
+                            Icons.group,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'Users Logged in Today',
+                            '${user?.usersLoggedInToday}',
+                            Colors.orange,
+                            Icons.help_outline,
+                          ),
+                        ),
+                      ],
+                    ),
+          ),
 
           // Search and Filter Row
           isMobile

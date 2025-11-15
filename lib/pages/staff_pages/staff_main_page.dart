@@ -10,12 +10,14 @@ import 'package:capstone_project/responsive/widgets/menu.dart';
 class StaffMainPage extends StatefulWidget {
   final int? initialTabIndex;
   final String? escalationId;
+  final String? conversationId;
   final bool autoOpen;
 
   const StaffMainPage({
     super.key,
     this.initialTabIndex,
     this.escalationId,
+    this.conversationId,
     this.autoOpen = false,
   });
 
@@ -27,6 +29,11 @@ class _StaffMainPageState extends State<StaffMainPage> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
   bool _handledInitialArgs = false;
+  
+  // ✅ Store escalation details to pass to HumanEscalation
+  String? _escalationId;
+  String? _conversationId;
+  bool _shouldAutoOpen = false;
 
   final List<String> _pageTitles = const [
     'Dashboard',
@@ -39,12 +46,17 @@ class _StaffMainPageState extends State<StaffMainPage> {
   @override
   void initState() {
     super.initState();
-    // Set initial tab if provided
+    
+    // Set initial values from constructor
     _selectedIndex = widget.initialTabIndex ?? 0;
+    _escalationId = widget.escalationId;
+    _conversationId = widget.conversationId;
+    _shouldAutoOpen = widget.autoOpen;
     
     print('🎯 StaffMainPage initialized with:');
     print('   - initialTabIndex: ${widget.initialTabIndex}');
     print('   - escalationId: ${widget.escalationId}');
+    print('   - conversationId: ${widget.conversationId}');
     print('   - autoOpen: ${widget.autoOpen}');
   }
 
@@ -56,33 +68,45 @@ class _StaffMainPageState extends State<StaffMainPage> {
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       
       if (args != null) {
+        print('📦 Received navigation arguments: $args');
+        
         final initialTab = args['initialTab'] as int?;
         final escalationId = args['escalationId'] as String?;
+        final conversationId = args['conversationId'] as String?;
         final autoOpen = args['autoOpen'] as bool? ?? false;
 
-        if (initialTab != null) {
-          setState(() {
+        setState(() {
+          if (initialTab != null) {
             _selectedIndex = initialTab;
-          });
-        }
+          }
+          
+          // ✅ Store escalation details
+          if (escalationId != null) {
+            _escalationId = escalationId;
+            _conversationId = conversationId;
+            _shouldAutoOpen = autoOpen;
+          }
+        });
 
-        // If navigating to escalations tab with specific escalation
-        if (_selectedIndex == 2 && escalationId != null) {
-          // The HumanEscalation widget will handle opening the specific escalation
-          print('📍 Staff navigated to escalation: $escalationId');
-        }
+        print('✅ State updated:');
+        print('   - selectedIndex: $_selectedIndex');
+        print('   - escalationId: $_escalationId');
+        print('   - shouldAutoOpen: $_shouldAutoOpen');
       }
+      
       _handledInitialArgs = true;
     }
   }
 
   List<Widget> _getPages() {
     return [
-      const StaffDashboardPage(),
-      const StaffReportsPage(),
+      // const StaffDashboardPage(),
+      // const StaffReportsPage(),
+      // ✅ Pass the stored escalation details to HumanEscalation
       HumanEscalation(
-        initialEscalationId: widget.escalationId,
-        autoOpen: widget.autoOpen || _selectedIndex == 2,
+        key: ValueKey('escalation_$_escalationId'), // ✅ Force rebuild when escalationId changes
+        initialEscalationId: _escalationId,
+        autoOpen: _shouldAutoOpen && _selectedIndex == 2,
       ),
       const StaffAnnouncementPage(),
       const StaffMessageLogsPage(),
@@ -92,6 +116,13 @@ class _StaffMainPageState extends State<StaffMainPage> {
   void _onNavigationItemTap(int index) {
     setState(() {
       _selectedIndex = index;
+      
+      // ✅ Reset escalation details when navigating away
+      if (index != 2) {
+        _escalationId = null;
+        _conversationId = null;
+        _shouldAutoOpen = false;
+      }
     });
   }
 

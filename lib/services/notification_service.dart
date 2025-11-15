@@ -7,9 +7,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:capstone_project/colors.dart';
+import 'package:capstone_project/icon_and_color.dart';
 
-// ✅ CRITICAL: Background handler MUST be top-level function
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print('📬 ===== BACKGROUND MESSAGE =====');
@@ -32,10 +31,8 @@ class NotificationService {
   bool _initialized = false;
   bool get isAndroidOrIOS => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
-  // ✅ NEW: Navigation callback
   Function(String notificationType, Map<String, dynamic> data)? _onNotificationTap;
 
-  // ✅ NEW: Set navigation handler
   void setNavigationHandler(
     Function(String notificationType, Map<String, dynamic> data) handler,
   ) {
@@ -208,6 +205,7 @@ class NotificationService {
     print('✅ Local notifications initialized');
   }
 
+  // ✅ FIXED: Save token as array in single user document
   Future<void> _saveFCMToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -244,19 +242,20 @@ class NotificationService {
       
       final role = userDoc.data()?['role'] ?? 'user';
 
+      // ✅ FIXED: Store tokens as array in single document per user
       await FirebaseFirestore.instance
           .collection('fcm_tokens')
-          .doc(token)
+          .doc(user.uid) // Use userId as document ID
           .set({
-        'token': token,
         'userId': user.uid,
         'userRole': role,
+        'tokens': FieldValue.arrayUnion([token]), // Add token to array
         'platform': Platform.isAndroid ? 'android' : 'ios',
         'updatedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      print('✅ FCM token saved with role: $role');
+      print('✅ FCM token saved to user document with role: $role');
     } catch (e) {
       print('❌ Error saving FCM token: $e');
     }
@@ -336,7 +335,6 @@ class NotificationService {
 
     final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     
-    // ✅ NEW: Create payload with type and data
     final payload = _createPayload(message.data);
     
     try {
@@ -354,20 +352,17 @@ class NotificationService {
     }
   }
 
-  // ✅ NEW: Create payload from message data
   String _createPayload(Map<String, dynamic> data) {
     final type = data['type'] ?? 'announcement';
-    final id = data['announcementId'] ?? 
-               data['escalationId'] ?? 
-               data['conversationId'] ?? 
-               '';
+    final escalationId = data['escalationId'] ?? '';
+    final announcementId = data['announcementId'] ?? '';
+    final conversationId = data['conversationId'] ?? '';
     final category = data['category'] ?? '';
     
-    // Format: type|id|category
-    return '$type|$id|$category';
+    // Format: type|escalationId|announcementId|conversationId|category
+    return '$type|$escalationId|$announcementId|$conversationId|$category';
   }
 
-  // ✅ NEW: Handle FCM message tap (background/terminated)
   void _handleMessageTap(RemoteMessage message) {
     print('👆 ===== NOTIFICATION TAPPED (FCM) =====');
     print('👆 Message ID: ${message.messageId}');
@@ -378,7 +373,6 @@ class NotificationService {
     _navigateBasedOnNotification(type, message.data);
   }
 
-  // ✅ NEW: Handle local notification tap
   void _onLocalNotificationTapped(NotificationResponse response) {
     print('👆 ===== LOCAL NOTIFICATION TAPPED =====');
     print('👆 Payload: ${response.payload}');
@@ -389,34 +383,34 @@ class NotificationService {
       return;
     }
 
-    // Parse payload: type|id|category
+    // Parse payload: type|escalationId|announcementId|conversationId|category
     final parts = response.payload!.split('|');
     if (parts.isEmpty) return;
 
     final type = parts[0];
-    final id = parts.length > 1 ? parts[1] : '';
-    final category = parts.length > 2 ? parts[2] : '';
+    final escalationId = parts.length > 1 ? parts[1] : '';
+    final announcementId = parts.length > 2 ? parts[2] : '';
+    final conversationId = parts.length > 3 ? parts[3] : '';
+    final category = parts.length > 4 ? parts[4] : '';
 
     final data = {
       'type': type,
-      if (type == 'announcement') 'announcementId': id,
-      if (type == 'escalation_reply' || type == 'new_escalation') 'escalationId': id,
+      if (escalationId.isNotEmpty) 'escalationId': escalationId,
+      if (announcementId.isNotEmpty) 'announcementId': announcementId,
+      if (conversationId.isNotEmpty) 'conversationId': conversationId,
       if (category.isNotEmpty) 'category': category,
     };
 
     _navigateBasedOnNotification(type, data);
   }
 
-  Future<void> _navigateBasedOnNotification(
+ Future<void> _navigateBasedOnNotification(
   String type,
   Map<String, dynamic> data,
 ) async {
   print('🔍 ===== NAVIGATION DEBUG =====');
   print('Type: $type');
-  print('Data keys: ${data.keys.toList()}');
-  print('Data values: $data');
-  print('Has escalationId: ${data.containsKey('escalationId')}');
-  print('EscalationId value: ${data['escalationId']}');
+  print('Data: $data');
   print('Handler registered: ${_onNotificationTap != null}');
   print('=============================');
   
@@ -440,22 +434,21 @@ class NotificationService {
     final role = userDoc.data()?['role'] ?? 'user';
 
     print('🔔 Navigation: Type=$type, Role=$role');
-    print('🔔 Data: $data');
 
-    // Handle based on type and role
-    if (type == 'new_escalation' && role == 'staff') {
+    // ✅ FIX: Pass the full data including announcementId
+    if (type == 'new_escalation' && (role == 'staff' || role == 'admin')) {
       _onNotificationTap!('escalation_detail', data);
     } else if (type == 'escalation_reply' && role == 'user') {
       _onNotificationTap!('escalation_response', data);
-    } else if (type == 'announcement') {
+    } else if (type == 'announcement' || type == 'deadline_reminder') {
+      // ✅ Pass announcement data for navigation
       _onNotificationTap!('announcement', data);
-    } else if (type == 'deadline_reminder') {
-      _onNotificationTap!('announcements_list', data);
     }
   } catch (e) {
     print('❌ Error handling notification navigation: $e');
   }
 }
+
   Future<void> _saveWebToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -470,17 +463,18 @@ class NotificationService {
 
       final webToken = 'web_${user.uid}_${DateTime.now().millisecondsSinceEpoch}';
 
+      // ✅ FIXED: Use same structure for web tokens
       await FirebaseFirestore.instance
           .collection('fcm_tokens')
-          .doc(webToken)
+          .doc(user.uid)
           .set({
-        'token': webToken,
         'userId': user.uid,
         'userRole': role,
+        'tokens': FieldValue.arrayUnion([webToken]),
         'platform': 'web',
         'updatedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
 
       print('✅ Web session token saved');
     } catch (e) {
@@ -534,10 +528,13 @@ class NotificationService {
         if (user != null) {
           final token = await _firebaseMessaging.getToken();
           if (token != null) {
+            // ✅ FIXED: Remove token from array instead of deleting document
             await FirebaseFirestore.instance
                 .collection('fcm_tokens')
-                .doc(token)
-                .delete();
+                .doc(user.uid)
+                .update({
+              'tokens': FieldValue.arrayRemove([token]),
+            });
           }
         }
       }

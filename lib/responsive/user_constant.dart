@@ -36,6 +36,7 @@ class UserConstant {
   static const Duration _faqCacheExpiry = Duration(hours: 1);
 
   static bool _isServicesExpanded = false;
+   static bool shouldShowFAQs = false;
 
   // Fixed logout method that handles both Firebase Auth and Google Sign In
   static Future<void> signUserOut() async {
@@ -230,42 +231,42 @@ class UserConstant {
     print('DEBUG: Successfully continued existing conversation');
   }
 
-  static Future<String> createNewConversation() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) throw Exception('No authenticated user');
+  // static Future<String> createNewConversation() async {
+  //   final userId = FirebaseAuth.instance.currentUser?.uid;
+  //   if (userId == null) throw Exception('No authenticated user');
 
-    try {
-      // End any existing active conversations
-      final activeQuery =
-          await FirebaseFirestore.instance
-              .collection('conversations')
-              .where('userId', isEqualTo: userId)
-              .where('status', isEqualTo: 'active')
-              .get();
+  //   try {
+  //     // End any existing active conversations
+  //     final activeQuery =
+  //         await FirebaseFirestore.instance
+  //             .collection('conversations')
+  //             .where('userId', isEqualTo: userId)
+  //             .where('status', isEqualTo: 'active')
+  //             .get();
 
-      for (final doc in activeQuery.docs) {
-        await doc.reference.update({
-          'status': 'ended',
-          'endedAt': FieldValue.serverTimestamp(),
-        });
-      }
+  //     for (final doc in activeQuery.docs) {
+  //       await doc.reference.update({
+  //         'status': 'ended',
+  //         'endedAt': FieldValue.serverTimestamp(),
+  //       });
+  //     }
 
-      // Create new conversation
-      final firestore = FirebaseFirestore.instance;
-      final conversationRef = await firestore.collection('conversations').add({
-        'userId': userId,
-        'title': 'New Conversation',
-        'status': 'active',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+  //     // Create new conversation
+  //     final firestore = FirebaseFirestore.instance;
+  //     final conversationRef = await firestore.collection('conversations').add({
+  //       'userId': userId,
+  //       'title': 'New Conversation',
+  //       'status': 'active',
+  //       'createdAt': FieldValue.serverTimestamp(),
+  //     });
 
-      print('DEBUG: Created new conversation: ${conversationRef.id}');
-      return conversationRef.id;
-    } catch (e) {
-      print('DEBUG: Error creating new conversation: $e');
-      rethrow;
-    }
-  }
+  //     print('DEBUG: Created new conversation: ${conversationRef.id}');
+  //     return conversationRef.id;
+  //   } catch (e) {
+  //     print('DEBUG: Error creating new conversation: $e');
+  //     rethrow;
+  //   }
+  // }
 
   // FIXED: Show all conversations instead of limiting to 5 active ones
   static void subscribeToRecentConversations(
@@ -562,128 +563,140 @@ static Future<void> onConversationSelected(
     }
   }
 
-  // UPDATED: New Chat will end active conversation and create a new one
-  static Future<void> startNewChat(
-    BuildContext context, [
-    String? firstUserMessage,
-    bool pushIfNeeded = true,
-  ]) async {
-    print('DEBUG: Starting new chat...');
+static Future<String?> startNewChat(
+  BuildContext context, [
+  String? firstUserMessage,
+  bool pushIfNeeded = true,
+]) async {
+  print('🆕 Starting new chat...');
 
-    if (!context.mounted) return;
+  if (!context.mounted) {
+    print('❌ Context not mounted');
+    return null;
+  }
 
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) {
-      _showErrorSnackBar(context, 'Please log in to start a chat');
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  if (userId == null) {
+    _showErrorSnackBar(context, 'Please log in to start a chat');
+    return null;
+  }
+
+  try {
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    // Step 1: End all active conversations
+    print('📝 Step 1: Ending all active conversations...');
+    await endAllActiveConversations(userId);
+    
+    // Step 2: Clear messages and reset state
+    print('🧹 Step 2: Clearing all state...');
+    chatProvider.clearMessages();
+    _selectedConversationId = null;
+    shouldShowFAQs = true;
+    
+    // Step 3: Wait for state to settle
+    await Future.delayed(Duration(milliseconds: 200));
+    
+    // Step 4: Create new conversation
+    print('✨ Step 3: Creating new conversation...');
+    final newConversationId = await createNewConversation(userId);
+    
+    // Step 5: Set up the new conversation
+    print('🔧 Step 4: Setting up conversation in provider...');
+    await chatProvider.setConversationId(newConversationId);
+    
+    // Step 6: Update static variables
+    print('📌 Step 5: Updating static variables...');
+    _selectedConversationId = newConversationId;
+    
+    // ✅ FIX: Force refresh the conversation list
+    print('🔄 Step 6: Refreshing conversation list...');
+    // The listener should pick this up automatically, but we can force a check
+    await Future.delayed(Duration(milliseconds: 500));
+    
+    print('✅ New chat created successfully: $newConversationId');
+    
+    return newConversationId;
+    
+  } catch (e) {
+    print('❌ Error starting new chat: $e');
+    if (context.mounted) {
+      _showErrorSnackBar(
+        context,
+        'Failed to start new chat: ${e.toString()}',
+      );
+    }
+    return null;
+  }
+}
+
+ static Future<void> endAllActiveConversations(String userId) async {
+  try {
+    print('🔍 Looking for active conversations to end...');
+
+    final activeQuery = await FirebaseFirestore.instance
+        .collection('conversations')
+        .where('userId', isEqualTo: userId)
+        .where('status', isEqualTo: 'active')
+        .get();
+
+    if (activeQuery.docs.isEmpty) {
+      print('ℹ️ No active conversations to end');
       return;
     }
 
-    try {
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    print('📝 Found ${activeQuery.docs.length} active conversation(s)');
 
-      // FIXED: End ALL active conversations before creating new one
-      await _endAllActiveConversations(userId);
+    final batch = FirebaseFirestore.instance.batch();
 
-      // Clear messages first
-      chatProvider.clearMessages();
-
-      // Create new conversation
-      final newConversationId = await _createNewConversation(userId);
-
-      // Set up the new conversation
-      await chatProvider.setConversationId(newConversationId);
-
-      // Update the static variable directly (no setState needed in static context)
-      _selectedConversationId = newConversationId;
-
-      // REMOVED: Navigation logic - let parent handle tab switching
-      // The parent (UserMainPage) should handle switching to chat tab
-
-      // Clear any input field if present
-      _controller.clear();
-
-      // Show success snackbar
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: const [
-              Icon(Icons.refresh, color: Colors.white, size: 20),
-              SizedBox(width: 12),
-              Text('New chat started!'),
-            ],
-          ),
-          backgroundColor: const Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      print('DEBUG: Error starting new chat: $e');
-      if (context.mounted) {
-        _showErrorSnackBar(
-          context,
-          'Failed to start new chat: ${e.toString()}',
-        );
-      }
-    }
-  }
-
-  static Future<void> _endAllActiveConversations(String userId) async {
-    try {
-      print('DEBUG: Ending all active conversations for user: $userId');
-
-      final activeQuery =
-          await FirebaseFirestore.instance
-              .collection('conversations')
-              .where('userId', isEqualTo: userId)
-              .where('status', isEqualTo: 'active')
-              .get();
-
-      final batch = FirebaseFirestore.instance.batch();
-
-      for (final doc in activeQuery.docs) {
-        batch.update(doc.reference, {
-          'status': 'ended',
-          'endedAt': FieldValue.serverTimestamp(),
-        });
-        print('DEBUG: Marking conversation ${doc.id} as ended');
-      }
-
-      if (activeQuery.docs.isNotEmpty) {
-        await batch.commit();
-        print(
-          'DEBUG: Successfully ended ${activeQuery.docs.length} conversations',
-        );
-      }
-    } catch (e) {
-      print('DEBUG: Error ending active conversations: $e');
-      rethrow;
-    }
-  }
-
-  static Future<String> _createNewConversation(String userId) async {
-    try {
-      print('DEBUG: Creating new conversation for user: $userId');
-
-      final firestore = FirebaseFirestore.instance;
-      final conversationRef = await firestore.collection('conversations').add({
-        'userId': userId,
-        'title': 'New Conversation',
-        'status': 'active',
-        'createdAt': FieldValue.serverTimestamp(),
-        'messageCount': 0,
+    for (final doc in activeQuery.docs) {
+      batch.update(doc.reference, {
+        'status': 'ended',
+        'endedAt': FieldValue.serverTimestamp(),
       });
-
-      print('DEBUG: Created new conversation: ${conversationRef.id}');
-      return conversationRef.id;
-    } catch (e) {
-      print('DEBUG: Error creating new conversation: $e');
-      rethrow;
+      print('   - Marking conversation ${doc.id} as ended');
     }
+
+    await batch.commit();
+    
+    // ✅ Wait for Firestore to propagate changes
+    await Future.delayed(Duration(milliseconds: 100));
+    
+    print('✅ Successfully ended ${activeQuery.docs.length} conversations');
+  } catch (e) {
+    print('❌ Error ending active conversations: $e');
+    rethrow;
   }
+}
+
+  static Future<String> createNewConversation(String userId) async {
+  try {
+    print('📝 Creating new conversation for user: $userId');
+
+    final firestore = FirebaseFirestore.instance;
+    final conversationRef = await firestore.collection('conversations').add({
+      'userId': userId,
+      'title': 'New Conversation',
+      'status': 'active',
+      'createdAt': FieldValue.serverTimestamp(),
+      'lastActivity': FieldValue.serverTimestamp(),
+      'messageCount': 0,
+    });
+
+    // ✅ Wait for Firestore to confirm write
+    final doc = await conversationRef.get();
+    if (!doc.exists) {
+      throw Exception('Failed to create conversation');
+    }
+
+    print('✅ Created new conversation: ${conversationRef.id}');
+    return conversationRef.id;
+  } catch (e) {
+    print('❌ Error creating new conversation: $e');
+    rethrow;
+  }
+}
+
 
   // NEW: Navigate to chat page without creating conversation
   // FIXED: Navigate to chat without auto-creating

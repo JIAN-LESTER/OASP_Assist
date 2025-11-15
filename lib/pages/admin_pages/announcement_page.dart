@@ -1,13 +1,12 @@
 import 'dart:convert';
-import 'dart:io';
+
 import 'package:capstone_project/services/fb_sync.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-import 'package:capstone_project/colors.dart';
+
 import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/category_dropdown_button.dart';
@@ -36,7 +35,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   void initState() {
     super.initState();
     loadAnnouncements();
-
   }
 
   Future<void> loadAnnouncements() async {
@@ -62,725 +60,754 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
   }
 
-
-Future<String?> _getAuthToken() async {
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      return await user.getIdToken();
-    }
-  } catch (e) {
-    print('Error getting auth token: $e');
-  }
-  return null;
-}
-
-
-// Manual refresh button (keep as is for manual sync)
-Future<void> _refreshFromFacebook() async {
-  if (isRefreshing) {
-    print('⚠️ Sync already in progress');
-    return;
-  }
-
-  setState(() => isRefreshing = true);
-
-  try {
-    print('🔄 Manual Facebook sync triggered...');
-    
-    final result = await FacebookSyncService.syncPosts();
-    
-    print('📦 Sync result: $result');
-    
-    if (result['success'] == true) {
-      await Future.delayed(Duration(milliseconds: 500));
-      await loadAnnouncements();
-      
-      final count = result['count'] ?? 0;
-      final failed = result['failed'] ?? 0;
-      
-      if (mounted) {
-        _showSuccessSnackBar(
-          '✅ Synced $count posts' + (failed > 0 ? ' ($failed failed)' : '')
-        );
+  Future<String?> _getAuthToken() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        return await user.getIdToken();
       }
-    } else {
-      final errorMsg = result['error'] ?? result['message'] ?? 'Sync failed';
-      throw Exception(errorMsg);
+    } catch (e) {
+      print('Error getting auth token: $e');
     }
-    
-  } catch (e) {
-    print('❌ Sync error: $e');
-    
-    if (mounted) {
-      final errorMessage = FacebookSyncService.parseErrorMessage(e);
-      _showErrorSnackBar(errorMessage);
+    return null;
+  }
+
+  // Manual refresh button (keep as is for manual sync)
+  Future<void> _refreshFromFacebook() async {
+    if (isRefreshing) {
+      print('⚠️ Sync already in progress');
+      return;
     }
-  } finally {
-    if (mounted) {
-      setState(() => isRefreshing = false);
+
+    setState(() => isRefreshing = true);
+
+    try {
+      print('🔄 Manual Facebook sync triggered...');
+
+      final result = await FacebookSyncService.syncPosts();
+
+      print('📦 Sync result: $result');
+
+      if (result['success'] == true) {
+        await Future.delayed(Duration(milliseconds: 500));
+        await loadAnnouncements();
+
+        final count = result['count'] ?? 0;
+        final failed = result['failed'] ?? 0;
+
+        if (mounted) {
+          _showSuccessSnackBar(
+            '✅ Synced $count posts' + (failed > 0 ? ' ($failed failed)' : ''),
+          );
+        }
+      } else {
+        final errorMsg = result['error'] ?? result['message'] ?? 'Sync failed';
+        throw Exception(errorMsg);
+      }
+    } catch (e) {
+      print('❌ Sync error: $e');
+
+      if (mounted) {
+        final errorMessage = FacebookSyncService.parseErrorMessage(e);
+        _showErrorSnackBar(errorMessage);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isRefreshing = false);
+      }
     }
   }
-}
 
+  Future<void> _showTokenInputModal() async {
+    final TextEditingController tokenController = TextEditingController();
+    bool isExchanging = false;
 
-Future<void> _showTokenInputModal() async {
-  final TextEditingController tokenController = TextEditingController();
-  bool isExchanging = false;
-
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setDialogState) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
-          title: Row(
-            children: const [
-              Icon(Icons.facebook, color: Color(0xFF2E7D32), size: 28),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Configure Facebook Token',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2E7D32),
-                  ),
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => StatefulBuilder(
+            builder: (context, setDialogState) {
+              return Dialog(
+                backgroundColor: Colors.transparent,
+                insetPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 24,
                 ),
-              ),
-            ],
-          ),
-          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-          content: SizedBox(
-            width: 520,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 🧭 Instruction Box
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Color(0xFF2E7D32).withOpacity(0.3)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Row(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Header
+                      Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Row(
                           children: [
-                            Icon(Icons.info_outline,
-                                color: Color(0xFF2E7D32), size: 20),
-                            SizedBox(width: 6),
-                            Text(
-                              'How to Get Your Facebook Access Token:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF1B5E20),
-                                fontSize: 15,
+                            Expanded(
+                              child: Text(
+                                'Facebook Integration',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[900],
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.pop(context),
+                              icon: Icon(
+                                Icons.close_rounded,
+                                color: Colors.grey[600],
+                              ),
+                              style: IconButton.styleFrom(
+                                padding: const EdgeInsets.all(8),
                               ),
                             ),
                           ],
                         ),
-                        SizedBox(height: 10),
-                        Text.rich(
-                          TextSpan(
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              color: Color(0xFF2E7D32),
-                              height: 1.55,
-                            ),
+                      ),
+
+                      // Content
+                      Flexible(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              TextSpan(text: '1. Visit '),
-                              TextSpan(
-                                text: 'https://developers.facebook.com/',
-                                style: TextStyle(
-                                  color: Colors.blueAccent,
-                                  decoration: TextDecoration.underline,
+                              // Instructions Section
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'SETUP INSTRUCTIONS',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey[500],
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+
+                                    _buildInstructionStep(
+                                      '1',
+                                      'Visit developers.facebook.com and log in',
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    _buildInstructionStep(
+                                      '2',
+                                      'Click "My Apps" → "Create App"',
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    _buildInstructionStep(
+                                      '3',
+                                      'Select "Business" app type',
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    _buildInstructionStep(
+                                      '4',
+                                      'Enable required permissions in Use Cases',
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    _buildInstructionStep(
+                                      '5',
+                                      'Go to Tools → Graph API Explorer',
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    _buildInstructionStep(
+                                      '6',
+                                      'Generate and copy your Access Token',
+                                    ),
+
+                                    const SizedBox(height: 16),
+
+                                    // Required Permissions
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.grey[300]!,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.check_circle_outline,
+                                                size: 16,
+                                                color: Colors.grey[600],
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Required Permissions',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'pages_read_engagement, pages_manage_posts, pages_show_list, pages_read_user_content, pages_manage_metadata',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[600],
+                                              height: 1.5,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              TextSpan(
-                                  text:
-                                      ' and log in using your Facebook account.\n'),
-                              TextSpan(
-                                  text:
-                                      '2. On the top bar, click “My Apps” → “Create App”.\n'),
-                              TextSpan(
-                                text:
-                                    '3. Choose "Manage everything on your Page" as the use case, and select "Business" as the App Type.',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              TextSpan(
-                                  text:
-                                      '\n4. Fill out the following details:\n   • App Display Name: OASP Assist\n   • Contact Email: your official email\n   • Business Account: Optional\n'),
-                              TextSpan(text: '5. Click “Create App”.\n\n'),
-                              TextSpan(
-                                  text:
-                                      '6. In the left sidebar, open “Use Cases” and select your created app.\n'),
-                              TextSpan(
-                                  text:
-                                      '7. Under “Manage everything on your Page”, enable:\n   '),
-                              TextSpan(
-                                text:
-                                    '✅ pages_read_engagement\n   ✅ pages_manage_posts\n   ✅ pages_show_list\n   ✅ pages_read_user_content\n   ✅ pages_manage_metadata\n',
+
+                              const SizedBox(height: 20),
+
+                              // Token Input Section
+                              Text(
+                                'ACCESS TOKEN',
                                 style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  color: Color(0xFF1B5E20),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[500],
+                                  letterSpacing: 0.5,
                                 ),
                               ),
-                              TextSpan(
-                                  text:
-                                      '8. Go to “Tools” → “Graph API Explorer”.\n9. Select your app and check the same permissions.\n10. Click “Generate Access Token” and copy it below.'),
+                              const SizedBox(height: 12),
+
+                              TextField(
+                                controller: tokenController,
+                                maxLines: 3,
+                                enabled: !isExchanging,
+                                style: const TextStyle(fontSize: 14),
+                                decoration: InputDecoration(
+                                  hintText:
+                                      'Paste your Facebook access token here...',
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 14,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: Colors.grey[300]!,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: Colors.grey[300]!,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFF2E7D32),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey[50],
+                                  contentPadding: const EdgeInsets.all(16),
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // Paste Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed:
+                                      isExchanging
+                                          ? null
+                                          : () async {
+                                            final data =
+                                                await Clipboard.getData(
+                                                  'text/plain',
+                                                );
+                                            if (data?.text != null) {
+                                              tokenController.text =
+                                                  data!.text!;
+                                              _showSuccessSnackBar(
+                                                '✅ Token pasted from clipboard',
+                                              );
+                                            }
+                                          },
+                                  icon: const Icon(
+                                    Icons.content_paste_rounded,
+                                    size: 22,
+                                  ),
+                                  label: const Text(
+                                    'Paste from Clipboard',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF2E7D32),
+                                    side: BorderSide(
+                                      color:
+                                          isExchanging
+                                              ? Colors.grey.shade300
+                                              : const Color(0xFF2E7D32),
+                                      width: 1.5,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 18,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 24),
+
+                              // Action Buttons
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed:
+                                          isExchanging
+                                              ? null
+                                              : () => Navigator.pop(context),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.grey[700],
+                                        side: BorderSide(
+                                          color: Colors.grey[300]!,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 18,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Cancel',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed:
+                                          isExchanging
+                                              ? null
+                                              : () async {
+                                                final token =
+                                                    tokenController.text.trim();
+
+                                                if (token.isEmpty) {
+                                                  _showErrorSnackBar(
+                                                    'Please enter a token',
+                                                  );
+                                                  return;
+                                                }
+
+                                                if (token.length < 50) {
+                                                  _showErrorSnackBar(
+                                                    'Token seems too short',
+                                                  );
+                                                  return;
+                                                }
+
+                                                setDialogState(
+                                                  () => isExchanging = true,
+                                                );
+
+                                                try {
+                                                  print(
+                                                    '🔄 Exchanging token...',
+                                                  );
+                                                  final result =
+                                                      await FacebookSyncService.exchangeToken(
+                                                        token,
+                                                      );
+
+                                                  if (result['success'] ==
+                                                          true ||
+                                                      result['ok'] == true) {
+                                                    final expiresIn =
+                                                        result['expires_in'] ??
+                                                        0;
+                                                    final daysValid =
+                                                        (expiresIn / 86400)
+                                                            .round();
+
+                                                    Navigator.pop(context);
+                                                    _showSuccessSnackBar(
+                                                      '✅ Token saved! Valid for ~$daysValid days.',
+                                                    );
+                                                    await _autoSyncAfterTokenSave();
+                                                    return;
+                                                  }
+
+                                                  throw Exception(
+                                                    result['message'] ??
+                                                        result['error'],
+                                                  );
+                                                } catch (e) {
+                                                  print('❌ Error: $e');
+                                                  setDialogState(
+                                                    () => isExchanging = false,
+                                                  );
+                                                  final errorMessage =
+                                                      FacebookSyncService.parseErrorMessage(
+                                                        e,
+                                                      );
+                                                  _showErrorSnackBar(
+                                                    'Failed to save token: $errorMessage',
+                                                  );
+                                                }
+                                              },
+                                      icon:
+                                          isExchanging
+                                              ? const SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.white),
+                                                ),
+                                              )
+                                              : const Icon(
+                                                Icons.check_circle,
+                                                size: 22,
+                                              ),
+                                      label: Text(
+                                        isExchanging
+                                            ? 'Saving...'
+                                            : 'Save & Connect',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFF2E7D32,
+                                        ),
+                                        foregroundColor: Colors.white,
+                                        disabledBackgroundColor:
+                                            Colors.grey.shade400,
+                                        elevation: 0,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 18,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
                         ),
-                        SizedBox(height: 10),
-                        Divider(color: Color(0xFFBDBDBD)),
-                        Text(
-                          '💡 Tip: Use a Business App to access Page posts and insights effectively.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF2E7D32),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
+                ),
+              );
+            },
+          ),
+    );
+  }
 
-                  const SizedBox(height: 20),
+  Widget _buildInstructionStep(String number, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.grey[400]!, width: 2),
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[700],
+                height: 1.5,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-                  // 🔑 Token Input
-                  const Text(
-                    'Facebook Access Token',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1B5E20),
-                      fontSize: 14.5,
-                    ),
+  Widget _buildPermissionItem(String permission) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 16),
+          const SizedBox(width: 8),
+          Text(
+            permission,
+            style: const TextStyle(
+              fontSize: 13,
+              fontFamily: 'monospace',
+              color: Color(0xFF0D47A1),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🎯 NEW: Auto-sync after token is saved
+  Future<void> _autoSyncAfterTokenSave() async {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => Center(
+            child: Container(
+              padding: EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text(
+                    'Syncing Facebook posts...',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: tokenController,
-                    maxLines: 3,
-                    enabled: !isExchanging,
-                    style: const TextStyle(fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: 'Paste your token here...',
-                      hintStyle: const TextStyle(color: Colors.grey),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            const BorderSide(color: Color(0xFF2E7D32), width: 1),
-                      ),
-                      focusedBorder: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                        borderSide: BorderSide(
-                          color: Color(0xFF2E7D32),
-                          width: 2,
-                        ),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                      contentPadding: const EdgeInsets.all(12),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // 📋 Paste Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: isExchanging
-                          ? null
-                          : () async {
-                              final data =
-                                  await Clipboard.getData('text/plain');
-                              if (data?.text != null) {
-                                tokenController.text = data!.text!;
-                                _showSuccessSnackBar(
-                                    '✅ Token pasted from clipboard');
-                              }
-                            },
-                      icon: const Icon(Icons.content_paste_rounded,
-                          color: Color(0xFF2E7D32), size: 18),
-                      label: const Text(
-                        'Paste from Clipboard',
-                        style: TextStyle(
-                          color: Color(0xFF2E7D32),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFF2E7D32), width: 1.5),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
+                  SizedBox(height: 8),
+                  Text(
+                    'This may take a moment',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                   ),
                 ],
               ),
             ),
           ),
+    );
 
-          // 🟢 Action Buttons
-          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          actions: [
-            TextButton(
-              onPressed: isExchanging ? null : () => Navigator.pop(context),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: isExchanging
-                  ? null
-                  : () async {
-                      final token = tokenController.text.trim();
+    try {
+      print('🔄 Starting auto-sync after token save...');
 
-                      if (token.isEmpty) {
-                        _showErrorSnackBar('Please enter a token');
-                        return;
-                      }
+      final result = await FacebookSyncService.syncPosts();
 
-                      if (token.length < 50) {
-                        _showErrorSnackBar('Token seems too short');
-                        return;
-                      }
+      Navigator.pop(context); // Close loading dialog
 
-                      setDialogState(() => isExchanging = true);
+      if (result['success'] == true) {
+        final count = result['count'] ?? 0;
+        final failed = result['failed'] ?? 0;
 
-                      try {
-                        print('🔄 Exchanging token...');
-                        final result =
-                            await FacebookSyncService.exchangeToken(token);
+        print('✅ Auto-sync completed: $count posts synced');
 
-                        if (result['success'] == true ||
-                            result['ok'] == true) {
-                          final expiresIn = result['expires_in'] ?? 0;
-                          final daysValid = (expiresIn / 86400).round();
+        // Reload announcements
+        await loadAnnouncements();
 
-                          Navigator.pop(context);
-                          _showSuccessSnackBar(
-                              '✅ Token saved! Valid for ~$daysValid days.');
-                          await _autoSyncAfterTokenSave();
-                          return;
-                        }
-
-                        throw Exception(result['message'] ?? result['error']);
-                      } catch (e) {
-                        print('❌ Error: $e');
-                        setDialogState(() => isExchanging = false);
-                        final errorMessage =
-                            FacebookSyncService.parseErrorMessage(e);
-                        _showErrorSnackBar(
-                            'Failed to save token: $errorMessage');
-                      }
-                    },
-              icon: isExchanging
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.save, size: 18),
-              label: Text(isExchanging ? 'Saving...' : 'Save Token'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E7D32),
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 2,
-              ),
-            ),
-          ],
+        // Show success message
+        _showSuccessSnackBar(
+          '✅ Successfully synced $count posts!' +
+              (failed > 0 ? ' ($failed failed)' : ''),
         );
-      },
-    ),
-  );
-}
+      } else {
+        throw Exception(result['error'] ?? result['message'] ?? 'Sync failed');
+      }
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
 
+      print('❌ Auto-sync failed: $e');
 
+      final errorMessage = FacebookSyncService.parseErrorMessage(e);
 
-// 🎯 NEW: Auto-sync after token is saved
-Future<void> _autoSyncAfterTokenSave() async {
-  // Show loading indicator
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => Center(
-      child: Container(
-        padding: EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
-              'Syncing Facebook posts...',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'This may take a moment',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[600],
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-
-  try {
-    print('🔄 Starting auto-sync after token save...');
-    
-    final result = await FacebookSyncService.syncPosts();
-    
-    Navigator.pop(context); // Close loading dialog
-    
-    if (result['success'] == true) {
-      final count = result['count'] ?? 0;
-      final failed = result['failed'] ?? 0;
-      
-      print('✅ Auto-sync completed: $count posts synced');
-      
-      // Reload announcements
-      await loadAnnouncements();
-      
-      // Show success message
-      _showSuccessSnackBar(
-        '✅ Successfully synced $count posts!' + 
-        (failed > 0 ? ' ($failed failed)' : '')
-      );
-    } else {
-      throw Exception(result['error'] ?? result['message'] ?? 'Sync failed');
+      // Show error with retry option
+      _showSyncErrorDialog(errorMessage);
     }
-    
-  } catch (e) {
-    Navigator.pop(context); // Close loading dialog
-    
-    print('❌ Auto-sync failed: $e');
-    
-    final errorMessage = FacebookSyncService.parseErrorMessage(e);
-    
-    // Show error with retry option
-    _showSyncErrorDialog(errorMessage);
   }
-}
 
-// Show error dialog with retry option
-void _showSyncErrorDialog(String errorMessage) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      title: Row(
-        children: [
-          Icon(Icons.error, color: Colors.red[700], size: 28),
-          SizedBox(width: 12),
-          Text('Sync Failed'),
-        ],
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            errorMessage,
-            style: TextStyle(fontSize: 15),
-          ),
-          SizedBox(height: 16),
-          Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
+  // Show error dialog with retry option
+  void _showSyncErrorDialog(String errorMessage) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Row(
+            title: Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: Colors.grey[700]),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'You can manually sync later using the refresh button',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[700],
-                    ),
+                Icon(Icons.error, color: Colors.red[700], size: 28),
+                SizedBox(width: 12),
+                Text('Sync Failed'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(errorMessage, style: TextStyle(fontSize: 15)),
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: Colors.grey[700],
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'You can manually sync later using the refresh button',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Cancel'),
-        ),
-        ElevatedButton.icon(
-          onPressed: () {
-            Navigator.pop(context);
-            _refreshFromFacebook(); // Trigger manual sync
-          },
-          icon: Icon(Icons.refresh),
-          label: Text('Retry Sync'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue[700],
-            foregroundColor: Colors.white,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-
-Future<void> _testFacebookConnection() async {
-  try {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Center(
-        child: Container(
-          padding: EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Testing connection...'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _refreshFromFacebook(); // Trigger manual sync
+                },
+                icon: Icon(Icons.refresh),
+                label: Text('Retry Sync'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green[700],
+                  foregroundColor: Colors.white,
+                ),
+              ),
             ],
           ),
-        ),
-      ),
     );
-    
-    final result = await FacebookSyncService.testConnection();
-    
-    Navigator.pop(context); // Close loading dialog
-    
-    // Show detailed result dialog
-    _showConnectionTestResultDialog(result);
-    
-  } catch (e) {
-    Navigator.pop(context); // Close loading dialog
-    
-    final errorMessage = FacebookSyncService.parseErrorMessage(e);
-    _showErrorSnackBar('Test failed: $errorMessage');
   }
-}
 
-void _showConnectionTestResultDialog(Map<String, dynamic> result) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Row(
-        children: [
-          Icon(
-            result['success'] == true ? Icons.check_circle : Icons.error,
-            color: result['success'] == true ? Colors.green : Colors.red,
-          ),
-          SizedBox(width: 8),
-          Text('Connection Test'),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+  // Helper methods for snackbars
+  void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
           children: [
-            _buildTestResultItem('Status', result['success'] == true ? 'Success' : 'Failed'),
-            
-            if (result['message'] != null)
-              _buildTestResultItem('Message', result['message']),
-            
-            if (result['error'] != null)
-              _buildTestResultItem('Error', result['error'], isError: true),
-            
-            if (result['errorCode'] != null)
-              _buildTestResultItem('Error Code', result['errorCode'].toString()),
-            
-            if (result['tokenInfo'] != null) ...[
-              SizedBox(height: 16),
-              Text('Token Info:', style: TextStyle(fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              _buildTestResultItem('Has Token', result['tokenInfo']['hasToken'].toString()),
-              if (result['tokenInfo']['daysLeft'] != null)
-                _buildTestResultItem('Days Left', result['tokenInfo']['daysLeft'].toString()),
-              if (result['tokenInfo']['pagesCount'] != null)
-                _buildTestResultItem('Pages Count', result['tokenInfo']['pagesCount'].toString()),
-            ],
-            
-            if (result['pageInfo'] != null) ...[
-              SizedBox(height: 16),
-              Text('Page Info:', style: TextStyle(fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              _buildTestResultItem('Page ID', result['pageInfo']['id']),
-              _buildTestResultItem('Page Name', result['pageInfo']['name']),
-              if (result['pageInfo']['about'] != null)
-                _buildTestResultItem('About', result['pageInfo']['about']),
-            ],
+            Icon(Icons.check_circle, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Expanded(child: Text(message)),
           ],
         ),
+        backgroundColor: Colors.green[600],
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Close'),
-        ),
-        if (result['success'] != true)
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showTokenInputModal();
-            },
-            child: Text('Configure Token'),
-          ),
-      ],
-    ),
-  );
-}
-
-Widget _buildTestResultItem(String label, String value, {bool isError = false}) {
-  return Padding(
-    padding: EdgeInsets.only(bottom: 8),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 120,
-          child: Text(
-            '$label:',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              color: isError ? Colors.red : Colors.black87,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-// Helper methods for snackbars
-void _showSuccessSnackBar(String message) {
-  if (!mounted) return;
-  
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Row(
-        children: [
-          Icon(Icons.check_circle, color: Colors.white, size: 20),
-          SizedBox(width: 8),
-          Expanded(child: Text(message)),
-        ],
-      ),
-      backgroundColor: Colors.green[600],
-      behavior: SnackBarBehavior.floating,
-      duration: Duration(seconds: 4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-    ),
-  );
-}
-
-void _showErrorSnackBar(String message) {
-  if (!mounted) return;
-  
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Row(
-        children: [
-          Icon(Icons.error, color: Colors.white, size: 20),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-      backgroundColor: Colors.red,
-      behavior: SnackBarBehavior.floating,
-      duration: Duration(seconds: 5),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-    ),
-  );
-}
-
-
-
-Future<void> testCloudFunctions() async {
-  print('🧪 Testing Cloud Functions...');
-  
-  try {
-    // Test 1: Simple test function
-    print('Test 1: Calling testSync...');
-    final testCallable = FirebaseFunctions.instance.httpsCallable('testSync');
-    final testResult = await testCallable.call(<String, dynamic>{
-      'test': 'data',
-      'timestamp': DateTime.now().toIso8601String(),
-    });
-    print('✅ testSync response: ${testResult.data}');
-    
-    // Test 2: Actual sync function
-    print('Test 2: Calling manualSyncFacebookPosts...');
-    final syncCallable = FirebaseFunctions.instance
-        .httpsCallable('manualSyncFacebookPosts');
-    final syncResult = await syncCallable.call(<String, dynamic>{});
-    print('✅ manualSyncFacebookPosts response: ${syncResult.data}');
-    
-  } catch (e) {
-    print('❌ Test failed: $e');
+    );
   }
-}
+
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.error, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Expanded(child: Text(message, style: TextStyle(fontSize: 13))),
+          ],
+        ),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
 
   List<DocumentSnapshot> get filteredAnnouncements {
     var filtered =
@@ -848,7 +875,7 @@ Future<void> testCloudFunctions() async {
                       padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
                       child: Center(
                         child: Container(
-                          constraints: const BoxConstraints(maxWidth: 800),
+                          constraints: const BoxConstraints(maxWidth: 1100),
                           child: Row(
                             children: [
                               // Search field
@@ -986,104 +1013,83 @@ Future<void> testCloudFunctions() async {
     );
   }
 
- static Future<Map<String, dynamic>> testConnection() async {
-  print('🧪 Testing Facebook connection...');
-  
-  try {
-    final callable = FirebaseFunctions.instance
-        .httpsCallable('testFacebookConnection');
-    
-    final result = await callable.call(<String, dynamic>{})
-        .timeout(Duration(seconds: 30));
-    
-    print('📦 Test result: ${json.encode(result.data)}');
-    return result.data as Map<String, dynamic>;
-  } catch (e) {
-    print('❌ Test failed: $e');
-    rethrow;
-  }
-}
+  Widget _buildRefreshButton({required bool isDesktop}) {
+    return Row(
+      children: [
+        // Test button
+        SizedBox(width: 8),
 
-
-
-// Update your refresh button row to include the test button:
-Widget _buildRefreshButton({required bool isDesktop}) {
-  return Row(
-    children: [
-      // Test button
-
-      SizedBox(width: 8),
-      
-      // Facebook Token Config Button
-      Container(
-        decoration: BoxDecoration(
-          color: Colors.blue[50],
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.blue[200]!),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
+        // Facebook Token Config Button
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.blue[50],
             borderRadius: BorderRadius.circular(8),
-            onTap: _showTokenInputModal,
-            child: Tooltip(
-              message: 'Configure Facebook Token (Auto-syncs after save)',
-              child: Padding(
-                padding: EdgeInsets.all(isDesktop ? 12 : 10),
-                child: Icon(
-                  Icons.vpn_key,
-                  color: Colors.blue[700],
-                  size: isDesktop ? 24 : 20,
+            border: Border.all(color: Colors.blue[200]!),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: _showTokenInputModal,
+              child: Tooltip(
+                message: 'Configure Facebook Token (Auto-syncs after save)',
+                child: Padding(
+                  padding: EdgeInsets.all(isDesktop ? 12 : 10),
+                  child: Icon(
+                    Icons.vpn_key,
+                    color: Colors.blue[700],
+                    size: isDesktop ? 24 : 20,
+                  ),
                 ),
               ),
             ),
           ),
         ),
-      ),
-      SizedBox(width: 8),
-      
-      // Manual Sync Button
-      Container(
-        decoration: BoxDecoration(
-          color: isRefreshing ? Colors.grey[100] : Colors.green[50],
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isRefreshing ? Colors.grey[300]! : Colors.green[200]!,
-          ),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
+        SizedBox(width: 8),
+
+        // Manual Sync Button
+        Container(
+          decoration: BoxDecoration(
+            color: isRefreshing ? Colors.grey[100] : Colors.green[50],
             borderRadius: BorderRadius.circular(8),
-            onTap: isRefreshing ? null : _refreshFromFacebook,
-            child: Tooltip(
-              message: 'Manual Sync Facebook Posts',
-              child: Padding(
-                padding: EdgeInsets.all(isDesktop ? 12 : 10),
-                child: isRefreshing
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.grey[600]!,
+            border: Border.all(
+              color: isRefreshing ? Colors.grey[300]! : Colors.green[200]!,
+            ),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: isRefreshing ? null : _refreshFromFacebook,
+              child: Tooltip(
+                message: 'Manual Sync Facebook Posts',
+                child: Padding(
+                  padding: EdgeInsets.all(isDesktop ? 12 : 10),
+                  child:
+                      isRefreshing
+                          ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.grey[600]!,
+                              ),
+                            ),
+                          )
+                          : Icon(
+                            Icons.sync_rounded,
+                            color: Colors.green[700],
+                            size: isDesktop ? 24 : 20,
                           ),
-                        ),
-                      )
-                    : Icon(
-                        Icons.sync_rounded,
-                        color: Colors.green[700],
-                        size: isDesktop ? 24 : 20,
-                      ),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
   // SEARCH FIELD
   Widget _buildSearchField() {
@@ -1210,7 +1216,7 @@ Widget _buildRefreshButton({required bool isDesktop}) {
           return Center(
             child: Container(
               constraints:
-                  isDesktop ? const BoxConstraints(maxWidth: 800) : null,
+                  isDesktop ? const BoxConstraints(maxWidth: 1100) : null,
               padding: EdgeInsets.only(bottom: isDesktop ? 24 : 16),
               child: AnnouncementCard(
                 announcement: displayedAnnouncements[index],
@@ -1842,7 +1848,11 @@ Widget _buildRefreshButton({required bool isDesktop}) {
                                 'deadline':
                                     deadlineController.text.trim().isEmpty
                                         ? null
-                                        : deadlineController.text.trim(),
+                                        : Timestamp.fromDate(
+                                          DateTime.parse(
+                                            deadlineController.text.trim(),
+                                          ),
+                                        ),
                                 'updated_at': FieldValue.serverTimestamp(),
                               });
 
@@ -2219,7 +2229,7 @@ class AnnouncementCard extends StatelessWidget {
           ),
 
           // Deadline notice
-          if (deadline != null && deadline.isNotEmpty)
+          if (deadline != null)
             Container(
               margin: EdgeInsets.fromLTRB(
                 isDesktop ? 24 : 20,
@@ -2227,24 +2237,24 @@ class AnnouncementCard extends StatelessWidget {
                 isDesktop ? 24 : 20,
                 isDesktop ? 20 : 16,
               ),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.orange[50]!,
-                    Colors.orange[100]!.withOpacity(0.3),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange[300]!, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.orange[100]!.withOpacity(0.5),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
+              // padding: const EdgeInsets.all(16),
+              // decoration: BoxDecoration(
+              //   gradient: LinearGradient(
+              //     colors: [
+              //       Colors.orange[50]!,
+              //       Colors.orange[100]!.withOpacity(0.3),
+              //     ],
+              //   ),
+              //   borderRadius: BorderRadius.circular(8),
+              //   border: Border.all(color: Colors.orange[300]!, width: 1.5),
+              //   boxShadow: [
+              //     BoxShadow(
+              //       color: Colors.orange[100]!.withOpacity(0.5),
+              //       blurRadius: 8,
+              //       offset: const Offset(0, 2),
+              //     ),
+              //   ],
+              // ),
               child: Row(
                 children: [
                   Container(
@@ -2253,7 +2263,7 @@ class AnnouncementCard extends StatelessWidget {
                       color: Colors.orange[600],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.schedule_rounded,
                       color: Colors.white,
                       size: 20,
@@ -2274,8 +2284,12 @@ class AnnouncementCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 2),
+
+                        // ✅ Format the Firestore Timestamp into readable text
                         Text(
-                          deadline,
+                          DateFormat(
+                            'MMMM d, yyyy',
+                          ).format((deadline as Timestamp).toDate()),
                           style: TextStyle(
                             color: Colors.orange[900],
                             fontWeight: FontWeight.w700,
@@ -2409,9 +2423,11 @@ class AnnouncementCard extends StatelessWidget {
                 top: BorderSide(color: Colors.grey[200]!, width: 1),
               ),
             ),
+
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Expanded(
+                Flexible(
                   child: _buildActionButton(
                     icon: Icons.open_in_new_rounded,
                     label: 'View on Facebook',
@@ -2419,6 +2435,7 @@ class AnnouncementCard extends StatelessWidget {
                     isPrimary: true,
                   ),
                 ),
+
                 const SizedBox(width: 8),
                 _buildIconButton(
                   icon: Icons.edit_rounded,
@@ -2445,54 +2462,57 @@ class AnnouncementCard extends StatelessWidget {
     required VoidCallback onTap,
     required bool isPrimary,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-          decoration: BoxDecoration(
-            gradient:
-                isPrimary
-                    ? LinearGradient(
-                      colors: [Colors.green[600]!, Colors.green[700]!],
-                    )
-                    : null,
-            color: isPrimary ? null : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isPrimary ? Colors.green[700]! : Colors.grey[300]!,
-              width: isPrimary ? 0 : 1.5,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 200, maxWidth: 240),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+            decoration: BoxDecoration(
+              gradient:
+                  isPrimary
+                      ? LinearGradient(
+                        colors: [Colors.green[600]!, Colors.green[700]!],
+                      )
+                      : null,
+              color: isPrimary ? null : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isPrimary ? Colors.green[700]! : Colors.grey[300]!,
+                width: isPrimary ? 0 : 1.5,
+              ),
+              boxShadow: [
+                if (isPrimary)
+                  BoxShadow(
+                    color: Colors.green[600]!.withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+              ],
             ),
-            boxShadow: [
-              if (isPrimary)
-                BoxShadow(
-                  color: Colors.green[600]!.withOpacity(0.4),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: isPrimary ? Colors.white : Colors.grey[700],
-              ),
-              const SizedBox(width: 10),
-              Text(
-                label,
-                style: TextStyle(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
                   color: isPrimary ? Colors.white : Colors.grey[700],
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isPrimary ? Colors.white : Colors.grey[700],
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2608,5 +2628,3 @@ IconData getCategoryIcon(String category) {
 Color getCategoryColor(String category) {
   return getColorForCategory(category);
 }
-
-// FACEBOOK API FUNCTION

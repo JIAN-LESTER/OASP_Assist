@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+
 import 'package:capstone_project/edit_profile_modal.dart';
 
 void showProfileModal(BuildContext context) {
@@ -63,9 +63,31 @@ class _ProfileModalState extends State<ProfileModal> {
     );
   }
 
+  String _formatLastLogin(Timestamp? lastLoginAt) {
+    if (lastLoginAt == null) return 'Never';
+
+    final lastLogin = lastLoginAt.toDate();
+    final now = DateTime.now();
+    final difference = now.difference(lastLogin);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} minute${difference.inMinutes == 1 ? '' : 's'} ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} hour${difference.inHours == 1 ? '' : 's'} ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} day${difference.inDays == 1 ? '' : 's'} ago';
+    } else {
+      return '${lastLogin.day}/${lastLogin.month}/${lastLogin.year} at ${lastLogin.hour.toString().padLeft(2, '0')}:${lastLogin.minute.toString().padLeft(2, '0')}';
+    }
+  }
+
   Widget _buildProfileHeader(Map<String, dynamic> data, bool isMobile) {
     final name = data['name'] ?? 'User';
     final email = data['email'] ?? '';
+    final lastLoginAt = data['lastLoginAt'] as Timestamp?;
+    final lastLoginFormatted = _formatLastLogin(lastLoginAt);
 
     return Container(
       padding: EdgeInsets.all(isMobile ? 24 : 28),
@@ -120,27 +142,36 @@ class _ProfileModalState extends State<ProfileModal> {
                     letterSpacing: -0.5,
                   ),
                 ),
-                if (email.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      email,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
                   ),
-                ],
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.access_time_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Last login: $lastLoginFormatted',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -338,6 +369,7 @@ class _ProfileModalState extends State<ProfileModal> {
                                 ? ''
                                 : 'Error',
                         'email': '',
+                        'lastLoginAt': null,
                       };
                   return _buildProfileHeader(data, isMobile);
                 },
@@ -411,6 +443,22 @@ class _ProfileModalState extends State<ProfileModal> {
                             padding: EdgeInsets.all(isMobile ? 24 : 28),
                             child: Column(
                               children: [
+                                // Name field
+                                _buildFormRow(
+                                  label: 'Full Name',
+                                  child: _buildTextValue(
+                                    name,
+                                    icon: Icons.person_outline_rounded,
+                                  ),
+                                ),
+                                // Email field
+                                _buildFormRow(
+                                  label: 'Email Address',
+                                  child: _buildTextValue(
+                                    email,
+                                    icon: Icons.email_outlined,
+                                  ),
+                                ),
                                 if (role.toLowerCase() == 'user') ...[
                                   if (year.isNotEmpty)
                                     _buildFormRow(
@@ -428,14 +476,13 @@ class _ProfileModalState extends State<ProfileModal> {
                                         icon: Icons.book_outlined,
                                       ),
                                     ),
-                                            if (affiliation.isNotEmpty)
+                                  if (affiliation.isNotEmpty)
                                     _buildFormRow(
                                       label: 'Affiliations',
                                       child: _buildTextValue(
                                         affiliation,
-                                        icon: Icons.person_outline_rounded,
+                                        icon: Icons.people_outline,
                                       ),
-                                 
                                     ),
 
                                   if (scholarship.isNotEmpty)
@@ -443,12 +490,10 @@ class _ProfileModalState extends State<ProfileModal> {
                                       label: 'Scholarship',
                                       child: _buildTextValue(
                                         scholarship,
-                                        icon: Icons.person_outline_rounded,
+                                        icon: Icons.card_membership_outlined,
                                       ),
                                       isLast: true,
                                     ),
-
-                            
                                 ] else
                                   const SizedBox(),
                               ],

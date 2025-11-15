@@ -1,8 +1,16 @@
+import 'package:capstone_project/pages/data/chatbot_usage_charts.dart';
+import 'package:capstone_project/pages/data/chatbot_usage_data.dart';
+
+import 'package:capstone_project/pages/data/inquiry_trends_charts.dart';
+import 'package:capstone_project/pages/data/inquiry_trends_data.dart';
+
+import 'package:capstone_project/pages/data/user_demographics_charts.dart';
+import 'package:capstone_project/pages/data/user_demographics_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:capstone_project/colors.dart';
+
 import 'package:capstone_project/pages/admin_pages/widgets/custom_dropdown_button.dart';
+import 'package:capstone_project/pages/admin_pages/widgets/refresh_button.dart';
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:capstone_project/pages/data/reports.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
@@ -17,13 +25,17 @@ class ReportsPage extends StatefulWidget {
 
 class _ReportsPageState extends State<ReportsPage> {
   String selectedTimeFrame = 'This Month';
-  String selectedReportType = 'Inquiry Trends'; // ADD THIS
+  String selectedReportType = 'Inquiry Trends';
   final currentUser = FirebaseAuth.instance.currentUser;
   final FirebaseService _firebaseService = FirebaseService();
+
   InquiryReportsData? inq;
   ChatbotUsageReportsData? cb;
   UserDemographicsReportsData? ud;
+  String? userName;
+
   bool isLoading = true;
+  bool isRefreshing = false;
 
   DateTime startDate = DateTime.now();
   String timeFrame = "This Month";
@@ -32,72 +44,191 @@ class _ReportsPageState extends State<ReportsPage> {
   @override
   void initState() {
     super.initState();
-    _loadReportsdData();
-    fetchUserName();
+    _loadAllData();
   }
 
   void _onReportTypeChanged(String newValue) {
-    // ADD THIS METHOD
     setState(() {
       selectedReportType = newValue;
     });
-    // No need to reload data, just filter display
   }
 
-  String? userName;
-  bool isNameLoading = true;
+  // ✅ OPTIMIZED: Load all data in parallel
+  Future<void> _loadAllData() async {
+    if (!mounted) return;
 
-  Future<void> fetchUserName() async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null) {
-      final userDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(currentUser.uid)
-              .get();
-      if (userDoc.exists) {
-        setState(() {
-          userName = userDoc.data()?['name'] ?? 'User';
-          isNameLoading = false;
-        });
-      } else {
-        setState(() {
-          userName = 'User';
-          isNameLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _loadReportsdData() async {
     setState(() {
       isLoading = true;
     });
 
     try {
-      InquiryReportsData inqData = await _firebaseService.getInquiryReportsData(
-        selectedTimeFrame,
-      );
+      final results = await Future.wait([
+        _fetchUserName(),
+        _firebaseService.getInquiryReportsData(selectedTimeFrame),
+        _firebaseService.getChatbotUsageReportsData(selectedTimeFrame),
+        _firebaseService.getUserDemographicsReportsData(selectedTimeFrame),
+      ]);
 
-      ChatbotUsageReportsData cbData = await _firebaseService
-          .getChatbotUsageReportsData(selectedTimeFrame);
+      if (!mounted) return;
 
-      UserDemographicsReportsData udData = await _firebaseService
-          .getUserDemographicsReportsData(selectedTimeFrame);
-
-      if (!mounted) return; // <== ✅ safety check
       setState(() {
-        inq = inqData;
-        cb = cbData;
-        ud = udData;
+        userName = results[0] as String?;
+        inq = results[1] as InquiryReportsData;
+        cb = results[2] as ChatbotUsageReportsData;
+        ud = results[3] as UserDemographicsReportsData;
         isLoading = false;
       });
     } catch (e) {
-      print('Error loading dashboard data: $e');
-      if (!mounted) return; // <== ✅ safety check
+      print('Error loading reports data: $e');
+      if (!mounted) return;
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  //  OPTIMIZED: Refresh function for the refresh button
+  Future<void> _refreshData() async {
+    if (!mounted || isRefreshing) return;
+
+    setState(() {
+      isRefreshing = true;
+    });
+
+    try {
+      final results = await Future.wait([
+        _firebaseService.getInquiryReportsData(selectedTimeFrame),
+        _firebaseService.getChatbotUsageReportsData(selectedTimeFrame),
+        _firebaseService.getUserDemographicsReportsData(selectedTimeFrame),
+      ]);
+
+      if (!mounted) return;
+
+      setState(() {
+        inq = results[0] as InquiryReportsData;
+        cb = results[1] as ChatbotUsageReportsData;
+        ud = results[2] as UserDemographicsReportsData;
+        isRefreshing = false;
+      });
+
+      // Show success feedback with responsive sizing
+      if (mounted) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isMobile = screenWidth < 600;
+        final isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.check_circle_outline_outlined,
+                  color: Colors.white,
+                  size: isMobile ? 20 : 24,
+                ),
+                SizedBox(width: isMobile ? 8 : 12),
+                Flexible(
+                  child: Text(
+                    'Reports refreshed successfully',
+                    style: TextStyle(
+                      fontSize: isMobile ? 15 : (isTablet ? 16 : 17),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 16 : 20,
+              vertical: isMobile ? 14 : 16,
+            ),
+            margin: EdgeInsets.only(
+              bottom: 20,
+              right: 20,
+              left: isMobile ? 20 : (screenWidth - (isTablet ? 380 : 420)),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+            elevation: 6,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error refreshing reports data: $e');
+      if (!mounted) return;
+      setState(() {
+        isRefreshing = false;
+      });
+
+      // Show error feedback with responsive sizing
+      if (mounted) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isMobile = screenWidth < 600;
+        final isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  color: Colors.white,
+                  size: isMobile ? 20 : 24,
+                ),
+                SizedBox(width: isMobile ? 8 : 12),
+                Flexible(
+                  child: Text(
+                    'Failed to refresh reports',
+                    style: TextStyle(
+                      fontSize: isMobile ? 15 : (isTablet ? 16 : 17),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red[600],
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 16 : 20,
+              vertical: isMobile ? 14 : 16,
+            ),
+            margin: EdgeInsets.only(
+              bottom: 20,
+              right: 20,
+              left: isMobile ? 20 : (screenWidth - (isTablet ? 380 : 420)),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(isMobile ? 10 : 12),
+            ),
+            elevation: 6,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<String?> _fetchUserName() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return 'User';
+
+    try {
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
+
+      return userDoc.exists ? (userDoc.data()?['name'] ?? 'User') : 'User';
+    } catch (e) {
+      print('Error fetching user name: $e');
+      return 'User';
     }
   }
 
@@ -105,21 +236,23 @@ class _ReportsPageState extends State<ReportsPage> {
     setState(() {
       selectedTimeFrame = newValue;
     });
-    _loadReportsdData();
+    _loadAllData();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading || isNameLoading || userName == null) {
+    if (isLoading || userName == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return ResponsiveLayout(
       mobileBody: MobileDashboard(
         selectedTimeFrame: selectedTimeFrame,
-        selectedReportType: selectedReportType, // ADD THIS
+        selectedReportType: selectedReportType,
         onTimeFrameChanged: _onTimeFrameChanged,
-        onReportTypeChanged: _onReportTypeChanged, // ADD THIS
+        onReportTypeChanged: _onReportTypeChanged,
+        onRefresh: _refreshData,
+        isRefreshing: isRefreshing,
         inq: inq,
         cb: cb,
         ud: ud,
@@ -130,27 +263,31 @@ class _ReportsPageState extends State<ReportsPage> {
       ),
       tabletBody: TabletDashboard(
         selectedTimeFrame: selectedTimeFrame,
-        selectedReportType: selectedReportType, // ADD THIS
+        selectedReportType: selectedReportType,
         onTimeFrameChanged: _onTimeFrameChanged,
-        onReportTypeChanged: _onReportTypeChanged, // ADD THIS
+        onReportTypeChanged: _onReportTypeChanged,
+        onRefresh: _refreshData,
+        isRefreshing: isRefreshing,
         inq: inq,
         cb: cb,
         ud: ud,
         userName: userName!,
-            startDate: startDate,
+        startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
       ),
       desktopBody: DesktopDashboard(
         selectedTimeFrame: selectedTimeFrame,
-        selectedReportType: selectedReportType, // ADD THIS
+        selectedReportType: selectedReportType,
         onTimeFrameChanged: _onTimeFrameChanged,
-        onReportTypeChanged: _onReportTypeChanged, // ADD THIS
+        onReportTypeChanged: _onReportTypeChanged,
+        onRefresh: _refreshData,
+        isRefreshing: isRefreshing,
         inq: inq,
         cb: cb,
         ud: ud,
         userName: userName!,
-            startDate: startDate,
+        startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
       ),
@@ -161,14 +298,15 @@ class _ReportsPageState extends State<ReportsPage> {
 // Desktop Dashboard
 class DesktopDashboard extends StatelessWidget {
   final String selectedTimeFrame;
-  final String selectedReportType; // ADD THIS
+  final String selectedReportType;
   final ValueChanged<String> onTimeFrameChanged;
-  final ValueChanged<String> onReportTypeChanged; // ADD THIS
+  final ValueChanged<String> onReportTypeChanged;
+  final VoidCallback onRefresh;
+  final bool isRefreshing;
   final InquiryReportsData? inq;
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
   final String userName;
-
   final DateTime startDate;
   final String timeFrame;
   final Map<String, Map<String, int>> timeCategoryCounts;
@@ -176,15 +314,15 @@ class DesktopDashboard extends StatelessWidget {
   const DesktopDashboard({
     super.key,
     required this.selectedTimeFrame,
-    required this.selectedReportType, // ADD THIS
+    required this.selectedReportType,
     required this.onTimeFrameChanged,
-    required this.onReportTypeChanged, // ADD THIS
-
+    required this.onReportTypeChanged,
+    required this.onRefresh,
+    required this.isRefreshing,
     this.inq,
     this.cb,
     this.ud,
     required this.userName,
-
     required this.startDate,
     required this.timeCategoryCounts,
     required this.timeFrame,
@@ -199,20 +337,21 @@ class DesktopDashboard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header - Fixed at top
             buildHeader(
               selectedTimeFrame,
-              selectedReportType, // ADD THIS
+              selectedReportType,
               onTimeFrameChanged,
-              onReportTypeChanged, // ADD THIS
+              onReportTypeChanged,
+              onRefresh,
+              isRefreshing,
               userName,
             ),
             const SizedBox(height: 32),
-
             ...ReportsHelper.buildReportContent(
               selectedReportType,
               inq,
               cb,
+              selectedTimeFrame,
               ud,
               startDate,
               timeFrame,
@@ -229,14 +368,15 @@ class DesktopDashboard extends StatelessWidget {
 // Tablet Dashboard
 class TabletDashboard extends StatelessWidget {
   final String selectedTimeFrame;
-  final String selectedReportType; // ADD THIS
+  final String selectedReportType;
   final ValueChanged<String> onTimeFrameChanged;
-  final ValueChanged<String> onReportTypeChanged; // ADD THIS
+  final ValueChanged<String> onReportTypeChanged;
+  final VoidCallback onRefresh;
+  final bool isRefreshing;
   final InquiryReportsData? inq;
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
   final String userName;
-
   final DateTime startDate;
   final String timeFrame;
   final Map<String, Map<String, int>> timeCategoryCounts;
@@ -244,9 +384,11 @@ class TabletDashboard extends StatelessWidget {
   const TabletDashboard({
     super.key,
     required this.selectedTimeFrame,
-    required this.selectedReportType, // ADD THIS
+    required this.selectedReportType,
     required this.onTimeFrameChanged,
-    required this.onReportTypeChanged, // ADD THIS
+    required this.onReportTypeChanged,
+    required this.onRefresh,
+    required this.isRefreshing,
     this.inq,
     this.cb,
     this.ud,
@@ -267,18 +409,19 @@ class TabletDashboard extends StatelessWidget {
           children: [
             buildHeader(
               selectedTimeFrame,
-              selectedReportType, // ADD THIS
+              selectedReportType,
               onTimeFrameChanged,
-              onReportTypeChanged, // ADD THIS
+              onReportTypeChanged,
+              onRefresh,
+              isRefreshing,
               userName,
             ),
             const SizedBox(height: 32),
-
-            // Top row with 4 stat cards
             ...ReportsHelper.buildReportContent(
               selectedReportType,
               inq,
               cb,
+              selectedTimeFrame,
               ud,
               startDate,
               timeFrame,
@@ -295,14 +438,15 @@ class TabletDashboard extends StatelessWidget {
 // Mobile Dashboard
 class MobileDashboard extends StatelessWidget {
   final String selectedTimeFrame;
-  final String selectedReportType; // ADD THIS
+  final String selectedReportType;
   final ValueChanged<String> onTimeFrameChanged;
-  final ValueChanged<String> onReportTypeChanged; // ADD THIS
+  final ValueChanged<String> onReportTypeChanged;
+  final VoidCallback onRefresh;
+  final bool isRefreshing;
   final InquiryReportsData? inq;
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
   final String userName;
-
   final DateTime startDate;
   final String timeFrame;
   final Map<String, Map<String, int>> timeCategoryCounts;
@@ -310,9 +454,11 @@ class MobileDashboard extends StatelessWidget {
   const MobileDashboard({
     super.key,
     required this.selectedTimeFrame,
-    required this.selectedReportType, // ADD THIS
+    required this.selectedReportType,
     required this.onTimeFrameChanged,
-    required this.onReportTypeChanged, // ADD THIS
+    required this.onReportTypeChanged,
+    required this.onRefresh,
+    required this.isRefreshing,
     this.inq,
     this.cb,
     this.ud,
@@ -333,17 +479,19 @@ class MobileDashboard extends StatelessWidget {
           children: [
             buildHeader(
               selectedTimeFrame,
-              selectedReportType, // ADD THIS
+              selectedReportType,
               onTimeFrameChanged,
-              onReportTypeChanged, // ADD THIS
+              onReportTypeChanged,
+              onRefresh,
+              isRefreshing,
               userName,
             ),
             const SizedBox(height: 32),
-
             ...ReportsHelper.buildReportContent(
               selectedReportType,
               inq,
               cb,
+              selectedTimeFrame,
               ud,
               startDate,
               timeFrame,
@@ -363,6 +511,7 @@ class ReportsHelper {
     String reportType,
     InquiryReportsData? inq,
     ChatbotUsageReportsData? cb,
+    String selectedTimeFrame,
     UserDemographicsReportsData? ud,
     DateTime startDate,
     String timeFrame,
@@ -373,7 +522,7 @@ class ReportsHelper {
   }) {
     switch (reportType) {
       case 'Inquiry Trends':
-        return buildInquiryTrendsReport(inq, isDesktop: isDesktop);
+        return buildInquiryTrendsReport(inq, isDesktop: isDesktop, selectedTimeFrame: selectedTimeFrame);
       case 'Chatbot Usage':
         return buildChatbotUsageReport(
           cb,
@@ -390,13 +539,12 @@ class ReportsHelper {
   }
 }
 
-
 List<Widget> buildInquiryTrendsReport(
   InquiryReportsData? data, {
+  String? selectedTimeFrame,
   bool isDesktop = false,
 }) {
   return [
-    
     SizedBox(
       height: 120,
       child: Row(
@@ -439,25 +587,18 @@ List<Widget> buildInquiryTrendsReport(
         ],
       ),
     ),
-
     const SizedBox(height: 16),
-
-    // Inquiry Pattern
     SizedBox(
-      height: 400,
+      height: 500,
       child: Row(
         children: [
-          Expanded(child: buildInquiryTrendCard(data?.inquiryTrend ?? [])),
+          Expanded(child: buildInquiryTrendCard(data?.inquiryTrend ?? [], selectedTimeFrame.toString())),
         ],
       ),
     ),
     const SizedBox(height: 16),
-
-    // Category Distribution and FAQs
-    
-   
     SizedBox(
-      height: 400,
+      height: 450,
       child: Row(
         children: [
           Expanded(
@@ -470,35 +611,13 @@ List<Widget> buildInquiryTrendsReport(
         ],
       ),
     ),
-
     const SizedBox(height: 16),
     SizedBox(
-      height: 400,
+      height: 500,
       child: Row(
         children: [
-          Expanded(
-            child: buildResponseDistributionCard(
-              data?.responseDistribution ?? {},
-            ),
-          ),
-          const SizedBox(width: 20),
+        
           Expanded(child: buildSeasonalTrendsCard(data?.seasonalTrends ?? {})),
-        ],
-      ),
-    ),
-
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-          Expanded(
-            child: buildTop5UnansweredCard(data?.top5UnansweredInquiries ?? []),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: buildTop5EscalatedCard(data?.top5EscalatedInquiries ?? []),
-          ),
         ],
       ),
     ),
@@ -512,7 +631,6 @@ List<Widget> buildChatbotUsageReport(
   String timeFrame, {
   bool isDesktop = false,
 }) {
-  // Safe way to get trend data with null checks
   List<ChartData> getConversationTrendData() {
     if (data == null) return <ChartData>[];
 
@@ -530,16 +648,9 @@ List<Widget> buildChatbotUsageReport(
     }
   }
 
-  final conversationTrend = getConversationTrendData(
-    // start,
-    // timeFrame,
-    // timeCategoryCounts,
-  );
+  final conversationTrend = getConversationTrendData();
 
   return [
-  
-
-    // Usage Stats
     SizedBox(
       height: 120,
       child: Row(
@@ -583,9 +694,6 @@ List<Widget> buildChatbotUsageReport(
       ),
     ),
     const SizedBox(height: 32),
-
-    // Usage Patterns
-  
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
@@ -594,48 +702,51 @@ List<Widget> buildChatbotUsageReport(
           Expanded(
             child: buildConversationsOverTimeCard(conversationTrend, timeFrame),
           ),
-         
         ],
       ),
     ),
-
     const SizedBox(height: 16),
     SizedBox(
       height: 350,
       child: Row(
         children: [
-              Expanded(child: buildUsersByCourseCard(data?.usersByCourse ?? <String, int>{})),
-          const SizedBox(width: 20),
-          Expanded(child: buildPeakUsageHoursCard(data?.peakUsageByHour ?? <int, int>{})),
+         
+          Expanded(
+            child: buildPeakUsageHoursCard(
+              data?.peakUsageByHour ?? <int, int>{},
+            ),
+          ),
         ],
       ),
     ),
-
-  
+    const SizedBox(height: 16),
+    SizedBox(
+      height: 400,
+      child: Row(
+        children: [
+           Expanded(
+            child: buildUsersByCourseCard(
+              data?.usersByCourse ?? <String, int>{},
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: buildUsersByYearLevelCard(
+              data?.usersByYearLevel ?? <String, int>{},
+            ),
+          ),
+        ],
+      ),
+    ),
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
       child: Row(
         children: [
           Expanded(
-            child: buildTop10ActiveUsersCard(data?.top10ActiveUsers ?? <MapEntry<String, int>>[]),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: buildUsersByYearLevelCard(data?.usersByYearLevel ?? <String, int>{}),
-          ),
-        ],
-      ),
-    ),
-
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-
-          Expanded(
-            child: buildResponseTimeTrendCard(data?.responseTimeTrend ?? <ChartData>[]), // Fixed null issue
+            child: buildResponseTimeTrendCard(
+              data?.responseTimeTrend ?? <ChartData>[],
+            ),
           ),
         ],
       ),
@@ -648,9 +759,6 @@ List<Widget> buildUserDemographicsReport(
   bool isDesktop = false,
 }) {
   return [
-    
-
-    // Demographics Stats
     SizedBox(
       height: 120,
       child: Row(
@@ -694,8 +802,6 @@ List<Widget> buildUserDemographicsReport(
       ),
     ),
     const SizedBox(height: 16),
-
-
     SizedBox(
       height: 400,
       child: Row(
@@ -713,36 +819,23 @@ List<Widget> buildUserDemographicsReport(
         children: [
           Expanded(child: buildUsersByYearCard(data?.usersByYear ?? {})),
           const SizedBox(width: 20),
-    
         ],
       ),
     ),
-
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
       child: Row(
         children: [
-      //  Expanded(
-      //       child: buildEnrollmentStatusCard(data?.enrollmentStatus ?? {}),
-      //     ),
-      //     const SizedBox(width: 20),
-      //    Expanded(
-      //       child: buildScholarshipStatusCard(data?.scholarshipStatus ?? {}),
-      //     ),
-            Expanded(child: buildUsersByProgramCard(data?.usersByProgram ?? {})),
+          Expanded(child: buildUsersByProgramCard(data?.usersByProgram ?? {})),
         ],
       ),
     ),
-
-    
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
       child: Row(
         children: [
-       
-      
           Expanded(
             child: buildScholarshipTypesCard(data?.scholarshipTypes ?? {}),
           ),
@@ -752,13 +845,13 @@ List<Widget> buildUserDemographicsReport(
   ];
 }
 
-
-
 Widget buildHeader(
   String selectedTimeFrame,
-  String selectedReportType, // ADD THIS
+  String selectedReportType,
   ValueChanged<String> onTimeFrameChanged,
-  ValueChanged<String> onReportTypeChanged, // ADD THIS
+  ValueChanged<String> onReportTypeChanged,
+  VoidCallback onRefresh,
+  bool isRefreshing,
   String userName,
 ) {
   return LayoutBuilder(
@@ -778,14 +871,25 @@ Widget buildHeader(
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
-                  CustomDropdownButton(
-                    items: [
-                      'Inquiry Trends',
-                      'Chatbot Usage',
-                      'User Demographics',
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CustomDropdownButton(
+                          items: [
+                            'Inquiry Trends',
+                            'Chatbot Usage',
+                            'User Demographics',
+                          ],
+                          initialValue: selectedReportType,
+                          onChanged: onReportTypeChanged,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      RefreshButton(
+                        onRefresh: onRefresh,
+                        isRefreshing: isRefreshing,
+                      ),
                     ],
-                    initialValue: selectedReportType,
-                    onChanged: onReportTypeChanged, // MODIFY THIS
                   ),
                   const SizedBox(height: 8),
                   CustomDropdownButton(
@@ -818,9 +922,9 @@ Widget buildHeader(
                           'User Demographics',
                         ],
                         initialValue: selectedReportType,
-                        onChanged: onReportTypeChanged, // MODIFY THIS
+                        onChanged: onReportTypeChanged,
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       CustomDropdownButton(
                         items: [
                           'All',
@@ -832,16 +936,18 @@ Widget buildHeader(
                         initialValue: selectedTimeFrame,
                         onChanged: onTimeFrameChanged,
                       ),
+                      const SizedBox(width: 12),
+                      RefreshButton(
+                        onRefresh: onRefresh,
+                        isRefreshing: isRefreshing,
+                      ),
                     ],
                   ),
                 ],
               ),
           SizedBox(height: isMobile ? 12 : 8),
           Text(
-            _getReportDescription(
-              selectedReportType,
-              selectedTimeFrame,
-            ), // MODIFY THIS
+            _getReportDescription(selectedReportType, selectedTimeFrame),
             style: TextStyle(fontSize: isMobile ? 13 : 14, color: Colors.grey),
           ),
         ],

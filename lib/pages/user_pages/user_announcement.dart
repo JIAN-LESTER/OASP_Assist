@@ -112,7 +112,7 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
                   padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
                   child: Center(
                     child: Container(
-                      constraints: const BoxConstraints(maxWidth: 800),
+                      constraints: const BoxConstraints(maxWidth: 1100),
                       child: Row(
                         children: [
                           // Search field
@@ -126,9 +126,8 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
                             child: CategoryDropdownButton(
                               initialValue: selectedCategory,
                               onChanged:
-                                  (value) => setState(
-                                    () => selectedCategory = value,
-                                  ),
+                                  (value) =>
+                                      setState(() => selectedCategory = value),
                             ),
                           ),
                         ],
@@ -359,7 +358,7 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
           return Center(
             child: Container(
               constraints:
-                  isDesktop ? const BoxConstraints(maxWidth: 800) : null,
+                  isDesktop ? const BoxConstraints(maxWidth: 1100) : null,
               padding: EdgeInsets.only(bottom: isDesktop ? 24 : 16),
               child: AnnouncementCard(
                 announcement: displayedAnnouncements[index],
@@ -720,7 +719,7 @@ class AnnouncementCard extends StatelessWidget {
           ),
 
           // Deadline notice
-          if (deadline != null && deadline.isNotEmpty)
+          if (deadline != null)
             Container(
               margin: EdgeInsets.fromLTRB(
                 isDesktop ? 24 : 20,
@@ -728,24 +727,24 @@ class AnnouncementCard extends StatelessWidget {
                 isDesktop ? 24 : 20,
                 isDesktop ? 20 : 16,
               ),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.orange[50]!,
-                    Colors.orange[100]!.withOpacity(0.3),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange[300]!, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.orange[100]!.withOpacity(0.5),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
+              // padding: const EdgeInsets.all(16),
+              // decoration: BoxDecoration(
+              //   gradient: LinearGradient(
+              //     colors: [
+              //       // Colors.orange[50]!,
+              //       // Colors.orange[100]!.withOpacity(0.3),
+              //     ],
+              //   ),
+              //   borderRadius: BorderRadius.circular(8),
+              //   border: Border.all(color: Colors.orange[300]!, width: 1.5),
+              //   boxShadow: [
+              //     BoxShadow(
+              //       color: Colors.orange[100]!.withOpacity(0.5),
+              //       blurRadius: 8,
+              //       offset: const Offset(0, 2),
+              //     ),
+              //   ],
+              // ),
               child: Row(
                 children: [
                   Container(
@@ -754,7 +753,7 @@ class AnnouncementCard extends StatelessWidget {
                       color: Colors.orange[600],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.schedule_rounded,
                       color: Colors.white,
                       size: 20,
@@ -775,8 +774,12 @@ class AnnouncementCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 2),
+
+                        // ✅ Format the Firestore Timestamp into readable text
                         Text(
-                          deadline,
+                          DateFormat(
+                            'MMMM d, yyyy',
+                          ).format((deadline as Timestamp).toDate()),
                           style: TextStyle(
                             color: Colors.orange[900],
                             fontWeight: FontWeight.w700,
@@ -910,9 +913,11 @@ class AnnouncementCard extends StatelessWidget {
                 top: BorderSide(color: Colors.grey[200]!, width: 1),
               ),
             ),
+
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Expanded(
+                Flexible(
                   child: _buildActionButton(
                     icon: Icons.open_in_new_rounded,
                     label: 'View on Facebook',
@@ -934,54 +939,57 @@ class AnnouncementCard extends StatelessWidget {
     required VoidCallback onTap,
     required bool isPrimary,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-          decoration: BoxDecoration(
-            gradient:
-                isPrimary
-                    ? LinearGradient(
-                      colors: [Colors.green[600]!, Colors.green[700]!],
-                    )
-                    : null,
-            color: isPrimary ? null : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isPrimary ? Colors.green[700]! : Colors.grey[300]!,
-              width: isPrimary ? 0 : 1.5,
+    return ConstrainedBox(
+      constraints: BoxConstraints(minWidth: 200, maxWidth: 240),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+            decoration: BoxDecoration(
+              gradient:
+                  isPrimary
+                      ? LinearGradient(
+                        colors: [Colors.green[600]!, Colors.green[700]!],
+                      )
+                      : null,
+              color: isPrimary ? null : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isPrimary ? Colors.green[700]! : Colors.grey[300]!,
+                width: isPrimary ? 0 : 1.5,
+              ),
+              boxShadow: [
+                if (isPrimary)
+                  BoxShadow(
+                    color: Colors.green[600]!.withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+              ],
             ),
-            boxShadow: [
-              if (isPrimary)
-                BoxShadow(
-                  color: Colors.green[600]!.withOpacity(0.4),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: isPrimary ? Colors.white : Colors.grey[700],
-              ),
-              const SizedBox(width: 10),
-              Text(
-                label,
-                style: TextStyle(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
                   color: isPrimary ? Colors.white : Colors.grey[700],
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isPrimary ? Colors.white : Colors.grey[700],
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

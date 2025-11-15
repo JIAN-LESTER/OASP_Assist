@@ -1,5 +1,7 @@
+import 'package:capstone_project/pages/data/charts.dart';
+import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:capstone_project/crud/delete/delete.dart';
 
 import 'package:capstone_project/modal_pages/add_edit_affiliation.dart';
@@ -13,7 +15,8 @@ class AffiliationManagementPage extends StatefulWidget {
   const AffiliationManagementPage({super.key});
 
   @override
-  State<AffiliationManagementPage> createState() => _AffiliationManagementPageState();
+  State<AffiliationManagementPage> createState() =>
+      _AffiliationManagementPageState();
 }
 
 class _AffiliationManagementPageState extends State<AffiliationManagementPage> {
@@ -23,10 +26,42 @@ class _AffiliationManagementPageState extends State<AffiliationManagementPage> {
   int currentPage = 1;
   int itemsPerPage = 10;
 
+  bool isLoading = true;
+
+  final StatDataManagement statData = StatDataManagement();
+  AffiliationData? affiliation;
+
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    loadStatData();
+  }
+
+  Future<void> loadStatData() async {
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Call the getInformationBankData() method
+      final data = await statData.getAffiliationData();
+
+      if (!mounted) return;
+
+      setState(() {
+        affiliation = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading information bank data: $e");
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   @override
@@ -57,6 +92,9 @@ class _AffiliationManagementPageState extends State<AffiliationManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return ResponsiveLayout(
       mobileBody: MobileAffiliationManagement(
         searchController: _searchController,
@@ -64,6 +102,7 @@ class _AffiliationManagementPageState extends State<AffiliationManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        affiliation: affiliation,
       ),
       tabletBody: TabletAffiliationManagement(
         searchController: _searchController,
@@ -71,6 +110,7 @@ class _AffiliationManagementPageState extends State<AffiliationManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        affiliation: affiliation,
       ),
       desktopBody: DesktopAffiliationManagement(
         searchController: _searchController,
@@ -78,6 +118,7 @@ class _AffiliationManagementPageState extends State<AffiliationManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        affiliation: affiliation,
       ),
     );
   }
@@ -90,6 +131,7 @@ class DesktopAffiliationManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final AffiliationData? affiliation;
 
   const DesktopAffiliationManagement({
     super.key,
@@ -98,6 +140,7 @@ class DesktopAffiliationManagement extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.affiliation,
   });
 
   @override
@@ -110,6 +153,7 @@ class DesktopAffiliationManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       24.0,
+      affiliation,
     );
   }
 }
@@ -121,6 +165,7 @@ class TabletAffiliationManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final AffiliationData? affiliation;
 
   const TabletAffiliationManagement({
     super.key,
@@ -129,6 +174,7 @@ class TabletAffiliationManagement extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.affiliation,
   });
 
   @override
@@ -141,6 +187,7 @@ class TabletAffiliationManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       20.0,
+      affiliation,
     );
   }
 }
@@ -152,6 +199,7 @@ class MobileAffiliationManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final AffiliationData? affiliation;
 
   const MobileAffiliationManagement({
     super.key,
@@ -160,6 +208,7 @@ class MobileAffiliationManagement extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.affiliation,
   });
 
   @override
@@ -172,6 +221,7 @@ class MobileAffiliationManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       16.0,
+      affiliation,
     );
   }
 }
@@ -184,66 +234,75 @@ Widget mainContent(
   final ValueChanged<int> onPageChanged,
   final ValueChanged<int> onItemsPerPageChanged,
   final double padding,
+  final AffiliationData? affiliation,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
-    body: SingleChildScrollView(
+    body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(searchController, context),
+          _buildHeader(searchController, context, affiliation),
           const SizedBox(height: 16),
-          Container(
-            height: MediaQuery.of(context).size.height - 200,
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                _buildTableHeader(),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('affiliations')
-                        .orderBy('name')
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      }
-
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return buildEmptyState(false, false, "affiliations");
-                      }
-
-                      return _buildAffiliationList(
-                        allAffiliations: snapshot.data!.docs,
-                        searchQuery: searchController.text,
-                        currentPage: currentPage,
-                        itemsPerPage: itemsPerPage,
-                        onPageChanged: onPageChanged,
-                        onItemsPerPageChanged: onItemsPerPageChanged,
-                      );
-                    },
+          Expanded(
+            child: Container(
+              height: MediaQuery.of(context).size.height - 200,
+              padding: EdgeInsets.all(padding),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Column(
+                children: [
+                  _buildTableHeader(),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream:
+                          FirebaseFirestore.instance
+                              .collection('affiliations')
+                              .orderBy('name')
+                              .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Text('Error: ${snapshot.error}'),
+                          );
+                        }
+
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return buildEmptyState(false, false, "affiliations");
+                        }
+
+                        return _buildAffiliationList(
+                          allAffiliations: snapshot.data!.docs,
+                          searchQuery: searchController.text,
+                          currentPage: currentPage,
+                          itemsPerPage: itemsPerPage,
+                          onPageChanged: onPageChanged,
+                          onItemsPerPageChanged: onItemsPerPageChanged,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -261,15 +320,17 @@ Widget _buildAffiliationList({
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
   // Filtering
-  final filtered = allAffiliations.where((doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final name = (data['name'] ?? '').toString().toLowerCase();
+  final filtered =
+      allAffiliations.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final name = (data['name'] ?? '').toString().toLowerCase();
 
-    // Search filter
-    bool matchesSearch = searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
+        // Search filter
+        bool matchesSearch =
+            searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
 
-    return matchesSearch;
-  }).toList();
+        return matchesSearch;
+      }).toList();
 
   // Calculate pagination
   final totalItems = filtered.length;
@@ -288,25 +349,27 @@ Widget _buildAffiliationList({
     children: [
       // Affiliation List
       Expanded(
-        child: currentPageAffiliations.isEmpty
-            ? const Center(
-                child: Text('No affiliations match your search criteria.'),
-              )
-            : ListView.separated(
-                itemCount: currentPageAffiliations.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final doc = currentPageAffiliations[index];
-                  final data = doc.data() as Map<String, dynamic>;
+        child:
+            currentPageAffiliations.isEmpty
+                ? const Center(
+                  child: Text('No affiliations match your search criteria.'),
+                )
+                : ListView.separated(
+                  itemCount: currentPageAffiliations.length,
+                  separatorBuilder:
+                      (context, index) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final doc = currentPageAffiliations[index];
+                    final data = doc.data() as Map<String, dynamic>;
 
-                  return _buildAffiliationRow(
-                    context: context,
-                    doc: doc,
-                    name: data['name'] ?? 'N/A',
-                    description: data['description'] ?? '-',
-                  );
-                },
-              ),
+                    return _buildAffiliationRow(
+                      context: context,
+                      doc: doc,
+                      name: data['name'] ?? 'N/A',
+                      description: data['description'] ?? '-',
+                    );
+                  },
+                ),
       ),
       // Pagination
       if (totalItems > 0)
@@ -387,10 +450,11 @@ Widget _buildAffiliationRow({
             if (value == 'edit') {
               showDialog(
                 context: context,
-                builder: (context) => AddEditaffiliationDialog(
-                  affiliation: doc,
-                  onSaved: () {},
-                ),
+                builder:
+                    (context) => AddEditaffiliationDialog(
+                      affiliation: doc,
+                      onSaved: () {},
+                    ),
               );
             } else if (value == 'delete') {
               showDeleteConfirmation(
@@ -401,28 +465,29 @@ Widget _buildAffiliationRow({
               );
             }
           },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit, size: 18),
-                  SizedBox(width: 8),
-                  Text('Edit'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, size: 18, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: Colors.red)),
-                ],
-              ),
-            ),
-          ],
+          itemBuilder:
+              (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
         ),
       ],
     ),
@@ -432,6 +497,7 @@ Widget _buildAffiliationRow({
 Widget _buildHeader(
   TextEditingController searchController,
   BuildContext context,
+  AffiliationData? affiliation,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -471,9 +537,8 @@ Widget _buildHeader(
                 onPressed: () {
                   showDialog(
                     context: context,
-                    builder: (context) => AddEditaffiliationDialog(
-                      onSaved: () {},
-                    ),
+                    builder:
+                        (context) => AddEditaffiliationDialog(onSaved: () {}),
                   );
                 },
                 icon: const Icon(Icons.add, size: 18),
@@ -493,7 +558,51 @@ Widget _buildHeader(
               ),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child:
+                isMobile
+                    ? Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        buildStatCard(
+                          'Total Affiliations',
+                          '${affiliation?.totalAffiliations}',
+                          Colors.blue,
+                          Icons.message,
+                        ),
+                        buildStatCard(
+                          'Affiliation where most students are affiliated',
+                          '${affiliation?.dominantAffiliation}',
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                      ],
+                    )
+                    : Row(
+                      children: [
+                        Expanded(
+                          child: buildStatCard(
+                            'Total Affiliations',
+                            '${affiliation?.totalAffiliations}',
+                            Colors.blue,
+                            Icons.message,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'Affiliation where most students are affiliated',
+                            '${affiliation?.dominantAffiliation}',
+                            Colors.green,
+                            Icons.check_circle,
+                          ),
+                        ),
+                      ],
+                    ),
+          ),
 
           // Search Row
           buildSearchField('Search affiliations by name', searchController),

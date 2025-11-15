@@ -464,7 +464,7 @@ Widget _buildActionButtons(
               Navigator.of(context).pop();
               Future.delayed(
                 const Duration(milliseconds: 200),
-                () => showEditADModal(context, doc, previousModal: 'info'),
+                () => showEditAdmissionDialog(context, doc, previousModal: 'info'),
               );
             },
             icon: const Icon(Icons.edit_outlined, size: 18),
@@ -777,7 +777,7 @@ Widget _buildFullContentActionButtons(
               Future.delayed(
                 const Duration(milliseconds: 200),
                 () =>
-                    showEditADModal(context, doc, previousModal: 'fullContent'),
+                    showEditAdmissionDialog(context, doc, previousModal: 'fullContent'),
               );
             },
             icon: const Icon(Icons.edit_outlined, size: 18),

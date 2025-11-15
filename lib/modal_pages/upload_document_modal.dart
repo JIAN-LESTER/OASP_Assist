@@ -1,11 +1,11 @@
-
 import 'dart:io';
-
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 
@@ -68,7 +68,6 @@ class UploadDocumentModal extends StatelessWidget {
     final screenWidth = screenSize.width;
     final screenHeight = screenSize.height;
 
-    // Responsive dimensions
     double modalWidth;
     double modalHeight;
     EdgeInsets modalPadding;
@@ -143,16 +142,17 @@ class UploadDocumentContent extends StatefulWidget {
 
 class _UploadDocumentContentState extends State<UploadDocumentContent> {
   final FileService _fileService = FileService();
-
   final TextEditingController _titleController = TextEditingController();
   final CohereService _cohereService = CohereService();
   final TextEditingController _categoryController = TextEditingController();
+  final ImagePicker _imagePicker = ImagePicker();
+  final TextRecognizer _textRecognizer = TextRecognizer();
 
   String? _selectedFileName;
   String? _extractedText;
   File? _selectedFile;
-
   bool _isUploading = false;
+  bool _isProcessingImage = false;
 
   final List<String> _predefinedCategories = [
     'Admission',
@@ -165,9 +165,9 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
   void dispose() {
     _titleController.dispose();
     _categoryController.dispose();
+    _textRecognizer.close();
     super.dispose();
   }
-
 
   Future<void> _pickFile() async {
     try {
@@ -185,7 +185,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
         setState(() {
           _selectedFile = file;
           _selectedFileName = fileName;
-
         });
 
         String extractedText;
@@ -209,6 +208,215 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
     } catch (e) {
       _showTopRightAlert('Error processing file: $e', AlertType.error);
     }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 100,
+      );
+
+      if (image != null) {
+        await _processImage(image);
+      }
+    } catch (e) {
+      _showTopRightAlert('Error picking image: $e', AlertType.error);
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    try {
+      final XFile? photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 100,
+        preferredCameraDevice: CameraDevice.rear,
+      );
+
+      if (photo != null) {
+        await _processImage(photo);
+      }
+    } catch (e) {
+      _showTopRightAlert('Error taking photo: $e', AlertType.error);
+    }
+  }
+
+  Future<void> _processImage(XFile image) async {
+    setState(() {
+      _isProcessingImage = true;
+    });
+
+    try {
+      final inputImage = InputImage.fromFilePath(image.path);
+      final RecognizedText recognizedText = await _textRecognizer.processImage(
+        inputImage,
+      );
+
+      String extractedText = recognizedText.text;
+
+      if (extractedText.trim().isEmpty) {
+        _showTopRightAlert('No text found in image', AlertType.warning);
+        setState(() {
+          _isProcessingImage = false;
+        });
+        return;
+      }
+
+      setState(() {
+        _selectedFile = File(image.path);
+        _selectedFileName =
+            'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        _extractedText = extractedText;
+        _isProcessingImage = false;
+
+        if (_titleController.text.isEmpty) {
+          _titleController.text = 'Document from Image';
+        }
+      });
+
+      _showTopRightAlert(
+        'Text extracted successfully! Found ${extractedText.split(' ').length} words',
+        AlertType.success,
+      );
+    } catch (e) {
+      setState(() {
+        _isProcessingImage = false;
+      });
+      _showTopRightAlert(
+        'Error extracting text from image: $e',
+        AlertType.error,
+      );
+    }
+  }
+
+  void _showUploadOptionsBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 16),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Choose Upload Method',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _buildUploadOption(
+                  icon: Icons.insert_drive_file,
+                  title: 'Upload Document',
+                  subtitle: 'PDF, TXT, DOC, DOCX',
+                  color: const Color(0xFF2E7D32),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickFile();
+                  },
+                ),
+                _buildUploadOption(
+                  icon: Icons.photo_library,
+                  title: 'Choose from Gallery',
+                  subtitle: 'Extract text from image',
+                  color: Colors.blue,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImageFromGallery();
+                  },
+                ),
+                if (widget.isMobile)
+                  _buildUploadOption(
+                    icon: Icons.camera_alt,
+                    title: 'Take Photo',
+                    subtitle: 'Capture and extract text',
+                    color: Colors.orange,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _takePhoto();
+                    },
+                  ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildUploadOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _uploadDocument() async {
@@ -260,7 +468,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
           print("📋 Admission analysis result: $admissionCohere");
 
-          // Handle contacts properly
           List<String>? contactsList;
           try {
             if (admissionCohere['contacts'] is List<Map<String, dynamic>>) {
@@ -280,7 +487,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
             contactsList = null;
           }
 
-          // Ensure steps is List<String>
           List<String> stepsList = <String>[];
           try {
             if (admissionCohere['steps'] is List<String>) {
@@ -319,14 +525,12 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
           print("📋 Scholarship analysis result: $scholarshipCohere");
 
-          // Handle multiple scholarships
           if (scholarshipCohere['scholarships'] is List &&
               scholarshipCohere['scholarships'].isNotEmpty) {
             List<dynamic> scholarshipDataList =
                 scholarshipCohere['scholarships'];
             print("📚 Found ${scholarshipDataList.length} scholarship(s)");
 
-            // Prepare list of scholarship objects for batch saving
             List<Scholarship> scholarships = [];
 
             for (int i = 0; i < scholarshipDataList.length; i++) {
@@ -336,9 +540,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
               print(
                 "📝 Preparing scholarship ${i + 1}/${scholarshipDataList.length} with ID: $scholarshipId",
               );
-
-              // Parse deadline string to DateTime
-              
 
               final scholarship = Scholarship(
                 scholarshipID: scholarshipId,
@@ -350,8 +551,8 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
                 scholarshipProvider:
                     scholarshipData['scholarshipProvider'] ??
                     'Unknown Provider',
-       
-                eligibilityRequirements: scholarshipData['eligibilityRequirements'] ?? <String>[],
+                eligibilityRequirements:
+                    scholarshipData['eligibilityRequirements'] ?? <String>[],
                 privileges: scholarshipData['privileges'] ?? <String>[],
                 deadline: scholarshipCohere['deadline'],
                 applicationLink: scholarshipData['application_link'] ?? '',
@@ -361,7 +562,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
               scholarships.add(scholarship);
             }
 
-            // Batch save all scholarships
             await _fileService.saveMultipleScholarships(scholarships);
 
             _showTopRightAlert(
@@ -376,66 +576,69 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
             );
           }
           break;
-      case 'Placement':
-  print("🔍 Analyzing placement document...");
-  final placementCohere = await _cohereService.analyzePlacement(
-    _extractedText!,
-  );
 
-  print("📋 Placement analysis result: $placementCohere");
+        case 'Placement':
+          print("🔍 Analyzing placement document...");
+          final placementCohere = await _cohereService.analyzePlacement(
+            _extractedText!,
+          );
 
-  if (placementCohere['placements'] is List &&
-      placementCohere['placements'].isNotEmpty) {
-    List<dynamic> placementDataList = placementCohere['placements'];
-    print("📚 Found ${placementDataList.length} placement(s)");
+          print("📋 Placement analysis result: $placementCohere");
 
-    // Prepare list of placement objects for batch saving
-    List<Placement> placements = [];
+          if (placementCohere['placements'] is List &&
+              placementCohere['placements'].isNotEmpty) {
+            List<dynamic> placementDataList = placementCohere['placements'];
+            print("📚 Found ${placementDataList.length} placement(s)");
 
-    for (int i = 0; i < placementDataList.length; i++) {
-      final placementData = placementDataList[i];
-      final placementId = i == 0 ? documentId : '${documentId}_$i';
+            List<Placement> placements = [];
 
-      print(
-        "📝 Preparing placement ${i + 1}/${placementDataList.length} with ID: $placementId",
-      );
+            for (int i = 0; i < placementDataList.length; i++) {
+              final placementData = placementDataList[i];
+              final placementId = i == 0 ? documentId : '${documentId}_$i';
 
-      // Build Placement object based on your new model
-      final placement = Placement(
-        placementID: placementId,
-        partnerCompany:
-            placementData['partnerCompany'] ?? 'Unnamed Placement',
-        contacts: placementData['contacts'] is List
-            ? List<String>.from(
-                placementData['contacts'].map((e) => e.toString()))
-            : <String>[],
-        positions: placementData['positions'] is List
-            ? List<String>.from(
-                placementData['positions'].map((e) => e.toString()))
-            : <String>[],
-        createdAt: DateTime.tryParse(placementData['createdAt'] ?? '') ??
-            DateTime.now(),
-      );
+              print(
+                "📝 Preparing placement ${i + 1}/${placementDataList.length} with ID: $placementId",
+              );
 
-      placements.add(placement);
-    }
+              final placement = Placement(
+                placementID: placementId,
+                isRecruiting: true,
+                partnerCompany:
+                    placementData['partnerCompany'] ?? 'Unnamed Placement',
+                contacts:
+                    placementData['contacts'] is List
+                        ? List<String>.from(
+                          placementData['contacts'].map((e) => e.toString()),
+                        )
+                        : <String>[],
+                positions:
+                    placementData['positions'] is List
+                        ? List<String>.from(
+                          placementData['positions'].map((e) => e.toString()),
+                        )
+                        : <String>[],
+                createdAt:
+                    DateTime.tryParse(placementData['createdAt'] ?? '') ??
+                    DateTime.now(),
+              );
 
-    // Batch save all placements
-    await _fileService.saveMultiplePlacements(placements);
+              placements.add(placement);
+            }
 
-    _showTopRightAlert(
-      'Found and saved ${placements.length} placement(s)!',
-      AlertType.success,
-    );
-  } else {
-    print("⚠️ No placements found in the document");
-    _showTopRightAlert(
-      'No placements found in the document',
-      AlertType.warning,
-    );
-  }
-  break;
+            await _fileService.saveMultiplePlacements(placements);
 
+            _showTopRightAlert(
+              'Found and saved ${placements.length} placement(s)!',
+              AlertType.success,
+            );
+          } else {
+            print("⚠️ No placements found in the document");
+            _showTopRightAlert(
+              'No placements found in the document',
+              AlertType.warning,
+            );
+          }
+          break;
 
         default:
           print(
@@ -444,7 +647,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
           break;
       }
 
-      // Log the upload action
       await _logUploadAction();
 
       _showTopRightAlert('Document uploaded successfully!', AlertType.success);
@@ -507,7 +709,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
     overlay.insert(overlayEntry);
 
-    // Auto dismiss after 4 seconds
     Future.delayed(const Duration(seconds: 4), () {
       if (overlayEntry.mounted) {
         overlayEntry.remove();
@@ -608,7 +809,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
                   // Title Input
                   buildTextField(
-                     isMobile: false,
+                    isMobile: false,
                     controller: _titleController,
                     label: 'Document Title',
                     hint: 'Enter a descriptive title',
@@ -625,7 +826,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
                   // Action Buttons
                   _buildActionButtons(),
 
-                  // Bottom padding for better scrolling
                   const SizedBox(height: 16),
                 ],
               ),
@@ -672,7 +872,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: _pickFile,
+          onTap: _isProcessingImage ? null : _showUploadOptionsBottomSheet,
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: widget.isMobile ? 20 : 32,
@@ -680,54 +880,57 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
             ),
             child: Column(
               children: [
-                Container(
-                  width: widget.isMobile ? 56 : 72,
-                  height: widget.isMobile ? 56 : 72,
-                  decoration: BoxDecoration(
-                    color:
+                if (_isProcessingImage)
+                  Column(
+                    children: [
+                      CircularProgressIndicator(color: const Color(0xFF2E7D32)),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Extracting text from image...',
+                        style: TextStyle(
+                          fontSize: widget.isMobile ? 14 : 16,
+                          color: const Color(0xFF374151),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Column(
+                    children: [
+                      Container(
+                        width: widget.isMobile ? 56 : 72,
+                        height: widget.isMobile ? 56 : 72,
+                        decoration: BoxDecoration(
+                          color:
+                              _selectedFile != null
+                                  ? const Color(0xFF2E7D32)
+                                  :  Colors.green,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          _selectedFile != null
+                              ? Icons.insert_drive_file
+                              : Icons.upload_file,
+                          color: Colors.white,
+                          size: widget.isMobile ? 28 : 32,
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+                      Text(
                         _selectedFile != null
-                            ? const Color(0xFF2E7D32).withOpacity(0.15)
-                            : const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(
-                      widget.isMobile ? 28 : 36,
-                    ),
+                            ? 'File ready for upload'
+                            : 'Documents: PDF, TXT, DOC, DOCX • Images: JPG, PNG',
+                        style: TextStyle(
+                          fontSize: widget.isMobile ? 13 : 14,
+                          color: const Color(0xFF9CA3AF),
+                          fontWeight: FontWeight.w400,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
-                  child: Icon(
-                    _selectedFile != null
-                        ? Icons.check_circle
-                        : Icons.cloud_upload_rounded,
-                    size: widget.isMobile ? 28 : 36,
-                    color:
-                        _selectedFile != null
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFF9CA3AF),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  _selectedFileName ?? 'Click to select file',
-                  style: TextStyle(
-                    fontSize: widget.isMobile ? 16 : 18,
-                    fontWeight: FontWeight.w600,
-                    color:
-                        _selectedFile != null
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFF374151),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _selectedFile != null
-                      ? 'File ready for upload'
-                      : 'Supported formats: PDF, TXT, DOC, DOCX',
-                  style: TextStyle(
-                    fontSize: widget.isMobile ? 13 : 14,
-                    color: const Color(0xFF9CA3AF),
-                    fontWeight: FontWeight.w400,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
               ],
             ),
           ),
@@ -804,7 +1007,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
         const SizedBox(height: 16),
         buildTextField(
           controller: _categoryController,
-           isMobile: false,
+          isMobile: false,
           label: 'Custom Category',
           hint: 'Or enter a custom category',
           icon: Icons.category_outlined,
@@ -814,7 +1017,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
   }
 
   Widget _buildActionButtons() {
-    // Professional button sizing - more refined and proportional
     double buttonHeight =
         widget.isMobile
             ? 40

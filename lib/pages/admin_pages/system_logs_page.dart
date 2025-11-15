@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:intl/intl.dart';
-import 'package:capstone_project/colors.dart';
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/modal_pages/log_info.dart';
 import 'package:capstone_project/models/logs.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/date_range_filter.dart';
@@ -27,7 +27,7 @@ class _UserActivityLogsPageState extends State<UserActivityLogsPage> {
   String selectedRole = 'All Logs';
   int currentPage = 1;
   int itemsPerPage = 10;
-     final List<Map<String, dynamic>> messages = [];
+  final List<Map<String, dynamic>> messages = [];
 
   void _onDateRangeChanged(DateTimeRange? dateRange) {
     setState(() {
@@ -60,10 +60,15 @@ class _UserActivityLogsPageState extends State<UserActivityLogsPage> {
           isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Activity logs refreshed'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: const Text('Activity logs refreshed'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(
+              bottom: 16,
+              right: 16,
+              left: MediaQuery.of(context).size.width - 350,
+            ),
           ),
         );
       }
@@ -79,12 +84,12 @@ class _UserActivityLogsPageState extends State<UserActivityLogsPage> {
         searchController: _searchController,
         onRefresh: _onRefresh,
         isLoading: isLoading,
-  
+
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _onPageChanged,
         onItemsPerPageChanged: _onItemsPerPageChanged,
-           messages: messages,
+        messages: messages,
       ),
       tabletBody: TabletUserActivityLogs(
         selectedDateRange: selectedDateRange,
@@ -92,7 +97,7 @@ class _UserActivityLogsPageState extends State<UserActivityLogsPage> {
         searchController: _searchController,
         onRefresh: _onRefresh,
         isLoading: isLoading,
-      
+
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _onPageChanged,
@@ -105,7 +110,7 @@ class _UserActivityLogsPageState extends State<UserActivityLogsPage> {
         searchController: _searchController,
         onRefresh: _onRefresh,
         isLoading: isLoading,
-     
+
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _onPageChanged,
@@ -127,7 +132,7 @@ class DesktopUserActivityLogs extends StatefulWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-     final List<Map<String, dynamic>> messages;
+  final List<Map<String, dynamic>> messages;
 
   const DesktopUserActivityLogs({
     super.key,
@@ -161,7 +166,7 @@ class _DesktopUserActivityLogsState extends State<DesktopUserActivityLogs> {
         setState(() {}); // ✅ refresh handled here
       },
       widget.isLoading,
-      
+
       widget.currentPage,
       widget.itemsPerPage,
       widget.onPageChanged,
@@ -169,7 +174,7 @@ class _DesktopUserActivityLogsState extends State<DesktopUserActivityLogs> {
       widget.messages,
       context,
       24.0,
-      
+
       () => setState(() {}), // ✅ search handled here
     );
   }
@@ -186,7 +191,7 @@ class TabletUserActivityLogs extends StatefulWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-     final List<Map<String, dynamic>> messages;
+  final List<Map<String, dynamic>> messages;
 
   const TabletUserActivityLogs({
     super.key,
@@ -210,7 +215,7 @@ class TabletUserActivityLogs extends StatefulWidget {
 class _TabletUserActivityLogsState extends State<TabletUserActivityLogs> {
   @override
   Widget build(BuildContext context) {
- return mainContent(
+    return mainContent(
       widget.selectedDateRange,
       widget.onDateRangeChanged,
       widget.searchController,
@@ -219,7 +224,7 @@ class _TabletUserActivityLogsState extends State<TabletUserActivityLogs> {
         setState(() {}); // ✅ refresh handled here
       },
       widget.isLoading,
-      
+
       widget.currentPage,
       widget.itemsPerPage,
       widget.onPageChanged,
@@ -227,7 +232,7 @@ class _TabletUserActivityLogsState extends State<TabletUserActivityLogs> {
       widget.messages,
       context,
       20.0,
-      
+
       () => setState(() {}), // ✅ search handled here
     );
   }
@@ -245,7 +250,7 @@ class MobileUserActivityLogs extends StatefulWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-     final List<Map<String, dynamic>> messages;
+  final List<Map<String, dynamic>> messages;
 
   const MobileUserActivityLogs({
     super.key,
@@ -254,7 +259,7 @@ class MobileUserActivityLogs extends StatefulWidget {
     required this.searchController,
     required this.onRefresh,
     required this.isLoading,
- 
+
     required this.currentPage,
     required this.itemsPerPage,
     required this.onPageChanged,
@@ -269,7 +274,7 @@ class MobileUserActivityLogs extends StatefulWidget {
 class _MobileUserActivityLogsState extends State<MobileUserActivityLogs> {
   @override
   Widget build(BuildContext context) {
-  return mainContent(
+    return mainContent(
       widget.selectedDateRange,
       widget.onDateRangeChanged,
       widget.searchController,
@@ -278,7 +283,7 @@ class _MobileUserActivityLogsState extends State<MobileUserActivityLogs> {
         setState(() {}); // ✅ refresh handled here
       },
       widget.isLoading,
-      
+
       widget.currentPage,
       widget.itemsPerPage,
       widget.onPageChanged,
@@ -286,7 +291,7 @@ class _MobileUserActivityLogsState extends State<MobileUserActivityLogs> {
       widget.messages,
       context,
       16.0,
-      
+
       () => setState(() {}), // ✅ search handled here
     );
   }
@@ -309,7 +314,7 @@ Widget mainContent(
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
-    body: SingleChildScrollView(
+    body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,13 +323,14 @@ Widget mainContent(
             selectedDateRange,
             onDateRangeChanged,
             searchController,
-            onRefresh,       // 🔹 handled outside
+            onRefresh, // 🔹 handled outside
             onSearchChanged, // 🔹 handled outside
           ),
 
           const SizedBox(height: 16),
+          Expanded(
 
-          Container(
+          child: Container(
             height: MediaQuery.of(context).size.height - 200,
             padding: EdgeInsets.all(padding),
             decoration: BoxDecoration(
@@ -346,10 +352,11 @@ Widget mainContent(
 
                 Expanded(
                   child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('logs')
-                        .orderBy('time', descending: true)
-                        .snapshots(),
+                    stream:
+                        FirebaseFirestore.instance
+                            .collection('logs')
+                            .orderBy('time', descending: true)
+                            .snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
@@ -365,7 +372,7 @@ Widget mainContent(
 
                       return _buildLogsList(
                         allLogs: snapshot.data!.docs,
-              
+
                         searchQuery: searchController.text,
                         selectedDateRange: selectedDateRange,
                         currentPage: currentPage,
@@ -380,12 +387,12 @@ Widget mainContent(
               ],
             ),
           ),
+          ),
         ],
       ),
     ),
   );
 }
-
 
 Widget _buildHeader(
   DateTimeRange? selectedDateRange,
@@ -463,7 +470,7 @@ Widget _buildHeader(
               ? Column(
                 children: [
                   buildSearchField(
-                         'user or actions',
+                    'user or actions',
                     searchController,
                     onSearchChanged: onSearchChanged,
                   ),
@@ -485,7 +492,7 @@ Widget _buildHeader(
                   Expanded(
                     flex: 2,
                     child: buildSearchField(
-                           'user or actions',
+                      'user or actions',
                       searchController,
                       onSearchChanged: onSearchChanged,
                     ),
@@ -502,7 +509,6 @@ Widget _buildHeader(
     },
   );
 }
-
 
 Widget _buildTableHeader() {
   return LayoutBuilder(
@@ -619,7 +625,7 @@ Widget _buildLogsList({
   required int itemsPerPage,
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
-   required List<Map<String, dynamic>> messages
+  required List<Map<String, dynamic>> messages,
 }) {
   final filtered =
       allLogs.where((doc) {
@@ -724,12 +730,11 @@ Widget _buildLogsList({
                   itemBuilder: (context, index) {
                     final doc = currentPageLogs[index];
                     final data = doc.data() as Map<String, dynamic>;
-                final Timestamp timestamp = data['time'] ?? Timestamp.now();
-final DateTime logDate = timestamp.toDate();
-final String formattedTime = DateFormat(
-  "MMMM d, yyyy 'at' h:mm a",
-).format(logDate);
-
+                    final Timestamp timestamp = data['time'] ?? Timestamp.now();
+                    final DateTime logDate = timestamp.toDate();
+                    final String formattedTime = DateFormat(
+                      "MMMM d, yyyy 'at' h:mm a",
+                    ).format(logDate);
 
                     final log = Logs(
                       id: data['logId'] ?? 'N/A',
@@ -738,13 +743,18 @@ final String formattedTime = DateFormat(
                       time: formattedTime,
                     );
 
-                    return _buildLogsRow(context: context, doc: doc, logs: log, messages: messages);
+                    return _buildLogsRow(
+                      context: context,
+                      doc: doc,
+                      logs: log,
+                      messages: messages,
+                    );
                   },
                 ),
       ),
 
       if (totalItems > 0)
-buildPagination(
+        buildPagination(
           currentPage: safeCurrentPage,
           totalPages: totalPages,
           totalItems: totalItems,
@@ -761,11 +771,10 @@ Widget _buildLogsRow({
   required BuildContext context,
   required DocumentSnapshot doc,
   required Logs logs,
-   required List<Map<String, dynamic>> messages
+  required List<Map<String, dynamic>> messages,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
   bool isMobile = screenWidth < 600;
-
 
   return Container(
     padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
@@ -894,5 +903,3 @@ Widget _buildLogsRow({
     ),
   );
 }
-
-

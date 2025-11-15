@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:capstone_project/colors.dart';
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/modal_pages/msg_logs_info.dart';
 import 'package:capstone_project/models/message_logs.dart';
@@ -60,10 +60,15 @@ class _AdminMessageLogsPageState extends State<AdminMessageLogsPage> {
           isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Message logs refreshed'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: const Text('Message logs refreshed'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(
+              bottom: 16,
+              right: 16,
+              left: MediaQuery.of(context).size.width - 350,
+            ),
           ),
         );
       }
@@ -115,7 +120,6 @@ class _AdminMessageLogsPageState extends State<AdminMessageLogsPage> {
     );
   }
 }
-
 
 class DesktopAdminMessageLogsPage extends StatefulWidget {
   final DateTimeRange? selectedDateRange;
@@ -236,7 +240,6 @@ class _TabletAdminMessageLogsPageState
     );
   }
 }
-
 
 class MobileAdminMessageLogsPage extends StatefulWidget {
   final DateTimeRange? selectedDateRange;
@@ -432,7 +435,7 @@ Widget mainContent(
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
-    body: SingleChildScrollView(
+    body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,8 +449,8 @@ Widget mainContent(
           ),
 
           const SizedBox(height: 16),
-
-          Container(
+Expanded(
+          child:Container(
             height: MediaQuery.of(context).size.height - 200,
             padding: EdgeInsets.all(padding),
             decoration: BoxDecoration(
@@ -504,6 +507,7 @@ Widget mainContent(
               ],
             ),
           ),
+),
         ],
       ),
     ),
@@ -751,12 +755,11 @@ Widget _buildLogsList({
                   itemBuilder: (context, index) {
                     final doc = currentPageLogs[index];
                     final data = doc.data() as Map<String, dynamic>;
-                final Timestamp timestamp = data['time'] ?? Timestamp.now();
-final DateTime logDate = timestamp.toDate();
-final String formattedTime = DateFormat(
-  "MMMM d, yyyy 'at' h:mm a",
-).format(logDate);
-
+                    final Timestamp timestamp = data['time'] ?? Timestamp.now();
+                    final DateTime logDate = timestamp.toDate();
+                    final String formattedTime = DateFormat(
+                      "MMMM d, yyyy 'at' h:mm a",
+                    ).format(logDate);
 
                     final msglogs = MessageLogs(
                       id: data['logId'] ?? 'N/A',

@@ -1,9 +1,11 @@
+import 'package:capstone_project/pages/data/charts.dart';
+import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:capstone_project/colors.dart';
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/pages/admin_pages/buttons/upload_document_button.dart';
 import 'package:capstone_project/modal_pages/ib_edit.dart';
@@ -27,8 +29,12 @@ class _InformationBankPageState extends State<InformationBankPage> {
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  bool isLoading = true;
 
-  // WeaviateCloudService? _weaviateService;
+  // Create an instance of FirebaseService
+  final StatDataManagement statData = StatDataManagement();
+
+  InformationBankData? ibData;
 
   void _onCategoryChanged(String newCategory) {
     setState(() {
@@ -44,6 +50,8 @@ class _InformationBankPageState extends State<InformationBankPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    // Load data when page initializes
+    loadStatData();
   }
 
   @override
@@ -51,6 +59,33 @@ class _InformationBankPageState extends State<InformationBankPage> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  // Updated method to call FirebaseService
+  Future<void> loadStatData() async {
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Call the getInformationBankData() method
+      final data = await statData.getInformationBankData();
+
+      if (!mounted) return;
+
+      setState(() {
+        ibData = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading information bank data: $e");
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   void _onSearchChanged() {
@@ -74,6 +109,9 @@ class _InformationBankPageState extends State<InformationBankPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return ResponsiveLayout(
       mobileBody: MobileInformationBank(
         selectedCategory: selectedCategory,
@@ -83,6 +121,7 @@ class _InformationBankPageState extends State<InformationBankPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        ib: ibData,
       ),
       tabletBody: TabletInformationBank(
         selectedCategory: selectedCategory,
@@ -92,6 +131,7 @@ class _InformationBankPageState extends State<InformationBankPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        ib: ibData,
       ),
       desktopBody: DesktopInformationBank(
         selectedCategory: selectedCategory,
@@ -101,6 +141,7 @@ class _InformationBankPageState extends State<InformationBankPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        ib: ibData,
       ),
     );
   }
@@ -116,6 +157,7 @@ class DesktopInformationBank extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final InformationBankData? ib;
 
   const DesktopInformationBank({
     super.key,
@@ -126,6 +168,7 @@ class DesktopInformationBank extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.ib,
   });
 
   @override
@@ -139,6 +182,7 @@ class DesktopInformationBank extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       24.0,
+      ib,
     );
   }
 }
@@ -153,6 +197,7 @@ class TabletInformationBank extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final InformationBankData? ib;
 
   const TabletInformationBank({
     super.key,
@@ -163,6 +208,7 @@ class TabletInformationBank extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.ib,
   });
 
   @override
@@ -176,6 +222,7 @@ class TabletInformationBank extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       20.0,
+      ib,
     );
   }
 }
@@ -190,6 +237,7 @@ class MobileInformationBank extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+    final InformationBankData? ib;
 
   const MobileInformationBank({
     super.key,
@@ -200,6 +248,7 @@ class MobileInformationBank extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
+    this.ib,
   });
 
   @override
@@ -213,6 +262,7 @@ class MobileInformationBank extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       16.0,
+      ib,
     );
   }
 }
@@ -227,6 +277,7 @@ Widget mainContent(
   final ValueChanged<int> onPageChanged,
   final ValueChanged<int> onItemsPerPageChanged,
   final double padding,
+  final InformationBankData? ib,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -235,7 +286,7 @@ Widget mainContent(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(selectedCategory, onCategoryChanged, searchController),
+          _buildHeader(selectedCategory, onCategoryChanged, searchController, ib),
           const SizedBox(height: 16),
           Expanded(
             child: Container(
@@ -308,6 +359,7 @@ Widget _buildHeader(
   String selectedCategory,
   ValueChanged<String> onCategoryChanged,
   TextEditingController searchController,
+  InformationBankData? ib,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -318,7 +370,7 @@ Widget _buildHeader(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title and Upload Button
+          // 🔹 Title and Upload Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -346,9 +398,71 @@ Widget _buildHeader(
               UploadDocumentButton(),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
 
-          // Search and Filter Row
+          // 🔹 Stat Cards Section
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child:
+                isMobile
+                    ? Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        buildStatCard(
+                          'Total Documents',
+                          '${ib?.totalDocuments}',
+                          Colors.blue,
+                          Icons.message,
+                        ),
+                        buildStatCard(
+                          'Most Frequent Document Category',
+                          ib?.mostFrequentCategory?? "Unknown",
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                        buildStatCard(
+                          'Latest Upload',
+                          ib?.latestUpload ?? "Unknown",
+                          Colors.red,
+                          Icons.group,
+                        ),
+                      ],
+                    )
+                    : Row(
+                      children: [
+                        Expanded(
+                          child:  buildStatCard(
+                          'Total Documents',
+                          '${ib?.totalDocuments}',
+                          Colors.blue,
+                          Icons.message,
+                        ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child:  buildStatCard(
+                          'Most Frequent Category',
+                          ib?.mostFrequentCategory?? "Unknown",
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child:buildStatCard(
+                          'Latest Upload',
+                          ib?.latestUpload ?? "Unknown",
+                          Colors.red,
+                          Icons.group,
+                        ),
+                        ),
+                      ],
+                    ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // 🔹 Search and Filter Row (below stat cards)
           isMobile
               ? Column(
                 children: [
@@ -534,7 +648,6 @@ Widget _buildIBList({
 
   return Column(
     children: [
-  
       Expanded(
         child:
             currentPageIB.isEmpty
@@ -620,29 +733,29 @@ Widget _buildIBRow({
                     fontSize: 14,
                   ),
                   overflow: TextOverflow.ellipsis,
-                     textAlign: TextAlign.justify,
+                  textAlign: TextAlign.justify,
                 ),
                 if (!isMobile && source.isNotEmpty)
                   Text(
                     source,
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     overflow: TextOverflow.ellipsis,
-                     textAlign: TextAlign.justify,
+                    textAlign: TextAlign.justify,
                   ),
               ],
             ),
           ),
 
-         if (!isMobile)
-  Expanded(
-    flex: 3,
-    child: Text(
-      content,
-      style: const TextStyle(fontSize: 13),
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-    ),
-  ),
+          if (!isMobile)
+            Expanded(
+              flex: 3,
+              child: Text(
+                content,
+                style: const TextStyle(fontSize: 13),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
 
           // Category
           Expanded(
@@ -667,7 +780,7 @@ Widget _buildIBRow({
             ),
           ),
           // Created At (hidden on mobile)
-   
+
           // Actions
           SizedBox(width: isTablet ? 60 : 80),
           PopupMenuButton<String>(
