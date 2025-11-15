@@ -1,12 +1,10 @@
 import 'package:capstone_project/modal_pages/add_edit_scholarship.dart';
 import 'package:capstone_project/pages/data/charts.dart';
+import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:capstone_project/modal_pages/admission_info.dart';
 import 'package:capstone_project/modal_pages/admission_edit.dart';
-
-
-
 
 import 'package:capstone_project/pages/admin_pages/buttons/upload_document_button.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/admission_year_dropdown.dart';
@@ -35,11 +33,43 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
   int currentPage = 1;
   int itemsPerPage = 10;
 
+  bool isLoading = true;
+  final StatDataManagement statData = StatDataManagement();
+
+  AdmissionData? ad;
+
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
     _loadAdmissions();
+    loadStatData();
+  }
+
+  Future<void> loadStatData() async {
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Call the getInformationBankData() method
+      final data = await statData.getAdmissionData();
+
+      if (!mounted) return;
+
+      setState(() {
+        ad = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading information bank data: $e");
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   void _loadAdmissions() {
@@ -87,6 +117,9 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+       if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return ResponsiveLayout(
       mobileBody: MobileAdmissionManagement(
         allAdmissions: allAdmissions,
@@ -97,6 +130,7 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        ad: ad,
       ),
       tabletBody: TabletAdmissionManagement(
         allAdmissions: allAdmissions,
@@ -107,6 +141,7 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        ad: ad,
       ),
       desktopBody: DesktopAdmissionManagement(
         allAdmissions: allAdmissions,
@@ -117,6 +152,7 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        ad: ad,
       ),
     );
   }
@@ -132,6 +168,7 @@ class DesktopAdmissionManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final AdmissionData? ad;
 
   const DesktopAdmissionManagement({
     super.key,
@@ -143,6 +180,7 @@ class DesktopAdmissionManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.allAdmissions,
+    this.ad,
   });
 
   @override
@@ -158,6 +196,7 @@ class DesktopAdmissionManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       24.0,
+      ad,
     );
   }
 }
@@ -172,6 +211,7 @@ class TabletAdmissionManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final AdmissionData? ad;
 
   const TabletAdmissionManagement({
     super.key,
@@ -183,6 +223,7 @@ class TabletAdmissionManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.allAdmissions,
+    this.ad,
   });
 
   @override
@@ -198,6 +239,7 @@ class TabletAdmissionManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       20.0,
+      ad,
     );
   }
 }
@@ -212,6 +254,7 @@ class MobileAdmissionManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final AdmissionData? ad;
 
   const MobileAdmissionManagement({
     super.key,
@@ -223,6 +266,7 @@ class MobileAdmissionManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.allAdmissions,
+    this.ad,
   });
 
   @override
@@ -238,6 +282,7 @@ class MobileAdmissionManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       16.0,
+      ad,
     );
   }
 }
@@ -253,6 +298,7 @@ Widget mainContent(
   final ValueChanged<int> onPageChanged,
   final ValueChanged<int> onItemsPerPageChanged,
   final double padding,
+  final AdmissionData? ad
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -266,42 +312,43 @@ Widget mainContent(
             allAdmissions,
             onYearChanged,
             searchController,
+            ad,
           ),
           const SizedBox(height: 16),
           Expanded(
-          child:Container(
-            height: MediaQuery.of(context).size.height - 200,
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                _buildTableHeader(),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: _buildAdmissionList(
-                    allAdmissions: allAdmissions,
-                    selectedYear: selectedYear,
-                    searchQuery: searchController.text,
-                    currentPage: currentPage,
-                    itemsPerPage: itemsPerPage,
-                    onPageChanged: onPageChanged,
-                    onItemsPerPageChanged: onItemsPerPageChanged,
+            child: Container(
+              height: MediaQuery.of(context).size.height - 200,
+              padding: EdgeInsets.all(padding),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Column(
+                children: [
+                  _buildTableHeader(),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: _buildAdmissionList(
+                      allAdmissions: allAdmissions,
+                      selectedYear: selectedYear,
+                      searchQuery: searchController.text,
+                      currentPage: currentPage,
+                      itemsPerPage: itemsPerPage,
+                      onPageChanged: onPageChanged,
+                      onItemsPerPageChanged: onItemsPerPageChanged,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
           ),
         ],
       ),
@@ -379,8 +426,6 @@ Widget _buildAdmissionList({
                             .toList() ??
                         [];
 
-                
-
                     return _buildAdmissionRow(
                       context: context,
                       doc: doc,
@@ -389,7 +434,6 @@ Widget _buildAdmissionList({
                       content: data['content'],
                       contacts: contacts,
                       academicYear: data['academicYear'] ?? '-',
-                      
                     );
                   },
                 ),
@@ -459,17 +503,16 @@ Widget _buildAdmissionRow({
               ],
             ),
           ),
-                   if (!isMobile)
-  Expanded(
-    flex: 3,
-    child: Text(
-      content,
-      style: const TextStyle(fontSize: 13),
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-    ),
-  ),
-
+          if (!isMobile)
+            Expanded(
+              flex: 3,
+              child: Text(
+                content,
+                style: const TextStyle(fontSize: 13),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
 
           Expanded(
             flex: 4,
@@ -529,7 +572,6 @@ Widget _buildAdmissionRow({
             ),
 
           // Created At
-        
 
           // Actions
           SizedBox(width: isTablet ? 60 : 80),
@@ -537,14 +579,13 @@ Widget _buildAdmissionRow({
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {
               if (value == 'edit') {
-      showDialog(
-        context: context,
-        builder: (context) => ScholarshipFormDialog(
-          doc: doc,
-          isEdit: true,
-        ),
-      );
-    }else if (value == 'delete') {
+                showDialog(
+                  context: context,
+                  builder:
+                      (context) =>
+                          ScholarshipFormDialog(doc: doc, isEdit: true),
+                );
+              } else if (value == 'delete') {
                 showDeleteConfirmation(
                   context,
                   doc,
@@ -589,6 +630,7 @@ Widget _buildHeader(
   List<DocumentSnapshot> allAdmissions,
   ValueChanged<String> onYearChanged,
   TextEditingController searchController,
+  AdmissionData? ad,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -624,47 +666,53 @@ Widget _buildHeader(
                   ),
                 ],
               ),
-              Row(children: [
-  UploadDocumentButton(
-    formType: 'admission',
-    
-  )
-]),
+              Row(children: [UploadDocumentButton(formType: 'admission')]),
             ],
           ),
-  
-                 Padding(
+
+          Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child: isMobile
-                ? Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    children: [
-                      buildStatCard('Latest Admission Academic Year', '59', Colors.blue, Icons.message),
-                      buildStatCard('Total Admission Documents', '58', Colors.green, Icons.check_circle),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: buildStatCard(
+            child:
+                isMobile
+                    ? Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        buildStatCard(
                           'Latest Admission Academic Year',
-                          '59',
+                          '${ad?.latestAdmission}',
                           Colors.blue,
                           Icons.message,
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: buildStatCard(
+                        buildStatCard(
                           'Total Admission Documents',
-                          '58',
+                          '${ad?.totalAdmission}',
                           Colors.green,
                           Icons.check_circle,
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    )
+                    : Row(
+                      children: [
+                        Expanded(
+                          child: buildStatCard(
+                            'Latest Admission Academic Year',
+                            '${ad?.latestAdmission}',
+                            Colors.blue,
+                            Icons.message,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'Total Admission Documents',
+                            '${ad?.totalAdmission}',
+                            Colors.green,
+                            Icons.check_circle,
+                          ),
+                        ),
+                      ],
+                    ),
           ),
 
           // Search and Filter Row
@@ -784,7 +832,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-             Expanded(
+            Expanded(
               flex: 3,
               child: Text(
                 'Content',
@@ -817,7 +865,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            
+
             SizedBox(width: isTablet ? 60 : 80), // Actions space
           ],
         ),

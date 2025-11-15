@@ -351,6 +351,7 @@ class DesktopDashboard extends StatelessWidget {
               selectedReportType,
               inq,
               cb,
+              selectedTimeFrame,
               ud,
               startDate,
               timeFrame,
@@ -420,6 +421,7 @@ class TabletDashboard extends StatelessWidget {
               selectedReportType,
               inq,
               cb,
+              selectedTimeFrame,
               ud,
               startDate,
               timeFrame,
@@ -489,6 +491,7 @@ class MobileDashboard extends StatelessWidget {
               selectedReportType,
               inq,
               cb,
+              selectedTimeFrame,
               ud,
               startDate,
               timeFrame,
@@ -508,6 +511,7 @@ class ReportsHelper {
     String reportType,
     InquiryReportsData? inq,
     ChatbotUsageReportsData? cb,
+    String selectedTimeFrame,
     UserDemographicsReportsData? ud,
     DateTime startDate,
     String timeFrame,
@@ -518,7 +522,7 @@ class ReportsHelper {
   }) {
     switch (reportType) {
       case 'Inquiry Trends':
-        return buildInquiryTrendsReport(inq, isDesktop: isDesktop);
+        return buildInquiryTrendsReport(inq, isDesktop: isDesktop, selectedTimeFrame: selectedTimeFrame);
       case 'Chatbot Usage':
         return buildChatbotUsageReport(
           cb,
@@ -537,6 +541,7 @@ class ReportsHelper {
 
 List<Widget> buildInquiryTrendsReport(
   InquiryReportsData? data, {
+  String? selectedTimeFrame,
   bool isDesktop = false,
 }) {
   return [
@@ -584,16 +589,16 @@ List<Widget> buildInquiryTrendsReport(
     ),
     const SizedBox(height: 16),
     SizedBox(
-      height: 400,
+      height: 500,
       child: Row(
         children: [
-          Expanded(child: buildInquiryTrendCard(data?.inquiryTrend ?? [])),
+          Expanded(child: buildInquiryTrendCard(data?.inquiryTrend ?? [], selectedTimeFrame.toString())),
         ],
       ),
     ),
     const SizedBox(height: 16),
     SizedBox(
-      height: 400,
+      height: 450,
       child: Row(
         children: [
           Expanded(
@@ -608,7 +613,7 @@ List<Widget> buildInquiryTrendsReport(
     ),
     const SizedBox(height: 16),
     SizedBox(
-      height: 400,
+      height: 500,
       child: Row(
         children: [
         

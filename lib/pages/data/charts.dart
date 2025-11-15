@@ -7,62 +7,86 @@ import 'package:capstone_project/pages/data/reports.dart';
 // import 'package:capstone_project/pages/data/reports.dart';
 
 Widget buildStatCard(String title, String value, Color color, IconData icon) {
-  return Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.05),
-          blurRadius: 8,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: color, size: 20),
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isMobile = screenWidth < 600;
+      final isTablet = screenWidth >= 600 && screenWidth < 1100;
+      
+      // Responsive sizing
+      final padding = isMobile ? 12.0 : (isTablet ? 14.0 : 16.0);
+      final iconPadding = isMobile ? 6.0 : (isTablet ? 7.0 : 8.0);
+      final iconSize = isMobile ? 16.0 : (isTablet ? 18.0 : 20.0);
+      final valueFontSize = isMobile ? 16.0 : (isTablet ? 18.0 : 20.0);
+      final titleFontSize = isMobile ? 10.0 : (isTablet ? 11.0 : 12.0);
+      final spacing = isMobile ? 8.0 : (isTablet ? 10.0 : 12.0);
+      final borderRadius = isMobile ? 10.0 : 12.0;
+      final borderWidth = isMobile ? 3.0 : 4.0;
+      
+      return Container(
+        padding: EdgeInsets.all(padding),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(borderRadius),
+          border: Border(
+            left: BorderSide(
+              color: color,
+              width: borderWidth,
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              // Only use Expanded here, inside the card
-              child: Text(
-                value,
-                style: TextStyle(
-                  fontSize: 20, // Adjusted font size
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(iconPadding),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: color, size: iconSize),
+                ),
+                SizedBox(width: isMobile ? 6 : 8),
+                Expanded(
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: valueFontSize,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: spacing),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: titleFontSize,
+                color: Colors.grey,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
-      ],
-    ),
+      );
+    },
   );
 }
 

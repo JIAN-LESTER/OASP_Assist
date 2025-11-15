@@ -1,11 +1,10 @@
 import 'package:capstone_project/modal_pages/add_edit_placement.dart';
 import 'package:capstone_project/pages/data/charts.dart';
+import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:capstone_project/modal_pages/pl_info.dart';
 
-
 import 'package:capstone_project/modal_pages/placement_edit.dart';
-
 
 import 'package:capstone_project/pages/admin_pages/buttons/upload_document_button.dart';
 
@@ -35,11 +34,41 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
   int currentPage = 1;
   int itemsPerPage = 10;
 
+  bool isLoading = true;
+  final StatDataManagement statData = StatDataManagement();
+  PlacementData? pl;
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
     loadPlacements();
+    loadStatData();
+  }
+
+  Future<void> loadStatData() async {
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Call the getInformationBankData() method
+      final data = await statData.getPlacementData();
+
+      if (!mounted) return;
+
+      setState(() {
+        pl = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading information bank data: $e");
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   void loadPlacements() {
@@ -87,6 +116,9 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return ResponsiveLayout(
       mobileBody: MobilePlacementManagement(
         allPlacements: allPlacements,
@@ -97,6 +129,7 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        pl: pl,
       ),
       tabletBody: TabletPlacementManagement(
         allPlacements: allPlacements,
@@ -107,6 +140,7 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        pl: pl,
       ),
       desktopBody: DesktopPlacementManagement(
         allPlacements: allPlacements,
@@ -117,6 +151,7 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
+        pl: pl,
       ),
     );
   }
@@ -132,6 +167,7 @@ class DesktopPlacementManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final PlacementData? pl;
 
   const DesktopPlacementManagement({
     super.key,
@@ -143,6 +179,7 @@ class DesktopPlacementManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.allPlacements,
+    this.pl,
   });
 
   @override
@@ -158,6 +195,7 @@ class DesktopPlacementManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       24.0,
+      pl,
     );
   }
 }
@@ -172,6 +210,7 @@ class TabletPlacementManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+    final PlacementData? pl;
 
   const TabletPlacementManagement({
     super.key,
@@ -183,6 +222,7 @@ class TabletPlacementManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.allPlacements,
+    this.pl,
   });
 
   @override
@@ -198,6 +238,7 @@ class TabletPlacementManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       20.0,
+      pl,
     );
   }
 }
@@ -212,6 +253,7 @@ class MobilePlacementManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+    final PlacementData? pl;
 
   const MobilePlacementManagement({
     super.key,
@@ -223,6 +265,7 @@ class MobilePlacementManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.allPlacements,
+    this.pl,
   });
 
   @override
@@ -238,6 +281,7 @@ class MobilePlacementManagement extends StatelessWidget {
       onPageChanged,
       onItemsPerPageChanged,
       16.0,
+      pl,
     );
   }
 }
@@ -253,6 +297,7 @@ Widget mainContent(
   final ValueChanged<int> onPageChanged,
   final ValueChanged<int> onItemsPerPageChanged,
   final double padding,
+  final PlacementData? pl,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -266,42 +311,43 @@ Widget mainContent(
             allPlacements,
             onCompanyChanged,
             searchController,
+            pl,
           ),
           const SizedBox(height: 16),
           Expanded(
-          child:Container(
-            height: MediaQuery.of(context).size.height - 200,
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                _buildTableHeader(),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: _buildPlacementList(
-                    allPlacements: allPlacements,
-                    selectedCompany: selectedCompany,
-                    searchQuery: searchController.text,
-                    currentPage: currentPage,
-                    itemsPerPage: itemsPerPage,
-                    onPageChanged: onPageChanged,
-                    onItemsPerPageChanged: onItemsPerPageChanged,
+            child: Container(
+              height: MediaQuery.of(context).size.height - 200,
+              padding: EdgeInsets.all(padding),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Column(
+                children: [
+                  _buildTableHeader(),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: _buildPlacementList(
+                      allPlacements: allPlacements,
+                      selectedCompany: selectedCompany,
+                      searchQuery: searchController.text,
+                      currentPage: currentPage,
+                      itemsPerPage: itemsPerPage,
+                      onPageChanged: onPageChanged,
+                      onItemsPerPageChanged: onItemsPerPageChanged,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
           ),
         ],
       ),
@@ -319,33 +365,34 @@ Widget _buildPlacementList({
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
   // Filtering
-final filtered = allPlacements.where((doc) {
-  final data = doc.data() as Map<String, dynamic>;
-  final company =
-      (data['partnerCompany'] ?? '').toString().toLowerCase().trim();
+  final filtered =
+      allPlacements.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final company =
+            (data['partnerCompany'] ?? '').toString().toLowerCase().trim();
 
-  // Ensure positions is a List<String>
-  final List<String> positionsList = (data['positions'] is List)
-      ? List<String>.from(data['positions'].map((e) => e.toString()))
-      : <String>[];
+        // Ensure positions is a List<String>
+        final List<String> positionsList =
+            (data['positions'] is List)
+                ? List<String>.from(data['positions'].map((e) => e.toString()))
+                : <String>[];
 
-  final query = searchQuery.toLowerCase().trim();
-  final companyFilter = selectedCompany.toLowerCase().trim();
+        final query = searchQuery.toLowerCase().trim();
+        final companyFilter = selectedCompany.toLowerCase().trim();
 
+        bool matchesCompany =
+            companyFilter == 'all company' ||
+            companyFilter == 'all' ||
+            company == companyFilter;
 
-  bool matchesCompany =
-      companyFilter == 'all company' || 
-      companyFilter == 'all' ||
-      company == companyFilter;
+        // Search filter → check if query matches company or ANY position
+        bool matchesSearch =
+            query.isEmpty ||
+            company.contains(query) ||
+            positionsList.any((pos) => pos.toLowerCase().contains(query));
 
-  // Search filter → check if query matches company or ANY position
-  bool matchesSearch = query.isEmpty ||
-      company.contains(query) ||
-      positionsList.any((pos) => pos.toLowerCase().contains(query));
-
-  return matchesCompany && matchesSearch;
-}).toList();
-
+        return matchesCompany && matchesSearch;
+      }).toList();
 
   // Calculate pagination
   final totalItems = filtered.length;
@@ -362,13 +409,10 @@ final filtered = allPlacements.where((doc) {
 
   return Column(
     children: [
- 
       Expanded(
         child:
             currentPagePlacements.isEmpty
-                ? const Center(
-                  child: Text('No companies match your criteria.'),
-                )
+                ? const Center(child: Text('No companies match your criteria.'))
                 : ListView.separated(
                   itemCount: currentPagePlacements.length,
                   separatorBuilder:
@@ -383,19 +427,17 @@ final filtered = allPlacements.where((doc) {
                             .toList() ??
                         [];
 
-                              final List<String> positions =
+                    final List<String> positions =
                         (data['positions'] as List<dynamic>?)
                             ?.map((c) => c.toString())
                             .toList() ??
                         [];
 
-
-          
                     return _buildPlacementRow(
                       context: context,
                       doc: doc,
                       partnerCompany: data['partnerCompany'] ?? 'N/A',
-                 
+
                       contacts: contacts,
                       positions: positions,
                     );
@@ -507,8 +549,7 @@ Widget _buildPlacementRow({
             ),
           ),
 
-    
-           Expanded(
+          Expanded(
             flex: 4,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -560,15 +601,13 @@ Widget _buildPlacementRow({
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {
-             if (value == 'edit') {
-      showDialog(
-        context: context,
-        builder: (context) => PlacementFormDialog(
-          doc: doc,
-          isEdit: true,
-        ),
-      );
-    } else if (value == 'delete') {
+              if (value == 'edit') {
+                showDialog(
+                  context: context,
+                  builder:
+                      (context) => PlacementFormDialog(doc: doc, isEdit: true),
+                );
+              } else if (value == 'delete') {
                 showDeleteConfirmation(
                   context,
                   doc,
@@ -612,6 +651,7 @@ Widget _buildHeader(
   List<DocumentSnapshot> allPlacements,
   ValueChanged<String> onCompanyChanged,
   TextEditingController searchController,
+  PlacementData? pl,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -647,45 +687,63 @@ Widget _buildHeader(
                   ),
                 ],
               ),
-            Row(children: [
-  UploadDocumentButton(
-    formType: 'placement',
-
-  )
-]),
+              Row(children: [UploadDocumentButton(formType: 'placement')]),
             ],
           ),
- 
-                 Padding(
+
+          Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child: isMobile
-                ? Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    children: [
-                      buildStatCard('Total Companies', '59', Colors.blue, Icons.message),
-                      buildStatCard('Companies Looking for Vacancy', '58', Colors.green, Icons.check_circle),
-                      buildStatCard('Approaching Deadline', '26', Colors.red, Icons.group),
-                    
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child:  buildStatCard('Total Companies', '59', Colors.blue, Icons.message),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child:  buildStatCard('Companies Looking for Vacancy', '58', Colors.green, Icons.check_circle),
-                      ),
-                      const SizedBox(width: 16),
-                      
-            
-                      Expanded(
-                        child: buildStatCard('Approaching Deadline', '26', Colors.red, Icons.group),
-                      ),
-                    ],
-                  ),
+            child:
+                isMobile
+                    ? Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        buildStatCard(
+                          'Total Companies',
+                          '${pl?.totalCompanies ?? 0}',
+                          Colors.blue,
+                          Icons.message,
+                        ),
+                        buildStatCard(
+                          'Companies Looking for Vacancy',
+                          '${pl?.vacantCompanies ?? 0}',
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                      ],
+                    )
+                    : Row(
+                      children: [
+                        Expanded(
+                          child: buildStatCard(
+                            'Total Companies',
+                            '${pl?.totalCompanies ?? 0}',
+                            Colors.blue,
+                            Icons.message,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'Companies Looking for Vacancy',
+                            '${pl?.vacantCompanies ?? 0}',
+                            Colors.green,
+                            Icons.check_circle,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+
+                        Expanded(
+                          child: buildStatCard(
+                            'Approaching Deadline',
+                            pl?.approachingDeadline ?? 'Unknown',
+                            Colors.red,
+                            Icons.group,
+                          ),
+                        ),
+                      ],
+                    ),
           ),
 
           // Search and Filter Row

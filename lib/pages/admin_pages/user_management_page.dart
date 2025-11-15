@@ -1,4 +1,5 @@
 import 'package:capstone_project/pages/data/charts.dart';
+import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:capstone_project/crud/delete/delete.dart';
@@ -27,10 +28,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
   final TextEditingController _searchController = TextEditingController();
   int currentPage = 1;
   int itemsPerPage = 10;
+
+  bool isLoading = true;
+  final StatDataManagement statData = StatDataManagement();
+
+  UserData? user;
+
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    loadStatData();
   }
 
   @override
@@ -38,6 +46,32 @@ class _UserManagementPageState extends State<UserManagementPage> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> loadStatData() async {
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Call the getInformationBankData() method
+      final data = await statData.getUserData();
+
+      if (!mounted) return;
+
+      setState(() {
+        user = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading information bank data: $e");
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   void _onRoleChanged(String newRole) {
@@ -68,6 +102,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+     if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return ResponsiveLayout(
       mobileBody: MobileUserManagement(
         selectedRole: selectedRole,
@@ -78,6 +115,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         onNavigateToPage: widget.onNavigateToPage,
+        user: user,
       ),
       tabletBody: TabletUserManagement(
         selectedRole: selectedRole,
@@ -88,6 +126,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         onNavigateToPage: widget.onNavigateToPage,
+        user: user,
       ),
       desktopBody: DesktopUserManagement(
         selectedRole: selectedRole,
@@ -98,6 +137,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         onNavigateToPage: widget.onNavigateToPage,
+        user: user,
       ),
     );
   }
@@ -113,6 +153,7 @@ class DesktopUserManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final Function(int)? onNavigateToPage;
+  final UserData? user;
 
   const DesktopUserManagement({
     super.key,
@@ -124,6 +165,7 @@ class DesktopUserManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.onNavigateToPage,
+    this.user,
   });
 
   @override
@@ -139,6 +181,7 @@ class DesktopUserManagement extends StatelessWidget {
       onItemsPerPageChanged,
       onNavigateToPage,
       24.0,
+      user,
     );
   }
 }
@@ -153,6 +196,7 @@ class TabletUserManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final Function(int)? onNavigateToPage;
+    final UserData? user;
 
   const TabletUserManagement({
     super.key,
@@ -164,6 +208,7 @@ class TabletUserManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.onNavigateToPage,
+    this.user,
   });
 
   @override
@@ -179,6 +224,7 @@ class TabletUserManagement extends StatelessWidget {
       onItemsPerPageChanged,
       onNavigateToPage,
       20.0,
+      user,
     );
   }
 }
@@ -193,6 +239,7 @@ class MobileUserManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final Function(int)? onNavigateToPage;
+    final UserData? user;
 
   const MobileUserManagement({
     super.key,
@@ -204,6 +251,7 @@ class MobileUserManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.onNavigateToPage,
+    this.user,
   });
 
   @override
@@ -219,6 +267,7 @@ class MobileUserManagement extends StatelessWidget {
       onItemsPerPageChanged,
       onNavigateToPage,
       16.0,
+      user,
     );
   }
 }
@@ -234,6 +283,7 @@ Widget mainContent(
   final ValueChanged<int> onItemsPerPageChanged,
   final Function(int)? onNavigateToPage, // ✅ Add this parameter
   final double padding,
+  final UserData? user
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -247,64 +297,70 @@ Widget mainContent(
             onRoleChanged,
             searchController,
             onNavigateToPage, // ✅ Pass it to header
+            user,
           ),
           const SizedBox(height: 16),
           Expanded(
-          child: Container(
-            height: MediaQuery.of(context).size.height - 200,
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                _buildTableHeader(),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream:
-                        FirebaseFirestore.instance
-                            .collection('users')
-                            .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      }
-
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return const Center(child: Text('No users found.'));
-                      }
-
-                      return _buildUserList(
-                        allUsers: snapshot.data!.docs,
-                        selectedRole: selectedRole,
-                        searchQuery: searchController.text,
-                        currentPage: currentPage,
-                        itemsPerPage: itemsPerPage,
-                        onPageChanged: onPageChanged,
-                        onItemsPerPageChanged: onItemsPerPageChanged,
-                        onNavigateToPage:
-                            onNavigateToPage, // ✅ Pass it to user list
-                      );
-                    },
+            child: Container(
+              height: MediaQuery.of(context).size.height - 200,
+              padding: EdgeInsets.all(padding),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Column(
+                children: [
+                  _buildTableHeader(),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream:
+                          FirebaseFirestore.instance
+                              .collection('users')
+                              .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Text('Error: ${snapshot.error}'),
+                          );
+                        }
+
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return const Center(child: Text('No users found.'));
+                        }
+
+                        return _buildUserList(
+                          allUsers: snapshot.data!.docs,
+                          selectedRole: selectedRole,
+                          searchQuery: searchController.text,
+                          currentPage: currentPage,
+                          itemsPerPage: itemsPerPage,
+                          onPageChanged: onPageChanged,
+                          onItemsPerPageChanged: onItemsPerPageChanged,
+                          onNavigateToPage:
+                              onNavigateToPage, // ✅ Pass it to user list
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
           ),
         ],
       ),
@@ -608,6 +664,7 @@ Widget _buildHeader(
   ValueChanged<String> onRoleChanged,
   TextEditingController searchController,
   Function(int)? onNavigateToPage,
+  UserData? user,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -653,60 +710,81 @@ Widget _buildHeader(
               ),
             ],
           ),
- 
-           // 🔹 Stat Cards Section
+
+          // 🔹 Stat Cards Section
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child: isMobile
-                ? Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    children: [
-                      buildStatCard('Total Users', '59', Colors.blue, Icons.message),
-                      buildStatCard('Active Users', '58', Colors.green, Icons.check_circle),
-                      buildStatCard('New Users (This Month)', '26', Colors.red, Icons.group),
-                      buildStatCard('Users Logged in Today', 'General', Colors.orange, Icons.help_outline),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: buildStatCard(
+            child:
+                isMobile
+                    ? Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        buildStatCard(
                           'Total Users',
-                          '59',
+                          '${user?.totalUsers}',
                           Colors.blue,
                           Icons.message,
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: buildStatCard(
+                        buildStatCard(
                           'Active Users',
-                          '58',
+                          '${user?.activeUsers}',
                           Colors.green,
                           Icons.check_circle,
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: buildStatCard(
+                        buildStatCard(
                           'New Users (This Month)',
-                          '26',
+                          '${user?.newUsersThisMonth}',
                           Colors.red,
                           Icons.group,
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: buildStatCard(
+                        buildStatCard(
                           'Users Logged in Today',
-                          'General',
+                          '${user?.usersLoggedInToday}',
                           Colors.orange,
                           Icons.help_outline,
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    )
+                    : Row(
+                      children: [
+                        Expanded(
+                          child: buildStatCard(
+                            'Total Users',
+                            '${user?.totalUsers}',
+                            Colors.blue,
+                            Icons.message,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'Active Users',
+                            '${user?.activeUsers}',
+                            Colors.green,
+                            Icons.check_circle,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'New Users (This Month)',
+                            '${user?.newUsersThisMonth}',
+                            Colors.red,
+                            Icons.group,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'Users Logged in Today',
+                            '${user?.usersLoggedInToday}',
+                            Colors.orange,
+                            Icons.help_outline,
+                          ),
+                        ),
+                      ],
+                    ),
           ),
 
           // Search and Filter Row

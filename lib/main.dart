@@ -3,18 +3,15 @@ import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/pages/admin_pages/admin_main_page.dart';
 import 'package:capstone_project/pages/staff_pages/human_escalation.dart';
 import 'package:capstone_project/pages/staff_pages/staff_main_page.dart';
-
 import 'package:flutter/services.dart';
 import 'package:capstone_project/auth_pages/auth_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-
 import 'package:capstone_project/onboarding/onboarding.dart';
 import 'package:capstone_project/onboarding/useronboarding.dart';
 import 'package:capstone_project/pages/admin_pages/information_bank_page.dart';
 import 'package:capstone_project/pages/user_pages/admission_info.dart';
 import 'package:capstone_project/pages/user_pages/chat_page.dart';
-
 import 'package:capstone_project/pages/user_pages/placement_info.dart';
 import 'package:capstone_project/pages/user_pages/scholarship_list.dart';
 import 'package:capstone_project/pages/user_pages/user_announcement.dart';
@@ -23,7 +20,6 @@ import 'package:capstone_project/provider/chat_provider.dart';
 import 'package:capstone_project/services/admin_functions.dart';
 import 'package:capstone_project/services/answer_retrieval.dart';
 import 'package:capstone_project/services/cohere_service.dart';
-
 import 'package:capstone_project/services/pinecone_service.dart';
 import 'package:capstone_project/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,12 +29,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 
-
-
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
-
-bool _servicesInitialized = false;
 
 class NotificationNavigationHandler {
   final GlobalKey<NavigatorState> navigatorKey;
@@ -291,7 +282,6 @@ class NotificationNavigationHandler {
     }
   }
 
-  // ✅ FIXED: Navigate directly to the announcements tab based on role
   Future<void> _navigateToAnnouncement(BuildContext context, Map<String, dynamic> data) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -311,12 +301,11 @@ class NotificationNavigationHandler {
       print('📢 Navigating to announcements for role: $role');
       print('📢 Announcement ID: $announcementId');
 
-      // ✅ FIXED: Navigate with proper route and tab index for each role
       if (role == 'user') {
         Navigator.of(context).pushReplacementNamed(
           '/home',
           arguments: {
-            'initialTab': 2, // Announcements tab for users
+            'initialTab': 2,
             'announcementId': announcementId,
           },
         );
@@ -324,7 +313,7 @@ class NotificationNavigationHandler {
         Navigator.of(context).pushReplacementNamed(
           '/staff/home',
           arguments: {
-            'initialTab': 3, // Announcements tab for staff
+            'initialTab': 3,
             'announcementId': announcementId,
           },
         );
@@ -332,7 +321,7 @@ class NotificationNavigationHandler {
         Navigator.of(context).pushReplacementNamed(
           '/admin/home',
           arguments: {
-            'initialTab': 4, // Announcements tab for admin (adjust based on your structure)
+            'initialTab': 4,
             'announcementId': announcementId,
           },
         );
@@ -369,66 +358,42 @@ class NotificationNavigationHandler {
       ),
     );
   }
-
-
 }
 
+// ✅ OPTIMIZED: Single, efficient initialization
 Future<void> initializeServices() async {
-  if (_servicesInitialized) {
-    print('⚠️ Services already initialized');
-    return;
-  }
-
   try {
-    print('🚀 Starting service initialization...');
+    print('🚀 Initializing services...');
     
-    // Step 1: Initialize Firebase FIRST
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    print('✅ Firebase initialized');
+    // Firebase is already initialized in main(), skip here
     
-    // ✅ CRITICAL: Wait for Firebase to be fully ready
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    // Step 2: Test Firebase Auth (ensures platform channels are ready)
-    try {
-      final _ = FirebaseAuth.instance.currentUser;
-      print('✅ Firebase Auth ready');
-    } catch (e) {
-      print('⚠️ Firebase Auth not ready: $e');
-    }
-    
-    // Step 4: Register background message handler
+    // Register background message handler
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    print('✅ Background message handler registered');
+    print('✅ Background handler registered');
     
-    // Step 5: Initialize notification service
-    print('🔔 Initializing notification service...');
-    await NotificationService().initialize();
-    print('✅ Notification service initialized');
+    // Initialize notification service (async but don't block)
+    NotificationService().initialize().then((_) {
+      print('✅ Notifications ready');
+    }).catchError((e) {
+      print('⚠️ Notification init failed (non-critical): $e');
+    });
     
-    // Step 6: Setup navigation handler
+    // Setup navigation handler
     NotificationNavigationHandler(navigatorKey).setup();
-    print('✅ Navigation handler setup complete');
     
-    _servicesInitialized = true;
-    print('✅ All services initialized successfully');
+    print('✅ Core services initialized');
   } catch (e, stackTrace) {
-    print('❌ Service initialization error: $e');
-    print('Stack trace: $stackTrace');
-    // Don't rethrow - allow app to continue with degraded functionality
+    print('⚠️ Service init warning: $e');
+    print('Stack: $stackTrace');
   }
 }
-// 
 
 void main() {
   runZonedGuarded(() async {
+    // ✅ Step 1: Initialize Flutter binding
     WidgetsFlutterBinding.ensureInitialized();
-    await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
     
+    // ✅ Step 2: Set orientations (fast, synchronous)
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -439,12 +404,16 @@ void main() {
       overlays: [SystemUiOverlay.bottom],
     );
 
-    // ✅ Initialize all services and WAIT for completion
-    await initializeServices();
-    
-    // ✅ Additional delay to ensure platform channels are fully connected
-    await Future.delayed(const Duration(milliseconds: 300));
+    // ✅ Step 3: Initialize Firebase ONCE (most critical)
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print('✅ Firebase initialized');
 
+    // ✅ Step 4: Initialize other services (don't block on notifications)
+    initializeServices(); // Fire and forget - don't await
+
+    // ✅ Step 5: Start app immediately
     runApp(
       MultiProvider(
         providers: [
@@ -457,17 +426,13 @@ void main() {
             update: (_, retriever, __) => ChatProvider(retriever),
           ),
           Provider<PineconeCloudService>(create: (_) => PineconeCloudService()),
-          
-          // ✅ CRITICAL FIX: Create service lazily and only when needed
           Provider<FirebaseFunctionsService>(
             create: (_) {
-              print('🔧 Creating FirebaseFunctionsService instance');
+              print('🔧 Creating FirebaseFunctionsService');
               return FirebaseFunctionsService();
             },
-            // ✅ Don't dispose the static instance
-            dispose: (_, __) => print('📌 FirebaseFunctionsService provider disposed'),
+            dispose: (_, __) {},
           ),
-          
           Provider<NotificationService>.value(
             value: NotificationService(),
           ),
@@ -487,7 +452,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey, // ✅ Use global navigator key
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'OASP Assist',
       theme: ThemeData(
@@ -503,49 +468,36 @@ class MyApp extends StatelessWidget {
       ),
       home: const AppInitializer(),
       routes: {
-         '/admin/home': (context) {
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    
-    print('📍 /admin/home route called');
-    print('📍 Arguments: $args');
-    
-    return AdminMainPage(
-      initialTabIndex: args?['initialTab'] as int?,
-      escalationId: args?['escalationId'] as String?,
-      conversationId: args?['conversationId'] as String?,
-      autoOpen: args?['autoOpen'] as bool? ?? false,
-    );
-  },
-
-  '/admin/escalations': (context) {
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final escalationId = args?['escalationId'] as String?;
-    final autoOpen = args?['autoOpen'] as bool? ?? false;
-    return HumanEscalation(
-      initialEscalationId: escalationId,
-      autoOpen: autoOpen,
-    );
-  },
-  
+        '/admin/home': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          return AdminMainPage(
+            initialTabIndex: args?['initialTab'] as int?,
+            escalationId: args?['escalationId'] as String?,
+            conversationId: args?['conversationId'] as String?,
+            autoOpen: args?['autoOpen'] as bool? ?? false,
+          );
+        },
+        '/admin/escalations': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final escalationId = args?['escalationId'] as String?;
+          final autoOpen = args?['autoOpen'] as bool? ?? false;
+          return HumanEscalation(
+            initialEscalationId: escalationId,
+            autoOpen: autoOpen,
+          );
+        },
         '/onboarding': (context) => const OnboardingScreen(),
-        '/userOnboarding': (context) => const UserOnboardingScreen(userId: '', userName: '',),
+        '/userOnboarding': (context) => const UserOnboardingScreen(userId: '', userName: ''),
         '/auth': (context) => AuthPage(),
-    '/home': (context) {
-  final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-  
-  print('🏠 /home route called with args: $args');
-  
-  final initialTab = args?['initialTab'] as int?;
-  final conversationId = args?['conversationId'] as String?;
-  final loadExisting = args?['loadExisting'] as bool?;
-  
-  return UserMainPage(
-    initialTabIndex: initialTab,
-    conversationId: conversationId,
-    loadExisting: loadExisting,
-    fromNotification: loadExisting ?? false,
-  );
-},
+        '/home': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          return UserMainPage(
+            initialTabIndex: args?['initialTab'] as int?,
+            conversationId: args?['conversationId'] as String?,
+            loadExisting: args?['loadExisting'] as bool?,
+            fromNotification: args?['loadExisting'] ?? false,
+          );
+        },
         '/chat': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
           final conversationId = args?['conversationId'] as String? ?? '';
@@ -553,25 +505,19 @@ class MyApp extends StatelessWidget {
         },
         '/informationBank': (context) => InformationBankPage(),
         '/announcements': (context) => const UserAnnouncementPage(),
-        '/announcements/detail': (context) {
-          return const UserAnnouncementPage();
-        },
+        '/announcements/detail': (context) => const UserAnnouncementPage(),
         '/admission': (context) => AdmissionInfo(),
         '/scholarships': (context) => ScholarshipList(),
         '/placements': (context) => PlacementInfo(),
         '/staff/home': (context) {
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    
-    print('📍 /staff/home route called');
-    print('📍 Arguments: $args');
-    
-    return StaffMainPage(
-      initialTabIndex: args?['initialTab'] as int?,
-      escalationId: args?['escalationId'] as String?,
-      conversationId: args?['conversationId'] as String?,
-      autoOpen: args?['autoOpen'] as bool? ?? false,
-    );
-  },
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          return StaffMainPage(
+            initialTabIndex: args?['initialTab'] as int?,
+            escalationId: args?['escalationId'] as String?,
+            conversationId: args?['conversationId'] as String?,
+            autoOpen: args?['autoOpen'] as bool? ?? false,
+          );
+        },
         '/staff/escalations': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
           final escalationId = args?['escalationId'] as String?;
@@ -682,11 +628,7 @@ class SplashScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.school,
-                size: 80,
-                color: Colors.white,
-              ),
+              Icon(Icons.school, size: 80, color: Colors.white),
               SizedBox(height: 24),
               Text(
                 'OASP Assist',
@@ -714,59 +656,32 @@ class ErrorScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 80,
-                color: Colors.white,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 80, color: Colors.red),
+            const SizedBox(height: 24),
+            const Text(
+              'Something went wrong',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            const Text('Please try again later', style: TextStyle(fontSize: 16)),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pushReplacementNamed('/auth');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF667EEA),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Something went wrong',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Please try again later',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white70,
-                ),
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pushReplacementNamed('/auth');
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF667EEA),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 16,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                child: const Text(
-                  'Continue to App',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
+              child: const Text('Continue to App', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+          ],
         ),
       ),
     );

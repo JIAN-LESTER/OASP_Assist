@@ -40,7 +40,7 @@ class _DashboardPageState extends State<DashboardPage> {
     _loadAllData();
   }
 
-  // ✅ OPTIMIZED: Load all data in parallel
+ 
   Future<void> _loadAllData() async {
     if (!mounted) return;
 
@@ -409,6 +409,16 @@ Widget dashboardContents(
           const SizedBox(height: 32),
 
           // Top row with 4 stat cards
+         LayoutBuilder(
+  builder: (context, constraints) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1100;
+    
+    if (isMobile) {
+      // Mobile: 2 cards per row
+      return Column(
+        children: [
           Row(
             children: [
               Expanded(
@@ -419,7 +429,7 @@ Widget dashboardContents(
                   Icons.message,
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 12),
               Expanded(
                 child: buildStatCard(
                   'Answered Messages',
@@ -428,7 +438,11 @@ Widget dashboardContents(
                   Icons.check_circle,
                 ),
               ),
-              const SizedBox(width: 20),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
               Expanded(
                 child: buildStatCard(
                   'Total Users',
@@ -437,7 +451,7 @@ Widget dashboardContents(
                   Icons.people,
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 12),
               Expanded(
                 child: buildStatCard(
                   'Most Frequent Category',
@@ -448,6 +462,52 @@ Widget dashboardContents(
               ),
             ],
           ),
+        ],
+      );
+    } else {
+      // Tablet and Desktop: 4 cards in a row
+      return Row(
+        children: [
+          Expanded(
+            child: buildStatCard(
+              'Total Messages',
+              '${inq?.totalMessages ?? 0}',
+              Colors.blue,
+              Icons.message,
+            ),
+          ),
+          SizedBox(width: isTablet ? 12 : 20),
+          Expanded(
+            child: buildStatCard(
+              'Answered Messages',
+              '${inq?.answeredMessages ?? 0}',
+              Colors.green,
+              Icons.check_circle,
+            ),
+          ),
+          SizedBox(width: isTablet ? 12 : 20),
+          Expanded(
+            child: buildStatCard(
+              'Total Users',
+              '${ud?.totalUsers ?? 0}',
+              Colors.red,
+              Icons.people,
+            ),
+          ),
+          SizedBox(width: isTablet ? 12 : 20),
+          Expanded(
+            child: buildStatCard(
+              'Most Frequent Category',
+              inq?.mostFrequentCategory ?? 'Unknown',
+              Colors.orange,
+              Icons.help,
+            ),
+          ),
+        ],
+      );
+    }
+  },
+),
           const SizedBox(height: 32),
 
           // Second row with 2 larger boxes
@@ -461,7 +521,7 @@ Widget dashboardContents(
                   ),
                 ),
                 const SizedBox(width: 20),
-                Expanded(child: buildInquiryTrendCard(inq?.inquiryTrend ?? [])),
+                Expanded(child: buildInquiryTrendCard(inq?.inquiryTrend ?? [], selectedTimeFrame)),
               ],
             ),
           ),
