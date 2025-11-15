@@ -154,203 +154,511 @@ class DashboardWidgets {
   }
 }
 
+
+// Enhanced System Logs Card with modern design
 Widget buildSystemLogsCard(List<SystemLog> logs) {
-  return Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(8),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
-          spreadRadius: 1,
-          blurRadius: 3,
-          offset: const Offset(0, 1),
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isMobile = screenWidth < 600;
+      final isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+      return Container(
+        padding: EdgeInsets.all(isMobile ? 14 : 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+           border: Border(
+        left: BorderSide(
+          color: const Color.fromARGB(255, 221, 48, 192),
+          width: 4,
         ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Recent System Logs',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        Expanded(
-          child:
-              logs.isEmpty
-                  ? Center(
-                    child: Text(
-                      'No recent logs available',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[400]),
-                    ),
-                  )
-                  : ListView.builder(
-                    itemCount: logs.length,
-                    itemBuilder: (context, index) {
-                      final log = logs[index];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              getLogIcon(log.action),
-                              size: 16,
-                              color: getLogColor(log.action),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    log.action,
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                  Text(
-                                    'By: ${log.user}',
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              DateFormat(
-                                'MMMM d, yyyy, hh:mm a',
-                              ).format(log.time),
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with icon
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  child: Icon(
+                    Icons.history,
+                    color: Colors.blue[700],
+                    size: isMobile ? 20 : 24,
+                  ),
+                ),
+                SizedBox(width: isMobile ? 10 : 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Recent System Logs',
+                        style: TextStyle(
+                          fontSize: isMobile ? 16 : 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[900],
+                        ),
+                      ),
+                      Text(
+                        '${logs.length} recent activities',
+                        style: TextStyle(
+                          fontSize: isMobile ? 11 : 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: isMobile ? 14 : 20),
+            
+            // Logs List
+            Expanded(
+              child: logs.isEmpty
+                  ? _buildEmptyState(
+                      icon: Icons.inventory_2_outlined,
+                      message: 'No system logs available',
+                      isMobile: isMobile,
+                    )
+                  : ListView.separated(
+                      itemCount: logs.length,
+                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final log = logs[index];
+                        return _buildSystemLogItem(log, isMobile, isTablet);
+                      },
+                    ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+// Enhanced Message Logs Card with modern design
+Widget buildMessageLogsCard(List<MessageLogs> msgLogs) {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isMobile = screenWidth < 600;
+      final isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+      return Container(
+        padding: EdgeInsets.all(isMobile ? 14 : 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+           border: Border(
+        left: BorderSide(
+          color: const Color.fromARGB(255, 48, 169, 221),
+          width: 4,
+        ),
+      ),
+          
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with icon
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.chat_bubble_outline,
+                    color: Colors.green[700],
+                    size: isMobile ? 20 : 24,
+                  ),
+                ),
+                SizedBox(width: isMobile ? 10 : 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Recent Conversations',
+                        style: TextStyle(
+                          fontSize: isMobile ? 16 : 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[900],
+                        ),
+                      ),
+                      Text(
+                        '${msgLogs.length} recent messages',
+                        style: TextStyle(
+                          fontSize: isMobile ? 11 : 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: isMobile ? 14 : 20),
+            
+            // Message Logs List
+            Expanded(
+              child: msgLogs.isEmpty
+                  ? _buildEmptyState(
+                      icon: Icons.mark_chat_unread_outlined,
+                      message: 'No recent conversations',
+                      isMobile: isMobile,
+                    )
+                  : ListView.separated(
+                      itemCount: msgLogs.length,
+                      separatorBuilder: (context, index) => SizedBox(height: isMobile ? 10 : 12),
+                      itemBuilder: (context, index) {
+                        final log = msgLogs[index];
+                        return _buildMessageLogItem(log, isMobile, isTablet);
+                      },
+                    ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+// System Log Item with enhanced design
+Widget _buildSystemLogItem(SystemLog log, bool isMobile, bool isTablet) {
+  return Container(
+    padding: EdgeInsets.symmetric(
+      horizontal: isMobile ? 10 : 12,
+      vertical: isMobile ? 10 : 12,
+    ),
+    child: Row(
+      children: [
+        // Action icon with colored background
+        Container(
+          padding: EdgeInsets.all(isMobile ? 8 : 10),
+          decoration: BoxDecoration(
+            color: getLogColor(log.action).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            getLogIcon(log.action),
+            size: isMobile ? 18 : 20,
+            color: getLogColor(log.action),
+          ),
+        ),
+        SizedBox(width: isMobile ? 10 : 12),
+        
+        // Log details
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                log.action,
+                style: TextStyle(
+                  fontSize: isMobile ? 13 : 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[900],
+                ),
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Icon(
+                    Icons.person_outline,
+                    size: isMobile ? 12 : 14,
+                    color: Colors.grey[600],
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      log.user,
+                      style: TextStyle(
+                        fontSize: isMobile ? 11 : 12,
+                        color: Colors.grey[600],
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        
+        // Timestamp
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              DateFormat('MMM d').format(log.time),
+              style: TextStyle(
+                fontSize: isMobile ? 11 : 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
+            ),
+            Text(
+              DateFormat('h:mm a').format(log.time),
+              style: TextStyle(
+                fontSize: isMobile ? 10 : 11,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
         ),
       ],
     ),
   );
 }
 
-
-
-Widget buildMessageLogsCard(List<MessageLogs> msgLogs) {
+// Message Log Item with enhanced design
+Widget _buildMessageLogItem(MessageLogs log, bool isMobile, bool isTablet) {
   return Container(
-    padding: const EdgeInsets.all(16),
+    padding: EdgeInsets.all(isMobile ? 12 : 14),
+    
     decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(8),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
-          spreadRadius: 1,
-          blurRadius: 3,
-          offset: const Offset(0, 1),
-        ),
-      ],
+      color: Colors.grey[50],
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: Colors.grey[200]!),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Recent Message Logs',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-        Expanded(
-          child: msgLogs.isEmpty
-              ? Center(
-                  child: Text(
-                    'No recent logs available',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[400]),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: msgLogs.length,
-                  itemBuilder: (context, index) {
-                    final log = msgLogs[index];
-
-                    // Parse timestamp safely (assuming ISO8601 or millis)
-                    DateTime parsedTime;
-                    try {
-                      parsedTime = DateTime.parse(log.time.toIso8601String());
-                    } catch (_) {
-                      parsedTime = DateTime.now();
-                    }
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.chat_bubble_outline,
-                            size: 18,
-                            color: Colors.green,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "User: ${log.user}",
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "Message: ${log.message}",
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                                if (log.reply.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    "Reply: ${log.reply}",
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          Text(
-                            DateFormat('MMM d, yyyy\nhh:mm a').format(parsedTime),
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey,
-                            ),
-                            textAlign: TextAlign.right,
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+        // Header with user and timestamp
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.green[100],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.person,
+                size: isMobile ? 14 : 16,
+                color: Colors.green[700],
+              ),
+            ),
+            SizedBox(width: isMobile ? 8 : 10),
+            Expanded(
+              child: Text(
+                log.user,
+                style: TextStyle(
+                  fontSize: isMobile ? 12 : 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[900],
                 ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _getRelativeTime(log.time),
+                style: TextStyle(
+                  fontSize: isMobile ? 10 : 11,
+                  color: Colors.blue[700],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: isMobile ? 8 : 10),
+        
+        // User Message
+        Container(
+          padding: EdgeInsets.all(isMobile ? 8 : 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.chat_bubble_outline,
+                size: isMobile ? 14 : 16,
+                color: Colors.blue[600],
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  log.message,
+                  style: TextStyle(
+                    fontSize: isMobile ? 12 : 13,
+                    color: Colors.grey[800],
+                    height: 1.4,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // Bot Reply (if exists)
+        if (log.reply.isNotEmpty) ...[
+          SizedBox(height: isMobile ? 6 : 8),
+          Container(
+            padding: EdgeInsets.all(isMobile ? 8 : 10),
+            decoration: BoxDecoration(
+              color: Colors.green[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green[200]!),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.smart_toy_outlined,
+                  size: isMobile ? 14 : 16,
+                  color: Colors.green[700],
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    log.reply,
+                    style: TextStyle(
+                      fontSize: isMobile ? 12 : 13,
+                      color: Colors.grey[800],
+                      height: 1.4,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+// Empty state widget
+Widget _buildEmptyState({
+  required IconData icon,
+  required String message,
+  required bool isMobile,
+}) {
+  return Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: EdgeInsets.all(isMobile ? 16 : 20),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            size: isMobile ? 40 : 48,
+            color: Colors.grey[400],
+          ),
+        ),
+        SizedBox(height: isMobile ? 12 : 16),
+        Text(
+          message,
+          style: TextStyle(
+            fontSize: isMobile ? 13 : 14,
+            color: Colors.grey[500],
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ],
     ),
   );
+}
+
+// Helper function to get relative time
+String _getRelativeTime(DateTime dateTime) {
+  final now = DateTime.now();
+  final difference = now.difference(dateTime);
+
+  if (difference.inMinutes < 1) {
+    return 'Just now';
+  } else if (difference.inMinutes < 60) {
+    return '${difference.inMinutes}m ago';
+  } else if (difference.inHours < 24) {
+    return '${difference.inHours}h ago';
+  } else if (difference.inDays < 7) {
+    return '${difference.inDays}d ago';
+  } else {
+    return DateFormat('MMM d').format(dateTime);
+  }
+}
+
+// Utility functions (keep existing ones)
+IconData getLogIcon(String action) {
+  switch (action.toLowerCase()) {
+    case 'login':
+      return Icons.login;
+    case 'logout':
+      return Icons.logout;
+    case 'create':
+      return Icons.add_circle_outline;
+    case 'update':
+      return Icons.edit_outlined;
+    case 'delete':
+      return Icons.delete_outline;
+    case 'view':
+      return Icons.visibility_outlined;
+    default:
+      return Icons.info_outline;
+  }
+}
+
+Color getLogColor(String action) {
+  switch (action.toLowerCase()) {
+    case 'login':
+      return Colors.green;
+    case 'logout':
+      return Colors.orange;
+    case 'create':
+      return Colors.blue;
+    case 'update':
+      return Colors.amber;
+    case 'delete':
+      return Colors.red;
+    case 'view':
+      return Colors.grey;
+    default:
+      return Colors.grey;
+  }
 }
 
 
@@ -383,43 +691,7 @@ Color getColorForCategory(String category) {
   }
 }
 
-IconData getLogIcon(String action) {
-  switch (action.toLowerCase()) {
-    case 'login':
-      return Icons.login;
-    case 'logout':
-      return Icons.logout;
-    case 'create':
-      return Icons.add;
-    case 'update':
-      return Icons.edit;
-    case 'delete':
-      return Icons.delete;
-    case 'view':
-      return Icons.visibility;
-    default:
-      return Icons.info;
-  }
-}
 
-Color getLogColor(String action) {
-  switch (action.toLowerCase()) {
-    case 'login':
-      return Colors.green;
-    case 'logout':
-      return Colors.orange;
-    case 'create':
-      return Colors.blue;
-    case 'update':
-      return Colors.amber;
-    case 'delete':
-      return Colors.red;
-    case 'view':
-      return Colors.grey;
-    default:
-      return Colors.grey;
-  }
-}
 
 List<Color> getbar(String type) {
   switch (type.toLowerCase()) {

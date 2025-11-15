@@ -650,6 +650,42 @@ List<Widget> buildChatbotUsageReport(
 
   final conversationTrend = getConversationTrendData();
 
+  // ✅ Format response time display
+  String formatResponseTime(double seconds) {
+    if (seconds == 0) return 'N/A';
+    
+    if (seconds < 1) {
+      // Show in milliseconds if less than 1 second
+      return '${(seconds * 1000).toInt()}ms';
+    } else if (seconds < 10) {
+      // Show with 2 decimal places for 1-10 seconds
+      return '${seconds.toStringAsFixed(2)}s';
+    } else {
+      // Show with 1 decimal place for 10+ seconds
+      return '${seconds.toStringAsFixed(1)}s';
+    }
+  }
+
+  // ✅ Format session length display
+  String formatSessionLength(double seconds) {
+    if (seconds == 0) return 'N/A';
+    
+    if (seconds < 60) {
+      // Show in seconds if less than 1 minute
+      return '${seconds.toInt()}s';
+    } else if (seconds < 3600) {
+      // Show in minutes and seconds
+      final minutes = seconds ~/ 60;
+      final remainingSeconds = (seconds % 60).toInt();
+      return '${minutes}m ${remainingSeconds}s';
+    } else {
+      // Show in hours and minutes
+      final hours = seconds ~/ 3600;
+      final remainingMinutes = (seconds % 3600) ~/ 60;
+      return '${hours}h ${remainingMinutes}m';
+    }
+  }
+
   return [
     SizedBox(
       height: 120,
@@ -658,7 +694,7 @@ List<Widget> buildChatbotUsageReport(
           Expanded(
             child: buildStatCard(
               'Average Response Time',
-              '${(data?.averageResponseTime ?? 0).toStringAsFixed(2)}s',
+              formatResponseTime(data?.averageResponseTime ?? 0), // ✅ Fixed
               Colors.blue,
               Icons.timer,
             ),
@@ -685,7 +721,7 @@ List<Widget> buildChatbotUsageReport(
           Expanded(
             child: buildStatCard(
               'Avg Session Length',
-              '${(data?.averageSessionLength ?? 0).toStringAsFixed(0)}s',
+              formatSessionLength(data?.averageSessionLength ?? 0), // ✅ Fixed
               Colors.purple,
               Icons.trending_up,
             ),
@@ -693,7 +729,6 @@ List<Widget> buildChatbotUsageReport(
         ],
       ),
     ),
-    const SizedBox(height: 32),
     const SizedBox(height: 16),
     SizedBox(
       height: 400,

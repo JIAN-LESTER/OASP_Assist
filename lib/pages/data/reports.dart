@@ -111,7 +111,7 @@ class FirebaseService {
 
     for (final u in users) {
       final data = u.data() as Map<String, dynamic>;
-      final uid = data['userID'] as String?;
+      final uid = data['uid'] as String?;
       if (uid != null) {
         userLookup[uid] = {
           'year': data['year'] ?? 'Unknown',
@@ -242,7 +242,6 @@ class FirebaseService {
     }
   }
 
-  
   Future<List<QueryDocumentSnapshot>> _getMessagesOptimized(
     DateTime startDate,
   ) async {
@@ -383,7 +382,7 @@ class FirebaseService {
   InquiryReportsData _processInquiryReportsData({
     required List<QueryDocumentSnapshot> messages,
     required List<QueryDocumentSnapshot> faqs,
-  
+
     required List<QueryDocumentSnapshot> logs,
     required List<QueryDocumentSnapshot> escalations,
     required List<QueryDocumentSnapshot> unanswered,
@@ -450,120 +449,153 @@ class FirebaseService {
   }
 
   // FIXED: Now uses cached userLookup instead of QuerySnapshot
-  ChatbotUsageReportsData _processChatbotUsageReportsData({
-    required List<QueryDocumentSnapshot> sessions,
-    required List<QueryDocumentSnapshot> messages,
-    required Map<String, Map<String, dynamic>> userLookup,
-    required DateTime startDate,
-    required String timeFrame,
-  }) {
-    // Process sessions efficiently
-    double totalSessionDuration = 0;
-    int completedSessionsCount = 0;
-    final userSessionCounts = <String, int>{};
+ChatbotUsageReportsData _processChatbotUsageReportsData({
+  required List<QueryDocumentSnapshot> sessions,
+  required List<QueryDocumentSnapshot> messages,
+  required Map<String, Map<String, dynamic>> userLookup,
+  required DateTime startDate,
+  required String timeFrame,
+}) {
+  // ✅ FIX 1: Process sessions with better error handling
+  double totalSessionDuration = 0;
+  int completedSessionsCount = 0;
+  final userSessionCounts = <String, int>{};
 
-    // Track UNIQUE users by year/program who have active sessions
-    final uniqueUsersByYear = <String, Set<String>>{};
-    final uniqueUsersByProgram = <String, Set<String>>{};
+  // Track UNIQUE users by year/program who have active sessions
+  final uniqueUsersByYear = <String, Set<String>>{};
+  final uniqueUsersByProgram = <String, Set<String>>{};
 
-    for (final doc in sessions) {
-      final data = doc.data() as Map<String, dynamic>;
-      final userId = data['userId'] as String? ?? 'unknown';
-      final createdAt = data['createdAt'] as Timestamp?;
-      final endedAt = data['endedAt'] as Timestamp?;
-      final status = data['status'] as String? ?? 'unknown';
+  for (final doc in sessions) {
+    final data = doc.data() as Map<String, dynamic>;
+    final userId = data['userId'] as String? ?? 'unknown';
+    final createdAt = data['createdAt'] as Timestamp?;
+    final endedAt = data['endedAt'] as Timestamp?;
+    final status = data['status'] as String? ?? 'unknown';
 
-      // Get user info from cached lookup
-      final userInfo = userLookup[userId];
-      if (userInfo != null) {
-        final year = userInfo['year'] ?? 'Unknown';
-        final program = userInfo['program'] ?? 'Unknown';
+    // Get user info from cached lookup
+    final userInfo = userLookup[userId];
+    if (userInfo != null) {
+      final year = userInfo['year'] ?? 'Unknown';
+      final program = userInfo['program'] ?? 'Unknown';
 
-        // Count unique users per year/program (not sessions)
-        uniqueUsersByYear.putIfAbsent(year, () => <String>{});
-        uniqueUsersByYear[year]!.add(userId);
+      uniqueUsersByYear.putIfAbsent(year, () => <String>{});
+      uniqueUsersByYear[year]!.add(userId);
 
-        uniqueUsersByProgram.putIfAbsent(program, () => <String>{});
-        uniqueUsersByProgram[program]!.add(userId);
-      }
+      uniqueUsersByProgram.putIfAbsent(program, () => <String>{});
+      uniqueUsersByProgram[program]!.add(userId);
+    }
 
-      if (createdAt != null && endedAt != null && status == 'ended') {
-        final duration = endedAt.toDate().difference(createdAt.toDate());
+    // ✅ FIX 2: Better session duration calculation
+    if (createdAt != null && endedAt != null && status == 'ended') {
+      final duration = endedAt.toDate().difference(createdAt.toDate());
+      
+      // Only count reasonable session durations (between 10 seconds and 2 hours)
+      if (duration.inSeconds >= 10 && duration.inSeconds <= 7200) {
         totalSessionDuration += duration.inSeconds.toDouble();
         completedSessionsCount++;
+        print('✅ Valid session: ${duration.inSeconds}s');
+      } else {
+        print('⚠️ Skipped invalid session duration: ${duration.inSeconds}s');
       }
-
-      userSessionCounts[userId] = (userSessionCounts[userId] ?? 0) + 1;
     }
 
-    // Convert sets to counts
-    final sessionYearCounts = <String, int>{};
-    uniqueUsersByYear.forEach((year, userIds) {
-      sessionYearCounts[year] = userIds.length;
-    });
+    userSessionCounts[userId] = (userSessionCounts[userId] ?? 0) + 1;
+  }
 
-    final sessionProgramCounts = <String, int>{};
-    uniqueUsersByProgram.forEach((program, userIds) {
-      sessionProgramCounts[program] = userIds.length;
-    });
+  // Convert sets to counts
+  final sessionYearCounts = <String, int>{};
+  uniqueUsersByYear.forEach((year, userIds) {
+    sessionYearCounts[year] = userIds.length;
+  });
 
-    final averageSessionLength =
-        completedSessionsCount > 0
-            ? totalSessionDuration / completedSessionsCount
-            : 0.0;
+  final sessionProgramCounts = <String, int>{};
+  uniqueUsersByProgram.forEach((program, userIds) {
+    sessionProgramCounts[program] = userIds.length;
+  });
 
-    final averageMessagesPerUser =
-        userSessionCounts.isNotEmpty
-            ? sessions.length / userSessionCounts.length.toDouble()
-            : 0.0;
+  final averageSessionLength =
+      completedSessionsCount > 0
+          ? totalSessionDuration / completedSessionsCount
+          : 0.0;
 
-    // Process messages
-    double totalResponseTime = 0;
-    int responseTimeCount = 0;
-    final responseTimeData = <String, List<double>>{};
+  print('📊 Session Stats:');
+  print('   Total sessions: ${sessions.length}');
+  print('   Completed sessions: $completedSessionsCount');
+  print('   Average session length: ${averageSessionLength.toStringAsFixed(2)}s');
 
-    for (final doc in messages) {
-      final data = doc.data() as Map<String, dynamic>;
-      final responseTimeMs = data['responseTimeMs'] as num?;
-      final sentAt = data['sent_at'] as Timestamp?;
+  final averageMessagesPerUser =
+      userSessionCounts.isNotEmpty
+          ? sessions.length / userSessionCounts.length.toDouble()
+          : 0.0;
 
-      if (responseTimeMs != null && responseTimeMs > 0) {
-        final responseTimeSeconds = responseTimeMs.toDouble() / 1000;
+  // ✅ FIX 3: Enhanced response time calculation
+  double totalResponseTime = 0;
+  int responseTimeCount = 0;
+  final responseTimeByDate = <String, List<double>>{};
+
+  print('📊 Processing ${messages.length} messages for response time');
+
+  for (final doc in messages) {
+    final data = doc.data() as Map<String, dynamic>;
+    final responseTimeMs = data['responseTimeMs'];
+    final sentAt = data['sent_at'] as Timestamp?;
+
+    if (responseTimeMs != null && responseTimeMs is num && responseTimeMs > 0) {
+      final responseTimeSeconds = responseTimeMs.toDouble() / 1000;
+      
+      // ✅ Only count reasonable response times (between 0.1s and 60s)
+      if (responseTimeSeconds >= 0.1 && responseTimeSeconds <= 60) {
         totalResponseTime += responseTimeSeconds;
         responseTimeCount++;
-
+        
+        // Group by date for trend
         if (sentAt != null) {
-          final key = _getTimeKey(sentAt.toDate(), timeFrame);
-          responseTimeData.putIfAbsent(key, () => []);
-          responseTimeData[key]!.add(responseTimeSeconds);
+          final dateKey = _getDateKey(sentAt.toDate(), timeFrame);
+          responseTimeByDate.putIfAbsent(dateKey, () => []);
+          responseTimeByDate[dateKey]!.add(responseTimeSeconds);
         }
+        
+        print('   ✅ Valid response time: ${responseTimeSeconds.toStringAsFixed(2)}s');
+      } else {
+        print('   ⚠️ Skipped outlier: ${responseTimeSeconds.toStringAsFixed(2)}s');
       }
     }
-
-    final averageResponseTime =
-        responseTimeCount > 0 ? totalResponseTime / responseTimeCount : 0.0;
-
-    return ChatbotUsageReportsData(
-      totalSessions: sessions.length,
-      averageResponseTime: averageResponseTime,
-      averageMessagesPerUser: averageMessagesPerUser,
-      averageSessionLength: averageSessionLength,
-      usageTrendByTimeOfDay: _generateHourlyUsageTrend(sessions) ?? [],
-      dailySessions: _generateDailySessionTrend(sessions, timeFrame) ?? [],
-      weeklySessions: _generateWeeklySessionTrend(sessions, timeFrame) ?? [],
-      monthlySessions: _generateMonthlySessionTrend(sessions, timeFrame) ?? [],
-      responseTimeTrend:
-          _generateResponseTimeTrend(responseTimeData, timeFrame) ?? [],
-      peakUsageByHour: _generatePeakUsageByHour(sessions),
-      // FIXED: Now shows unique user counts by year/program
-      usersByYearLevel:
-          sessionYearCounts.isNotEmpty ? sessionYearCounts : <String, int>{},
-      usersByCourse:
-          sessionProgramCounts.isNotEmpty
-              ? sessionProgramCounts
-              : <String, int>{},
-    );
   }
+
+  final averageResponseTime =
+      responseTimeCount > 0 ? totalResponseTime / responseTimeCount : 0.0;
+
+  print('📈 Response Time Summary:');
+  print('   Valid messages: $responseTimeCount / ${messages.length}');
+  print('   Average: ${averageResponseTime.toStringAsFixed(2)}s');
+  print('   Total: ${totalResponseTime.toStringAsFixed(2)}s');
+
+  // ✅ FIX 4: Build response time trend data
+  final responseTimeTrend = _buildResponseTimeTrend(
+    responseTimeByDate,
+    timeFrame,
+    startDate,
+  );
+
+  return ChatbotUsageReportsData(
+    totalSessions: sessions.length,
+    averageResponseTime: averageResponseTime, // ✅ Now correctly calculated
+    averageMessagesPerUser: averageMessagesPerUser,
+    averageSessionLength: averageSessionLength, // ✅ Now correctly calculated
+    usageTrendByTimeOfDay: _generateHourlyUsageTrend(sessions) ?? [],
+    dailySessions: _generateDailySessionTrend(sessions, timeFrame) ?? [],
+    weeklySessions: _generateWeeklySessionTrend(sessions, timeFrame) ?? [],
+    monthlySessions: _generateMonthlySessionTrend(sessions, timeFrame) ?? [],
+    responseTimeTrend: responseTimeTrend,
+    peakUsageByHour: _generatePeakUsageByHour(sessions),
+    usersByYearLevel:
+        sessionYearCounts.isNotEmpty ? sessionYearCounts : <String, int>{},
+    usersByCourse:
+        sessionProgramCounts.isNotEmpty
+            ? sessionProgramCounts
+            : <String, int>{},
+  );
+}
 
   UserDemographicsReportsData _processUserDemographicsReportsData({
     required List<QueryDocumentSnapshot> users,
@@ -627,6 +659,59 @@ class FirebaseService {
       enrollmentStatus: enrollmentStatus,
     );
   }
+
+  String _getDateKey(DateTime date, String timeFrame) {
+  switch (timeFrame) {
+    case 'Today':
+      return "${date.hour.toString().padLeft(2, '0')}:00";
+    case 'This Week':
+      return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+    case 'This Month':
+      final weekOfMonth = ((date.day - 1) ~/ 7) + 1;
+      return "Week $weekOfMonth";
+    case 'This Year':
+      return "${date.year}-${date.month.toString().padLeft(2, '0')}";
+    default:
+      return "${date.year}-${date.month.toString().padLeft(2, '0')}";
+  }
+}
+
+// ✅ NEW METHOD: Build response time trend
+List<ChartData> _buildResponseTimeTrend(
+  Map<String, List<double>> responseTimeByDate,
+  String timeFrame,
+  DateTime startDate,
+) {
+  if (responseTimeByDate.isEmpty) {
+    return [];
+  }
+
+  final trendData = <ChartData>[];
+  final sortedKeys = responseTimeByDate.keys.toList()..sort();
+
+  for (final key in sortedKeys) {
+    final times = responseTimeByDate[key]!;
+    if (times.isEmpty) continue;
+    
+    // Calculate average for this time period
+    final average = times.reduce((a, b) => a + b) / times.length;
+    
+    // Convert to milliseconds for display (more readable)
+    final averageMs = (average * 1000).round();
+    
+    trendData.add(ChartData(
+      date: key,
+      count: averageMs, // Store as milliseconds
+    ));
+  }
+
+  print('📈 Response Time Trend: ${trendData.length} data points');
+  for (var data in trendData) {
+    print('   ${data.date}: ${data.count}ms');
+  }
+
+  return trendData;
+}
 
   List<ChartData>? _generateResponseTimeTrend(
     Map<String, List<double>> responseTimeData,
