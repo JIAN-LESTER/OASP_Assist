@@ -928,33 +928,6 @@ Widget buildUserAffiliationsCard(Map<String, int> userAffiliations) {
   );
 }
 
-Widget _buildAffiliationBadge(String text, bool isMobile) {
-  return Container(
-    padding: EdgeInsets.symmetric(
-      horizontal: isMobile ? 4 : 6,
-      vertical: isMobile ? 2 : 4,
-    ),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(4),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.1),
-          blurRadius: 4,
-        ),
-      ],
-    ),
-    child: Text(
-      text,
-      style: TextStyle(
-        fontSize: isMobile ? 9 : 10,
-        fontWeight: FontWeight.bold,
-        color: Colors.grey[800],
-      ),
-    ),
-  );
-}
-
 Widget _buildAffiliationLegend(Map<String, int> affiliations, int totalUsers, bool isMobile) {
   final sortedEntries = affiliations.entries.toList()
     ..sort((a, b) => b.value.compareTo(a.value));
@@ -1026,6 +999,36 @@ Widget _buildAffiliationLegend(Map<String, int> affiliations, int totalUsers, bo
     ),
   );
 }
+
+Widget _buildAffiliationBadge(String text, bool isMobile) {
+  return Container(
+    padding: EdgeInsets.symmetric(
+      horizontal: isMobile ? 4 : 6,
+      vertical: isMobile ? 2 : 4,
+    ),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(4),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.1),
+          blurRadius: 4,
+        ),
+      ],
+    ),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: isMobile ? 9 : 10,
+        fontWeight: FontWeight.bold,
+        color: Colors.grey[800],
+      ),
+    ),
+  );
+}
+
+
+
 
 // ==================== UTILITY FUNCTIONS ====================
 

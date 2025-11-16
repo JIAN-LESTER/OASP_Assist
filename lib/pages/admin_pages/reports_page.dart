@@ -589,7 +589,7 @@ List<Widget> buildInquiryTrendsReport(
     ),
     const SizedBox(height: 16),
     SizedBox(
-      height: 500,
+      height: 400,
       child: Row(
         children: [
           Expanded(child: buildInquiryTrendCard(data?.inquiryTrend ?? [], selectedTimeFrame.toString())),
@@ -598,7 +598,7 @@ List<Widget> buildInquiryTrendsReport(
     ),
     const SizedBox(height: 16),
     SizedBox(
-      height: 450,
+      height: 350,
       child: Row(
         children: [
           Expanded(
@@ -613,7 +613,7 @@ List<Widget> buildInquiryTrendsReport(
     ),
     const SizedBox(height: 16),
     SizedBox(
-      height: 500,
+      height: 400,
       child: Row(
         children: [
         
