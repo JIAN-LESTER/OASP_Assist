@@ -15,7 +15,7 @@ import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 
 class UserManagementPage extends StatefulWidget {
-  final Function(int)? onNavigateToPage; // ✅ Add this parameter
+  final Function(int)? onNavigateToPage;
 
   const UserManagementPage({super.key, this.onNavigateToPage});
 
@@ -56,7 +56,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
     });
 
     try {
-      // Call the getInformationBankData() method
       final data = await statData.getUserData();
 
       if (!mounted) return;
@@ -102,7 +101,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-     if (isLoading) {
+    if (isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return ResponsiveLayout(
@@ -143,7 +142,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }
 }
 
-// Desktop User Management
 class DesktopUserManagement extends StatelessWidget {
   final String selectedRole;
   final ValueChanged<String> onRoleChanged;
@@ -186,7 +184,6 @@ class DesktopUserManagement extends StatelessWidget {
   }
 }
 
-// Tablet User Management
 class TabletUserManagement extends StatelessWidget {
   final String selectedRole;
   final ValueChanged<String> onRoleChanged;
@@ -196,7 +193,7 @@ class TabletUserManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final Function(int)? onNavigateToPage;
-    final UserData? user;
+  final UserData? user;
 
   const TabletUserManagement({
     super.key,
@@ -229,7 +226,6 @@ class TabletUserManagement extends StatelessWidget {
   }
 }
 
-// Mobile User Management
 class MobileUserManagement extends StatelessWidget {
   final String selectedRole;
   final ValueChanged<String> onRoleChanged;
@@ -239,7 +235,7 @@ class MobileUserManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final Function(int)? onNavigateToPage;
-    final UserData? user;
+  final UserData? user;
 
   const MobileUserManagement({
     super.key,
@@ -281,9 +277,9 @@ Widget mainContent(
   final int itemsPerPage,
   final ValueChanged<int> onPageChanged,
   final ValueChanged<int> onItemsPerPageChanged,
-  final Function(int)? onNavigateToPage, // ✅ Add this parameter
+  final Function(int)? onNavigateToPage,
   final double padding,
-  final UserData? user
+  final UserData? user,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -296,7 +292,7 @@ Widget mainContent(
             selectedRole,
             onRoleChanged,
             searchController,
-            onNavigateToPage, // ✅ Pass it to header
+            onNavigateToPage,
             user,
           ),
           const SizedBox(height: 16),
@@ -352,8 +348,7 @@ Widget mainContent(
                           itemsPerPage: itemsPerPage,
                           onPageChanged: onPageChanged,
                           onItemsPerPageChanged: onItemsPerPageChanged,
-                          onNavigateToPage:
-                              onNavigateToPage, // ✅ Pass it to user list
+                          onNavigateToPage: onNavigateToPage,
                         );
                       },
                     ),
@@ -378,7 +373,6 @@ Widget _buildUserList({
   required ValueChanged<int> onItemsPerPageChanged,
   required Function(int)? onNavigateToPage,
 }) {
-  // Filtering
   final filtered =
       allUsers.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
@@ -386,14 +380,12 @@ Widget _buildUserList({
         final email = (data['email'] ?? '').toString().toLowerCase();
         final role = data['role'] ?? '';
 
-        // Role filter
         bool matchesRole =
             selectedRole == 'All Roles' ||
             (selectedRole == 'User' && role == 'user') ||
             (selectedRole == 'Staff' && role == 'staff') ||
             (selectedRole == 'Admin' && role == 'admin');
 
-        // Search filter
         bool matchesSearch =
             searchQuery.isEmpty ||
             name.contains(searchQuery.toLowerCase()) ||
@@ -402,12 +394,10 @@ Widget _buildUserList({
         return matchesRole && matchesSearch;
       }).toList();
 
-  // Calculate pagination
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
   final safeCurrentPage = currentPage.clamp(1, totalPages);
 
-  // Pagination
   final startIndex = (safeCurrentPage - 1) * itemsPerPage;
   final endIndex = (startIndex + itemsPerPage).clamp(0, filtered.length);
   final currentPageUsers = filtered.sublist(
@@ -417,43 +407,45 @@ Widget _buildUserList({
 
   return Column(
     children: [
-      // User List
       Expanded(
         child:
             currentPageUsers.isEmpty
                 ? const Center(
                   child: Text('No users match your search criteria.'),
                 )
-                : ListView.separated(
+                : ListView.builder(
+                  shrinkWrap: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: currentPageUsers.length,
-                  separatorBuilder:
-                      (context, index) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final doc = currentPageUsers[index];
                     final data = doc.data() as Map<String, dynamic>;
 
-                    return _buildUserRow(
-                      context: context,
-                      doc: doc,
-                      name: data['name'] ?? 'N/A',
-                      email: data['email'] ?? 'N/A',
-                      role:
-                          data['role'] == 'user'
-                              ? 'User'
-                              : data['role'] == 'admin'
-                              ? 'Admin'
-                              : data['role'] == 'staff'
-                              ? 'Staff'
-                              : (data['role'] ?? 'N/A'),
-                      year: data['year']?.toString() ?? '-',
-                      program: data['program'] ?? '-',
-                      status: data['isActive'] == true ? 'Active' : 'Inactive',
-                      onNavigateToPage: onNavigateToPage,
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildUserRow(
+                        context: context,
+                        doc: doc,
+                        name: data['name'] ?? 'N/A',
+                        email: data['email'] ?? 'N/A',
+                        role:
+                            data['role'] == 'user'
+                                ? 'User'
+                                : data['role'] == 'admin'
+                                ? 'Admin'
+                                : data['role'] == 'staff'
+                                ? 'Staff'
+                                : (data['role'] ?? 'N/A'),
+                        year: data['year']?.toString() ?? '-',
+                        program: data['program'] ?? '-',
+                        status:
+                            data['isActive'] == true ? 'Active' : 'Inactive',
+                        onNavigateToPage: onNavigateToPage,
+                      ),
                     );
                   },
                 ),
       ),
-      // Pagination
       if (totalItems > 0)
         buildPagination(
           currentPage: safeCurrentPage,
@@ -506,9 +498,7 @@ Widget _buildUserRow({
               color: Colors.grey[700],
             ),
           ),
-
           const SizedBox(width: 12),
-          // User Info (Name/Email)
           Expanded(
             flex: 3,
             child: Column(
@@ -531,7 +521,6 @@ Widget _buildUserRow({
               ],
             ),
           ),
-          // Role
           Expanded(
             flex: 3,
             child: Align(
@@ -566,13 +555,11 @@ Widget _buildUserRow({
               ),
             ),
           ),
-          // Year (hidden on mobile)
           if (!isMobile)
             Expanded(
               flex: 2,
               child: Text(year, style: const TextStyle(fontSize: 13)),
             ),
-          // Program (hidden on mobile)
           if (!isMobile)
             Expanded(
               flex: 3,
@@ -582,7 +569,6 @@ Widget _buildUserRow({
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-          // Status
           Expanded(
             flex: 2,
             child: Align(
@@ -608,7 +594,6 @@ Widget _buildUserRow({
               ),
             ),
           ),
-          // Actions
           SizedBox(width: isTablet ? 60 : 80),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
@@ -617,7 +602,7 @@ Widget _buildUserRow({
                 showEditUserModal(
                   context,
                   doc,
-                  onNavigateToPage: onNavigateToPage, // Pass it through
+                  onNavigateToPage: onNavigateToPage,
                 );
               } else if (value == 'delete') {
                 showDeleteConfirmation(
@@ -675,7 +660,6 @@ Widget _buildHeader(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title and Add Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -701,48 +685,60 @@ Widget _buildHeader(
                 ],
               ),
               Row(
-                children: [
-                  AddUserButton(
-                    onNavigateToPage:
-                        onNavigateToPage, // ✅ Pass it to AddUserButton
-                  ),
-                ],
+                children: [AddUserButton(onNavigateToPage: onNavigateToPage)],
               ),
             ],
           ),
 
-          // 🔹 Stat Cards Section
+          // Stat Cards Section - Fixed for Mobile (2 per row)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child:
                 isMobile
-                    ? Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
+                    ? Column(
                       children: [
-                        buildStatCard(
-                          'Total Users',
-                          '${user?.totalUsers}',
-                          Colors.blue,
-                          Icons.message,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: buildStatCard(
+                                'Total Users',
+                                '${user?.totalUsers}',
+                                Colors.blue,
+                                Icons.message,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: buildStatCard(
+                                'Active Users',
+                                '${user?.activeUsers}',
+                                Colors.green,
+                                Icons.check_circle,
+                              ),
+                            ),
+                          ],
                         ),
-                        buildStatCard(
-                          'Active Users',
-                          '${user?.activeUsers}',
-                          Colors.green,
-                          Icons.check_circle,
-                        ),
-                        buildStatCard(
-                          'New Users (This Month)',
-                          '${user?.newUsersThisMonth}',
-                          Colors.red,
-                          Icons.group,
-                        ),
-                        buildStatCard(
-                          'Users Logged in Today',
-                          '${user?.usersLoggedInToday}',
-                          Colors.orange,
-                          Icons.help_outline,
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: buildStatCard(
+                                'New Users (This Month)',
+                                '${user?.newUsersThisMonth}',
+                                Colors.red,
+                                Icons.group,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: buildStatCard(
+                                'Users Logged in Today',
+                                '${user?.usersLoggedInToday}',
+                                Colors.orange,
+                                Icons.help_outline,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     )
@@ -876,7 +872,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 40), // Actions space
+              SizedBox(width: 40),
             ],
           ),
         );
@@ -951,7 +947,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            SizedBox(width: isTablet ? 60 : 80), // Actions space
+            SizedBox(width: isTablet ? 60 : 80),
           ],
         ),
       );

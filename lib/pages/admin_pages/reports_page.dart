@@ -1,14 +1,11 @@
 import 'package:capstone_project/pages/data/chatbot_usage_charts.dart';
 import 'package:capstone_project/pages/data/chatbot_usage_data.dart';
-
 import 'package:capstone_project/pages/data/inquiry_trends_charts.dart';
 import 'package:capstone_project/pages/data/inquiry_trends_data.dart';
-
 import 'package:capstone_project/pages/data/user_demographics_charts.dart';
 import 'package:capstone_project/pages/data/user_demographics_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
 import 'package:capstone_project/pages/admin_pages/widgets/custom_dropdown_button.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/refresh_button.dart';
 import 'package:capstone_project/pages/data/charts.dart';
@@ -53,7 +50,6 @@ class _ReportsPageState extends State<ReportsPage> {
     });
   }
 
-  // ✅ OPTIMIZED: Load all data in parallel
   Future<void> _loadAllData() async {
     if (!mounted) return;
 
@@ -87,7 +83,6 @@ class _ReportsPageState extends State<ReportsPage> {
     }
   }
 
-  //  OPTIMIZED: Refresh function for the refresh button
   Future<void> _refreshData() async {
     if (!mounted || isRefreshing) return;
 
@@ -111,7 +106,6 @@ class _ReportsPageState extends State<ReportsPage> {
         isRefreshing = false;
       });
 
-      // Show success feedback with responsive sizing
       if (mounted) {
         final screenWidth = MediaQuery.of(context).size.width;
         final isMobile = screenWidth < 600;
@@ -164,7 +158,6 @@ class _ReportsPageState extends State<ReportsPage> {
         isRefreshing = false;
       });
 
-      // Show error feedback with responsive sizing
       if (mounted) {
         final screenWidth = MediaQuery.of(context).size.width;
         final isMobile = screenWidth < 600;
@@ -295,7 +288,6 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 }
 
-// Desktop Dashboard
 class DesktopDashboard extends StatelessWidget {
   final String selectedTimeFrame;
   final String selectedReportType;
@@ -356,7 +348,7 @@ class DesktopDashboard extends StatelessWidget {
               startDate,
               timeFrame,
               timeCategoryCounts,
-              isDesktop: true,
+              isMobile: false,
             ),
           ],
         ),
@@ -365,7 +357,6 @@ class DesktopDashboard extends StatelessWidget {
   }
 }
 
-// Tablet Dashboard
 class TabletDashboard extends StatelessWidget {
   final String selectedTimeFrame;
   final String selectedReportType;
@@ -426,7 +417,7 @@ class TabletDashboard extends StatelessWidget {
               startDate,
               timeFrame,
               timeCategoryCounts,
-              isDesktop: true,
+              isMobile: false,
             ),
           ],
         ),
@@ -435,7 +426,6 @@ class TabletDashboard extends StatelessWidget {
   }
 }
 
-// Mobile Dashboard
 class MobileDashboard extends StatelessWidget {
   final String selectedTimeFrame;
   final String selectedReportType;
@@ -486,7 +476,7 @@ class MobileDashboard extends StatelessWidget {
               isRefreshing,
               userName,
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             ...ReportsHelper.buildReportContent(
               selectedReportType,
               inq,
@@ -496,9 +486,8 @@ class MobileDashboard extends StatelessWidget {
               startDate,
               timeFrame,
               timeCategoryCounts,
-              isDesktop: true,
+              isMobile: true,
             ),
-            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -516,25 +505,27 @@ class ReportsHelper {
     DateTime startDate,
     String timeFrame,
     Map<String, Map<String, int>> timeCategoryCounts, {
-    bool isDesktop = false,
-    bool isTablet = false,
     bool isMobile = false,
   }) {
     switch (reportType) {
       case 'Inquiry Trends':
-        return buildInquiryTrendsReport(inq, isDesktop: isDesktop, selectedTimeFrame: selectedTimeFrame);
+        return buildInquiryTrendsReport(
+          inq,
+          selectedTimeFrame: selectedTimeFrame,
+          isMobile: isMobile,
+        );
       case 'Chatbot Usage':
         return buildChatbotUsageReport(
           cb,
           startDate,
           timeCategoryCounts,
           timeFrame,
-          isDesktop: isDesktop,
+          isMobile: isMobile,
         );
       case 'User Demographics':
-        return buildUserDemographicsReport(ud, isDesktop: isDesktop);
+        return buildUserDemographicsReport(ud, isMobile: isMobile);
       default:
-        return buildInquiryTrendsReport(inq, isDesktop: isDesktop);
+        return buildInquiryTrendsReport(inq, isMobile: isMobile);
     }
   }
 }
@@ -542,8 +533,79 @@ class ReportsHelper {
 List<Widget> buildInquiryTrendsReport(
   InquiryReportsData? data, {
   String? selectedTimeFrame,
-  bool isDesktop = false,
+  bool isMobile = false,
 }) {
+  if (isMobile) {
+    return [
+      Row(
+        children: [
+          Expanded(
+            child: buildStatCard(
+              'Total Messages',
+              '${data?.totalMessages ?? 0}',
+              Colors.blue,
+              Icons.message,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: buildStatCard(
+              'Answered Messages',
+              '${data?.answeredMessages ?? 0}',
+              Colors.green,
+              Icons.check_circle,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: buildStatCard(
+              'Unanswered Messages',
+              '${data?.unAnsweredMessages ?? 0}',
+              Colors.red,
+              Icons.people,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: buildStatCard(
+              'Escalated Messages',
+              data?.escalatedMessages.toString() ?? '0',
+              Colors.orange,
+              Icons.help,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 24),
+      Container(
+        height: 400,
+        child: buildInquiryTrendCard(
+          data?.inquiryTrend ?? [],
+          selectedTimeFrame.toString(),
+        ),
+      ),
+      const SizedBox(height: 16),
+      Container(
+        height: 400,
+        child: buildCategoryDistributionCard(data?.categoryDistribution ?? {}),
+      ),
+      const SizedBox(height: 16),
+      Container(
+        height: 400,
+        child: buildHighestFAQCard(data?.highestFAQs ?? {}),
+      ),
+      const SizedBox(height: 16),
+      Container(
+        height: 400,
+        child: buildSeasonalTrendsCard(data?.seasonalTrends ?? {}),
+      ),
+    ];
+  }
+
   return [
     SizedBox(
       height: 120,
@@ -629,7 +691,7 @@ List<Widget> buildChatbotUsageReport(
   DateTime start,
   Map<String, Map<String, int>> timeCategoryCounts,
   String timeFrame, {
-  bool isDesktop = false,
+  bool isMobile = false,
 }) {
   List<ChartData> getConversationTrendData() {
     if (data == null) return <ChartData>[];
@@ -732,34 +794,19 @@ List<Widget> buildChatbotUsageReport(
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
-      child: Row(
-        children: [
-          Expanded(
-            child: buildConversationsOverTimeCard(conversationTrend, timeFrame),
-          ),
-        ],
-      ),
+      child: buildConversationsOverTimeCard(conversationTrend, timeFrame),
     ),
     const SizedBox(height: 16),
     SizedBox(
       height: 350,
-      child: Row(
-        children: [
-         
-          Expanded(
-            child: buildPeakUsageHoursCard(
-              data?.peakUsageByHour ?? <int, int>{},
-            ),
-          ),
-        ],
-      ),
+      child: buildPeakUsageHoursCard(data?.peakUsageByHour ?? <int, int>{}),
     ),
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
       child: Row(
         children: [
-           Expanded(
+          Expanded(
             child: buildUsersByCourseCard(
               data?.usersByCourse ?? <String, int>{},
             ),
@@ -776,14 +823,8 @@ List<Widget> buildChatbotUsageReport(
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
-      child: Row(
-        children: [
-          Expanded(
-            child: buildResponseTimeTrendCard(
-              data?.responseTimeTrend ?? <ChartData>[],
-            ),
-          ),
-        ],
+      child: buildResponseTimeTrendCard(
+        data?.responseTimeTrend ?? <ChartData>[],
       ),
     ),
   ];
@@ -791,8 +832,76 @@ List<Widget> buildChatbotUsageReport(
 
 List<Widget> buildUserDemographicsReport(
   UserDemographicsReportsData? data, {
-  bool isDesktop = false,
+  bool isMobile = false,
 }) {
+  if (isMobile) {
+    return [
+      Row(
+        children: [
+          Expanded(
+            child: buildStatCard(
+              'Total Users',
+              '${data?.totalUsers ?? 0}',
+              Colors.blue,
+              Icons.people,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: buildStatCard(
+              'Enrolled Users',
+              '${data?.activeUsers ?? 0}',
+              Colors.green,
+              Icons.person_outline,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: buildStatCard(
+              'Users with Scholarships',
+              '${data?.newlyRegisteredUsers ?? 0}',
+              Colors.orange,
+              Icons.person_add,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: buildStatCard(
+              'Affiliated Users',
+              '${data?.affiliatedUsers ?? 0}',
+              Colors.purple,
+              Icons.business,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 24),
+      Container(
+        height: 400,
+        child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
+      ),
+      const SizedBox(height: 16),
+      Container(
+        height: 400,
+        child: buildUsersByYearCard(data?.usersByYear ?? {}),
+      ),
+      const SizedBox(height: 16),
+      Container(
+        height: 400,
+        child: buildUsersByProgramCard(data?.usersByProgram ?? {}),
+      ),
+      const SizedBox(height: 16),
+      Container(
+        height: 400,
+        child: buildScholarshipTypesCard(data?.scholarshipTypes ?? {}),
+      ),
+    ];
+  }
+
   return [
     SizedBox(
       height: 120,
@@ -839,43 +948,19 @@ List<Widget> buildUserDemographicsReport(
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
-      child: Row(
-        children: [
-          Expanded(
-            child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
-          ),
-        ],
-      ),
+      child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
+    ),
+    const SizedBox(height: 16),
+    SizedBox(height: 400, child: buildUsersByYearCard(data?.usersByYear ?? {})),
+    const SizedBox(height: 16),
+    SizedBox(
+      height: 400,
+      child: buildUsersByProgramCard(data?.usersByProgram ?? {}),
     ),
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
-      child: Row(
-        children: [
-          Expanded(child: buildUsersByYearCard(data?.usersByYear ?? {})),
-          const SizedBox(width: 20),
-        ],
-      ),
-    ),
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-          Expanded(child: buildUsersByProgramCard(data?.usersByProgram ?? {})),
-        ],
-      ),
-    ),
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-          Expanded(
-            child: buildScholarshipTypesCard(data?.scholarshipTypes ?? {}),
-          ),
-        ],
-      ),
+      child: buildScholarshipTypesCard(data?.scholarshipTypes ?? {}),
     ),
   ];
 }

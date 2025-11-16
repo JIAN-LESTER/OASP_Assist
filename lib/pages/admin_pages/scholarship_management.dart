@@ -30,7 +30,6 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage> {
   final TextEditingController _searchController = TextEditingController();
   List<DocumentSnapshot> allScholarships = [];
 
-  // Pagination variables
   int currentPage = 1;
   int itemsPerPage = 10;
 
@@ -54,7 +53,6 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage> {
     });
 
     try {
-      // Call the getInformationBankData() method
       final data = await statData.getScholarshipData();
 
       if (!mounted) return;
@@ -158,7 +156,6 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage> {
   }
 }
 
-// Desktop Scholarship Management
 class DesktopScholarshipManagement extends StatelessWidget {
   final List<DocumentSnapshot> allScholarships;
   final String selectedProvider;
@@ -180,7 +177,7 @@ class DesktopScholarshipManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.allScholarships,
-    this.sc
+    this.sc,
   });
 
   @override
@@ -201,7 +198,6 @@ class DesktopScholarshipManagement extends StatelessWidget {
   }
 }
 
-// Tablet Scholarship Management
 class TabletScholarshipManagement extends StatelessWidget {
   final List<DocumentSnapshot> allScholarships;
   final String selectedProvider;
@@ -211,8 +207,7 @@ class TabletScholarshipManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-    final ScholarshipData? sc;
-
+  final ScholarshipData? sc;
 
   const TabletScholarshipManagement({
     super.key,
@@ -224,7 +219,7 @@ class TabletScholarshipManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.allScholarships,
-    this.sc
+    this.sc,
   });
 
   @override
@@ -245,7 +240,6 @@ class TabletScholarshipManagement extends StatelessWidget {
   }
 }
 
-// Mobile Scholarship Management
 class MobileScholarshipManagement extends StatelessWidget {
   final List<DocumentSnapshot> allScholarships;
   final String selectedProvider;
@@ -255,8 +249,7 @@ class MobileScholarshipManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-    final ScholarshipData? sc;
-
+  final ScholarshipData? sc;
 
   const MobileScholarshipManagement({
     super.key,
@@ -367,7 +360,6 @@ Widget _buildScholarshipList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  // Filtering
   final filtered =
       allScholarships.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
@@ -391,7 +383,6 @@ Widget _buildScholarshipList({
         return matchesProvider && matchesSearch;
       }).toList();
 
-  // Pagination
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
   final safeCurrentPage = currentPage.clamp(1, totalPages);
@@ -405,27 +396,21 @@ Widget _buildScholarshipList({
 
   return Column(
     children: [
-      // Scholarship List
       Expanded(
         child:
             currentPageScholarships.isEmpty
                 ? const Center(
                   child: Text('No scholarships match your criteria.'),
                 )
-                : ListView.separated(
+                : ListView.builder(
+                  shrinkWrap: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: currentPageScholarships.length,
-                  separatorBuilder:
-                      (context, index) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final doc = currentPageScholarships[index];
                     final data = doc.data() as Map<String, dynamic>;
 
-                    // Combine eligibility + requirements
                     List<String> eligibilityRequirements = [];
-
-                    // if (data['eligibility'] != null && data['eligibility'].toString().trim().isNotEmpty) {
-                    //   eligibilityRequirements.add(data['eligibility'].toString().trim());
-                    // }
 
                     if (data['eligibilityRequirements'] != null) {
                       final reqs =
@@ -454,21 +439,23 @@ Widget _buildScholarshipList({
                       }
                     }
 
-                    return _buildScholarshipRow(
-                      context: context,
-                      doc: doc,
-                      name: data['name'] ?? 'N/A',
-                      description: data['description'] ?? 'N/A',
-                      eligibilityRequirements: eligibilityRequirements,
-                      scholarshipProvider: data['scholarshipProvider'] ?? 'N/A',
-                      privileges: privileges,
-                      deadline: deadline,
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildScholarshipRow(
+                        context: context,
+                        doc: doc,
+                        name: data['name'] ?? 'N/A',
+                        description: data['description'] ?? 'N/A',
+                        eligibilityRequirements: eligibilityRequirements,
+                        scholarshipProvider:
+                            data['scholarshipProvider'] ?? 'N/A',
+                        privileges: privileges,
+                        deadline: deadline,
+                      ),
                     );
                   },
                 ),
       ),
-
-      // Pagination
       if (totalItems > 0)
         buildPagination(
           currentPage: safeCurrentPage,
@@ -489,7 +476,7 @@ Widget _buildScholarshipRow({
   required String name,
   required String scholarshipProvider,
   required String description,
-  required List<String>? eligibilityRequirements, // combined field
+  required List<String>? eligibilityRequirements,
   required String deadline,
   required List<String>? privileges,
 }) {
@@ -508,7 +495,6 @@ Widget _buildScholarshipRow({
       onTap: () => showSCInfoModal(context, doc),
       child: Row(
         children: [
-          // Title + Provider
           Expanded(
             flex: 3,
             child: Column(
@@ -531,8 +517,6 @@ Widget _buildScholarshipRow({
               ],
             ),
           ),
-
-          // Eligibility & Requirements combined
           Expanded(
             flex: 4,
             child: Column(
@@ -571,8 +555,6 @@ Widget _buildScholarshipRow({
                       ],
             ),
           ),
-
-          // Privileges
           Expanded(
             flex: 3,
             child: Column(
@@ -610,8 +592,6 @@ Widget _buildScholarshipRow({
                       ],
             ),
           ),
-
-          // Deadline
           if (!isMobile)
             Expanded(
               flex: 3,
@@ -620,10 +600,6 @@ Widget _buildScholarshipRow({
                 style: const TextStyle(fontSize: 13),
               ),
             ),
-
-          // Created At
-
-          // Actions
           SizedBox(width: isTablet ? 60 : 80),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
@@ -691,7 +667,6 @@ Widget _buildHeader(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title and Add Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -720,13 +695,12 @@ Widget _buildHeader(
             ],
           ),
 
+          // Stat Cards Section - Fixed for Mobile (1 per row)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child:
                 isMobile
-                    ? Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
+                    ? Column(
                       children: [
                         buildStatCard(
                           'Total Scholarships',
@@ -734,11 +708,18 @@ Widget _buildHeader(
                           Colors.blue,
                           Icons.message,
                         ),
-
+                        const SizedBox(height: 12),
+                        buildStatCard(
+                          'New Scholarship',
+                          sc?.newScholarship ?? "Unknown",
+                          Colors.green,
+                          Icons.check_circle,
+                        ),
+                        const SizedBox(height: 12),
                         buildStatCard(
                           'Approaching Deadline',
                           sc?.approachingDeadline ?? "Unknown",
-                          Colors.green,
+                          const Color.fromARGB(255, 245, 118, 0),
                           Icons.check_circle,
                         ),
                       ],
@@ -747,7 +728,7 @@ Widget _buildHeader(
                       children: [
                         Expanded(
                           child: buildStatCard(
-                            'Total Scholarshipss',
+                            'Total Scholarships',
                             '${sc?.totalScholarship}',
                             Colors.blue,
                             Icons.message,
@@ -762,12 +743,12 @@ Widget _buildHeader(
                             Icons.check_circle,
                           ),
                         ),
-                        SizedBox(width: 16),
+                        const SizedBox(width: 16),
                         Expanded(
                           child: buildStatCard(
                             'Approaching Deadline',
                             sc?.approachingDeadline ?? "Unknown",
-                            Colors.yellow,
+                            const Color.fromARGB(255, 245, 118, 0),
                             Icons.check_circle,
                           ),
                         ),
@@ -866,7 +847,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 40), // Actions space
+              SizedBox(width: 40),
             ],
           ),
         );
@@ -895,9 +876,8 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-
             Expanded(
-              flex: 4, // match row
+              flex: 4,
               child: Text(
                 'Eligibility/Requirements',
                 style: TextStyle(
@@ -908,7 +888,7 @@ Widget _buildTableHeader() {
               ),
             ),
             Expanded(
-              flex: 3, // match row
+              flex: 3,
               child: Text(
                 'Benefits',
                 style: TextStyle(
@@ -929,8 +909,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-
-            SizedBox(width: isTablet ? 60 : 80), // Actions space
+            SizedBox(width: isTablet ? 60 : 80),
           ],
         ),
       );

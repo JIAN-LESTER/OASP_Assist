@@ -22,7 +22,6 @@ class AffiliationManagementPage extends StatefulWidget {
 class _AffiliationManagementPageState extends State<AffiliationManagementPage> {
   final TextEditingController _searchController = TextEditingController();
 
-  // Pagination variables
   int currentPage = 1;
   int itemsPerPage = 10;
 
@@ -46,7 +45,6 @@ class _AffiliationManagementPageState extends State<AffiliationManagementPage> {
     });
 
     try {
-      // Call the getInformationBankData() method
       final data = await statData.getAffiliationData();
 
       if (!mounted) return;
@@ -124,7 +122,6 @@ class _AffiliationManagementPageState extends State<AffiliationManagementPage> {
   }
 }
 
-// Desktop Affiliation Management
 class DesktopAffiliationManagement extends StatelessWidget {
   final TextEditingController searchController;
   final int currentPage;
@@ -158,7 +155,6 @@ class DesktopAffiliationManagement extends StatelessWidget {
   }
 }
 
-// Tablet Affiliation Management
 class TabletAffiliationManagement extends StatelessWidget {
   final TextEditingController searchController;
   final int currentPage;
@@ -192,7 +188,6 @@ class TabletAffiliationManagement extends StatelessWidget {
   }
 }
 
-// Mobile Affiliation Management
 class MobileAffiliationManagement extends StatelessWidget {
   final TextEditingController searchController;
   final int currentPage;
@@ -319,25 +314,21 @@ Widget _buildAffiliationList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  // Filtering
   final filtered =
       allAffiliations.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
         final name = (data['name'] ?? '').toString().toLowerCase();
 
-        // Search filter
         bool matchesSearch =
             searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
 
         return matchesSearch;
       }).toList();
 
-  // Calculate pagination
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
   final safeCurrentPage = currentPage.clamp(1, totalPages);
 
-  // Pagination
   final startIndex = (safeCurrentPage - 1) * itemsPerPage;
   final endIndex = (startIndex + itemsPerPage).clamp(0, filtered.length);
   final currentPageAffiliations = filtered.sublist(
@@ -347,31 +338,32 @@ Widget _buildAffiliationList({
 
   return Column(
     children: [
-      // Affiliation List
       Expanded(
         child:
             currentPageAffiliations.isEmpty
                 ? const Center(
                   child: Text('No affiliations match your search criteria.'),
                 )
-                : ListView.separated(
+                : ListView.builder(
+                  shrinkWrap: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: currentPageAffiliations.length,
-                  separatorBuilder:
-                      (context, index) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final doc = currentPageAffiliations[index];
                     final data = doc.data() as Map<String, dynamic>;
 
-                    return _buildAffiliationRow(
-                      context: context,
-                      doc: doc,
-                      name: data['name'] ?? 'N/A',
-                      description: data['description'] ?? '-',
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildAffiliationRow(
+                        context: context,
+                        doc: doc,
+                        name: data['name'] ?? 'N/A',
+                        description: data['description'] ?? '-',
+                      ),
                     );
                   },
                 ),
       ),
-      // Pagination
       if (totalItems > 0)
         buildPagination(
           currentPage: safeCurrentPage,
@@ -405,7 +397,6 @@ Widget _buildAffiliationRow({
     ),
     child: Row(
       children: [
-        // Icon
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -419,7 +410,6 @@ Widget _buildAffiliationRow({
           ),
         ),
         const SizedBox(width: 12),
-        // Affiliation Info
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,7 +432,6 @@ Widget _buildAffiliationRow({
             ],
           ),
         ),
-        // Actions
         SizedBox(width: isTablet ? 60 : 80),
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_horiz),
@@ -508,7 +497,6 @@ Widget _buildHeader(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title and Add Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -533,39 +521,16 @@ Widget _buildHeader(
                   ),
                 ],
               ),
-              ElevatedButton.icon(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder:
-                        (context) => AddEditaffiliationDialog(onSaved: () {}),
-                  );
-                },
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(isMobile ? 'Add' : 'Add Affiliation'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E7D32),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 12 : 20,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
+              _buildAddButton(context, isMobile, isTablet),
             ],
           ),
 
+          // Stat Cards Section - Fixed for Mobile (1 per row)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child:
                 isMobile
-                    ? Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
+                    ? Column(
                       children: [
                         buildStatCard(
                           'Total Affiliations',
@@ -573,6 +538,7 @@ Widget _buildHeader(
                           Colors.blue,
                           Icons.message,
                         ),
+                        const SizedBox(height: 12),
                         buildStatCard(
                           'Affiliation where most students are affiliated',
                           '${affiliation?.dominantAffiliation}',
@@ -604,11 +570,64 @@ Widget _buildHeader(
                     ),
           ),
 
-          // Search Row
           buildSearchField('Search affiliations by name', searchController),
         ],
       );
     },
+  );
+}
+
+Widget _buildAddButton(BuildContext context, bool isMobile, bool isTablet) {
+  double height = isMobile ? 44 : (isTablet ? 46 : 48);
+  double fontSize = isMobile ? 13 : (isTablet ? 14 : 15);
+  double horizontalPadding = isMobile ? 16 : (isTablet ? 18 : 20);
+  double iconSize = isMobile ? 18 : (isTablet ? 20 : 22);
+  double borderRadius = 8;
+
+  return Container(
+    height: height,
+    decoration: BoxDecoration(
+      color: const Color(0xFF2E7D32),
+      borderRadius: BorderRadius.circular(borderRadius),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.1),
+          spreadRadius: 1,
+          blurRadius: isMobile ? 2 : 3,
+          offset: const Offset(0, 1),
+        ),
+      ],
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(borderRadius),
+        onTap: () {
+          showDialog(
+            context: context,
+            builder: (context) => AddEditaffiliationDialog(onSaved: () {}),
+          );
+        },
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add, color: Colors.white, size: iconSize),
+              const SizedBox(width: 8),
+              Text(
+                isMobile ? 'Add' : 'Add Affiliation',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
   );
 }
 
@@ -647,7 +666,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            SizedBox(width: isTablet ? 60 : 80), // Actions space
+            SizedBox(width: isTablet ? 60 : 80),
           ],
         ),
       );

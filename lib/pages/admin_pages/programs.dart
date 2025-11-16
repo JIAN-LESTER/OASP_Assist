@@ -10,10 +10,6 @@ import 'package:capstone_project/pages/admin_pages/widgets/empty_state.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 
-// Import the AddEditProgramDialog from the manage programs modal
-// Assuming it's in the same file or import path
-// If it's in a separate file, adjust the import accordingly
-
 class ProgramManagementPage extends StatefulWidget {
   const ProgramManagementPage({super.key});
 
@@ -628,27 +624,14 @@ Widget _buildHeader(
                   ),
                 ],
               ),
-              ElevatedButton.icon(
+              // Updated button using the new component
+              AddProgramButton(
                 onPressed: () {
                   showDialog(
                     context: context,
                     builder: (context) => AddEditProgramDialog(onSaved: () {}),
                   );
                 },
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(isMobile ? 'Add' : 'Add Program'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E7D32),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 12 : 20,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
               ),
             ],
           ),
@@ -748,7 +731,75 @@ Widget _buildTableHeader() {
   );
 }
 
-// AddEditProgramDialog class - copied from manage_programs modal
+// AddProgramButton Widget
+class AddProgramButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+
+  const AddProgramButton({Key? key, this.onPressed}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        double screenWidth = MediaQuery.of(context).size.width;
+
+        // Using the same breakpoints as ResponsiveLayout
+        bool isMobile = screenWidth < 600;
+        bool isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+        // Responsive dimensions
+        double height = isMobile ? 44 : (isTablet ? 46 : 48);
+        double fontSize = isMobile ? 13 : (isTablet ? 14 : 15);
+        double horizontalPadding = isMobile ? 16 : (isTablet ? 18 : 20);
+        double iconSize = isMobile ? 18 : (isTablet ? 20 : 22);
+        double borderRadius = 8;
+
+        return Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: Color(0xFF2E7D32),
+            borderRadius: BorderRadius.circular(borderRadius),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: isMobile ? 2 : 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(borderRadius),
+              onTap: onPressed,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add, color: Colors.white, size: iconSize),
+                    const SizedBox(width: 8),
+                    Text(
+                      isMobile ? 'Add' : 'Add Program',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// AddEditProgramDialog class
 class AddEditProgramDialog extends StatelessWidget {
   final DocumentSnapshot? program;
   final VoidCallback onSaved;
@@ -970,36 +1021,19 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
       backgroundColor: Colors.transparent,
       body: Column(
         children: [
-          // Header with gradient
+          // Header
           Container(
             width: double.infinity,
-            padding: EdgeInsets.all(widget.isMobile ? 20 : 28),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF2E7D32), Color(0xFF2E7D32)],
-              ),
-              borderRadius: BorderRadius.only(
+            padding: EdgeInsets.all(widget.isMobile ? 20 : 24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2E7D32),
+              borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
               ),
             ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    isEditing ? Icons.edit : Icons.add_circle_outline,
-                    color: Colors.white,
-                    size: widget.isMobile ? 24 : 28,
-                  ),
-                ),
-                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1007,20 +1041,19 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
                       Text(
                         isEditing ? 'Edit Program' : 'Add New Program',
                         style: TextStyle(
-                          fontSize: widget.isMobile ? 20 : 24,
+                          fontSize: widget.isMobile ? 18 : 20,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
-                          letterSpacing: -0.5,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         isEditing
-                            ? 'Update program details'
+                            ? 'Update program information'
                             : 'Create a new academic program',
                         style: TextStyle(
-                          fontSize: widget.isMobile ? 14 : 16,
-                          color: Colors.white.withOpacity(0.85),
+                          fontSize: widget.isMobile ? 13 : 14,
+                          color: Colors.white.withOpacity(0.9),
                           fontWeight: FontWeight.w400,
                         ),
                       ),
@@ -1030,15 +1063,11 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(20),
                     onTap: () => Navigator.of(context).pop(),
                     child: Container(
-                      padding: const EdgeInsets.all(8),
-                      child: Icon(
-                        Icons.close,
-                        color: Colors.white.withOpacity(0.9),
-                        size: 24,
-                      ),
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(Icons.close, color: Colors.white, size: 22),
                     ),
                   ),
                 ),
