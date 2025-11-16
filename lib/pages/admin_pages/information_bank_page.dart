@@ -16,8 +16,6 @@ import 'package:capstone_project/pages/admin_pages/widgets/search_field.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 
-// import 'package:capstone_project/services/weviate_service.dart';
-
 class InformationBankPage extends StatefulWidget {
   const InformationBankPage({super.key});
 
@@ -31,7 +29,6 @@ class _InformationBankPageState extends State<InformationBankPage> {
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
   bool isLoading = true;
 
-  // Create an instance of FirebaseService
   final StatDataManagement statData = StatDataManagement();
 
   InformationBankData? ibData;
@@ -42,7 +39,6 @@ class _InformationBankPageState extends State<InformationBankPage> {
     });
   }
 
-  // Pagination variables
   int currentPage = 1;
   int itemsPerPage = 10;
 
@@ -50,7 +46,6 @@ class _InformationBankPageState extends State<InformationBankPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    // Load data when page initializes
     loadStatData();
   }
 
@@ -61,7 +56,6 @@ class _InformationBankPageState extends State<InformationBankPage> {
     super.dispose();
   }
 
-  // Updated method to call FirebaseService
   Future<void> loadStatData() async {
     if (!mounted) return;
 
@@ -70,7 +64,6 @@ class _InformationBankPageState extends State<InformationBankPage> {
     });
 
     try {
-      // Call the getInformationBankData() method
       final data = await statData.getInformationBankData();
 
       if (!mounted) return;
@@ -147,12 +140,10 @@ class _InformationBankPageState extends State<InformationBankPage> {
   }
 }
 
-// Desktop Information Bank
 class DesktopInformationBank extends StatelessWidget {
   final String selectedCategory;
   final ValueChanged<String> onCategoryChanged;
   final TextEditingController searchController;
-
   final int currentPage;
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
@@ -187,12 +178,10 @@ class DesktopInformationBank extends StatelessWidget {
   }
 }
 
-// Tablet Information Bank
 class TabletInformationBank extends StatelessWidget {
   final String selectedCategory;
   final ValueChanged<String> onCategoryChanged;
   final TextEditingController searchController;
-
   final int currentPage;
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
@@ -227,17 +216,15 @@ class TabletInformationBank extends StatelessWidget {
   }
 }
 
-// Mobile Information Bank
 class MobileInformationBank extends StatelessWidget {
   final String selectedCategory;
   final ValueChanged<String> onCategoryChanged;
   final TextEditingController searchController;
-
   final int currentPage;
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-    final InformationBankData? ib;
+  final InformationBankData? ib;
 
   const MobileInformationBank({
     super.key,
@@ -271,7 +258,6 @@ Widget mainContent(
   final String selectedCategory,
   final ValueChanged<String> onCategoryChanged,
   final TextEditingController searchController,
-
   final int currentPage,
   final int itemsPerPage,
   final ValueChanged<int> onPageChanged,
@@ -286,7 +272,12 @@ Widget mainContent(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(selectedCategory, onCategoryChanged, searchController, ib),
+          _buildHeader(
+            selectedCategory,
+            onCategoryChanged,
+            searchController,
+            ib,
+          ),
           const SizedBox(height: 16),
           Expanded(
             child: Container(
@@ -370,7 +361,7 @@ Widget _buildHeader(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 🔹 Title and Upload Button
+          // Title and Upload Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -399,27 +390,35 @@ Widget _buildHeader(
             ],
           ),
 
-          // 🔹 Stat Cards Section
+          // Stat Cards Section - Fixed for Mobile
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child:
                 isMobile
-                    ? Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
+                    ? Column(
                       children: [
-                        buildStatCard(
-                          'Total Documents',
-                          '${ib?.totalDocuments}',
-                          Colors.blue,
-                          Icons.message,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: buildStatCard(
+                                'Total Documents',
+                                '${ib?.totalDocuments}',
+                                Colors.blue,
+                                Icons.message,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: buildStatCard(
+                                'Most Frequent Category',
+                                ib?.mostFrequentCategory ?? "Unknown",
+                                Colors.green,
+                                Icons.check_circle,
+                              ),
+                            ),
+                          ],
                         ),
-                        buildStatCard(
-                          'Most Frequent Document Category',
-                          ib?.mostFrequentCategory?? "Unknown",
-                          Colors.green,
-                          Icons.check_circle,
-                        ),
+                        const SizedBox(height: 12),
                         buildStatCard(
                           'Latest Upload',
                           ib?.latestUpload ?? "Unknown",
@@ -431,30 +430,30 @@ Widget _buildHeader(
                     : Row(
                       children: [
                         Expanded(
-                          child:  buildStatCard(
-                          'Total Documents',
-                          '${ib?.totalDocuments}',
-                          Colors.blue,
-                          Icons.message,
-                        ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child:  buildStatCard(
-                          'Most Frequent Category',
-                          ib?.mostFrequentCategory?? "Unknown",
-                          Colors.green,
-                          Icons.check_circle,
-                        ),
+                          child: buildStatCard(
+                            'Total Documents',
+                            '${ib?.totalDocuments}',
+                            Colors.blue,
+                            Icons.message,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child:buildStatCard(
-                          'Latest Upload',
-                          ib?.latestUpload ?? "Unknown",
-                          Colors.red,
-                          Icons.group,
+                          child: buildStatCard(
+                            'Most Frequent Category',
+                            ib?.mostFrequentCategory ?? "Unknown",
+                            Colors.green,
+                            Icons.check_circle,
+                          ),
                         ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'Latest Upload',
+                            ib?.latestUpload ?? "Unknown",
+                            Colors.red,
+                            Icons.group,
+                          ),
                         ),
                       ],
                     ),
@@ -462,7 +461,7 @@ Widget _buildHeader(
 
           const SizedBox(height: 24),
 
-          // 🔹 Search and Filter Row (below stat cards)
+          // Search and Filter Row
           isMobile
               ? Column(
                 children: [
@@ -543,7 +542,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 40), // Actions space
+              SizedBox(width: 40),
             ],
           ),
         );
@@ -594,7 +593,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            SizedBox(width: isTablet ? 60 : 80), // Actions space
+            SizedBox(width: isTablet ? 60 : 80),
           ],
         ),
       );
@@ -611,7 +610,6 @@ Widget _buildIBList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  // Filtering with corrected logic
   final filtered =
       getAllDocuments.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
@@ -619,12 +617,10 @@ Widget _buildIBList({
         final source = (data['source'] ?? '').toString().toLowerCase();
         final category = (data['category'] ?? '').toString().toLowerCase();
 
-        // Fixed category filter - exact matching instead of contains
         bool matchesCategory =
             selectedCategory == 'All Categories' ||
             category == selectedCategory.toLowerCase();
 
-        // Search filter - search across multiple fields
         bool matchesSearch =
             searchQuery.isEmpty ||
             title.contains(searchQuery.toLowerCase()) ||
@@ -634,7 +630,6 @@ Widget _buildIBList({
         return matchesCategory && matchesSearch;
       }).toList();
 
-  // Rest of the pagination logic remains the same...
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
   final safeCurrentPage = currentPage.clamp(1, totalPages);
@@ -654,10 +649,10 @@ Widget _buildIBList({
                 ? const Center(
                   child: Text('No documents match your search criteria.'),
                 )
-                : ListView.separated(
+                : ListView.builder(
+                  shrinkWrap: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: currentPageIB.length,
-                  separatorBuilder:
-                      (context, index) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final doc = currentPageIB[index];
                     final data = doc.data() as Map<String, dynamic>;
@@ -668,18 +663,20 @@ Widget _buildIBList({
                       "MMMM d, yyyy 'at' hh:mm a",
                     ).format(date);
 
-                    return _buildIBRow(
-                      context: context,
-                      doc: doc,
-                      title: data['ib_title'] ?? 'N/A',
-                      source: data['source'] ?? 'N/A',
-                      category: data['category'] ?? 'General',
-                      content: data['content'],
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildIBRow(
+                        context: context,
+                        doc: doc,
+                        title: data['ib_title'] ?? 'N/A',
+                        source: data['source'] ?? 'N/A',
+                        category: data['category'] ?? 'General',
+                        content: data['content'],
+                      ),
                     );
                   },
                 ),
       ),
-      // Pagination
       if (totalItems > 0)
         buildPagination(
           currentPage: safeCurrentPage,
@@ -706,7 +703,6 @@ Widget _buildIBRow({
   bool isMobile = screenWidth < 600;
   bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
-  // Normalize category for consistent display
   final categoryStyle = getCategoryStyle(category);
 
   return Container(
@@ -720,7 +716,6 @@ Widget _buildIBRow({
       onTap: () => showIBInfoModal(context, doc),
       child: Row(
         children: [
-          // Document Info
           Expanded(
             flex: 2,
             child: Column(
@@ -745,7 +740,6 @@ Widget _buildIBRow({
               ],
             ),
           ),
-
           if (!isMobile)
             Expanded(
               flex: 3,
@@ -756,8 +750,6 @@ Widget _buildIBRow({
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-
-          // Category
           Expanded(
             flex: 1,
             child: Align(
@@ -779,9 +771,6 @@ Widget _buildIBRow({
               ),
             ),
           ),
-          // Created At (hidden on mobile)
-
-          // Actions
           SizedBox(width: isTablet ? 60 : 80),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),

@@ -37,7 +37,6 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
     });
   }
 
-  // Pagination variables
   int currentPage = 1;
   int itemsPerPage = 10;
 
@@ -56,7 +55,6 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
     });
 
     try {
-      // Call the getInformationBankData() method
       final data = await statData.getFAQsData();
 
       if (!mounted) return;
@@ -102,7 +100,7 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-     if (isLoading) {
+    if (isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return ResponsiveLayout(
@@ -124,7 +122,7 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
-         faq: faqData,
+        faq: faqData,
       ),
       desktopBody: DesktopFaqManagement(
         selectedCategory: selectedCategory,
@@ -134,23 +132,21 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
-         faq: faqData,
+        faq: faqData,
       ),
     );
   }
 }
 
-// Desktop FAQ Management
 class DesktopFaqManagement extends StatelessWidget {
   final String selectedCategory;
   final ValueChanged<String> onCategoryChanged;
   final TextEditingController searchController;
-
   final int currentPage;
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-    final FAQsData? faq;
+  final FAQsData? faq;
 
   const DesktopFaqManagement({
     super.key,
@@ -181,18 +177,15 @@ class DesktopFaqManagement extends StatelessWidget {
   }
 }
 
-// Tablet FAQ Management
 class TabletFaqManagement extends StatelessWidget {
   final String selectedCategory;
   final ValueChanged<String> onCategoryChanged;
   final TextEditingController searchController;
-
   final int currentPage;
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-      final FAQsData? faq;
-  
+  final FAQsData? faq;
 
   const TabletFaqManagement({
     super.key,
@@ -223,13 +216,11 @@ class TabletFaqManagement extends StatelessWidget {
   }
 }
 
-// Mobile FAQ Management
 class MobileFaqManagement extends StatelessWidget {
   final String selectedCategory;
   final ValueChanged<String> onCategoryChanged;
   final TextEditingController searchController;
-      final FAQsData? faq;
-
+  final FAQsData? faq;
   final int currentPage;
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
@@ -246,6 +237,7 @@ class MobileFaqManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     this.faq,
   });
+
   @override
   Widget build(BuildContext context) {
     return mainContent(
@@ -282,10 +274,13 @@ Widget mainContent(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(selectedCategory, onCategoryChanged, searchController, faq),
+          _buildHeader(
+            selectedCategory,
+            onCategoryChanged,
+            searchController,
+            faq,
+          ),
           const SizedBox(height: 16),
-
-          // Main container
           Expanded(
             child: Container(
               padding: EdgeInsets.all(padding),
@@ -305,8 +300,6 @@ Widget mainContent(
                 children: [
                   _buildTableHeader(),
                   const SizedBox(height: 10),
-
-                  // FAQ list area
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
                       stream:
@@ -368,7 +361,7 @@ Widget _buildHeader(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title and Upload Button
+          // Title and Add FAQ Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -397,14 +390,12 @@ Widget _buildHeader(
             ],
           ),
 
-          // 🔹 Stat Cards Section
+          // Stat Cards Section - Fixed for Mobile (1 per row)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child:
                 isMobile
-                    ? Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
+                    ? Column(
                       children: [
                         buildStatCard(
                           'Total FAQs',
@@ -412,21 +403,24 @@ Widget _buildHeader(
                           Colors.blue,
                           Icons.message,
                         ),
+                        const SizedBox(height: 12),
                         buildStatCard(
                           'Most Frequent Category',
                           faq?.mostFrequentCategory ?? "Unknown",
                           Colors.green,
                           Icons.check_circle,
                         ),
+                        const SizedBox(height: 12),
                         buildStatCard(
                           'Most Asked Question',
                           faq?.mostAskedQuestion ?? 'Unknown',
                           Colors.red,
                           Icons.group,
                         ),
+                        const SizedBox(height: 12),
                         buildStatCard(
                           'Latest FAQ',
-                          faq?.latestFAQ ?? "Unkown",
+                          faq?.latestFAQ ?? "Unknown",
                           Colors.orange,
                           Icons.help_outline,
                         ),
@@ -435,39 +429,39 @@ Widget _buildHeader(
                     : Row(
                       children: [
                         Expanded(
-                          child:  buildStatCard(
-                          'Total FAQs',
-                          '${faq?.totalFAQs}',
-                          Colors.blue,
-                          Icons.message,
-                        ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child:  buildStatCard(
-                          'Most Frequent Category',
-                          faq?.mostFrequentCategory ?? "Unknown",
-                          Colors.green,
-                          Icons.check_circle,
-                        ),
+                          child: buildStatCard(
+                            'Total FAQs',
+                            '${faq?.totalFAQs}',
+                            Colors.blue,
+                            Icons.message,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: buildStatCard(
-                          'Most Asked Question',
-                          faq?.mostAskedQuestion ?? 'Unknown',
-                          Colors.red,
-                          Icons.group,
-                        ),
+                            'Most Frequent Category',
+                            faq?.mostFrequentCategory ?? "Unknown",
+                            Colors.green,
+                            Icons.check_circle,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child:  buildStatCard(
-                          'Latest FAQ',
-                          faq?.latestFAQ ?? "Unknown",
-                          Colors.orange,
-                          Icons.help_outline,
+                          child: buildStatCard(
+                            'Most Asked Question',
+                            faq?.mostAskedQuestion ?? 'Unknown',
+                            Colors.red,
+                            Icons.group,
+                          ),
                         ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'Latest FAQ',
+                            faq?.latestFAQ ?? "Unknown",
+                            Colors.orange,
+                            Icons.help_outline,
+                          ),
                         ),
                       ],
                     ),
@@ -551,7 +545,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 40), // Actions space
+              SizedBox(width: 40),
             ],
           ),
         );
@@ -618,19 +612,16 @@ Widget _buildFAQList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  // Filtering with corrected logic
   final filtered =
       getAllFAQs.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
         final question = (data['question'] ?? '').toString().toLowerCase();
         final category = (data['category'] ?? '').toString().toLowerCase();
 
-        // Fixed category filter - exact matching instead of contains
         bool matchesCategory =
             selectedCategory == 'All Categories' ||
             category == selectedCategory.toLowerCase();
 
-        // Search filter - search across multiple fields
         bool matchesSearch =
             searchQuery.isEmpty ||
             question.contains(searchQuery.toLowerCase()) ||
@@ -639,7 +630,6 @@ Widget _buildFAQList({
         return matchesCategory && matchesSearch;
       }).toList();
 
-  // Rest of the pagination logic remains the same...
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
   final safeCurrentPage = currentPage.clamp(1, totalPages);
@@ -659,25 +649,27 @@ Widget _buildFAQList({
                 ? const Center(
                   child: Text('No FAQs match your search criteria.'),
                 )
-                : ListView.separated(
+                : ListView.builder(
+                  shrinkWrap: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: currentPageFAQs.length,
-                  separatorBuilder:
-                      (context, index) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final doc = currentPageFAQs[index];
                     final data = doc.data() as Map<String, dynamic>;
 
-                    return _buildIBRow(
-                      context: context,
-                      doc: doc,
-                      question: data['question'] ?? 'N/A',
-                      answer: data['answer'] ?? 'N/A',
-                      category: data['category'] ?? 'General',
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildIBRow(
+                        context: context,
+                        doc: doc,
+                        question: data['question'] ?? 'N/A',
+                        answer: data['answer'] ?? 'N/A',
+                        category: data['category'] ?? 'General',
+                      ),
                     );
                   },
                 ),
       ),
-      // Pagination
       if (totalItems > 0)
         buildPagination(
           currentPage: safeCurrentPage,
@@ -702,7 +694,6 @@ Widget _buildIBRow({
   double screenWidth = MediaQuery.of(context).size.width;
   bool isMobile = screenWidth < 600;
 
-  // Normalize category for consistent display
   final categoryStyle = getCategoryStyle(category);
 
   return Container(
@@ -717,7 +708,6 @@ Widget _buildIBRow({
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Question
           Expanded(
             flex: 4,
             child: Text(
@@ -729,8 +719,6 @@ Widget _buildIBRow({
             ),
           ),
           const SizedBox(width: 12),
-
-          // Answer
           Expanded(
             flex: 3,
             child: Text(
@@ -743,34 +731,32 @@ Widget _buildIBRow({
             ),
           ),
           const SizedBox(width: 12),
-
-          // Category
-          Expanded(
-            flex: 3,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: categoryStyle.backgroundColor,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  categoryStyle.displayName,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: categoryStyle.textColor,
-                    fontWeight: FontWeight.w500,
+          if (!isMobile)
+            Expanded(
+              flex: 3,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: categoryStyle.backgroundColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    categoryStyle.displayName,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: categoryStyle.textColor,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
           const SizedBox(width: 12),
-
-          const SizedBox(width: 12),
-
-          // Actions
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {

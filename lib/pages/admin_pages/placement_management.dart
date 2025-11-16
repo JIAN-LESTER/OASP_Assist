@@ -30,13 +30,13 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
   final TextEditingController _searchController = TextEditingController();
   List<DocumentSnapshot> allPlacements = [];
 
-  // Pagination variables
   int currentPage = 1;
   int itemsPerPage = 10;
 
   bool isLoading = true;
   final StatDataManagement statData = StatDataManagement();
   PlacementData? pl;
+
   @override
   void initState() {
     super.initState();
@@ -53,7 +53,6 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
     });
 
     try {
-      // Call the getInformationBankData() method
       final data = await statData.getPlacementData();
 
       if (!mounted) return;
@@ -157,7 +156,6 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
   }
 }
 
-// Desktop Placement Management
 class DesktopPlacementManagement extends StatelessWidget {
   final List<DocumentSnapshot> allPlacements;
   final String selectedCompany;
@@ -200,7 +198,6 @@ class DesktopPlacementManagement extends StatelessWidget {
   }
 }
 
-// Tablet Placement Management
 class TabletPlacementManagement extends StatelessWidget {
   final List<DocumentSnapshot> allPlacements;
   final String selectedCompany;
@@ -210,7 +207,7 @@ class TabletPlacementManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-    final PlacementData? pl;
+  final PlacementData? pl;
 
   const TabletPlacementManagement({
     super.key,
@@ -243,7 +240,6 @@ class TabletPlacementManagement extends StatelessWidget {
   }
 }
 
-// Mobile Placement Management
 class MobilePlacementManagement extends StatelessWidget {
   final List<DocumentSnapshot> allPlacements;
   final String selectedCompany;
@@ -253,7 +249,7 @@ class MobilePlacementManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
-    final PlacementData? pl;
+  final PlacementData? pl;
 
   const MobilePlacementManagement({
     super.key,
@@ -364,14 +360,12 @@ Widget _buildPlacementList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  // Filtering
   final filtered =
       allPlacements.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
         final company =
             (data['partnerCompany'] ?? '').toString().toLowerCase().trim();
 
-        // Ensure positions is a List<String>
         final List<String> positionsList =
             (data['positions'] is List)
                 ? List<String>.from(data['positions'].map((e) => e.toString()))
@@ -385,7 +379,6 @@ Widget _buildPlacementList({
             companyFilter == 'all' ||
             company == companyFilter;
 
-        // Search filter → check if query matches company or ANY position
         bool matchesSearch =
             query.isEmpty ||
             company.contains(query) ||
@@ -394,12 +387,10 @@ Widget _buildPlacementList({
         return matchesCompany && matchesSearch;
       }).toList();
 
-  // Calculate pagination
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
   final safeCurrentPage = currentPage.clamp(1, totalPages);
 
-  // Pagination
   final startIndex = (safeCurrentPage - 1) * itemsPerPage;
   final endIndex = (startIndex + itemsPerPage).clamp(0, filtered.length);
   final currentPagePlacements = filtered.sublist(
@@ -413,10 +404,10 @@ Widget _buildPlacementList({
         child:
             currentPagePlacements.isEmpty
                 ? const Center(child: Text('No companies match your criteria.'))
-                : ListView.separated(
+                : ListView.builder(
+                  shrinkWrap: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: currentPagePlacements.length,
-                  separatorBuilder:
-                      (context, index) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final doc = currentPagePlacements[index];
                     final data = doc.data() as Map<String, dynamic>;
@@ -433,18 +424,19 @@ Widget _buildPlacementList({
                             .toList() ??
                         [];
 
-                    return _buildPlacementRow(
-                      context: context,
-                      doc: doc,
-                      partnerCompany: data['partnerCompany'] ?? 'N/A',
-
-                      contacts: contacts,
-                      positions: positions,
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildPlacementRow(
+                        context: context,
+                        doc: doc,
+                        partnerCompany: data['partnerCompany'] ?? 'N/A',
+                        contacts: contacts,
+                        positions: positions,
+                      ),
                     );
                   },
                 ),
       ),
-      // Pagination
       if (totalItems > 0)
         buildPagination(
           currentPage: safeCurrentPage,
@@ -459,13 +451,10 @@ Widget _buildPlacementList({
   );
 }
 
-// Helper to format month names
-
 Widget _buildPlacementRow({
   required BuildContext context,
   required DocumentSnapshot doc,
   required String partnerCompany,
-
   required List<String>? contacts,
   required List<String>? positions,
 }) {
@@ -484,7 +473,6 @@ Widget _buildPlacementRow({
       onTap: () => showPLInfoModal(context, doc),
       child: Row(
         children: [
-          // Title + Source
           Expanded(
             flex: 3,
             child: Column(
@@ -501,7 +489,6 @@ Widget _buildPlacementRow({
               ],
             ),
           ),
-
           Expanded(
             flex: 4,
             child: Column(
@@ -513,7 +500,6 @@ Widget _buildPlacementRow({
 
                         if (c.contains(":")) {
                           final parts = c.split(":");
-                          // Join everything after the first colon → keeps full URL
                           final value = parts.sublist(1).join(":").trim();
                           displayValue = value;
                         }
@@ -548,7 +534,6 @@ Widget _buildPlacementRow({
                       ],
             ),
           ),
-
           Expanded(
             flex: 4,
             child: Column(
@@ -560,7 +545,6 @@ Widget _buildPlacementRow({
 
                         if (c.contains(":")) {
                           final parts = c.split(":");
-                          // Join everything after the first colon → keeps full URL
                           final value = parts.sublist(1).join(":").trim();
                           displayValue = value;
                         }
@@ -595,8 +579,6 @@ Widget _buildPlacementRow({
                       ],
             ),
           ),
-
-          // Actions
           SizedBox(width: isTablet ? 60 : 80),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
@@ -662,7 +644,6 @@ Widget _buildHeader(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title and Add Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -691,13 +672,12 @@ Widget _buildHeader(
             ],
           ),
 
+          // Stat Cards Section - Fixed for Mobile (1 per row)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child:
                 isMobile
-                    ? Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
+                    ? Column(
                       children: [
                         buildStatCard(
                           'Total Companies',
@@ -705,11 +685,19 @@ Widget _buildHeader(
                           Colors.blue,
                           Icons.message,
                         ),
+                        const SizedBox(height: 12),
                         buildStatCard(
                           'Companies Looking for Vacancy',
                           '${pl?.vacantCompanies ?? 0}',
                           Colors.green,
                           Icons.check_circle,
+                        ),
+                        const SizedBox(height: 12),
+                        buildStatCard(
+                          'Approaching Deadline',
+                          pl?.approachingDeadline ?? 'Unknown',
+                          Colors.red,
+                          Icons.group,
                         ),
                       ],
                     )
@@ -733,7 +721,6 @@ Widget _buildHeader(
                           ),
                         ),
                         const SizedBox(width: 16),
-
                         Expanded(
                           child: buildStatCard(
                             'Approaching Deadline',
@@ -834,7 +821,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 40), // Actions space
+              SizedBox(width: 40),
             ],
           ),
         );
@@ -864,7 +851,7 @@ Widget _buildTableHeader() {
               ),
             ),
             Expanded(
-              flex: 4, // match row
+              flex: 4,
               child: Text(
                 'Positions',
                 style: TextStyle(
@@ -885,7 +872,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            SizedBox(width: isTablet ? 60 : 80), // Actions space
+            SizedBox(width: isTablet ? 60 : 80),
           ],
         ),
       );

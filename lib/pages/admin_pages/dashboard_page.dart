@@ -1,4 +1,3 @@
-
 import 'package:capstone_project/pages/data/chatbot_usage_data.dart';
 import 'package:capstone_project/pages/data/inquiry_trends_charts.dart';
 import 'package:capstone_project/pages/data/inquiry_trends_data.dart';
@@ -40,7 +39,6 @@ class _DashboardPageState extends State<DashboardPage> {
     _loadAllData();
   }
 
- 
   Future<void> _loadAllData() async {
     if (!mounted) return;
 
@@ -392,147 +390,195 @@ Widget dashboardContents(
   final UserDemographicsReportsData? ud,
   final String userName,
 ) {
-  return Scaffold(
-    backgroundColor: Colors.grey[100],
-    body: Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(
-            selectedTimeFrame,
-            onTimeFrameChanged,
-            onRefresh,
-            isRefreshing,
-            userName,
-          ),
-          const SizedBox(height: 32),
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isMobile = screenWidth < 600;
 
-          // Top row with 4 stat cards
-         LayoutBuilder(
-  builder: (context, constraints) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final isTablet = screenWidth >= 600 && screenWidth < 1100;
-    
-    if (isMobile) {
-      // Mobile: 2 cards per row
-      return Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: buildStatCard(
-                  'Total Messages',
-                  '${inq?.totalMessages ?? 0}',
-                  Colors.blue,
-                  Icons.message,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: buildStatCard(
-                  'Answered Messages',
-                  '${inq?.answeredMessages ?? 0}',
-                  Colors.green,
-                  Icons.check_circle,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: buildStatCard(
-                  'Total Users',
-                  '${ud?.totalUsers ?? 0}',
-                  Colors.red,
-                  Icons.people,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: buildStatCard(
-                  'Most Frequent Category',
-                  inq?.mostFrequentCategory ?? 'Unknown',
-                  Colors.orange,
-                  Icons.help,
-                ),
-              ),
-            ],
-          ),
-        ],
-      );
-    } else {
-      // Tablet and Desktop: 4 cards in a row
-      return Row(
-        children: [
-          Expanded(
-            child: buildStatCard(
-              'Total Messages',
-              '${inq?.totalMessages ?? 0}',
-              Colors.blue,
-              Icons.message,
-            ),
-          ),
-          SizedBox(width: isTablet ? 12 : 20),
-          Expanded(
-            child: buildStatCard(
-              'Answered Messages',
-              '${inq?.answeredMessages ?? 0}',
-              Colors.green,
-              Icons.check_circle,
-            ),
-          ),
-          SizedBox(width: isTablet ? 12 : 20),
-          Expanded(
-            child: buildStatCard(
-              'Total Users',
-              '${ud?.totalUsers ?? 0}',
-              Colors.red,
-              Icons.people,
-            ),
-          ),
-          SizedBox(width: isTablet ? 12 : 20),
-          Expanded(
-            child: buildStatCard(
-              'Most Frequent Category',
-              inq?.mostFrequentCategory ?? 'Unknown',
-              Colors.orange,
-              Icons.help,
-            ),
-          ),
-        ],
-      );
-    }
-  },
-),
-          const SizedBox(height: 32),
-
-          // Second row with 2 larger boxes
-          Expanded(
-            flex: 2,
-            child: Row(
-              children: [
-                Expanded(
-                  child: buildCategoryDistributionCard(
-                    inq?.categoryDistribution ?? {},
+      return Scaffold(
+        backgroundColor: Colors.grey[100],
+        body:
+            isMobile
+                ? SingleChildScrollView(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(
+                        selectedTimeFrame,
+                        onTimeFrameChanged,
+                        onRefresh,
+                        isRefreshing,
+                        userName,
+                      ),
+                      const SizedBox(height: 32),
+                      _buildStatCards(true, inq, ud),
+                      const SizedBox(height: 32),
+                      Container(
+                        height: 400,
+                        child: buildCategoryDistributionCard(
+                          inq?.categoryDistribution ?? {},
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        height: 400,
+                        child: buildInquiryTrendCard(
+                          inq?.inquiryTrend ?? [],
+                          selectedTimeFrame,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      Container(
+                        height: 400,
+                        child: buildSystemLogsCard(inq?.recentLogs ?? []),
+                      ),
+                    ],
+                  ),
+                )
+                : Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(
+                        selectedTimeFrame,
+                        onTimeFrameChanged,
+                        onRefresh,
+                        isRefreshing,
+                        userName,
+                      ),
+                      const SizedBox(height: 32),
+                      _buildStatCards(false, inq, ud),
+                      const SizedBox(height: 32),
+                      Expanded(
+                        flex: 2,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: buildCategoryDistributionCard(
+                                inq?.categoryDistribution ?? {},
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: buildInquiryTrendCard(
+                                inq?.inquiryTrend ?? [],
+                                selectedTimeFrame,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      Expanded(
+                        flex: 1,
+                        child: buildSystemLogsCard(inq?.recentLogs ?? []),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 20),
-                Expanded(child: buildInquiryTrendCard(inq?.inquiryTrend ?? [], selectedTimeFrame)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          // Bottom section - Recent System Logs
-          Expanded(flex: 1, child: buildSystemLogsCard(inq?.recentLogs ?? [])),
-        ],
-      ),
-    ),
+      );
+    },
   );
+}
+
+Widget _buildStatCards(
+  bool isMobile,
+  InquiryReportsData? inq,
+  UserDemographicsReportsData? ud,
+) {
+  final isTablet = !isMobile;
+
+  if (isMobile) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: buildStatCard(
+                'Total Messages',
+                '${inq?.totalMessages ?? 0}',
+                Colors.blue,
+                Icons.message,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: buildStatCard(
+                'Answered Messages',
+                '${inq?.answeredMessages ?? 0}',
+                Colors.green,
+                Icons.check_circle,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: buildStatCard(
+                'Total Users',
+                '${ud?.totalUsers ?? 0}',
+                Colors.red,
+                Icons.people,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: buildStatCard(
+                'Most Frequent Category',
+                inq?.mostFrequentCategory ?? 'Unknown',
+                Colors.orange,
+                Icons.help,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  } else {
+    return Row(
+      children: [
+        Expanded(
+          child: buildStatCard(
+            'Total Messages',
+            '${inq?.totalMessages ?? 0}',
+            Colors.blue,
+            Icons.message,
+          ),
+        ),
+        SizedBox(width: isTablet ? 12 : 20),
+        Expanded(
+          child: buildStatCard(
+            'Answered Messages',
+            '${inq?.answeredMessages ?? 0}',
+            Colors.green,
+            Icons.check_circle,
+          ),
+        ),
+        SizedBox(width: isTablet ? 12 : 20),
+        Expanded(
+          child: buildStatCard(
+            'Total Users',
+            '${ud?.totalUsers ?? 0}',
+            Colors.red,
+            Icons.people,
+          ),
+        ),
+        SizedBox(width: isTablet ? 12 : 20),
+        Expanded(
+          child: buildStatCard(
+            'Most Frequent Category',
+            inq?.mostFrequentCategory ?? 'Unknown',
+            Colors.orange,
+            Icons.help,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 Widget _buildHeader(
