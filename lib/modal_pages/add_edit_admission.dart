@@ -172,9 +172,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
 
       if (kIsWeb || Platform.isWindows) {
         // Use Tesseract for web/windows
-        // Uncomment and implement when flusseract is added
-        // final tesseract = Tesseract();
-        // extractedText = await tesseract.extractText(image.path);
+
         extractedText = "OCR not yet implemented for web/windows";
         _showAlert('Tesseract OCR not yet implemented', AlertType.warning);
         setState(() => _isProcessing = false);

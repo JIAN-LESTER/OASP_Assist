@@ -469,6 +469,12 @@ Widget buildCategoryDistributionCard(Map<String, int> categoryData) {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(borderRadius),
+          border: Border(
+            left: BorderSide(
+              color: const Color.fromARGB(255, 37, 31, 212),
+              width: 4,
+            ),
+          ),
 
           boxShadow: [
             BoxShadow(
@@ -562,7 +568,7 @@ Widget buildCategoryDistributionCard(Map<String, int> categoryData) {
                                       return PieChartSectionData(
                                         color: _getColorForCategory(entry.key),
                                         value: entry.value.toDouble(),
-                                        title: '$percentage%',
+                                        title: '',
                                         radius: pieRadius,
                                         titleStyle: TextStyle(
                                           fontSize: isMobile ? 11 : 13,
@@ -631,7 +637,7 @@ Widget buildCategoryDistributionCard(Map<String, int> categoryData) {
                                       return PieChartSectionData(
                                         color: _getColorForCategory(entry.key),
                                         value: entry.value.toDouble(),
-                                        title: '$percentage%',
+                                        title: '',
                                         radius: pieRadius,
                                         titleStyle: TextStyle(
                                           fontSize: isTablet ? 12 : 13,
@@ -960,7 +966,6 @@ Widget buildHighestFAQCard(Map<String, int> highestFAQ) {
                     swapAnimationCurve: Curves.easeInOutCubic,
                   ),
         ),
-      
       ],
     ),
   );
@@ -1001,6 +1006,12 @@ Widget buildInquiryTrendCard(List<ChartData> trendData, String timeFrame) {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
+      border: Border(
+        left: BorderSide(
+          color: const Color.fromARGB(255, 15, 244, 23),
+          width: 4,
+        ),
+      ),
 
       boxShadow: [
         BoxShadow(

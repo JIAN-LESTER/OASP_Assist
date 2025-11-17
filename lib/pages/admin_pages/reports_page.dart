@@ -26,13 +26,23 @@ class _ReportsPageState extends State<ReportsPage> {
   final currentUser = FirebaseAuth.instance.currentUser;
   final FirebaseService _firebaseService = FirebaseService();
 
+  // Separate data for each report type
   InquiryReportsData? inq;
   ChatbotUsageReportsData? cb;
   UserDemographicsReportsData? ud;
   String? userName;
 
-  bool isLoading = true;
+  // Separate loading states for each report type
+  bool isLoadingUser = true;
+  bool isLoadingInquiry = false;
+  bool isLoadingChatbot = false;
+  bool isLoadingDemographics = false;
   bool isRefreshing = false;
+
+  // Track which data has been loaded
+  bool inquiryDataLoaded = false;
+  bool chatbotDataLoaded = false;
+  bool demographicsDataLoaded = false;
 
   DateTime startDate = DateTime.now();
   String timeFrame = "This Month";
@@ -41,170 +51,219 @@ class _ReportsPageState extends State<ReportsPage> {
   @override
   void initState() {
     super.initState();
-    _loadAllData();
+    _loadUserName();
+    _loadDataForSelectedReport();
   }
 
+  // ✅ Load user name first (always needed)
+  Future<void> _loadUserName() async {
+    if (!mounted) return;
+    
+    final name = await _fetchUserName();
+    if (!mounted) return;
+    
+    setState(() {
+      userName = name;
+      isLoadingUser = false;
+    });
+  }
+
+  // ✅ LAZY LOADING: Only load data for the selected report type
+  Future<void> _loadDataForSelectedReport() async {
+    if (!mounted) return;
+
+    switch (selectedReportType) {
+      case 'Inquiry Trends':
+        if (!inquiryDataLoaded) {
+          setState(() => isLoadingInquiry = true);
+          try {
+            final data = await _firebaseService.getInquiryReportsData(selectedTimeFrame);
+            if (!mounted) return;
+            setState(() {
+              inq = data;
+              isLoadingInquiry = false;
+              inquiryDataLoaded = true;
+            });
+          } catch (e) {
+            print('Error loading inquiry data: $e');
+            if (!mounted) return;
+            setState(() => isLoadingInquiry = false);
+          }
+        }
+        break;
+
+      case 'Chatbot Usage':
+        if (!chatbotDataLoaded) {
+          setState(() => isLoadingChatbot = true);
+          try {
+            final data = await _firebaseService.getChatbotUsageReportsData(selectedTimeFrame);
+            if (!mounted) return;
+            setState(() {
+              cb = data;
+              isLoadingChatbot = false;
+              chatbotDataLoaded = true;
+            });
+          } catch (e) {
+            print('Error loading chatbot data: $e');
+            if (!mounted) return;
+            setState(() => isLoadingChatbot = false);
+          }
+        }
+        break;
+
+      case 'User Demographics':
+        if (!demographicsDataLoaded) {
+          setState(() => isLoadingDemographics = true);
+          try {
+            final data = await _firebaseService.getUserDemographicsReportsData(selectedTimeFrame);
+            if (!mounted) return;
+            setState(() {
+              ud = data;
+              isLoadingDemographics = false;
+              demographicsDataLoaded = true;
+            });
+          } catch (e) {
+            print('Error loading demographics data: $e');
+            if (!mounted) return;
+            setState(() => isLoadingDemographics = false);
+          }
+        }
+        break;
+    }
+  }
+
+  // ✅ When report type changes, load only that data
   void _onReportTypeChanged(String newValue) {
     setState(() {
       selectedReportType = newValue;
     });
+    _loadDataForSelectedReport();
   }
 
-  Future<void> _loadAllData() async {
-    if (!mounted) return;
-
+  // ✅ When timeframe changes, invalidate and reload current report
+  void _onTimeFrameChanged(String newValue) {
     setState(() {
-      isLoading = true;
+      selectedTimeFrame = newValue;
+      
+      // Invalidate loaded data flags to force reload
+      switch (selectedReportType) {
+        case 'Inquiry Trends':
+          inquiryDataLoaded = false;
+          break;
+        case 'Chatbot Usage':
+          chatbotDataLoaded = false;
+          break;
+        case 'User Demographics':
+          demographicsDataLoaded = false;
+          break;
+      }
     });
-
-    try {
-      final results = await Future.wait([
-        _fetchUserName(),
-        _firebaseService.getInquiryReportsData(selectedTimeFrame),
-        _firebaseService.getChatbotUsageReportsData(selectedTimeFrame),
-        _firebaseService.getUserDemographicsReportsData(selectedTimeFrame),
-      ]);
-
-      if (!mounted) return;
-
-      setState(() {
-        userName = results[0] as String?;
-        inq = results[1] as InquiryReportsData;
-        cb = results[2] as ChatbotUsageReportsData;
-        ud = results[3] as UserDemographicsReportsData;
-        isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading reports data: $e');
-      if (!mounted) return;
-      setState(() {
-        isLoading = false;
-      });
-    }
+    _loadDataForSelectedReport();
   }
 
+  // ✅ Refresh only the currently visible report
   Future<void> _refreshData() async {
     if (!mounted || isRefreshing) return;
 
-    setState(() {
-      isRefreshing = true;
-    });
+    setState(() => isRefreshing = true);
 
     try {
-      final results = await Future.wait([
-        _firebaseService.getInquiryReportsData(selectedTimeFrame),
-        _firebaseService.getChatbotUsageReportsData(selectedTimeFrame),
-        _firebaseService.getUserDemographicsReportsData(selectedTimeFrame),
-      ]);
+      // Only refresh the selected report type
+      switch (selectedReportType) {
+        case 'Inquiry Trends':
+          final data = await _firebaseService.getInquiryReportsData(selectedTimeFrame);
+          if (!mounted) return;
+          setState(() {
+            inq = data;
+            isRefreshing = false;
+          });
+          break;
 
-      if (!mounted) return;
+        case 'Chatbot Usage':
+          final data = await _firebaseService.getChatbotUsageReportsData(selectedTimeFrame);
+          if (!mounted) return;
+          setState(() {
+            cb = data;
+            isRefreshing = false;
+          });
+          break;
 
-      setState(() {
-        inq = results[0] as InquiryReportsData;
-        cb = results[1] as ChatbotUsageReportsData;
-        ud = results[2] as UserDemographicsReportsData;
-        isRefreshing = false;
-      });
+        case 'User Demographics':
+          final data = await _firebaseService.getUserDemographicsReportsData(selectedTimeFrame);
+          if (!mounted) return;
+          setState(() {
+            ud = data;
+            isRefreshing = false;
+          });
+          break;
+      }
 
+      // Show success feedback
       if (mounted) {
-        final screenWidth = MediaQuery.of(context).size.width;
-        final isMobile = screenWidth < 600;
-        final isTablet = screenWidth >= 600 && screenWidth < 1100;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.check_circle_outline_outlined,
-                  color: Colors.white,
-                  size: isMobile ? 20 : 24,
-                ),
-                SizedBox(width: isMobile ? 8 : 12),
-                Flexible(
-                  child: Text(
-                    'Reports refreshed successfully',
-                    style: TextStyle(
-                      fontSize: isMobile ? 15 : (isTablet ? 16 : 17),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 16 : 20,
-              vertical: isMobile ? 14 : 16,
-            ),
-            margin: EdgeInsets.only(
-              bottom: 20,
-              right: 20,
-              left: isMobile ? 20 : (screenWidth - (isTablet ? 380 : 420)),
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
-            ),
-            elevation: 6,
-          ),
+        _showSnackBar(
+          message: 'Reports refreshed successfully',
+          isError: false,
         );
       }
     } catch (e) {
       print('Error refreshing reports data: $e');
       if (!mounted) return;
-      setState(() {
-        isRefreshing = false;
-      });
+      setState(() => isRefreshing = false);
 
       if (mounted) {
-        final screenWidth = MediaQuery.of(context).size.width;
-        final isMobile = screenWidth < 600;
-        final isTablet = screenWidth >= 600 && screenWidth < 1100;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  color: Colors.white,
-                  size: isMobile ? 20 : 24,
-                ),
-                SizedBox(width: isMobile ? 8 : 12),
-                Flexible(
-                  child: Text(
-                    'Failed to refresh reports',
-                    style: TextStyle(
-                      fontSize: isMobile ? 15 : (isTablet ? 16 : 17),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.red[600],
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 16 : 20,
-              vertical: isMobile ? 14 : 16,
-            ),
-            margin: EdgeInsets.only(
-              bottom: 20,
-              right: 20,
-              left: isMobile ? 20 : (screenWidth - (isTablet ? 380 : 420)),
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(isMobile ? 10 : 12),
-            ),
-            elevation: 6,
-          ),
+        _showSnackBar(
+          message: 'Failed to refresh reports',
+          isError: true,
         );
       }
     }
+  }
+
+  void _showSnackBar({required String message, required bool isError}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isError ? Icons.error_outline : Icons.check_circle_outline_outlined,
+              color: Colors.white,
+              size: isMobile ? 20 : 24,
+            ),
+            SizedBox(width: isMobile ? 8 : 12),
+            Flexible(
+              child: Text(
+                message,
+                style: TextStyle(
+                  fontSize: isMobile ? 15 : (isTablet ? 16 : 17),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: isError ? Colors.red[600] : null,
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 16 : 20,
+          vertical: isMobile ? 14 : 16,
+        ),
+        margin: EdgeInsets.only(
+          bottom: 20,
+          right: 20,
+          left: isMobile ? 20 : (screenWidth - (isTablet ? 380 : 420)),
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(4),
+        ),
+        elevation: 6,
+      ),
+    );
   }
 
   Future<String?> _fetchUserName() async {
@@ -212,11 +271,10 @@ class _ReportsPageState extends State<ReportsPage> {
     if (currentUser == null) return 'User';
 
     try {
-      final userDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(currentUser.uid)
-              .get();
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
 
       return userDoc.exists ? (userDoc.data()?['name'] ?? 'User') : 'User';
     } catch (e) {
@@ -225,17 +283,27 @@ class _ReportsPageState extends State<ReportsPage> {
     }
   }
 
-  void _onTimeFrameChanged(String newValue) {
-    setState(() {
-      selectedTimeFrame = newValue;
-    });
-    _loadAllData();
+  // ✅ Check if current report is loading
+  bool get isCurrentReportLoading {
+    switch (selectedReportType) {
+      case 'Inquiry Trends':
+        return isLoadingInquiry;
+      case 'Chatbot Usage':
+        return isLoadingChatbot;
+      case 'User Demographics':
+        return isLoadingDemographics;
+      default:
+        return false;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading || userName == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    // Only show loading spinner while user name is loading
+    if (isLoadingUser) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     return ResponsiveLayout(
@@ -246,6 +314,7 @@ class _ReportsPageState extends State<ReportsPage> {
         onReportTypeChanged: _onReportTypeChanged,
         onRefresh: _refreshData,
         isRefreshing: isRefreshing,
+        isLoading: isCurrentReportLoading,
         inq: inq,
         cb: cb,
         ud: ud,
@@ -261,6 +330,7 @@ class _ReportsPageState extends State<ReportsPage> {
         onReportTypeChanged: _onReportTypeChanged,
         onRefresh: _refreshData,
         isRefreshing: isRefreshing,
+        isLoading: isCurrentReportLoading,
         inq: inq,
         cb: cb,
         ud: ud,
@@ -276,6 +346,7 @@ class _ReportsPageState extends State<ReportsPage> {
         onReportTypeChanged: _onReportTypeChanged,
         onRefresh: _refreshData,
         isRefreshing: isRefreshing,
+        isLoading: isCurrentReportLoading,
         inq: inq,
         cb: cb,
         ud: ud,
@@ -288,6 +359,7 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 }
 
+// Updated widget signatures to include isLoading
 class DesktopDashboard extends StatelessWidget {
   final String selectedTimeFrame;
   final String selectedReportType;
@@ -295,6 +367,7 @@ class DesktopDashboard extends StatelessWidget {
   final ValueChanged<String> onReportTypeChanged;
   final VoidCallback onRefresh;
   final bool isRefreshing;
+  final bool isLoading;
   final InquiryReportsData? inq;
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
@@ -311,6 +384,7 @@ class DesktopDashboard extends StatelessWidget {
     required this.onReportTypeChanged,
     required this.onRefresh,
     required this.isRefreshing,
+    required this.isLoading,
     this.inq,
     this.cb,
     this.ud,
@@ -339,17 +413,27 @@ class DesktopDashboard extends StatelessWidget {
               userName,
             ),
             const SizedBox(height: 32),
-            ...ReportsHelper.buildReportContent(
-              selectedReportType,
-              inq,
-              cb,
-              selectedTimeFrame,
-              ud,
-              startDate,
-              timeFrame,
-              timeCategoryCounts,
-              isMobile: false,
-            ),
+            
+            // ✅ Show loading indicator for current report
+            if (isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(40.0),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else
+              ...ReportsHelper.buildReportContent(
+                selectedReportType,
+                inq,
+                cb,
+                selectedTimeFrame,
+                ud,
+                startDate,
+                timeFrame,
+                timeCategoryCounts,
+                isMobile: false,
+              ),
           ],
         ),
       ),
@@ -364,6 +448,7 @@ class TabletDashboard extends StatelessWidget {
   final ValueChanged<String> onReportTypeChanged;
   final VoidCallback onRefresh;
   final bool isRefreshing;
+  final bool isLoading;
   final InquiryReportsData? inq;
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
@@ -380,6 +465,7 @@ class TabletDashboard extends StatelessWidget {
     required this.onReportTypeChanged,
     required this.onRefresh,
     required this.isRefreshing,
+    required this.isLoading,
     this.inq,
     this.cb,
     this.ud,
@@ -408,17 +494,26 @@ class TabletDashboard extends StatelessWidget {
               userName,
             ),
             const SizedBox(height: 32),
-            ...ReportsHelper.buildReportContent(
-              selectedReportType,
-              inq,
-              cb,
-              selectedTimeFrame,
-              ud,
-              startDate,
-              timeFrame,
-              timeCategoryCounts,
-              isMobile: false,
-            ),
+            
+            if (isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(40.0),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else
+              ...ReportsHelper.buildReportContent(
+                selectedReportType,
+                inq,
+                cb,
+                selectedTimeFrame,
+                ud,
+                startDate,
+                timeFrame,
+                timeCategoryCounts,
+                isMobile: false,
+              ),
           ],
         ),
       ),
@@ -433,6 +528,7 @@ class MobileDashboard extends StatelessWidget {
   final ValueChanged<String> onReportTypeChanged;
   final VoidCallback onRefresh;
   final bool isRefreshing;
+  final bool isLoading;
   final InquiryReportsData? inq;
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
@@ -449,6 +545,7 @@ class MobileDashboard extends StatelessWidget {
     required this.onReportTypeChanged,
     required this.onRefresh,
     required this.isRefreshing,
+    required this.isLoading,
     this.inq,
     this.cb,
     this.ud,
@@ -477,17 +574,26 @@ class MobileDashboard extends StatelessWidget {
               userName,
             ),
             const SizedBox(height: 24),
-            ...ReportsHelper.buildReportContent(
-              selectedReportType,
-              inq,
-              cb,
-              selectedTimeFrame,
-              ud,
-              startDate,
-              timeFrame,
-              timeCategoryCounts,
-              isMobile: true,
-            ),
+            
+            if (isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(40.0),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else
+              ...ReportsHelper.buildReportContent(
+                selectedReportType,
+                inq,
+                cb,
+                selectedTimeFrame,
+                ud,
+                startDate,
+                timeFrame,
+                timeCategoryCounts,
+                isMobile: true,
+              ),
           ],
         ),
       ),

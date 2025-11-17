@@ -223,19 +223,19 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
                                     _buildInstructionStep(
                                       '3',
-                                      'Select "Business" app type',
+                                      'Choose "Manage everything on your Page" as the use case, and select "Business" as the App Type.',
                                     ),
                                     const SizedBox(height: 12),
 
                                     _buildInstructionStep(
                                       '4',
-                                      'Enable required permissions in Use Cases',
+                                      'In the left sidebar, open “Use Cases” and select your created app and enable required permissions in Use Cases',
                                     ),
                                     const SizedBox(height: 12),
 
                                     _buildInstructionStep(
                                       '5',
-                                      'Go to Tools → Graph API Explorer',
+                                      'Go to Tools → Graph API Explorer → Select your app and check the same permissions.',
                                     ),
                                     const SizedBox(height: 12),
 

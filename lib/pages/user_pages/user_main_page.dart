@@ -2,6 +2,7 @@
 
   import 'package:capstone_project/models/message.dart';
   import 'package:capstone_project/onboarding/onBoardingGuide.dart';
+import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
   import 'package:circle_nav_bar/circle_nav_bar.dart' show CircleNavBar;
   import 'package:cloud_firestore/cloud_firestore.dart';
   import 'package:firebase_auth/firebase_auth.dart';
@@ -890,7 +891,7 @@ Widget _buildMobileLayout(List<Widget> pages) {
         pages[_selectedIndex],
         // ✅ Only white out the body content
         if (_isNavigating || _isLoading)
-          _buildContentLoadingOverlay(),
+          buildContentLoadingOverlay(_navigationLoadingTextForIndex(_selectedIndex)),
       ],
     ),
     bottomNavigationBar: Container(
@@ -937,7 +938,7 @@ Widget _buildTabletDesktopLayout(List<Widget> pages) {
               pages[_selectedIndex],
               // ✅ Only white out the content area
               if (_isNavigating || _isLoading)
-                _buildContentLoadingOverlay(),
+                buildContentLoadingOverlay(_navigationLoadingTextForIndex(_selectedIndex)),
             ],
           ),
         ),
@@ -946,60 +947,6 @@ Widget _buildTabletDesktopLayout(List<Widget> pages) {
   );
 }
 
-// ✅ NEW: Content-only loading overlay (doesn't cover appbar/sidebar)
-Widget _buildContentLoadingOverlay() {
-  return Container(
-    color: Colors.white,
-    child: Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 20,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  UniversalUIComponents.primaryGreen,
-                ),
-                strokeWidth: 3,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            _loadingText,   // 👈 Dynamic wording here
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[800],
-              letterSpacing: 0.3,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Please wait a moment',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
 
     Widget _buildMobileChatDrawer() {
       return Drawer(
