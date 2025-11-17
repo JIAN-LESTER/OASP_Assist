@@ -74,21 +74,12 @@ class FirebaseService {
   static final Map<String, UserDemographicsReportsData> _demographicsCache = {};
   static final Map<String, DateTime> _cacheTimestamps = {};
 
-  // Persistent user lookup cache (shared across all queries)
+  // NEW: Cache for user lookup data (persists across all queries)
   static Map<String, Map<String, dynamic>>? _userLookupCache;
   static DateTime? _userLookupCacheTime;
 
-  // Quick stats cache (lightweight queries for initial load)
-  static final Map<String, Map<String, int>> _quickStatsCache = {};
-  static final Map<String, DateTime> _quickStatsCacheTimestamps = {};
-
   static const int _cacheDurationMinutes = 5;
   static const int _userLookupCacheDurationMinutes = 10;
-  static const int _quickStatsCacheDurationMinutes = 3;
-
-  // ============================================================================
-  // CACHE VALIDATION
-  // ============================================================================
 
   bool _isCacheValid(String cacheKey) {
     if (!_cacheTimestamps.containsKey(cacheKey)) return false;
@@ -101,6 +92,7 @@ class FirebaseService {
     _cacheTimestamps[cacheKey] = DateTime.now();
   }
 
+  // NEW: Check if user lookup cache is valid
   bool _isUserLookupCacheValid() {
     if (_userLookupCache == null || _userLookupCacheTime == null) return false;
     final now = DateTime.now();
@@ -108,78 +100,11 @@ class FirebaseService {
         _userLookupCacheDurationMinutes;
   }
 
-  bool _isQuickStatsCacheValid(String timeFrame) {
-    if (!_quickStatsCacheTimestamps.containsKey(timeFrame)) return false;
-    final now = DateTime.now();
-    return now.difference(_quickStatsCacheTimestamps[timeFrame]!).inMinutes <
-        _quickStatsCacheDurationMinutes;
-  }
-
-  // ============================================================================
-  // QUICK STATS (Lightweight for initial load)
-  // ============================================================================
-
-  Future<Map<String, int>> getQuickStats(String timeFrame) async {
-    final cacheKey = timeFrame;
-
-    // Check cache first
-    if (_quickStatsCache.containsKey(cacheKey) &&
-        _isQuickStatsCacheValid(cacheKey)) {
-      print('✅ Quick stats from cache: $timeFrame');
-      return _quickStatsCache[cacheKey]!;
-    }
-
-    print('🔄 Fetching quick stats for: $timeFrame');
-
-    try {
-      final startDate = _getStartDate(timeFrame);
-
-      // Use count() aggregation queries for efficiency
-      final results = await Future.wait([
-        _firestore
-            .collectionGroup('messages')
-            .where('sender', isEqualTo: 'user')
-            .where('sent_at', isGreaterThanOrEqualTo: startDate)
-            .count()
-            .get(),
-        _firestore
-            .collectionGroup('messages')
-            .where('sender', isEqualTo: 'user')
-            .where('sent_at', isGreaterThanOrEqualTo: startDate)
-            .where('isAnswered', isEqualTo: true)
-            .count()
-            .get(),
-        _firestore.collection('users').count().get(),
-      ]);
-
-      final stats = {
-        'totalMessages': results[0].count ?? 0,
-        'answered': results[1].count ?? 0,
-        'totalUsers': results[2].count ?? 0,
-      };
-
-      // Cache the results
-      _quickStatsCache[cacheKey] = stats;
-      _quickStatsCacheTimestamps[cacheKey] = DateTime.now();
-
-      return stats;
-    } catch (e) {
-      print('Error getting quick stats: $e');
-      return {'totalMessages': 0, 'answered': 0, 'totalUsers': 0};
-    }
-  }
-
-  // ============================================================================
-  // USER LOOKUP CACHE (Shared across all report types)
-  // ============================================================================
-
+  // NEW: Get or create user lookup cache
   Future<Map<String, Map<String, dynamic>>> _getUserLookup() async {
     if (_isUserLookupCacheValid()) {
-      print('✅ Using cached user lookup');
       return _userLookupCache!;
     }
-
-    print('🔄 Fetching user lookup data');
 
     final users = await _getUsers();
     final userLookup = <String, Map<String, dynamic>>{};
@@ -191,9 +116,6 @@ class FirebaseService {
         userLookup[uid] = {
           'year': data['year'] ?? 'Unknown',
           'program': data['program'] ?? 'Unknown',
-          'affiliation': data['affiliation'],
-          'scholarship': data['scholarship'],
-          'isEnrolled': data['isEnrolled'],
         };
       }
     }
@@ -201,24 +123,15 @@ class FirebaseService {
     _userLookupCache = userLookup;
     _userLookupCacheTime = DateTime.now();
 
-    print('✅ User lookup cached: ${userLookup.length} users');
-
     return userLookup;
   }
-
-  // ============================================================================
-  // INQUIRY REPORTS DATA
-  // ============================================================================
 
   Future<InquiryReportsData> getInquiryReportsData(String timeFrame) async {
     final cacheKey = 'inquiry_$timeFrame';
 
     if (_inquiryCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
-      print('✅ Inquiry data from cache: $timeFrame');
       return _inquiryCache[cacheKey]!;
     }
-
-    print('🔄 Fetching inquiry data for: $timeFrame');
 
     try {
       final startDate = _getStartDate(timeFrame);
@@ -247,18 +160,12 @@ class FirebaseService {
       _inquiryCache[cacheKey] = data;
       _updateCacheTimestamp(cacheKey);
 
-      print('✅ Inquiry data cached: $timeFrame');
-
       return data;
     } catch (e) {
-      print('❌ Error fetching inquiry data: $e');
+      print('Error fetching inquiry data: $e');
       return getEmptyInquiryReportsData();
     }
   }
-
-  // ============================================================================
-  // CHATBOT USAGE REPORTS DATA
-  // ============================================================================
 
   Future<ChatbotUsageReportsData> getChatbotUsageReportsData(
     String timeFrame,
@@ -266,19 +173,16 @@ class FirebaseService {
     final cacheKey = 'chatbot_$timeFrame';
 
     if (_chatbotCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
-      print('✅ Chatbot data from cache: $timeFrame');
       return _chatbotCache[cacheKey]!;
     }
-
-    print('🔄 Fetching chatbot data for: $timeFrame');
 
     try {
       final startDate = _getStartDate(timeFrame);
 
-      // Get user lookup first (cached)
+      // NEW: Get user lookup first (cached)
       final userLookup = await _getUserLookup();
 
-      // Optimized parallel fetch
+      // Optimized parallel fetch - removed users query since we have it cached
       final results = await Future.wait([
         _getConversationsOptimized(startDate),
         _getMessagesOptimized(startDate),
@@ -295,18 +199,12 @@ class FirebaseService {
       _chatbotCache[cacheKey] = data;
       _updateCacheTimestamp(cacheKey);
 
-      print('✅ Chatbot data cached: $timeFrame');
-
       return data;
     } catch (e) {
-      print('❌ Error fetching chatbot usage data: $e');
+      print('Error fetching chatbot usage data: $e');
       return getEmptyChatbotUsageReportsData();
     }
   }
-
-  // ============================================================================
-  // USER DEMOGRAPHICS REPORTS DATA
-  // ============================================================================
 
   Future<UserDemographicsReportsData> getUserDemographicsReportsData(
     String timeFrame,
@@ -314,74 +212,68 @@ class FirebaseService {
     final cacheKey = 'demographics_$timeFrame';
 
     if (_demographicsCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
-      print('✅ Demographics data from cache: $timeFrame');
       return _demographicsCache[cacheKey]!;
     }
-
-    print('🔄 Fetching demographics data for: $timeFrame');
 
     try {
       final startDate = _getStartDate(timeFrame);
 
-      // Get user lookup first (cached)
-      final userLookup = await _getUserLookup();
-
       final results = await Future.wait([
+        _getUsers(),
         _getActiveUsers(),
         _getNewUsers(timeFrame),
         _getMessagesOptimized(startDate),
       ]);
 
       final data = _processUserDemographicsReportsData(
-        userLookup: userLookup,
-        activeUsers: results[0],
-        newUsers: results[1],
-        messages: results[2],
+        users: results[0],
+        activeUsers: results[1],
+        newUsers: results[2],
+        messages: results[3],
       );
 
       _demographicsCache[cacheKey] = data;
       _updateCacheTimestamp(cacheKey);
 
-      print('✅ Demographics data cached: $timeFrame');
-
       return data;
     } catch (e) {
-      print('❌ Error fetching user demographics data: $e');
+      print('Error fetching user demographics data: $e');
       return getEmptyUserDemographicsReportsData();
     }
   }
 
-  // ============================================================================
-  // OPTIMIZED FIRESTORE QUERIES
-  // ============================================================================
+  
 
   Future<List<QueryDocumentSnapshot>> _getMessagesOptimized(
     DateTime startDate,
   ) async {
-    final snapshot = await _firestore
-        .collectionGroup('messages')
-        .where('sender', isEqualTo: 'user')
-        .where('sent_at', isGreaterThanOrEqualTo: startDate)
-        .orderBy('sent_at', descending: true)
-        .get();
+    final snapshot =
+        await _firestore
+            .collectionGroup('messages')
+            .where('sender', isEqualTo: 'user')
+            .where('sent_at', isGreaterThanOrEqualTo: startDate)
+            .orderBy('sent_at', descending: true)
+            .get();
     return snapshot.docs;
   }
 
   Future<List<QueryDocumentSnapshot>> _getLogs() async {
-    final snapshot = await _firestore
-        .collection('logs')
-        .orderBy('time', descending: true)
-        .limit(5)
-        .get();
+    final snapshot =
+        await _firestore
+            .collection('logs')
+            .orderBy('time', descending: true)
+            .limit(5)
+            .get();
     return snapshot.docs;
   }
 
   Future<List<QueryDocumentSnapshot>> _getMessageLogs() async {
-    final snapshot = await _firestore
-        .collection('message_logs')
-        .orderBy('time', descending: true)
-        .limit(5)
-        .get();
+    final snapshot =
+        await _firestore
+            .collection('message_logs')
+            .orderBy('time', descending: true)
+            .limit(5)
+            .get();
     return snapshot.docs;
   }
 
@@ -409,53 +301,90 @@ class FirebaseService {
   }
 
   Future<List<QueryDocumentSnapshot>> _getFAQs() async {
-    final snapshot = await _firestore
-        .collection('faqs')
-        .orderBy('similarityCount', descending: true)
-        .limit(10)
-        .get();
+    final snapshot =
+        await _firestore
+            .collection('faqs')
+            .orderBy('similarityCount', descending: true)
+            .limit(10)
+            .get();
     return snapshot.docs;
   }
 
   Future<List<QueryDocumentSnapshot>> _getActiveUsers() async {
-    final snapshot = await _firestore
-        .collection('users')
-        .where('isActive', isEqualTo: true)
-        .get();
+    final snapshot =
+        await _firestore
+            .collection('users')
+            .where('isActive', isEqualTo: true)
+            .get();
     return snapshot.docs;
   }
 
   Future<List<QueryDocumentSnapshot>> _getNewUsers(String timeFrame) async {
     final startDate = _getStartDate(timeFrame);
-    final snapshot = await _firestore
-        .collection('users')
-        .where(
-          'createdAt',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
-        )
-        .orderBy('createdAt', descending: true)
-        .get();
+    final snapshot =
+        await _firestore
+            .collection('users')
+            .where(
+              'createdAt',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+            )
+            .orderBy('createdAt', descending: true)
+            .get();
     return snapshot.docs;
   }
 
   Future<List<QueryDocumentSnapshot>> _getUnansweredMessages() async {
-    final snapshot = await _firestore
-        .collectionGroup('messages')
-        .where('sender', isEqualTo: 'user')
-        .where('isAnswered', isEqualTo: false)
-        .orderBy('sent_at', descending: true)
-        .limit(5)
-        .get();
+    final snapshot =
+        await _firestore
+            .collectionGroup('messages')
+            .where('sender', isEqualTo: 'user')
+            .where('isAnswered', isEqualTo: false)
+            .orderBy('sent_at', descending: true)
+            .limit(5)
+            .get();
     return snapshot.docs;
   }
 
-  // ============================================================================
-  // DATA PROCESSING
-  // ============================================================================
+  Map<int, int> _generatePeakUsageByHour(List<QueryDocumentSnapshot> sessions) {
+    final hourCounts = <int, int>{};
+
+    for (final doc in sessions) {
+      final data = doc.data() as Map<String, dynamic>;
+      final timestamp = data['createdAt'];
+      if (timestamp is Timestamp) {
+        final hour = timestamp.toDate().hour;
+        hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
+      }
+    }
+
+    return hourCounts;
+  }
+
+  DateTime _getStartDate(String timeFrame) {
+    final now = DateTime.now();
+    return switch (timeFrame) {
+      'All' => DateTime(2000, 1, 1), // Far past date to get all data
+      'Today' => DateTime(now.year, now.month, now.day),
+      'This Week' => _getStartOfWeek(now),
+      'This Month' => DateTime(now.year, now.month, 1),
+      'This Year' => DateTime(now.year, 1, 1),
+      _ => DateTime(now.year, now.month, 1),
+    };
+  }
+
+  DateTime _getStartOfWeek(DateTime date) {
+    final daysFromMonday = date.weekday - 1;
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).subtract(Duration(days: daysFromMonday));
+  }
 
   InquiryReportsData _processInquiryReportsData({
     required List<QueryDocumentSnapshot> messages,
     required List<QueryDocumentSnapshot> faqs,
+
     required List<QueryDocumentSnapshot> logs,
     required List<QueryDocumentSnapshot> escalations,
     required List<QueryDocumentSnapshot> unanswered,
@@ -521,127 +450,157 @@ class FirebaseService {
     );
   }
 
-  ChatbotUsageReportsData _processChatbotUsageReportsData({
-    required List<QueryDocumentSnapshot> sessions,
-    required List<QueryDocumentSnapshot> messages,
-    required Map<String, Map<String, dynamic>> userLookup,
-    required DateTime startDate,
-    required String timeFrame,
-  }) {
-    double totalSessionDuration = 0;
-    int completedSessionsCount = 0;
-    final userSessionCounts = <String, int>{};
+  // FIXED: Now uses cached userLookup instead of QuerySnapshot
+ChatbotUsageReportsData _processChatbotUsageReportsData({
+  required List<QueryDocumentSnapshot> sessions,
+  required List<QueryDocumentSnapshot> messages,
+  required Map<String, Map<String, dynamic>> userLookup,
+  required DateTime startDate,
+  required String timeFrame,
+}) {
+  // ✅ FIX 1: Process sessions with better error handling
+  double totalSessionDuration = 0;
+  int completedSessionsCount = 0;
+  final userSessionCounts = <String, int>{};
 
-    final uniqueUsersByYear = <String, Set<String>>{};
-    final uniqueUsersByProgram = <String, Set<String>>{};
+  // Track UNIQUE users by year/program who have active sessions
+  final uniqueUsersByYear = <String, Set<String>>{};
+  final uniqueUsersByProgram = <String, Set<String>>{};
 
-    for (final doc in sessions) {
-      final data = doc.data() as Map<String, dynamic>;
-      final userId = data['userId'] as String? ?? 'unknown';
-      final createdAt = data['createdAt'] as Timestamp?;
-      final endedAt = data['endedAt'] as Timestamp?;
-      final status = data['status'] as String? ?? 'unknown';
+  for (final doc in sessions) {
+    final data = doc.data() as Map<String, dynamic>;
+    final userId = data['userId'] as String? ?? 'unknown';
+    final createdAt = data['createdAt'] as Timestamp?;
+    final endedAt = data['endedAt'] as Timestamp?;
+    final status = data['status'] as String? ?? 'unknown';
 
-      final userInfo = userLookup[userId];
-      if (userInfo != null) {
-        final year = userInfo['year'] ?? 'Unknown';
-        final program = userInfo['program'] ?? 'Unknown';
+    // Get user info from cached lookup
+    final userInfo = userLookup[userId];
+    if (userInfo != null) {
+      final year = userInfo['year'] ?? 'Unknown';
+      final program = userInfo['program'] ?? 'Unknown';
 
-        uniqueUsersByYear.putIfAbsent(year, () => <String>{});
-        uniqueUsersByYear[year]!.add(userId);
+      uniqueUsersByYear.putIfAbsent(year, () => <String>{});
+      uniqueUsersByYear[year]!.add(userId);
 
-        uniqueUsersByProgram.putIfAbsent(program, () => <String>{});
-        uniqueUsersByProgram[program]!.add(userId);
-      }
-
-      if (createdAt != null && endedAt != null && status == 'ended') {
-        final duration = endedAt.toDate().difference(createdAt.toDate());
-
-        if (duration.inSeconds >= 10 && duration.inSeconds <= 7200) {
-          totalSessionDuration += duration.inSeconds.toDouble();
-          completedSessionsCount++;
-        }
-      }
-
-      userSessionCounts[userId] = (userSessionCounts[userId] ?? 0) + 1;
+      uniqueUsersByProgram.putIfAbsent(program, () => <String>{});
+      uniqueUsersByProgram[program]!.add(userId);
     }
 
-    final sessionYearCounts = <String, int>{};
-    uniqueUsersByYear.forEach((year, userIds) {
-      sessionYearCounts[year] = userIds.length;
-    });
-
-    final sessionProgramCounts = <String, int>{};
-    uniqueUsersByProgram.forEach((program, userIds) {
-      sessionProgramCounts[program] = userIds.length;
-    });
-
-    final averageSessionLength =
-        completedSessionsCount > 0
-            ? totalSessionDuration / completedSessionsCount
-            : 0.0;
-
-    final averageMessagesPerUser =
-        userSessionCounts.isNotEmpty
-            ? sessions.length / userSessionCounts.length.toDouble()
-            : 0.0;
-
-    double totalResponseTime = 0;
-    int responseTimeCount = 0;
-    final responseTimeByDate = <String, List<double>>{};
-
-    for (final doc in messages) {
-      final data = doc.data() as Map<String, dynamic>;
-      final responseTimeMs = data['responseTimeMs'];
-      final sentAt = data['sent_at'] as Timestamp?;
-
-      if (responseTimeMs != null && responseTimeMs is num && responseTimeMs > 0) {
-        final responseTimeSeconds = responseTimeMs.toDouble() / 1000;
-
-        if (responseTimeSeconds >= 0.1 && responseTimeSeconds <= 60) {
-          totalResponseTime += responseTimeSeconds;
-          responseTimeCount++;
-
-          if (sentAt != null) {
-            final dateKey = _getDateKey(sentAt.toDate(), timeFrame);
-            responseTimeByDate.putIfAbsent(dateKey, () => []);
-            responseTimeByDate[dateKey]!.add(responseTimeSeconds);
-          }
-        }
+    // ✅ FIX 2: Better session duration calculation
+    if (createdAt != null && endedAt != null && status == 'ended') {
+      final duration = endedAt.toDate().difference(createdAt.toDate());
+      
+      // Only count reasonable session durations (between 10 seconds and 2 hours)
+      if (duration.inSeconds >= 10 && duration.inSeconds <= 7200) {
+        totalSessionDuration += duration.inSeconds.toDouble();
+        completedSessionsCount++;
+        print('✅ Valid session: ${duration.inSeconds}s');
+      } else {
+        print('⚠️ Skipped invalid session duration: ${duration.inSeconds}s');
       }
     }
 
-    final averageResponseTime =
-        responseTimeCount > 0 ? totalResponseTime / responseTimeCount : 0.0;
-
-    final responseTimeTrend = _buildResponseTimeTrend(
-      responseTimeByDate,
-      timeFrame,
-      startDate,
-    );
-
-    return ChatbotUsageReportsData(
-      totalSessions: sessions.length,
-      averageResponseTime: averageResponseTime,
-      averageMessagesPerUser: averageMessagesPerUser,
-      averageSessionLength: averageSessionLength,
-      usageTrendByTimeOfDay: _generateHourlyUsageTrend(sessions) ?? [],
-      dailySessions: _generateDailySessionTrend(sessions, timeFrame) ?? [],
-      weeklySessions: _generateWeeklySessionTrend(sessions, timeFrame) ?? [],
-      monthlySessions: _generateMonthlySessionTrend(sessions, timeFrame) ?? [],
-      responseTimeTrend: responseTimeTrend,
-      peakUsageByHour: _generatePeakUsageByHour(sessions),
-      usersByYearLevel:
-          sessionYearCounts.isNotEmpty ? sessionYearCounts : <String, int>{},
-      usersByCourse:
-          sessionProgramCounts.isNotEmpty
-              ? sessionProgramCounts
-              : <String, int>{},
-    );
+    userSessionCounts[userId] = (userSessionCounts[userId] ?? 0) + 1;
   }
 
+  // Convert sets to counts
+  final sessionYearCounts = <String, int>{};
+  uniqueUsersByYear.forEach((year, userIds) {
+    sessionYearCounts[year] = userIds.length;
+  });
+
+  final sessionProgramCounts = <String, int>{};
+  uniqueUsersByProgram.forEach((program, userIds) {
+    sessionProgramCounts[program] = userIds.length;
+  });
+
+  final averageSessionLength =
+      completedSessionsCount > 0
+          ? totalSessionDuration / completedSessionsCount
+          : 0.0;
+
+  print('📊 Session Stats:');
+  print('   Total sessions: ${sessions.length}');
+  print('   Completed sessions: $completedSessionsCount');
+  print('   Average session length: ${averageSessionLength.toStringAsFixed(2)}s');
+
+  final averageMessagesPerUser =
+      userSessionCounts.isNotEmpty
+          ? sessions.length / userSessionCounts.length.toDouble()
+          : 0.0;
+
+  // ✅ FIX 3: Enhanced response time calculation
+  double totalResponseTime = 0;
+  int responseTimeCount = 0;
+  final responseTimeByDate = <String, List<double>>{};
+
+  print('📊 Processing ${messages.length} messages for response time');
+
+  for (final doc in messages) {
+    final data = doc.data() as Map<String, dynamic>;
+    final responseTimeMs = data['responseTimeMs'];
+    final sentAt = data['sent_at'] as Timestamp?;
+
+    if (responseTimeMs != null && responseTimeMs is num && responseTimeMs > 0) {
+      final responseTimeSeconds = responseTimeMs.toDouble() / 1000;
+      
+      // ✅ Only count reasonable response times (between 0.1s and 60s)
+      if (responseTimeSeconds >= 0.1 && responseTimeSeconds <= 60) {
+        totalResponseTime += responseTimeSeconds;
+        responseTimeCount++;
+        
+        // Group by date for trend
+        if (sentAt != null) {
+          final dateKey = _getDateKey(sentAt.toDate(), timeFrame);
+          responseTimeByDate.putIfAbsent(dateKey, () => []);
+          responseTimeByDate[dateKey]!.add(responseTimeSeconds);
+        }
+        
+        print('   ✅ Valid response time: ${responseTimeSeconds.toStringAsFixed(2)}s');
+      } else {
+        print('   ⚠️ Skipped outlier: ${responseTimeSeconds.toStringAsFixed(2)}s');
+      }
+    }
+  }
+
+  final averageResponseTime =
+      responseTimeCount > 0 ? totalResponseTime / responseTimeCount : 0.0;
+
+  print('📈 Response Time Summary:');
+  print('   Valid messages: $responseTimeCount / ${messages.length}');
+  print('   Average: ${averageResponseTime.toStringAsFixed(2)}s');
+  print('   Total: ${totalResponseTime.toStringAsFixed(2)}s');
+
+  // ✅ FIX 4: Build response time trend data
+  final responseTimeTrend = _buildResponseTimeTrend(
+    responseTimeByDate,
+    timeFrame,
+    startDate,
+  );
+
+  return ChatbotUsageReportsData(
+    totalSessions: sessions.length,
+    averageResponseTime: averageResponseTime, // ✅ Now correctly calculated
+    averageMessagesPerUser: averageMessagesPerUser,
+    averageSessionLength: averageSessionLength, // ✅ Now correctly calculated
+    usageTrendByTimeOfDay: _generateHourlyUsageTrend(sessions) ?? [],
+    dailySessions: _generateDailySessionTrend(sessions, timeFrame) ?? [],
+    weeklySessions: _generateWeeklySessionTrend(sessions, timeFrame) ?? [],
+    monthlySessions: _generateMonthlySessionTrend(sessions, timeFrame) ?? [],
+    responseTimeTrend: responseTimeTrend,
+    peakUsageByHour: _generatePeakUsageByHour(sessions),
+    usersByYearLevel:
+        sessionYearCounts.isNotEmpty ? sessionYearCounts : <String, int>{},
+    usersByCourse:
+        sessionProgramCounts.isNotEmpty
+            ? sessionProgramCounts
+            : <String, int>{},
+  );
+}
+
   UserDemographicsReportsData _processUserDemographicsReportsData({
-    required Map<String, Map<String, dynamic>> userLookup,
+    required List<QueryDocumentSnapshot> users,
     required List<QueryDocumentSnapshot> activeUsers,
     required List<QueryDocumentSnapshot> newUsers,
     required List<QueryDocumentSnapshot> messages,
@@ -653,13 +612,14 @@ class FirebaseService {
     final affiliationTypes = <String, int>{};
     int affiliatedCount = 0;
 
-    // Process from cached user lookup
-    for (final userInfo in userLookup.values) {
-      final year = userInfo['year']?.toString() ?? 'Unknown';
-      final program = userInfo['program']?.toString() ?? 'Unknown';
-      final affiliationValue = userInfo['affiliation']?.toString();
-      final scholarshipValue = userInfo['scholarship']?.toString();
-      final isEnrolled = userInfo['isEnrolled'];
+    for (final doc in users) {
+      final data = doc.data() as Map<String, dynamic>;
+
+      final year = data['year']?.toString() ?? 'Unknown';
+      final program = data['program']?.toString() ?? 'Unknown';
+      final affiliationValue = data['affiliation']?.toString();
+      final scholarshipValue = data['scholarship']?.toString();
+      final isEnrolled = data['isEnrolled'];
 
       usersByYear[year] = (usersByYear[year] ?? 0) + 1;
       usersByProgram[program] = (usersByProgram[program] ?? 0) + 1;
@@ -693,7 +653,7 @@ class FirebaseService {
       activeUsers: activeUsers.length,
       newlyRegisteredUsers: newUsers.length,
       affiliatedUsers: affiliatedCount,
-      totalUsers: userLookup.length,
+      totalUsers: users.length,
       usersByYear: usersByYear,
       usersByProgram: usersByProgram,
       userAffiliations: affiliationTypes,
@@ -702,75 +662,121 @@ class FirebaseService {
     );
   }
 
-  // ============================================================================
-  // HELPER METHODS (Remaining methods from original)
-  // ============================================================================
-
-  Map<int, int> _generatePeakUsageByHour(List<QueryDocumentSnapshot> sessions) {
-    final hourCounts = <int, int>{};
-    for (final doc in sessions) {
-      final data = doc.data() as Map<String, dynamic>;
-      final timestamp = data['createdAt'];
-      if (timestamp is Timestamp) {
-        final hour = timestamp.toDate().hour;
-        hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
-      }
-    }
-    return hourCounts;
-  }
-
-  DateTime _getStartDate(String timeFrame) {
-    final now = DateTime.now();
-    return switch (timeFrame) {
-      'All' => DateTime(2000, 1, 1),
-      'Today' => DateTime(now.year, now.month, now.day),
-      'This Week' => _getStartOfWeek(now),
-      'This Month' => DateTime(now.year, now.month, 1),
-      'This Year' => DateTime(now.year, 1, 1),
-      _ => DateTime(now.year, now.month, 1),
-    };
-  }
-
-  DateTime _getStartOfWeek(DateTime date) {
-    final daysFromMonday = date.weekday - 1;
-    return DateTime(date.year, date.month, date.day)
-        .subtract(Duration(days: daysFromMonday));
-  }
-
   String _getDateKey(DateTime date, String timeFrame) {
-    switch (timeFrame) {
-      case 'Today':
-        return "${date.hour.toString().padLeft(2, '0')}:00";
-      case 'This Week':
-        return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-      case 'This Month':
-        final weekOfMonth = ((date.day - 1) ~/ 7) + 1;
-        return "Week $weekOfMonth";
-      case 'This Year':
-        return "${date.year}-${date.month.toString().padLeft(2, '0')}";
-      default:
-        return "${date.year}-${date.month.toString().padLeft(2, '0')}";
+  switch (timeFrame) {
+    case 'Today':
+      return "${date.hour.toString().padLeft(2, '0')}:00";
+    case 'This Week':
+      return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+    case 'This Month':
+      final weekOfMonth = ((date.day - 1) ~/ 7) + 1;
+      return "Week $weekOfMonth";
+    case 'This Year':
+      return "${date.year}-${date.month.toString().padLeft(2, '0')}";
+    default:
+      return "${date.year}-${date.month.toString().padLeft(2, '0')}";
+  }
+}
+
+Future<Map<String, int>> getQuickStats(String timeFrame) async {
+    final startDate = _getStartDate(timeFrame);
+
+    try {
+      // Single optimized query for counts
+      final messagesSnapshot = await _firestore
+          .collectionGroup('messages')
+          .where('sender', isEqualTo: 'user')
+          .where('sent_at', isGreaterThanOrEqualTo: startDate)
+          .count()
+          .get();
+
+      final answeredSnapshot = await _firestore
+          .collectionGroup('messages')
+          .where('sender', isEqualTo: 'user')
+          .where('sent_at', isGreaterThanOrEqualTo: startDate)
+          .where('isAnswered', isEqualTo: true)
+          .count()
+          .get();
+
+      final usersSnapshot = await _firestore
+          .collection('users')
+          .count()
+          .get();
+
+      return {
+        'totalMessages': messagesSnapshot.count ?? 0,
+        'answered': answeredSnapshot.count ?? 0,
+        'totalUsers': usersSnapshot.count ?? 0,
+      };
+    } catch (e) {
+      print('Error getting quick stats: $e');
+      return {'totalMessages': 0, 'answered': 0, 'totalUsers': 0};
     }
   }
 
-  List<ChartData> _buildResponseTimeTrend(
-    Map<String, List<double>> responseTimeByDate,
-    String timeFrame,
-    DateTime startDate,
-  ) {
-    if (responseTimeByDate.isEmpty) return [];
+// ✅ NEW METHOD: Build response time trend
+List<ChartData> _buildResponseTimeTrend(
+  Map<String, List<double>> responseTimeByDate,
+  String timeFrame,
+  DateTime startDate,
+) {
+  if (responseTimeByDate.isEmpty) {
+    return [];
+  }
 
+  final trendData = <ChartData>[];
+  final sortedKeys = responseTimeByDate.keys.toList()..sort();
+
+  for (final key in sortedKeys) {
+    final times = responseTimeByDate[key]!;
+    if (times.isEmpty) continue;
+    
+    // Calculate average for this time period
+    final average = times.reduce((a, b) => a + b) / times.length;
+    
+    // Convert to milliseconds for display (more readable)
+    final averageMs = (average * 1000).round();
+    
+    trendData.add(ChartData(
+      date: key,
+      count: averageMs, // Store as milliseconds
+    ));
+  }
+
+  print('📈 Response Time Trend: ${trendData.length} data points');
+  for (var data in trendData) {
+    print('   ${data.date}: ${data.count}ms');
+  }
+
+  return trendData;
+}
+
+  List<ChartData>? _generateResponseTimeTrend(
+    Map<String, List<double>> responseTimeData,
+    String timeFrame,
+  ) {
+    try {
+      return _generateTrendDataFromAverages(responseTimeData, timeFrame);
+    } catch (e) {
+      print('Error generating response time trend: $e');
+      return [];
+    }
+  }
+
+  List<ChartData> _generateTrendDataFromAverages(
+    Map<String, List<double>> data,
+    String timeFrame,
+  ) {
     final trendData = <ChartData>[];
-    final sortedKeys = responseTimeByDate.keys.toList()..sort();
+    final sortedKeys = data.keys.toList()..sort();
 
     for (final key in sortedKeys) {
-      final times = responseTimeByDate[key]!;
-      if (times.isEmpty) continue;
-
-      final average = times.reduce((a, b) => a + b) / times.length;
-      final averageMs = (average * 1000).round();
-
-      trendData.add(ChartData(date: key, count: averageMs));
+      final values = data[key]!;
+      final average =
+          values.isNotEmpty
+              ? values.reduce((a, b) => a + b) / values.length
+              : 0.0;
+      trendData.add(ChartData(date: key, count: average.round()));
     }
 
     return trendData;
@@ -789,6 +795,7 @@ class FirebaseService {
   ) {
     try {
       final hourCounts = <int, int>{};
+
       for (final doc in sessions) {
         final data = doc.data() as Map<String, dynamic>;
         final timestamp = data['createdAt'];
@@ -797,6 +804,7 @@ class FirebaseService {
           hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
         }
       }
+
       return List.generate(24, (hour) {
         return ChartData(
           date: "${hour.toString().padLeft(2, '0')}:00",
