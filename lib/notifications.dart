@@ -246,9 +246,7 @@ class _NotificationModalState extends State<NotificationModal>
   }
 
   void _navigateToAnnouncements(String? announcementId) {
-    if (mounted) {
-      Navigator.of(context).pop();
-    }
+ 
 
     Future.delayed(const Duration(milliseconds: 200), () {
       if (!mounted) return;
@@ -539,39 +537,53 @@ class _NotificationModalState extends State<NotificationModal>
               child: SafeArea(
                 child: SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      Navigator.of(context).pop();
-                      await Future.delayed(const Duration(milliseconds: 200));
+                  child:ElevatedButton(
+  onPressed: () async {
+    print('🔄 Continue in Chat pressed');
+    print('   - conversationId: $conversationId');
+    
+    if (conversationId == null || conversationId.isEmpty || conversationId == 'null') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No conversation available'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+ 
+    // ✅ Wait for modal to close
+    await Future.delayed(const Duration(milliseconds: 200));
 
-                      if (!mounted) return;
+    if (!mounted) return;
 
-                      Navigator.of(context).pushReplacementNamed(
-                        '/home',
-                        arguments: {
-                          'initialTab': 1,
-                          'conversationId': conversationId,
-                          'loadExisting': true,
-                        },
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      'Continue in Chat',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
+    // ✅ Navigate to home with chat tab
+    Navigator.of(context).pushReplacementNamed(
+      '/home',
+      arguments: {
+        'initialTab': 1,
+        'conversationId': conversationId,
+        'loadExisting': true,
+      },
+    );
+  },
+  style: ElevatedButton.styleFrom(
+    backgroundColor: const Color(0xFF2E7D32),
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(vertical: 14),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(8),
+    ),
+    elevation: 0,
+  ),
+  child: const Text(
+    'Continue in Chat',
+    style: TextStyle(
+      fontWeight: FontWeight.w600,
+      fontSize: 15,
+    ),
+  ),
+)
                 ),
               ),
             ),
@@ -708,57 +720,64 @@ class _NotificationModalState extends State<NotificationModal>
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () async {
-                    final escalationId = _viewingEscalationId;
+  onPressed: () async {
+    final escalationId = _viewingEscalationId;
 
-                    if (escalationId == null || escalationId.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Error: No escalation ID'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                      return;
-                    }
+    print('🔧 Respond to Escalation pressed');
+    print('   - escalationId: $escalationId');
+    print('   - conversationId: $conversationId');
 
-                    Navigator.of(context).pop();
-                    await Future.delayed(const Duration(milliseconds: 200));
+    if (escalationId == null || escalationId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: No escalation ID'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
-                    if (!mounted) return;
 
-                    final route =
-                        widget.role == 'admin' ? '/admin/home' : '/staff/home';
-                    final tabIndex = widget.role == 'admin' ? 5 : 2;
+    // ✅ Wait for modal to close
+    await Future.delayed(const Duration(milliseconds: 200));
 
-                    Navigator.of(context).pushReplacementNamed(
-                      route,
-                      arguments: {
-                        'initialTab': tabIndex,
-                        'escalationId': escalationId,
-                        'conversationId': conversationId,
-                        'autoOpen': true,
-                      },
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    status == 'resolved'
-                        ? 'View Full Details'
-                        : 'Respond to Escalation',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
+    if (!mounted) return;
+
+    final route = widget.role == 'admin' ? '/admin/home' : '/staff/home';
+    final tabIndex = widget.role == 'admin' ? 5 : 2;
+
+    print('📍 Navigating to: $route (tab $tabIndex)');
+
+    // ✅ Navigate with escalation details
+    Navigator.of(context).pushReplacementNamed(
+      route,
+      arguments: {
+        'initialTab': tabIndex,
+        'escalationId': escalationId,
+        'conversationId': conversationId,
+        'autoOpen': true,
+      },
+    );
+  },
+  style: ElevatedButton.styleFrom(
+    backgroundColor: const Color(0xFF2E7D32),
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(vertical: 14),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(8),
+    ),
+    elevation: 0,
+  ),
+  child: Text(
+    status == 'resolved'
+        ? 'View Full Details'
+        : 'Respond to Escalation',
+    style: const TextStyle(
+      fontWeight: FontWeight.w600,
+      fontSize: 15,
+    ),
+  ),
+)
               ),
             ),
           ),
