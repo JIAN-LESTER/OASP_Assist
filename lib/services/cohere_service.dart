@@ -60,24 +60,49 @@ class CohereService {
     return data['text'] ?? '';
   }
 
- Future<Map<String, dynamic>> analyzeAdmission(String message) async {
+Future<Map<String, dynamic>> analyzeAdmission(String message) async {
+  Map<String, int>? parseAcademicYear(String? yearStr, String fallbackText) {
+    if ((yearStr == null || yearStr.trim().isEmpty) && fallbackText.isNotEmpty) {
+      yearStr = fallbackText;
+    }
+    if (yearStr == null || yearStr.trim().isEmpty) return null;
+
+    final rangeRegex = RegExp(r'(\d{4})\s*[-–]\s*(\d{4})');
+    final singleRegex = RegExp(r'(\d{4})');
+
+    final rangeMatch = rangeRegex.firstMatch(yearStr);
+    if (rangeMatch != null) {
+      return {
+        'start': int.parse(rangeMatch.group(1)!),
+        'end': int.parse(rangeMatch.group(2)!),
+      };
+    }
+
+    final singleMatch = singleRegex.firstMatch(yearStr);
+    if (singleMatch != null) {
+      return {'start': int.parse(singleMatch.group(1)!)};
+    }
+
+    return null;
+  }
+
   try {
     if (message.trim().isEmpty) {
       print("❌ Empty message provided to analyzeAdmission");
-      return _fallbackStepExtraction(message);
+      return _fallbackAdmissionExtraction(message);
     }
 
     print("📄 Admission input message length: ${message.length}");
 
     final prompt = '''
-Analyze the following admission document and extract the academic year, ALL contact information, ALL admission steps, and ALL links.
+Analyze the following admission document and extract the academic year, ALL contact information, ALL admission steps, ALL requirements, and ALL links.
 
 Admission Document: "$message"
 
 CRITICAL INSTRUCTIONS:
-- Extract EVERY SINGLE step mentioned in the document (usually numbered [1] to [11] or similar)
+- Extract EVERY SINGLE step mentioned (usually numbered [1] to [11])
+- Extract ALL requirements (documents needed: Form 137, Form 138, NSO Birth Certificate, Certificate of Good Moral, Medical Certificate, ID Pictures, etc.)
 - Preserve the original order and numbering
-- Include ALL details for each step
 - For academic year, find "S.Y." followed by a year range like "2024-2025"
 - Extract only valid contact information (emails, phone numbers)
 - Extract all valid websites separately into the "links" field
@@ -90,8 +115,15 @@ Return valid JSON only in this exact format:
   ],
   "steps": [
     "Step 1: Fill out the online application form",
-    "Step 2: Submit all required documents",
-    "Step 3: Pay the application fee"
+    "Step 2: Submit all required documents"
+  ],
+  "requirements": [
+    "Form 137 (Original Copy)",
+    "Form 138 (Original Copy)",
+    "NSO Birth Certificate",
+    "Certificate of Good Moral Character",
+    "Medical Certificate",
+    "2x2 ID Pictures (2 copies)"
   ],
   "academicYear": "2024-2025",
   "links": [
@@ -123,7 +155,7 @@ Return valid JSON only in this exact format:
 
       if (generatedText.isEmpty) {
         print("❌ Empty response from Cohere API");
-        return _fallbackStepExtraction(message);
+        return _fallbackAdmissionExtraction(message);
       }
 
       print("🔍 Generated Text: $generatedText");
@@ -136,44 +168,148 @@ Return valid JSON only in this exact format:
         result = jsonDecode(cleanedResponse);
       } catch (e) {
         print("❌ JSON decode error: $e");
-        return _fallbackStepExtraction(message);
+        return _fallbackAdmissionExtraction(message);
       }
 
       List<Map<String, dynamic>> contacts = _processContacts(result['contacts']);
       List<String> steps = _processSteps(result['steps']);
-      String academicYear = _extractAcademicYear(result['academicYear'], message);
+      List<String> requirements = _processStringList(result['requirements']);
       List<String> links = (result['links'] is List)
           ? List<String>.from(result['links'].map((e) => e.toString()))
           : [];
 
+      // Convert academic year to numeric map
+      Map<String, int>? academicYearMap = parseAcademicYear(
+        result['academicYear']?.toString(),
+        message,
+      );
+
       if (steps.isEmpty) {
         print("⚠️ No steps extracted, using fallback");
-        Map<String, dynamic> fallbackResult = _fallbackStepExtraction(message);
+        final fallbackResult = _fallbackAdmissionExtraction(message);
         steps = fallbackResult['steps'] as List<String>;
+      }
+
+      if (requirements.isEmpty) {
+        print("⚠️ No requirements extracted, using fallback");
+        final fallbackResult = _fallbackAdmissionExtraction(message);
+        requirements = fallbackResult['requirements'] as List<String>;
       }
 
       if (contacts.isEmpty && links.isEmpty) {
         print("⚠️ No valid contacts or links extracted, using fallback");
-        Map<String, dynamic> fallbackResult = _fallbackStepExtraction(message);
+        final fallbackResult = _fallbackAdmissionExtraction(message);
         contacts = fallbackResult['contacts'] as List<Map<String, dynamic>>;
         links = fallbackResult['links'] as List<String>;
       }
 
+      print("✅ Extracted: ${steps.length} steps, ${requirements.length} requirements, ${contacts.length} contacts");
+
       return {
         'contacts': contacts,
         'steps': steps,
-        'academicYear': academicYear,
+        'requirements': requirements,
+        'academicYear': academicYearMap,
         'links': links,
       };
     } else {
       print("❌ Cohere API error: ${response.statusCode}");
       print("📄 Error response: ${response.body}");
-      return _fallbackStepExtraction(message);
+      return _fallbackAdmissionExtraction(message);
     }
   } catch (e) {
     print('❌ Error analyzing admission with Cohere: $e');
-    return _fallbackStepExtraction(message);
+    return _fallbackAdmissionExtraction(message);
   }
+}
+
+// Updated fallback extraction
+Map<String, dynamic> _fallbackAdmissionExtraction(String text) {
+  print("🔧 Using fallback admission extraction");
+
+  List<String> steps = <String>[];
+  List<String> requirements = <String>[];
+  List<Map<String, dynamic>> contacts = <Map<String, dynamic>>[];
+  List<String> links = <String>[];
+  Map<String, int>? academicYear;
+
+  final requirementKeywords = [
+    'Form 137', 'Form 138', 'NSO Birth Certificate', 'Birth Certificate',
+    'Certificate of Good Moral', 'Good Moral Character', 'Medical Certificate',
+    'ID Picture', 'Transcript of Records', 'TOR', 'Diploma',
+    'Certificate of Registration', 'Marriage Certificate', 'Police Clearance',
+    '2x2', 'ID Photo', 'Passport Size'
+  ];
+
+  final lines = text.split('\n');
+  for (String line in lines) {
+    final trimmed = line.trim();
+    for (String keyword in requirementKeywords) {
+      if (trimmed.toLowerCase().contains(keyword.toLowerCase())) {
+        if (!requirements.contains(trimmed) && trimmed.length < 200) {
+          requirements.add(trimmed);
+        }
+        break;
+      }
+    }
+  }
+
+  final emailRegex = RegExp(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b');
+  final phoneRegex = RegExp(r'(?<!\d)(?:\+63|63|0)?[89]\d{9}(?!\d)');
+  final websiteRegex = RegExp(r'https?:\/\/[\w\.-]+\.[\w]{2,}(?:\/[\w\.-]*)*');
+
+  for (final match in emailRegex.allMatches(text)) {
+    String email = match.group(0) ?? '';
+    if (_isValidContact('email', email)) {
+      contacts.add({'type': 'email', 'value': email});
+    }
+  }
+
+  for (final match in phoneRegex.allMatches(text)) {
+    String phone = match.group(0) ?? '';
+    if (_isValidContact('phone', phone)) {
+      contacts.add({'type': 'phone', 'value': phone});
+    }
+  }
+
+  for (final match in websiteRegex.allMatches(text)) {
+    String website = match.group(0) ?? '';
+    if (_isValidContact('website', website)) {
+      links.add(website);
+    }
+  }
+
+  // Extract academic year as numeric map
+  final yearRegex = RegExp(r'S\.Y\.\s*(20\d{2}\s*[-–]?\s*20\d{2}?)', caseSensitive: false);
+  final yearMatch = yearRegex.firstMatch(text);
+  if (yearMatch != null) {
+    final rangeRegex = RegExp(r'(\d{4})\s*[-–]\s*(\d{4})');
+    final singleRegex = RegExp(r'(\d{4})');
+    final yearStr = yearMatch.group(1) ?? '';
+    
+    final rangeMatch = rangeRegex.firstMatch(yearStr);
+    if (rangeMatch != null) {
+      academicYear = {
+        'start': int.parse(rangeMatch.group(1)!),
+        'end': int.parse(rangeMatch.group(2)!),
+      };
+    } else {
+      final singleMatch = singleRegex.firstMatch(yearStr);
+      if (singleMatch != null) {
+        academicYear = {'start': int.parse(singleMatch.group(1)!)};
+      }
+    }
+  }
+
+  print("🔧 Fallback extracted ${steps.length} steps, ${requirements.length} requirements, ${contacts.length} contacts");
+
+  return {
+    'contacts': contacts,
+    'steps': steps,
+    'requirements': requirements,
+    'academicYear': academicYear,
+    'links': links,
+  };
 }
 
   String _extractJsonFromResponse(String response) {
@@ -342,15 +478,15 @@ Map<String, dynamic> _fallbackStepExtraction(String text) {
 }
 
   Future<Map<String, dynamic>> analyzeScholarship(String message) async {
-    try {
-      if (message.trim().isEmpty) {
-        print("❌ Empty message provided to analyzeScholarship");
-        return {"scholarships": []};
-      }
+  try {
+    if (message.trim().isEmpty) {
+      print("❌ Empty message provided to analyzeScholarship");
+      return {"scholarships": [], "deadline": null};
+    }
 
-      print("📄 Scholarship input message length: ${message.length}");
+    print("📄 Scholarship input message length: ${message.length}");
 
-      final prompt = '''
+    final prompt = '''
 Analyze the following text and extract ALL scholarship information found.
 
 Text: "$message"
@@ -361,7 +497,7 @@ Extract each scholarship with these exact fields:
 - scholarshipProvider: Organization offering it
 - eligibilityRequirements: Combined list of eligibility criteria and required documents
 - privileges: Benefits provided (tuition, stipend, allowance, etc.)
-- deadline: Application deadline (YYYY-MM-DD format if found)
+- deadline: Application deadline (YYYY-MM-DD format if found, be very careful to extract accurate dates)
 - application_link: URL to apply
 
 Respond in valid JSON format only:
@@ -379,70 +515,79 @@ Respond in valid JSON format only:
   ]
 }
 
-Extract every scholarship mentioned. Use empty strings for missing information.
+Extract every scholarship mentioned. Use null for missing deadline.
 ''';
 
-      final response = await http.post(
-        chatUrl,
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'model': 'command-r-08-2024',
-          'message': prompt,
-          'max_tokens': 4000,
-          'temperature': 0.1,
-        }),
-      );
+    final response = await http.post(
+      chatUrl,
+      headers: {
+        'Authorization': 'Bearer $apiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'model': 'command-r-08-2024',
+        'message': prompt,
+        'max_tokens': 4000,
+        'temperature': 0.1,
+      }),
+    );
 
-      print("📡 Cohere Scholarship API Response Status: ${response.statusCode}");
+    print("📡 Cohere Scholarship API Response Status: ${response.statusCode}");
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        String generatedText = data['text']?.toString().trim() ?? '';
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      String generatedText = data['text']?.toString().trim() ?? '';
 
-        if (generatedText.isEmpty) {
-          return {"scholarships": []};
-        }
+      if (generatedText.isEmpty) {
+        return {"scholarships": [], "deadline": null};
+      }
 
-        try {
-          String cleaned = _extractJsonFromResponse(generatedText);
-          final result = jsonDecode(cleaned);
+      try {
+        String cleaned = _extractJsonFromResponse(generatedText);
+        final result = jsonDecode(cleaned);
 
-          List<Map<String, dynamic>> scholarships = [];
+        List<Map<String, dynamic>> scholarships = [];
+        DateTime? extractedDeadline;
 
-          if (result['scholarships'] is List) {
-            for (var s in result['scholarships']) {
-              if (s is Map) {
-                scholarships.add({
-                  "name": s["name"]?.toString().trim() ?? "",
-                  "description": s["description"]?.toString().trim() ?? "",
-                  "scholarshipProvider": s["scholarshipProvider"]?.toString().trim() ?? "",
-                  "eligibilityRequirements": _processStringList(s["eligibilityRequirements"]),
-                  "privileges": _processStringList(s["privileges"]),
-                  "deadline": s["deadline"]?.toString().trim() ?? "",
-                  "application_link": s["application_link"]?.toString().trim() ?? "",
-                });
+        if (result['scholarships'] is List) {
+          for (var s in result['scholarships']) {
+            if (s is Map) {
+              DateTime? deadline;
+              if (s["deadline"] != null && s["deadline"].toString().isNotEmpty) {
+                deadline = DateTime.tryParse(s["deadline"].toString());
+                if (deadline != null && extractedDeadline == null) {
+                  extractedDeadline = deadline;
+                }
               }
+
+              scholarships.add({
+                "name": s["name"]?.toString().trim() ?? "",
+                "description": s["description"]?.toString().trim() ?? "",
+                "scholarshipProvider": s["scholarshipProvider"]?.toString().trim() ?? "",
+                "eligibilityRequirements": _processStringList(s["eligibilityRequirements"]),
+                "privileges": _processStringList(s["privileges"]),
+                "deadline": s["deadline"]?.toString().trim() ?? "",
+                "application_link": s["application_link"]?.toString().trim() ?? "",
+              });
             }
           }
-
-          print("✅ Successfully parsed ${scholarships.length} scholarships");
-          return {"scholarships": scholarships};
-        } catch (e) {
-          print("❌ JSON parsing error: $e");
-          return {"scholarships": []};
         }
-      } else {
-        print("❌ Cohere API error: ${response.statusCode}");
-        return {"scholarships": []};
+
+        print("✅ Successfully parsed ${scholarships.length} scholarships with deadline: $extractedDeadline");
+        return {"scholarships": scholarships, "deadline": extractedDeadline};
+      } catch (e) {
+        print("❌ JSON parsing error: $e");
+        return {"scholarships": [], "deadline": null};
       }
-    } catch (e) {
-      print('❌ Error analyzing scholarship with Cohere: $e');
-      return {"scholarships": []};
+    } else {
+      print("❌ Cohere API error: ${response.statusCode}");
+      return {"scholarships": [], "deadline": null};
     }
+  } catch (e) {
+    print('❌ Error analyzing scholarship with Cohere: $e');
+    return {"scholarships": [], "deadline": null};
   }
+}
 
   List<String> _processStringList(dynamic data) {
     if (data is List) {
@@ -457,16 +602,16 @@ Extract every scholarship mentioned. Use empty strings for missing information.
     return <String>[];
   }
 
-  Future<Map<String, dynamic>> analyzePlacement(String message) async {
-    try {
-      if (message.trim().isEmpty) {
-        print("❌ Empty message provided to analyzePlacement");
-        return {"placements": []};
-      }
+ Future<Map<String, dynamic>> analyzePlacement(String message) async {
+  try {
+    if (message.trim().isEmpty) {
+      print("❌ Empty message provided to analyzePlacement");
+      return {"placements": []};
+    }
 
-      print("📄 Placement input message length: ${message.length}");
+    print("📄 Placement input message length: ${message.length}");
 
-      final prompt = '''
+    final prompt = '''
 Analyze the following text and extract ALL placement information found.
 
 Text: "$message"
@@ -476,6 +621,7 @@ Extract placement information with these fields:
 - partnerCompany: Company or organization name
 - contacts: List of contact details (emails, phones)
 - positions: List of available positions/roles
+- deadline: Application deadline (YYYY-MM-DD format if found)
 - createdAt: Current timestamp in ISO 8601 format
 
 Respond in valid JSON format only:
@@ -486,72 +632,78 @@ Respond in valid JSON format only:
       "partnerCompany": "Company Name",
       "contacts": ["contact@company.com", "09123456789"],
       "positions": ["Position 1", "Position 2"],
+      "deadline": "2024-12-31",
       "createdAt": "2025-09-08T10:15:30Z"
     }
   ]
 }
 ''';
 
-      final response = await http.post(
-        chatUrl,
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'model': 'command-r-08-2024',
-          'message': prompt,
-          'max_tokens': 1500,
-          'temperature': 0.1,
-        }),
-      );
+    final response = await http.post(
+      chatUrl,
+      headers: {
+        'Authorization': 'Bearer $apiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'model': 'command-r-08-2024',
+        'message': prompt,
+        'max_tokens': 1500,
+        'temperature': 0.1,
+      }),
+    );
 
-      print("📡 Cohere Placement API Response Status: ${response.statusCode}");
+    print("📡 Cohere Placement API Response Status: ${response.statusCode}");
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        String generatedText = data['text']?.toString().trim() ?? '';
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      String generatedText = data['text']?.toString().trim() ?? '';
 
-        if (generatedText.isEmpty) {
-          return {"placements": []};
-        }
-
-        try {
-          String cleaned = _extractJsonFromResponse(generatedText);
-          final result = jsonDecode(cleaned);
-
-          List<Map<String, dynamic>> placements = [];
-
-          if (result['placements'] is List) {
-            for (var p in result['placements']) {
-              if (p is Map) {
-                placements.add({
-                  "placementID": p["placementID"]?.toString().trim() ?? "",
-                  "partnerCompany": p["partnerCompany"]?.toString().trim() ?? "",
-                  "contacts": _processStringList(p["contacts"]),
-                  "positions": _processStringList(p["positions"]),
-                  "createdAt": p["createdAt"]?.toString().trim() ?? DateTime.now().toIso8601String(),
-                });
-              }
-            }
-          }
-
-          print("✅ Successfully parsed ${placements.length} placements");
-          return {"placements": placements};
-        } catch (e) {
-          print("❌ JSON parsing error: $e");
-          return {"placements": []};
-        }
-      } else {
-        print("❌ Cohere API error: ${response.statusCode}");
+      if (generatedText.isEmpty) {
         return {"placements": []};
       }
-    } catch (e) {
-      print('❌ Error analyzing placement with Cohere: $e');
+
+      try {
+        String cleaned = _extractJsonFromResponse(generatedText);
+        final result = jsonDecode(cleaned);
+
+        List<Map<String, dynamic>> placements = [];
+
+        if (result['placements'] is List) {
+          for (var p in result['placements']) {
+            if (p is Map) {
+              DateTime? deadline;
+              if (p["deadline"] != null && p["deadline"].toString().isNotEmpty) {
+                deadline = DateTime.tryParse(p["deadline"].toString());
+              }
+
+              placements.add({
+                "placementID": p["placementID"]?.toString().trim() ?? "",
+                "partnerCompany": p["partnerCompany"]?.toString().trim() ?? "",
+                "contacts": _processStringList(p["contacts"]),
+                "positions": _processStringList(p["positions"]),
+                "deadline": deadline?.toIso8601String(),
+                "createdAt": p["createdAt"]?.toString().trim() ?? DateTime.now().toIso8601String(),
+              });
+            }
+          }
+        }
+
+        print("✅ Successfully parsed ${placements.length} placements");
+        return {"placements": placements};
+      } catch (e) {
+        print("❌ JSON parsing error: $e");
+        return {"placements": []};
+      }
+    } else {
+      print("❌ Cohere API error: ${response.statusCode}");
       return {"placements": []};
     }
+  } catch (e) {
+    print('❌ Error analyzing placement with Cohere: $e');
+    return {"placements": []};
   }
-
+}
   
 
   String _cleanCategory(String category) {

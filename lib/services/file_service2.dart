@@ -279,28 +279,32 @@ Future<void> batchUploadToInformationBank(List<InformationBank> documents) async
     rethrow;
   }
 }
-  Future<void> saveToAdmission(Admissions ad) async {
-    try {
-      final sanitizedId = sanitizeId(ad.id);
+Future<void> saveToAdmission(Admissions ad) async {
+  try {
+    final sanitizedId = sanitizeId(ad.id);
 
-      await firestore.collection('admissions').doc(sanitizedId).set({
-        'admissionID': sanitizedId,
-        'title': ad.title,
-        'content': ad.content,
-        'source': ad.source,
-        'academicYear': ad.academicYear,
-        'steps': ad.steps,
-        'contact': ad.contact,
-        'links': ad.links,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+    // Prepare data map
+    final Map<String, dynamic> admissionData = {
+      'admissionID': sanitizedId,
+      'title': ad.title,
+      'content': ad.content,
+      'source': ad.source,
+      'academicYear': ad.academicYear, // This is now Map<String, int>?
+      'steps': ad.steps,
+      'contact': ad.contact,
+      'requirements': ad.requirements ?? [], // Add requirements field
+      'links': ad.links,
+      'createdAt': FieldValue.serverTimestamp(),
+    };
 
-      print('✅ Admission document saved successfully');
-    } catch (e) {
-      print('❌ Error saving admission document: $e');
-      rethrow;
-    }
+    await firestore.collection('admissions').doc(sanitizedId).set(admissionData);
+
+    print('✅ Admission document saved successfully with ${ad.requirements?.length ?? 0} requirements');
+  } catch (e) {
+    print('❌ Error saving admission document: $e');
+    rethrow;
   }
+}
 
   Future<void> saveMultipleScholarships(List<Scholarship> scholarships) async {
     try {
@@ -337,30 +341,34 @@ Future<void> batchUploadToInformationBank(List<InformationBank> documents) async
   }
 
   Future<void> saveMultiplePlacements(List<Placement> placements) async {
-    try {
-      // Use batch write for better performance
-      WriteBatch batch = firestore.batch();
+  try {
+    WriteBatch batch = firestore.batch();
 
-      for (Placement placement in placements) {
-        final sanitizedId = sanitizeId(placement.placementID);
-        final docRef = firestore.collection('placements').doc(sanitizedId);
+    for (Placement placement in placements) {
+      final sanitizedId = sanitizeId(placement.placementID);
+      final docRef = firestore.collection('placements').doc(sanitizedId);
 
-        batch.set(docRef, {
-          'placementID': sanitizedId,
-          'partnerCompany': placement.partnerCompany,
-          'contacts': placement.contacts,
-          'positions': placement.positions,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
-
-      await batch.commit();
-      print('✅ Batch saved ${placements.length} placements successfully');
-    } catch (e) {
-      print('❌ Error batch saving placements: $e');
-      rethrow;
+      batch.set(docRef, {
+        'placementID': sanitizedId,
+        'partnerCompany': placement.partnerCompany,
+        'contacts': placement.contacts,
+        'positions': placement.positions,
+        'isRecruiting': placement.isRecruiting,
+        'deadline': placement.deadline != null
+            ? Timestamp.fromDate(placement.deadline!)
+            : null,
+        'createdAt': Timestamp.fromDate(placement.createdAt),
+      }, SetOptions(merge: true)); // important
     }
+
+    await batch.commit();
+    print('✅ Batch saved ${placements.length} placements successfully');
+  } catch (e) {
+    print('❌ Error batch saving placements: $e');
+    rethrow;
   }
+}
+
 
   /// Initialize Pinecone service
   Future<void> initializePinecone() async {

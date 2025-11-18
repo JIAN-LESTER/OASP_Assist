@@ -18,11 +18,8 @@ class AdmissionFormDialog extends StatefulWidget {
   final DocumentSnapshot? doc;
   final bool isEdit;
 
-  const AdmissionFormDialog({
-    Key? key,
-    this.doc,
-    this.isEdit = false,
-  }) : super(key: key);
+  const AdmissionFormDialog({Key? key, this.doc, this.isEdit = false})
+    : super(key: key);
 
   @override
   State<AdmissionFormDialog> createState() => _AdmissionFormDialogState();
@@ -42,6 +39,9 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
   List<TextEditingController> _contactControllers = [TextEditingController()];
   List<TextEditingController> _stepControllers = [TextEditingController()];
   List<TextEditingController> _linkControllers = [TextEditingController()];
+  List<TextEditingController> _requirementControllers = [
+    TextEditingController(),
+  ];
 
   bool _isSubmitting = false;
   bool _isProcessing = false;
@@ -61,24 +61,45 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     _titleController.text = data['title'] ?? '';
     _contentController.text = data['content'] ?? '';
     _sourceController.text = data['source'] ?? '';
-    _academicYearController.text = data['academicYear'] ?? '';
+
+    // Format academic year for display
+    if (data['academicYear'] is Map) {
+      final yearMap = Map<String, dynamic>.from(data['academicYear']);
+      if (yearMap.containsKey('end')) {
+        _academicYearController.text = '${yearMap['start']}-${yearMap['end']}';
+      } else {
+        _academicYearController.text = '${yearMap['start']}';
+      }
+    } else if (data['academicYear'] is String) {
+      _academicYearController.text = data['academicYear'];
+    }
 
     if (data['contact'] != null && data['contact'] is List) {
-      _contactControllers = (data['contact'] as List)
-          .map((c) => TextEditingController(text: c.toString()))
-          .toList();
+      _contactControllers =
+          (data['contact'] as List)
+              .map((c) => TextEditingController(text: c.toString()))
+              .toList();
     }
 
     if (data['steps'] != null && data['steps'] is List) {
-      _stepControllers = (data['steps'] as List)
-          .map((s) => TextEditingController(text: s.toString()))
-          .toList();
+      _stepControllers =
+          (data['steps'] as List)
+              .map((s) => TextEditingController(text: s.toString()))
+              .toList();
+    }
+
+    if (data['requirements'] != null && data['requirements'] is List) {
+      _requirementControllers =
+          (data['requirements'] as List)
+              .map((r) => TextEditingController(text: r.toString()))
+              .toList();
     }
 
     if (data['links'] != null && data['links'] is List) {
-      _linkControllers = (data['links'] as List)
-          .map((l) => TextEditingController(text: l.toString()))
-          .toList();
+      _linkControllers =
+          (data['links'] as List)
+              .map((l) => TextEditingController(text: l.toString()))
+              .toList();
     }
   }
 
@@ -90,6 +111,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     _academicYearController.dispose();
     for (var c in _contactControllers) c.dispose();
     for (var s in _stepControllers) s.dispose();
+    for (var r in _requirementControllers) r.dispose();
     for (var l in _linkControllers) l.dispose();
     _textRecognizer.close();
     super.dispose();
@@ -172,8 +194,8 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
         return;
       } else {
         final inputImage = InputImage.fromFilePath(image.path);
-        final RecognizedText recognizedText = 
-            await _textRecognizer.processImage(inputImage);
+        final RecognizedText recognizedText = await _textRecognizer
+            .processImage(inputImage);
         extractedText = recognizedText.text;
       }
 
@@ -185,7 +207,8 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
 
       setState(() {
         _selectedFile = File(image.path);
-        _selectedFileName = 'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        _selectedFileName =
+            'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
       });
 
       await _processExtractedText(extractedText, _selectedFileName!);
@@ -208,34 +231,86 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
         }
         _contentController.text = text;
         _sourceController.text = fileName;
-        _academicYearController.text = analysisResult['academicYear'] ?? '';
+
+        // Format academic year for display
+        if (analysisResult['academicYear'] is Map) {
+          final yearMap = analysisResult['academicYear'] as Map<String, int>;
+          if (yearMap.containsKey('end')) {
+            _academicYearController.text =
+                '${yearMap['start']}-${yearMap['end']}';
+          } else {
+            _academicYearController.text = '${yearMap['start']}';
+          }
+        }
 
         if (analysisResult['contacts'] is List<Map<String, dynamic>>) {
           List<Map<String, dynamic>> contacts =
               analysisResult['contacts'] as List<Map<String, dynamic>>;
           if (contacts.isNotEmpty) {
-            _contactControllers = contacts
-                .map((c) => TextEditingController(
-                    text: '${c['type']}: ${c['value']}'))
-                .toList();
+            _contactControllers =
+                contacts
+                    .map(
+                      (c) => TextEditingController(
+                        text: '${c['type']}: ${c['value']}',
+                      ),
+                    )
+                    .toList();
           }
         }
 
         if (analysisResult['steps'] is List) {
-          _stepControllers = (analysisResult['steps'] as List)
-              .map((s) => TextEditingController(text: s.toString()))
-              .toList();
+          _stepControllers =
+              (analysisResult['steps'] as List)
+                  .map((s) => TextEditingController(text: s.toString()))
+                  .toList();
+        }
+
+        if (analysisResult['requirements'] is List) {
+          _requirementControllers =
+              (analysisResult['requirements'] as List)
+                  .map((r) => TextEditingController(text: r.toString()))
+                  .toList();
         }
 
         if (analysisResult['links'] is List) {
-          _linkControllers = (analysisResult['links'] as List)
-              .map((l) => TextEditingController(text: l.toString()))
-              .toList();
+          _linkControllers =
+              (analysisResult['links'] as List)
+                  .map((l) => TextEditingController(text: l.toString()))
+                  .toList();
         }
       });
     } catch (e) {
       print('Error analyzing admission: $e');
     }
+  }
+
+  Map<String, int>? parseAcademicYear(
+    String? yearStr, [
+    String fallbackText = '',
+  ]) {
+    if ((yearStr == null || yearStr.trim().isEmpty) &&
+        fallbackText.isNotEmpty) {
+      yearStr = fallbackText;
+    }
+
+    if (yearStr == null || yearStr.trim().isEmpty) return null;
+
+    final rangeRegex = RegExp(r'(\d{4})\s*[-–]\s*(\d{4})');
+    final rangeMatch = rangeRegex.firstMatch(yearStr);
+    if (rangeMatch != null) {
+      return {
+        'start': int.parse(rangeMatch.group(1)!),
+        'end': int.parse(rangeMatch.group(2)!),
+      };
+    }
+
+    final singleRegex = RegExp(r'(\d{4})');
+    final singleMatch = singleRegex.firstMatch(yearStr);
+    if (singleMatch != null) {
+      return {'start': int.parse(singleMatch.group(1)!)};
+    }
+
+    return null;
   }
 
   void _showUploadOptionsBottomSheet() {
@@ -358,10 +433,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
         decoration: BoxDecoration(
           color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: color.withOpacity(0.2),
-            width: 1.5,
-          ),
+          border: Border.all(color: color.withOpacity(0.2), width: 1.5),
         ),
         child: Row(
           children: [
@@ -397,10 +469,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                   SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF6B7280),
-                    ),
+                    style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
                   ),
                 ],
               ),
@@ -433,19 +502,27 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
         title: _titleController.text.trim(),
         content: _contentController.text.trim(),
         source: _sourceController.text.trim(),
-        academicYear: _academicYearController.text.trim(),
-        contact: _contactControllers
-            .map((c) => c.text.trim())
-            .where((t) => t.isNotEmpty)
-            .toList(),
-        steps: _stepControllers
-            .map((s) => s.text.trim())
-            .where((t) => t.isNotEmpty)
-            .toList(),
-        links: _linkControllers
-            .map((l) => l.text.trim())
-            .where((t) => t.isNotEmpty)
-            .toList(),
+        academicYear: parseAcademicYear(_academicYearController.text.trim()),
+        contact:
+            _contactControllers
+                .map((c) => c.text.trim())
+                .where((t) => t.isNotEmpty)
+                .toList(),
+        steps:
+            _stepControllers
+                .map((s) => s.text.trim())
+                .where((t) => t.isNotEmpty)
+                .toList(),
+        requirements:
+            _requirementControllers
+                .map((r) => r.text.trim())
+                .where((t) => t.isNotEmpty)
+                .toList(),
+        links:
+            _linkControllers
+                .map((l) => l.text.trim())
+                .where((t) => t.isNotEmpty)
+                .toList(),
         createdAt: DateTime.now(),
       );
 
@@ -515,20 +592,47 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     late OverlayEntry overlayEntry;
 
     overlayEntry = OverlayEntry(
-      builder: (context) => TopRightAlert(
-        message: message,
-        type: type,
-        onDismiss: () => overlayEntry.remove(),
-        isMobile: MediaQuery.of(context).size.width < 600,
-        isTablet: MediaQuery.of(context).size.width >= 600 &&
-            MediaQuery.of(context).size.width < 1100,
-      ),
+      builder:
+          (context) => TopRightAlert(
+            message: message,
+            type: type,
+            onDismiss: () => overlayEntry.remove(),
+            isMobile: MediaQuery.of(context).size.width < 600,
+            isTablet:
+                MediaQuery.of(context).size.width >= 600 &&
+                MediaQuery.of(context).size.width < 1100,
+          ),
     );
 
     overlay.insert(overlayEntry);
     Future.delayed(Duration(seconds: 4), () {
       if (overlayEntry.mounted) overlayEntry.remove();
     });
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon, bool isMobile) {
+    return Row(
+      children: [
+        Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Color(0xFF2E7D32).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 20, color: Color(0xFF2E7D32)),
+        ),
+        SizedBox(width: 12),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1F2937),
+            letterSpacing: -0.2,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -658,46 +762,82 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                   children: [
                     // Upload button
                     if (!widget.isEdit)
-                      Center(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0xFF1976D2), Color(0xFF1565C0)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0xFF1976D2).withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Color(0xFFFAFBFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color:
+                                _selectedFile != null
+                                    ? Color(0xFF2E7D32).withOpacity(0.4)
+                                    : Color(0xFFE5E7EB),
+                            width: 2,
                           ),
-                          child: ElevatedButton.icon(
-                            icon: Icon(Icons.upload_file_outlined, size: 20),
-                            label: Text(
-                              'Import from Document/Image',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shadowColor: Colors.transparent,
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap:
+                                _isProcessing
+                                    ? null
+                                    : _showUploadOptionsBottomSheet,
+                            child: Padding(
                               padding: EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 14,
+                                horizontal: isMobile ? 20 : 32,
+                                vertical: isMobile ? 24 : 32,
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: isMobile ? 56 : 72,
+                                    height: isMobile ? 56 : 72,
+                                    decoration: BoxDecoration(
+                                      color:
+                                          _selectedFile != null
+                                              ? Color(0xFF2E7D32)
+                                              : Color(
+                                                0xFF2E7D32,
+                                              ).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(
+                                      _selectedFile != null
+                                          ? Icons.insert_drive_file
+                                          : Icons.upload_file,
+                                      color:
+                                          _selectedFile != null
+                                              ? Colors.white
+                                              : Color(0xFF2E7D32),
+                                      size: isMobile ? 28 : 32,
+                                    ),
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    _selectedFile != null
+                                        ? _selectedFileName ?? 'File selected'
+                                        : 'Click to upload document or image',
+                                    style: TextStyle(
+                                      fontSize: isMobile ? 15 : 16,
+                                      color: Color(0xFF1F2937),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Documents: PDF, TXT, DOC, DOCX • Images: JPG, PNG',
+                                    style: TextStyle(
+                                      fontSize: isMobile ? 13 : 14,
+                                      color: Color(0xFF9CA3AF),
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ),
                             ),
-                            onPressed: _isProcessing ? null : _showUploadOptionsBottomSheet,
                           ),
                         ),
                       ),
@@ -785,6 +925,14 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                       isMobile,
                     ),
                     SizedBox(height: 24),
+                    _buildDynamicListSection(
+                      'Requirements',
+                      _requirementControllers,
+                      Icons.checklist_outlined,
+                      'e.g., Form 137, Birth Certificate',
+                      isMobile,
+                    ),
+                    SizedBox(height: 24),
 
                     _buildDynamicListSection(
                       'Relevant Links',
@@ -816,10 +964,14 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                     child: SizedBox(
                       height: isMobile ? 40 : 46,
                       child: OutlinedButton(
-                        onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                        onPressed:
+                            _isSubmitting ? null : () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Color(0xFF6B7280),
-                          side: BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+                          side: BorderSide(
+                            color: Color(0xFFD1D5DB),
+                            width: 1.5,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -849,37 +1001,39 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: _isSubmitting
-                            ? Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
+                        child:
+                            _isSubmitting
+                                ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
                                       ),
                                     ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    '${widget.isEdit ? 'Updating' : 'Creating'}...',
-                                    style: TextStyle(
-                                      fontSize: isMobile ? 14 : 15,
-                                      fontWeight: FontWeight.w600,
+                                    SizedBox(width: 8),
+                                    Text(
+                                      '${widget.isEdit ? 'Updating' : 'Creating'}...',
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 14 : 15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
+                                  ],
+                                )
+                                : Text(
+                                  '${widget.isEdit ? 'Update' : 'Add'} Admission',
+                                  style: TextStyle(
+                                    fontSize: isMobile ? 14 : 15,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                ],
-                              )
-                            : Text(
-                                '${widget.isEdit ? 'Update' : 'Add'} Admission',
-                                style: TextStyle(
-                                  fontSize: isMobile ? 14 : 15,
-                                  fontWeight: FontWeight.w600,
                                 ),
-                              ),
                       ),
                     ),
                   ),

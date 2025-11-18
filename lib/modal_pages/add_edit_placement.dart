@@ -11,6 +11,7 @@ import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 import 'package:capstone_project/models/placement.dart';
 import 'package:capstone_project/services/cohere_service.dart';
 import 'package:capstone_project/services/file_service2.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:capstone_project/models/info_bank.dart';
 
@@ -18,11 +19,8 @@ class PlacementFormDialog extends StatefulWidget {
   final DocumentSnapshot? doc;
   final bool isEdit;
 
-  const PlacementFormDialog({
-    Key? key,
-    this.doc,
-    this.isEdit = false,
-  }) : super(key: key);
+  const PlacementFormDialog({Key? key, this.doc, this.isEdit = false})
+    : super(key: key);
 
   @override
   State<PlacementFormDialog> createState() => _PlacementFormDialogState();
@@ -35,9 +33,11 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
   final TextRecognizer _textRecognizer = TextRecognizer();
 
   final TextEditingController _companyController = TextEditingController();
-  
+
   List<TextEditingController> _positionControllers = [TextEditingController()];
   List<TextEditingController> _contactControllers = [TextEditingController()];
+  final TextEditingController _deadlineController = TextEditingController();
+  DateTime? _selectedDeadline;
 
   bool _isSubmitting = false;
   bool _isProcessing = false;
@@ -59,15 +59,26 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
     _isRecruiting = data['isRecruiting'] ?? true;
 
     if (data['positions'] != null && data['positions'] is List) {
-      _positionControllers = (data['positions'] as List)
-          .map((p) => TextEditingController(text: p.toString()))
-          .toList();
+      _positionControllers =
+          (data['positions'] as List)
+              .map((p) => TextEditingController(text: p.toString()))
+              .toList();
     }
 
     if (data['contacts'] != null && data['contacts'] is List) {
-      _contactControllers = (data['contacts'] as List)
-          .map((c) => TextEditingController(text: c.toString()))
-          .toList();
+      _contactControllers =
+          (data['contacts'] as List)
+              .map((c) => TextEditingController(text: c.toString()))
+              .toList();
+    }
+
+    if (data['deadline'] != null) {
+      if (data['deadline'] is Timestamp) {
+        _selectedDeadline = (data['deadline'] as Timestamp).toDate();
+        _deadlineController.text = DateFormat(
+          'yyyy-MM-dd',
+        ).format(_selectedDeadline!);
+      }
     }
   }
 
@@ -76,8 +87,37 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
     _companyController.dispose();
     for (var c in _positionControllers) c.dispose();
     for (var c in _contactControllers) c.dispose();
+    _deadlineController.dispose();
     _textRecognizer.close();
     super.dispose();
+  }
+
+  Future<void> _selectDeadline() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDeadline ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(Duration(days: 365 * 5)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Color(0xFF2E7D32),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF1F2937),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDeadline = picked;
+        _deadlineController.text = DateFormat('yyyy-MM-dd').format(picked);
+      });
+    }
   }
 
   Future<void> _pickFile() async {
@@ -157,8 +197,8 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
         return;
       } else {
         final inputImage = InputImage.fromFilePath(image.path);
-        final RecognizedText recognizedText = 
-            await _textRecognizer.processImage(inputImage);
+        final RecognizedText recognizedText = await _textRecognizer
+            .processImage(inputImage);
         extractedText = recognizedText.text;
       }
 
@@ -170,7 +210,8 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
 
       setState(() {
         _selectedFile = File(image.path);
-        _selectedFileName = 'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        _selectedFileName =
+            'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
       });
 
       await _processExtractedText(extractedText, _selectedFileName!);
@@ -187,7 +228,7 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
     try {
       final analysisResult = await _cohereService.analyzePlacement(text);
 
-      if (analysisResult['placements'] is List && 
+      if (analysisResult['placements'] is List &&
           (analysisResult['placements'] as List).isNotEmpty) {
         final placementData = (analysisResult['placements'] as List).first;
 
@@ -195,15 +236,17 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
           _companyController.text = placementData['partnerCompany'] ?? '';
 
           if (placementData['positions'] is List) {
-            _positionControllers = (placementData['positions'] as List)
-                .map((p) => TextEditingController(text: p.toString()))
-                .toList();
+            _positionControllers =
+                (placementData['positions'] as List)
+                    .map((p) => TextEditingController(text: p.toString()))
+                    .toList();
           }
 
           if (placementData['contacts'] is List) {
-            _contactControllers = (placementData['contacts'] as List)
-                .map((c) => TextEditingController(text: c.toString()))
-                .toList();
+            _contactControllers =
+                (placementData['contacts'] as List)
+                    .map((c) => TextEditingController(text: c.toString()))
+                    .toList();
           }
         });
       }
@@ -317,6 +360,32 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
     );
   }
 
+Widget _buildSectionHeader(String title, IconData icon, bool isMobile) {
+  return Row(
+    children: [
+      Container(
+        padding: EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Color(0xFF2E7D32).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, size: 20, color: Color(0xFF2E7D32)),
+      ),
+      SizedBox(width: 12),
+      Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF1F2937),
+          letterSpacing: -0.2,
+        ),
+      ),
+    ],
+  );
+}
+
+
   Widget _buildUploadOption({
     required IconData icon,
     required String title,
@@ -332,10 +401,7 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
         decoration: BoxDecoration(
           color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: color.withOpacity(0.2),
-            width: 1.5,
-          ),
+          border: Border.all(color: color.withOpacity(0.2), width: 1.5),
         ),
         child: Row(
           children: [
@@ -371,10 +437,7 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
                   SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF6B7280),
-                    ),
+                    style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
                   ),
                 ],
               ),
@@ -405,15 +468,18 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
       final placement = Placement(
         placementID: docId,
         partnerCompany: _companyController.text.trim(),
-        positions: _positionControllers
-            .map((p) => p.text.trim())
-            .where((t) => t.isNotEmpty)
-            .toList(),
-        contacts: _contactControllers
-            .map((c) => c.text.trim())
-            .where((t) => t.isNotEmpty)
-            .toList(),
+        positions:
+            _positionControllers
+                .map((p) => p.text.trim())
+                .where((t) => t.isNotEmpty)
+                .toList(),
+        contacts:
+            _contactControllers
+                .map((c) => c.text.trim())
+                .where((t) => t.isNotEmpty)
+                .toList(),
         isRecruiting: _isRecruiting,
+        deadline: _selectedDeadline, // ✅ ADDED
         createdAt: DateTime.now(),
       );
 
@@ -423,7 +489,7 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
 Company: ${_companyController.text.trim()}
 Positions: ${_positionControllers.map((p) => p.text.trim()).join(', ')}
 Contacts: ${_contactControllers.map((c) => c.text.trim()).join(', ')}
-Status: ${_isRecruiting ? 'Currently Recruiting' : 'Not Recruiting'}
+Status: ${_isRecruiting ? 'Currently Vacant' : 'Not Vacant'}
 ''';
 
       final informationBank = InformationBank(
@@ -459,10 +525,11 @@ Status: ${_isRecruiting ? 'Currently Recruiting' : 'Not Recruiting'}
       String actorName = 'Unknown';
 
       if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
         if (userDoc.exists) {
           final userData = userDoc.data() as Map<String, dynamic>;
           actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
@@ -487,14 +554,16 @@ Status: ${_isRecruiting ? 'Currently Recruiting' : 'Not Recruiting'}
     late OverlayEntry overlayEntry;
 
     overlayEntry = OverlayEntry(
-      builder: (context) => TopRightAlert(
-        message: message,
-        type: type,
-        onDismiss: () => overlayEntry.remove(),
-        isMobile: MediaQuery.of(context).size.width < 600,
-        isTablet: MediaQuery.of(context).size.width >= 600 &&
-            MediaQuery.of(context).size.width < 1100,
-      ),
+      builder:
+          (context) => TopRightAlert(
+            message: message,
+            type: type,
+            onDismiss: () => overlayEntry.remove(),
+            isMobile: MediaQuery.of(context).size.width < 600,
+            isTablet:
+                MediaQuery.of(context).size.width >= 600 &&
+                MediaQuery.of(context).size.width < 1100,
+          ),
     );
 
     overlay.insert(overlayEntry);
@@ -629,50 +698,78 @@ Status: ${_isRecruiting ? 'Currently Recruiting' : 'Not Recruiting'}
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Upload button
-                    if (!widget.isEdit)
-                      Center(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0xFF1976D2), Color(0xFF1565C0)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0xFF1976D2).withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: ElevatedButton.icon(
-                            icon: Icon(Icons.upload_file_outlined, size: 20),
-                            label: Text(
-                              'Import from Document/Image',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shadowColor: Colors.transparent,
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 14,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            onPressed: _isProcessing ? null : _showUploadOptionsBottomSheet,
-                          ),
-                        ),
-                      ),
+                   if (!widget.isEdit)
+  Container(
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: Color(0xFFFAFBFC),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: _selectedFile != null
+            ? Color(0xFF2E7D32).withOpacity(0.4)
+            : Color(0xFFE5E7EB),
+        width: 2,
+      ),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: _isProcessing ? null : _showUploadOptionsBottomSheet,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 20 : 32,
+            vertical: isMobile ? 24 : 32,
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: isMobile ? 56 : 72,
+                height: isMobile ? 56 : 72,
+                decoration: BoxDecoration(
+                  color: _selectedFile != null
+                      ? Color(0xFF2E7D32)
+                      : Color(0xFF2E7D32).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _selectedFile != null
+                      ? Icons.insert_drive_file
+                      : Icons.upload_file,
+                  color: _selectedFile != null
+                      ? Colors.white
+                      : Color(0xFF2E7D32),
+                  size: isMobile ? 28 : 32,
+                ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                _selectedFile != null
+                    ? _selectedFileName ?? 'File selected'
+                    : 'Click to upload document or image',
+                style: TextStyle(
+                  fontSize: isMobile ? 15 : 16,
+                  color: Color(0xFF1F2937),
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Documents: PDF, TXT, DOC, DOCX • Images: JPG, PNG',
+                style: TextStyle(
+                  fontSize: isMobile ? 13 : 14,
+                  color: Color(0xFF9CA3AF),
+                  fontWeight: FontWeight.w400,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  ),
 
                     if (_isProcessing)
                       Padding(
@@ -727,15 +824,19 @@ Status: ${_isRecruiting ? 'Currently Recruiting' : 'Not Recruiting'}
                           Container(
                             padding: EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: _isRecruiting 
-                                  ? Color(0xFF2E7D32).withOpacity(0.15)
-                                  : Colors.grey.withOpacity(0.15),
+                              color:
+                                  _isRecruiting
+                                      ? Color(0xFF2E7D32).withOpacity(0.15)
+                                      : Colors.grey.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
                               Icons.work_outline,
                               size: 20,
-                              color: _isRecruiting ? Color(0xFF2E7D32) : Colors.grey[600],
+                              color:
+                                  _isRecruiting
+                                      ? Color(0xFF2E7D32)
+                                      : Colors.grey[600],
                             ),
                           ),
                           SizedBox(width: 12),
@@ -754,9 +855,9 @@ Status: ${_isRecruiting ? 'Currently Recruiting' : 'Not Recruiting'}
                                 ),
                                 SizedBox(height: 2),
                                 Text(
-                                  _isRecruiting 
+                                  _isRecruiting
                                       ? 'Currently accepting applications'
-                                      : 'Not recruiting at this time',
+                                      : 'Not vacant at this time',
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: Color(0xFF6B7280),
@@ -776,7 +877,19 @@ Status: ${_isRecruiting ? 'Currently Recruiting' : 'Not Recruiting'}
                       ),
                     ),
                     SizedBox(height: 24),
-
+                    InkWell(
+                      onTap: _selectDeadline,
+                      child: AbsorbPointer(
+                        child: buildTextField(
+                          controller: _deadlineController,
+                          isMobile: isMobile,
+                          label: 'Application Deadline',
+                          hint: 'Select deadline date',
+                          icon: Icons.calendar_today_outlined,
+                        ),
+                      ),
+                    ),
+ SizedBox(height: 24),
                     // Dynamic Lists
                     _buildDynamicListSection(
                       'Available Positions',
@@ -817,10 +930,14 @@ Status: ${_isRecruiting ? 'Currently Recruiting' : 'Not Recruiting'}
                     child: SizedBox(
                       height: isMobile ? 40 : 46,
                       child: OutlinedButton(
-                        onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                        onPressed:
+                            _isSubmitting ? null : () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Color(0xFF6B7280),
-                          side: BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+                          side: BorderSide(
+                            color: Color(0xFFD1D5DB),
+                            width: 1.5,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -850,37 +967,39 @@ Status: ${_isRecruiting ? 'Currently Recruiting' : 'Not Recruiting'}
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: _isSubmitting
-                            ? Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
+                        child:
+                            _isSubmitting
+                                ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
                                       ),
                                     ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    '${widget.isEdit ? 'Updating' : 'Creating'}...',
-                                    style: TextStyle(
-                                      fontSize: isMobile ? 14 : 15,
-                                      fontWeight: FontWeight.w600,
+                                    SizedBox(width: 8),
+                                    Text(
+                                      '${widget.isEdit ? 'Updating' : 'Creating'}...',
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 14 : 15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
+                                  ],
+                                )
+                                : Text(
+                                  '${widget.isEdit ? 'Update' : 'Add'} Placement',
+                                  style: TextStyle(
+                                    fontSize: isMobile ? 14 : 15,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                ],
-                              )
-                            : Text(
-                                '${widget.isEdit ? 'Update' : 'Add'} Placement',
-                                style: TextStyle(
-                                  fontSize: isMobile ? 14 : 15,
-                                  fontWeight: FontWeight.w600,
                                 ),
-                              ),
                       ),
                     ),
                   ),

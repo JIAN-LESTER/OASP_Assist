@@ -1412,9 +1412,17 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final categoryController = TextEditingController(
       text: data['category'] ?? 'General',
     );
-    final deadlineController = TextEditingController(
-      text: data['deadline'] ?? '',
-    );
+    final d = data['deadline'];
+String deadlineText = '';
+
+if (d is Timestamp) {
+  deadlineText = DateFormat('yyyy-MM-dd').format(d.toDate());
+} else if (d is String) {
+  deadlineText = d;
+}
+
+final deadlineController = TextEditingController(text: deadlineText);
+
 
     String selectedCategory = data['category'] ?? 'General';
     bool isLoading = false;

@@ -13,6 +13,7 @@ async function getUserFCMTokens(
 ): Promise<Map<string, string[]>> {
   try {
     const userTokensMap = new Map<string, string[]>();
+    const allSeenTokens = new Set<string>(); // ✅ Track globally to avoid cross-user duplicates
 
     for (let i = 0; i < userIds.length; i += 10) {
       const batch = userIds.slice(i, i + 10);
@@ -25,18 +26,30 @@ async function getUserFCMTokens(
       tokensSnapshot.forEach((doc) => {
         const data = doc.data();
         const userId = data.userId;
-        const tokens = data.tokens || [];
+        // Ensure tokens is an array of strings
+        const rawTokens = Array.isArray(data.tokens) ? data.tokens : [];
+        const tokens: string[] = rawTokens
+          .map((t) => (typeof t === "string" ? t : String(t)))
+          .filter((t) => t && t.length > 0);
 
         const mobileTokens = tokens.filter(
           (token: string) => !token.startsWith("web_") && token.length > 10
         );
 
-        if (mobileTokens.length > 0) {
-          userTokensMap.set(userId, mobileTokens);
+        // ✅ Deduplicate tokens per user
+        const uniqueTokens = [...new Set(mobileTokens)].filter(
+          (token: string) => !allSeenTokens.has(token)
+        );
+        
+        uniqueTokens.forEach(token => allSeenTokens.add(token));
+
+        if (uniqueTokens.length > 0) {
+          userTokensMap.set(userId, uniqueTokens);
         }
       });
     }
 
+    console.log(`📊 Total unique tokens across ${userTokensMap.size} users: ${allSeenTokens.size}`);
     return userTokensMap;
   } catch (error) {
     console.error("❌ Error getting user FCM tokens:", error);
@@ -58,9 +71,17 @@ async function sendFCMNotifications(
       return;
     }
 
+    // ✅ FIX: Deduplicate tokens using Set
     const allTokens: string[] = [];
+    const seenTokens = new Set<string>();
+    
     userTokensMap.forEach((tokens) => {
-      allTokens.push(...tokens);
+      tokens.forEach(token => {
+        if (!seenTokens.has(token)) {
+          seenTokens.add(token);
+          allTokens.push(token);
+        }
+      });
     });
 
     if (allTokens.length === 0) {
@@ -69,9 +90,8 @@ async function sendFCMNotifications(
     }
 
     console.log(
-      `📱 Sending FCM to ${allTokens.length} mobile devices (${userTokensMap.size} users)`
+      `📱 Sending FCM to ${allTokens.length} unique mobile devices (${userTokensMap.size} users)`
     );
-
     const message = {
       notification: {
         title: title,
@@ -113,7 +133,6 @@ async function sendFCMNotifications(
     };
 
     const response = await admin.messaging().sendEachForMulticast(message);
-
     console.log(
       `✅ FCM sent: ${response.successCount} successful, ${response.failureCount} failed`
     );
@@ -182,16 +201,24 @@ async function createNotificationsForUsers(
       `📝 Creating notifications for ${userIds.length} ${targetRole} users`
     );
 
-    // ✅ Build unique notification key
+    // ✅ Build unique notification key with CONSISTENT reminderDate for deadline reminders
     let uniqueKey = `${type}`;
     if (data.announcementId) {
       uniqueKey += `-${data.announcementId}`;
     } else if (data.escalationId) {
       uniqueKey += `-${data.escalationId}`;
+    } else if (data.scholarshipId) {
+      uniqueKey += `-${data.scholarshipId}`;
+    } else if (data.placementId) {
+      uniqueKey += `-${data.placementId}`;
     }
-    if (data.reminderDate) {
-      uniqueKey += `-${data.reminderDate}`;
+    
+    // ✅ ALWAYS include reminderDate for deadline reminders
+    if (type === "deadline_reminder") {
+      const reminderDate = data.reminderDate || new Date().toISOString().substring(0, 10);
+      uniqueKey += `-${reminderDate}`;
     }
+    
     if (data.eventId) {
       uniqueKey += `-${data.eventId}`;
     }
@@ -219,6 +246,8 @@ async function createNotificationsForUsers(
           type: type,
           escalationId: data.escalationId || null,
           announcementId: data.announcementId || null,
+          scholarshipId: data.scholarshipId || null,
+          placementId: data.placementId || null,
           conversationId: data.conversationId || null,
           data: data,
           readBy: [],
@@ -279,7 +308,7 @@ export const onAnnouncementCreated = onDocumentCreated(
   {
     document: "announcements/{announcementId}",
     region: "us-central1",
-    retry: false, // ✅ Don't retry on failure to prevent duplicates
+    retry: false,
   },
   async (event) => {
     const announcementId = event.params.announcementId;
@@ -287,54 +316,53 @@ export const onAnnouncementCreated = onDocumentCreated(
     console.log(`📢 onAnnouncementCreated triggered for: ${announcementId}`);
     console.log(`📢 Event ID: ${event.id}`);
     
+    // ✅ FIX: Add small delay to debounce rapid triggers
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     try {
-      const announcementData = event.data?.data();
-
-      if (!announcementData || announcementData.deleted === true) {
-        console.log("Announcement is deleted or invalid, skipping");
-        return;
-      }
-
-      // ✅ CRITICAL: Use idempotency key based on event ID
-      const idempotencyRef = db.collection("notification_processing")
-        .doc(`announcement_${announcementId}_${event.id}`);
+      const announcementRef = db.collection("announcements").doc(announcementId);
       
-      // ✅ Try to create idempotency record
+      let announcementData: any;
       try {
-        await idempotencyRef.create({
-          announcementId: announcementId,
-          eventId: event.id,
-          processedAt: admin.firestore.FieldValue.serverTimestamp(),
-          status: "processing"
+        await db.runTransaction(async (transaction) => {
+          const doc = await transaction.get(announcementRef);
+          
+          if (!doc.exists) {
+            throw new Error("Announcement does not exist");
+          }
+          
+          const data = doc.data();
+          
+          if (data?.deleted === true) {
+            throw new Error("Announcement is deleted");
+          }
+          
+          if (data?.notification_sent === true) {
+            throw new Error("Notification already sent");
+          }
+          
+          // Atomically set the flag
+          transaction.update(announcementRef, {
+            notification_sent: true,
+            notification_sent_at: admin.firestore.FieldValue.serverTimestamp(),
+            notification_event_id: event.id,
+          });
+          
+          announcementData = data;
         });
-        console.log(`✅ Idempotency lock acquired for ${announcementId}`);
+        
+        console.log(`✅ Acquired lock for announcement ${announcementId}`);
       } catch (error: any) {
-        if (error.code === 6) { // ALREADY_EXISTS
-          console.log(`⚠️ Notification already being processed for ${announcementId} (event: ${event.id})`);
-          return { success: false, reason: "already_processing" };
+        if (error.message === "Notification already sent") {
+          console.log(`⚠️ Notification already sent for ${announcementId}, skipping`);
+          return { success: false, reason: "already_sent" };
+        }
+        if (error.message === "Announcement is deleted" || error.message === "Announcement does not exist") {
+          console.log(`⚠️ ${error.message}, skipping`);
+          return { success: false, reason: "invalid_announcement" };
         }
         throw error;
       }
-
-      // ✅ Double-check notification_sent flag
-      const announcementRef = db.collection("announcements").doc(announcementId);
-      const currentDoc = await announcementRef.get();
-      
-      if (currentDoc.data()?.notification_sent === true) {
-        console.log(`⚠️ Notification already sent for ${announcementId}, skipping`);
-        await idempotencyRef.update({ status: "skipped_already_sent" });
-        return { success: false, reason: "already_sent" };
-      }
-
-      // ✅ Mark as sent BEFORE creating notifications
-      await announcementRef.update({
-        notification_sent: true,
-        notification_sent_at: admin.firestore.FieldValue.serverTimestamp(),
-        notification_event_id: event.id,
-      });
-      
-      console.log(`✅ Marked announcement ${announcementId} as notification_sent`);
-
       const message = announcementData.message || "New announcement posted";
       const category = announcementData.category || "General";
       const deadline = announcementData.deadline || null;
@@ -372,20 +400,12 @@ export const onAnnouncementCreated = onDocumentCreated(
           category: category,
           deadline: deadline ? deadline.toMillis().toString() : null,
           message: message,
-          eventId: event.id, // ✅ Pass event ID for extra uniqueness
+          eventId: event.id,
         }
       );
 
       console.log(`✅ Created ${notificationsCreated} notifications`);
 
-      // ✅ Update idempotency record
-      await idempotencyRef.update({ 
-        status: "completed",
-        notificationsCreated: notificationsCreated,
-        completedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      // Send FCM after Firestore notifications are created
       if (notificationsCreated > 0) {
         await sendFCMNotifications(userIds, notificationTitle, notificationBody, {
           type: "announcement",
@@ -397,20 +417,6 @@ export const onAnnouncementCreated = onDocumentCreated(
       return { success: true, notificationsCreated, eventId: event.id };
     } catch (error) {
       console.error("Error creating announcement notification:", error);
-      
-      // ✅ Mark idempotency record as failed
-      try {
-        const idempotencyRef = db.collection("notification_processing")
-          .doc(`announcement_${event.params.announcementId}_${event.id}`);
-        await idempotencyRef.update({ 
-          status: "failed",
-          error: String(error),
-          failedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      } catch (e) {
-        console.error("Failed to update idempotency record:", e);
-      }
-      
       return { success: false, error: error };
     }
   }
@@ -418,41 +424,75 @@ export const onAnnouncementCreated = onDocumentCreated(
 
 export const checkUpcomingDeadlines = onSchedule(
   {
-    schedule: "0 9 * * *",
+    schedule: "0 6,18 * * *",
     timeZone: "Asia/Manila",
-    region: "us-central1",
   },
   async (event) => {
+    const now = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
+    );
+    now.setHours(0, 0, 0, 0);
+    const reminderDateKey = now.toISOString().substring(0, 10);
+    
+    console.log("🔍 Checking for upcoming deadlines...");
+    console.log(`📅 Reminder date key: ${reminderDateKey}`);
+    
+    // ✅ FIX: Add idempotency check for scheduled function
+    const runLogRef = db.collection("scheduled_runs").doc(`deadlines_${reminderDateKey}`);
+    
+    try {
+      await runLogRef.create({
+        runDate: reminderDateKey,
+        startedAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "running",
+        type: "deadline_check"
+      });
+      console.log(`✅ Acquired lock for deadline check on ${reminderDateKey}`);
+    } catch (error: any) {
+      if (error.code === 6) { // ALREADY_EXISTS
+        console.log(`⚠️ Deadline check already ran today (${reminderDateKey})`);
+        return;
+      }
+      throw error;
+    }
+
     let totalNotificationsCreated = 0;
-    const processedAnnouncements = [];
+    const processedItems: any[] = [];
 
     try {
-      console.log("🔍 Checking for upcoming deadlines...");
       console.log(
         `📅 Current time: ${new Date().toLocaleString("en-PH", {
           timeZone: "Asia/Manila",
         })}`
       );
 
-      const now = new Date(
-        new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
-      );
-      now.setHours(0, 0, 0, 0);
-      const reminderDateKey = now.toISOString().substring(0, 10);
+      // Calculate the target date (3 days from now)
+      const targetDate = new Date(now);
+      targetDate.setDate(targetDate.getDate() + 3);
+      targetDate.setHours(23, 59, 59, 999);
 
       console.log(`📅 Today (Manila): ${reminderDateKey}`);
+      console.log(`🎯 Target deadline date: ${targetDate.toISOString()}`);
 
       const usersSnapshot = await db
         .collection("users")
         .where("isActive", "==", true)
         .get();
       const allUserIds = usersSnapshot.docs.map((doc) => doc.id);
+      
       if (allUserIds.length === 0) {
         console.log("ℹ️ No active users found. Exiting.");
+        await runLogRef.update({
+          status: "completed",
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          notificationsSent: 0,
+          reason: "no_active_users"
+        });
         return;
       }
       console.log(`👤 Found ${allUserIds.length} active users.`);
 
+      // ✅ Check Announcements
       const announcementsSnapshot = await db
         .collection("announcements")
         .where("deleted", "==", false)
@@ -466,11 +506,10 @@ export const checkUpcomingDeadlines = onSchedule(
       for (const announcementDoc of announcementsSnapshot.docs) {
         const data = announcementDoc.data();
         const announcementId = announcementDoc.id;
-
         const { deadline, message = "", category = "General" } = data;
 
         if (!deadline || typeof deadline.toDate !== 'function') {
-          console.log(`⚠️ No valid Firestore Timestamp deadline for ${announcementId}`);
+          console.log(`⚠️ Skipping announcement ${announcementId}: invalid deadline`);
           continue;
         }
 
@@ -483,14 +522,10 @@ export const checkUpcomingDeadlines = onSchedule(
         const diffMs = deadlineLocal.getTime() - now.getTime();
         const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-        console.log(
-          `📅 ${announcementId}: ${daysUntilDeadline} days until ${deadlineLocal.toDateString()}`
-        );
+        console.log(`📋 Announcement ${announcementId}: ${daysUntilDeadline} days until deadline`);
 
         if (daysUntilDeadline === 3) {
-          console.log(`⏰ Deadline approaching in 3 days: ${announcementId}`);
-
-          const title = `⏰ Deadline Reminder: ${category}`;
+          const title = `⏰ Deadline Reminder: ${category} Announcement`;
           const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
             month: 'short',
             day: 'numeric',
@@ -511,13 +546,14 @@ export const checkUpcomingDeadlines = onSchedule(
               category,
               deadline: deadlineLocal.toISOString(),
               message,
-              daysUntilDeadline: 3,
-              reminderDate: reminderDateKey,
+              daysUntilDeadline: "3",
+              reminderDate: reminderDateKey, // ✅ Always include this
             }
           );
 
           totalNotificationsCreated += notificationsCreated;
-          processedAnnouncements.push({
+          processedItems.push({
+            type: 'announcement',
             id: announcementId,
             category,
             deadline: deadlineLocal.toISOString(),
@@ -525,14 +561,167 @@ export const checkUpcomingDeadlines = onSchedule(
           });
 
           if (notificationsCreated > 0) {
-            const fcmData = {
+            await sendFCMNotifications(allUserIds, title, body, {
               type: "deadline_reminder",
               announcementId,
               category,
               daysUntilDeadline: "3",
-            };
+            });
+            console.log(`✅ Sent ${notificationsCreated} notifications for announcement ${announcementId}`);
+          }
+        }
+      }
 
-            await sendFCMNotifications(allUserIds, title, body, fcmData);
+      // ✅ Check Scholarships
+      const scholarshipsSnapshot = await db
+        .collection("scholarships")
+        .where("deadline", "!=", null)
+        .get();
+
+      console.log(
+        `🎓 Found ${scholarshipsSnapshot.size} scholarships with deadlines`
+      );
+
+      for (const scholarshipDoc of scholarshipsSnapshot.docs) {
+        const data = scholarshipDoc.data();
+        const scholarshipId = scholarshipDoc.id;
+        const { deadline, name = "", scholarshipProvider = "" } = data;
+
+        if (!deadline || typeof deadline.toDate !== 'function') {
+          console.log(`⚠️ Skipping scholarship ${scholarshipId}: invalid deadline`);
+          continue;
+        }
+
+        const deadlineDate = deadline.toDate();
+        const deadlineLocal = new Date(
+          deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+        );
+        deadlineLocal.setHours(0, 0, 0, 0);
+
+        const diffMs = deadlineLocal.getTime() - now.getTime();
+        const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+        console.log(`🎓 Scholarship ${scholarshipId} (${name}): ${daysUntilDeadline} days until deadline`);
+
+        if (daysUntilDeadline === 3) {
+          const title = `⏰ Scholarship Deadline Reminder`;
+          const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          });
+          const body = `${name} (${scholarshipProvider}) - Deadline in 3 days: ${formattedDate}`;
+
+          const notificationsCreated = await createNotificationsForUsers(
+            allUserIds,
+            "user",
+            title,
+            body,
+            "deadline_reminder",
+            {
+              scholarshipId,
+              name,
+              scholarshipProvider,
+              deadline: deadlineLocal.toISOString(),
+              daysUntilDeadline: "3",
+              reminderDate: reminderDateKey, // ✅ Always include this
+            }
+          );
+
+          totalNotificationsCreated += notificationsCreated;
+          processedItems.push({
+            type: 'scholarship',
+            id: scholarshipId,
+            name,
+            deadline: deadlineLocal.toISOString(),
+            notificationsSent: notificationsCreated,
+          });
+
+          if (notificationsCreated > 0) {
+            await sendFCMNotifications(allUserIds, title, body, {
+              type: "deadline_reminder",
+              scholarshipId,
+              name,
+              daysUntilDeadline: "3",
+            });
+            console.log(`✅ Sent ${notificationsCreated} notifications for scholarship ${scholarshipId}`);
+          }
+        }
+      }
+
+      // ✅ Check Placements
+      const placementsSnapshot = await db
+        .collection("placements")
+        .where("deadline", "!=", null)
+        .where("isRecruiting", "==", true)
+        .get();
+
+      console.log(
+        `💼 Found ${placementsSnapshot.size} placements with deadlines`
+      );
+
+      for (const placementDoc of placementsSnapshot.docs) {
+        const data = placementDoc.data();
+        const placementId = placementDoc.id;
+        const { deadline, partnerCompany = "" } = data;
+
+        if (!deadline || typeof deadline.toDate !== 'function') {
+          console.log(`⚠️ Skipping placement ${placementId}: invalid deadline`);
+          continue;
+        }
+
+        const deadlineDate = deadline.toDate();
+        const deadlineLocal = new Date(
+          deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+        );
+        deadlineLocal.setHours(0, 0, 0, 0);
+
+        const diffMs = deadlineLocal.getTime() - now.getTime();
+        const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+        console.log(`💼 Placement ${placementId} (${partnerCompany}): ${daysUntilDeadline} days until deadline`);
+
+        if (daysUntilDeadline === 3) {
+          const title = `⏰ Placement Deadline Reminder`;
+          const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          });
+          const body = `${partnerCompany} placement - Deadline in 3 days: ${formattedDate}`;
+
+          const notificationsCreated = await createNotificationsForUsers(
+            allUserIds,
+            "user",
+            title,
+            body,
+            "deadline_reminder",
+            {
+              placementId,
+              partnerCompany,
+              deadline: deadlineLocal.toISOString(),
+              daysUntilDeadline: "3",
+              reminderDate: reminderDateKey, // ✅ Always include this
+            }
+          );
+
+          totalNotificationsCreated += notificationsCreated;
+          processedItems.push({
+            type: 'placement',
+            id: placementId,
+            company: partnerCompany,
+            deadline: deadlineLocal.toISOString(),
+            notificationsSent: notificationsCreated,
+          });
+
+          if (notificationsCreated > 0) {
+            await sendFCMNotifications(allUserIds, title, body, {
+              type: "deadline_reminder",
+              placementId,
+              partnerCompany,
+              daysUntilDeadline: "3",
+            });
+            console.log(`✅ Sent ${notificationsCreated} notifications for placement ${placementId}`);
           }
         }
       }
@@ -540,9 +729,28 @@ export const checkUpcomingDeadlines = onSchedule(
       console.log(
         `✅ Done. Created ${totalNotificationsCreated} notifications in total.`
       );
-      console.log("📊 Processed announcements:", processedAnnouncements);
+      console.log("📊 Processed items:", JSON.stringify(processedItems, null, 2));
+      
+      // ✅ Update run log with success
+      await runLogRef.update({
+        status: "completed",
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        notificationsSent: totalNotificationsCreated,
+        processedItems: processedItems
+      });
+      
+      return;
     } catch (error) {
       console.error("❌ Error checking deadlines:", error);
+      
+      // ✅ Update run log with failure
+      await runLogRef.update({
+        status: "failed",
+        error: String(error),
+        failedAt: admin.firestore.FieldValue.serverTimestamp(),
+        notificationsSent: totalNotificationsCreated
+      });
+      
       throw error;
     }
   }
@@ -571,6 +779,8 @@ export const cleanupDuplicateNotifications = onSchedule(
         const userId = data.userId;
         const announcementId = data.data?.announcementId || data.announcementId;
         const escalationId = data.data?.escalationId || data.escalationId;
+        const scholarshipId = data.data?.scholarshipId || data.scholarshipId;
+        const placementId = data.data?.placementId || data.placementId;
         const type = data.type;
         const reminderDate = data.data?.reminderDate;
 
@@ -579,6 +789,10 @@ export const cleanupDuplicateNotifications = onSchedule(
           key += `-${announcementId}`;
         } else if (escalationId) {
           key += `-${escalationId}`;
+        } else if (scholarshipId) {
+          key += `-${scholarshipId}`;
+        } else if (placementId) {
+          key += `-${placementId}`;
         }
         if (reminderDate) {
           key += `-${reminderDate}`;
@@ -633,9 +847,8 @@ export const cleanupOldNotifications = onSchedule(
   },
   async (event) => {
     try {
-      console.log("🧹 Cleaning up old notifications and idempotency records...");
+      console.log("🧹 Cleaning up old notifications and records...");
 
-      // Clean old notifications (30 days)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -658,10 +871,30 @@ export const cleanupOldNotifications = onSchedule(
         console.log("ℹ️ No old notifications to delete");
       }
 
-      // Clean old idempotency records (7 days)
+      // ✅ Cleanup old scheduled run logs (7 days)
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+      const oldRunLogsSnapshot = await db
+        .collection("scheduled_runs")
+        .where("startedAt", "<", sevenDaysAgo)
+        .limit(500)
+        .get();
+
+      if (!oldRunLogsSnapshot.empty) {
+        const batch = db.batch();
+        oldRunLogsSnapshot.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log(
+          `✅ Deleted ${oldRunLogsSnapshot.size} old scheduled run logs`
+        );
+      } else {
+        console.log("ℹ️ No old scheduled run logs to delete");
+      }
+
+      // ✅ Cleanup old processing records (removed from original code)
       const oldProcessingSnapshot = await db
         .collection("notification_processing")
         .where("processedAt", "<", sevenDaysAgo)
@@ -675,10 +908,10 @@ export const cleanupOldNotifications = onSchedule(
         });
         await batch.commit();
         console.log(
-          `✅ Deleted ${oldProcessingSnapshot.size} old idempotency records`
+          `✅ Deleted ${oldProcessingSnapshot.size} old processing records`
         );
       } else {
-        console.log("ℹ️ No old idempotency records to delete");
+        console.log("ℹ️ No old processing records to delete");
       }
     } catch (error) {
       console.error("Error cleaning up:", error);
@@ -690,6 +923,7 @@ export const onEscalationCreated = onDocumentCreated(
   {
     document: "escalations/{escalationId}",
     region: "us-central1",
+    retry: false,
   },
   async (event) => {
     try {
@@ -702,6 +936,28 @@ export const onEscalationCreated = onDocumentCreated(
       }
 
       console.log(`🆕 New escalation: ${escalationId}`);
+      console.log(`🆕 Event ID: ${event.id}`);
+
+      // ✅ FIX: Add idempotency check for escalation notifications
+      const idempotencyRef = db.collection("notification_processing")
+        .doc(`escalation_created_${escalationId}_${event.id}`);
+      
+      try {
+        await idempotencyRef.create({
+          escalationId: escalationId,
+          eventId: event.id,
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          status: "processing",
+          type: "escalation_created"
+        });
+        console.log(`✅ Idempotency lock acquired for escalation ${escalationId}`);
+      } catch (error: any) {
+        if (error.code === 6) { // ALREADY_EXISTS
+          console.log(`⚠️ Notification already being processed for escalation ${escalationId} (event: ${event.id})`);
+          return { success: false, reason: "already_processing" };
+        }
+        throw error;
+      }
 
       const question = escalationData.question || "New question";
       const userId = escalationData.userId;
@@ -738,18 +994,28 @@ export const onEscalationCreated = onDocumentCreated(
 
       if (staffSnapshot.empty) {
         console.log("⚠️ No staff members found");
+        await idempotencyRef.update({ 
+          status: "completed",
+          reason: "no_staff",
+          completedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
         return;
       }
 
       if (adminSnapshot.empty) {
         console.log("⚠️ No admin found");
+        await idempotencyRef.update({ 
+          status: "completed",
+          reason: "no_admin",
+          completedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
         return;
       }
 
       const staffIds = staffSnapshot.docs.map((doc) => doc.id);
       const adminIds = adminSnapshot.docs.map((doc) => doc.id);
 
-      await createNotificationsForUsers(
+      const staffNotifications = await createNotificationsForUsers(
         staffIds,
         "staff",
         notificationTitle,
@@ -760,10 +1026,11 @@ export const onEscalationCreated = onDocumentCreated(
           question: question,
           userId: userId,
           conversationId: conversationId,
+          eventId: event.id,
         }
       );
 
-      await createNotificationsForUsers(
+      const adminNotifications = await createNotificationsForUsers(
         adminIds,
         "admin",
         notificationTitle,
@@ -774,6 +1041,7 @@ export const onEscalationCreated = onDocumentCreated(
           question: question,
           userId: userId,
           conversationId: conversationId,
+          eventId: event.id,
         }
       );
 
@@ -802,9 +1070,32 @@ export const onEscalationCreated = onDocumentCreated(
       console.log(
         `✅ Notifications sent with escalationId: ${escalationId}, conversationId: ${conversationId}`
       );
-      return { success: true };
+      console.log(`✅ Created ${staffNotifications} staff + ${adminNotifications} admin notifications`);
+      
+      // ✅ Update idempotency record with success
+      await idempotencyRef.update({ 
+        status: "completed",
+        notificationsCreated: staffNotifications + adminNotifications,
+        completedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      return { success: true, staffNotifications, adminNotifications };
     } catch (error) {
       console.error("Error creating escalation notification:", error);
+      
+      // ✅ Update idempotency record with failure
+      try {
+        const idempotencyRef = db.collection("notification_processing")
+          .doc(`escalation_created_${event.params.escalationId}_${event.id}`);
+        await idempotencyRef.update({ 
+          status: "failed",
+          error: String(error),
+          failedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (e) {
+        console.error("Failed to update idempotency record:", e);
+      }
+      
       return { success: false, error: error };
     }
   }
@@ -814,6 +1105,7 @@ export const onEscalationReplied = onDocumentUpdated(
   {
     document: "escalations/{escalationId}",
     region: "us-central1",
+    retry: false,
   },
   async (event) => {
     try {
@@ -838,6 +1130,28 @@ export const onEscalationReplied = onDocumentUpdated(
       }
 
       console.log(`💬 Staff or Admin replied to escalation: ${escalationId}`);
+      console.log(`💬 Event ID: ${event.id}`);
+
+      // ✅ FIX: Add idempotency check for escalation reply notifications
+      const idempotencyRef = db.collection("notification_processing")
+        .doc(`escalation_reply_${escalationId}_${event.id}`);
+      
+      try {
+        await idempotencyRef.create({
+          escalationId: escalationId,
+          eventId: event.id,
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          status: "processing",
+          type: "escalation_reply"
+        });
+        console.log(`✅ Idempotency lock acquired for escalation reply ${escalationId}`);
+      } catch (error: any) {
+        if (error.code === 6) { // ALREADY_EXISTS
+          console.log(`⚠️ Reply notification already being processed for escalation ${escalationId} (event: ${event.id})`);
+          return { success: false, reason: "already_processing" };
+        }
+        throw error;
+      }
 
       const userId = afterData.userId;
       const question = afterData.question || "Your question";
@@ -848,6 +1162,11 @@ export const onEscalationReplied = onDocumentUpdated(
 
       if (!userId) {
         console.log("No userId found in escalation");
+        await idempotencyRef.update({ 
+          status: "completed",
+          reason: "no_user_id",
+          completedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
         return;
       }
 
@@ -864,7 +1183,7 @@ export const onEscalationReplied = onDocumentUpdated(
           ? adminResponse || "Admin has responded."
           : staffResponse || "Staff has responded.";
 
-      await createNotificationsForUsers(
+      const notificationsCreated = await createNotificationsForUsers(
         [userId],
         "user",
         notificationTitle,
@@ -876,6 +1195,7 @@ export const onEscalationReplied = onDocumentUpdated(
           staffResponse,
           adminResponse,
           conversationId,
+          eventId: event.id,
         }
       );
 
@@ -893,9 +1213,31 @@ export const onEscalationReplied = onDocumentUpdated(
       console.log(
         `✅ Reply notification sent (${responderRole}) with escalationId: ${escalationId}`
       );
-      return { success: true, userId };
+      
+      // ✅ Update idempotency record with success
+      await idempotencyRef.update({ 
+        status: "completed",
+        notificationsCreated: notificationsCreated,
+        completedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      return { success: true, userId, notificationsCreated };
     } catch (error) {
       console.error("Error creating escalation reply notification:", error);
+      
+      // ✅ Update idempotency record with failure
+      try {
+        const idempotencyRef = db.collection("notification_processing")
+          .doc(`escalation_reply_${event.params.escalationId}_${event.id}`);
+        await idempotencyRef.update({ 
+          status: "failed",
+          error: String(error),
+          failedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (e) {
+        console.error("Failed to update idempotency record:", e);
+      }
+      
       return { success: false, error };
     }
   }

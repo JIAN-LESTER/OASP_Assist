@@ -505,6 +505,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
           final admissions = Admissions(
             id: documentId,
             steps: stepsList,
+            requirements: admissionCohere['requirements'],
             title: _titleController.text.trim(),
             content: _extractedText!,
             contact: contactsList,

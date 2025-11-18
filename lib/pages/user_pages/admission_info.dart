@@ -15,14 +15,13 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     with TickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   List<Admissions> _admissionYears = [];
-  String? _selectedAcademicYear;
+  Map<String, int>? _selectedAcademicYear;
   bool _isLoading = true;
   String? _error;
   int _currentStepIndex = 0;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  // Color scheme
   final Color primaryGreen = const Color(0xFF2E7D32);
   final Color lightGreen = const Color(0xFF4CAF50);
   final Color accentGreen = const Color(0xFF81C784);
@@ -54,36 +53,41 @@ class _AdmissionInfoState extends State<AdmissionInfo>
         _error = null;
       });
 
-      final querySnapshot =
-          await _firestore
-              .collection('admissions')
-              .orderBy('createdAt', descending: true)
-              .get();
+      final querySnapshot = await _firestore
+          .collection('admissions')
+          .orderBy('createdAt', descending: true)
+          .get();
 
       if (querySnapshot.docs.isNotEmpty) {
-        final List<Admissions> admissions =
-            querySnapshot.docs
-                .map(
-                  (doc) => Admissions.fromJson({...doc.data(), 'id': doc.id}),
-                )
-                .toList();
+        final List<Admissions> admissions = querySnapshot.docs
+            .map((doc) => Admissions.fromJson({...doc.data(), 'id': doc.id}))
+            .toList();
 
-        // Group by academic year and get unique years
+        // Group by academic year and keep one admission per year
         final Map<String, Admissions> yearMap = {};
         for (final admission in admissions) {
-          final year = admission.academicYear ?? 'Unknown Year';
-          if (!yearMap.containsKey(year)) {
-            yearMap[year] = admission;
+          final yearStr = _formatAcademicYear(admission.academicYear);
+          if (!yearMap.containsKey(yearStr)) {
+            yearMap[yearStr] = admission;
           }
         }
 
+        // Sort descending (most recent first)
+        final sortedAdmissions = yearMap.values.toList()
+          ..sort((a, b) {
+            final aStart = a.academicYear?['start'] ?? 0;
+            final bStart = b.academicYear?['start'] ?? 0;
+            return bStart.compareTo(aStart);
+          });
+
         setState(() {
-          _admissionYears = yearMap.values.toList();
+          _admissionYears = sortedAdmissions;
           if (_admissionYears.isNotEmpty) {
             _selectedAcademicYear = _admissionYears.first.academicYear;
           }
           _isLoading = false;
         });
+
         _animationController.forward();
       } else {
         setState(() {
@@ -99,9 +103,23 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     }
   }
 
+  String _formatAcademicYear(Map<String, int>? year) {
+    if (year == null) return 'Unknown Year';
+    if (year.containsKey('end')) {
+      return '${year['start']}-${year['end']}';
+    }
+    return '${year['start']}';
+  }
+
+  bool _isSameAcademicYear(Map<String, int>? year1, Map<String, int>? year2) {
+    if (year1 == null || year2 == null) return false;
+    return year1['start'] == year2['start'] && 
+           year1['end'] == year2['end'];
+  }
+
   Admissions? get _selectedAdmission {
     return _admissionYears.firstWhere(
-      (admission) => admission.academicYear == _selectedAcademicYear,
+      (admission) => _isSameAcademicYear(admission.academicYear, _selectedAcademicYear),
       orElse: () => _admissionYears.first,
     );
   }
@@ -156,6 +174,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
                 children: [
                   _buildAcademicYearSelector(),
                   _buildStepsOverview(),
+                  _buildRequirementsSection(),
                   _buildHelpSection(),
                   const SizedBox(height: 32),
                 ],
@@ -304,64 +323,59 @@ class _AdmissionInfoState extends State<AdmissionInfo>
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children:
-                _admissionYears.map((admission) {
-                  final isSelected =
-                      admission.academicYear == _selectedAcademicYear;
-                  return InkWell(
-                    onTap: () {
-                      setState(() {
-                        _selectedAcademicYear = admission.academicYear;
-                        _currentStepIndex = 0;
-                      });
-                    },
+            children: _admissionYears.map((admission) {
+              final yearStr = _formatAcademicYear(admission.academicYear);
+              final isSelected = _isSameAcademicYear(
+                admission.academicYear,
+                _selectedAcademicYear,
+              );
+
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedAcademicYear = admission.academicYear;
+                    _currentStepIndex = 0;
+                  });
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: isSelected
+                        ? LinearGradient(
+                            colors: [Colors.green[600]!, Colors.green[700]!],
+                          )
+                        : null,
+                    color: isSelected ? null : Colors.grey[100],
                     borderRadius: BorderRadius.circular(20),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient:
-                            isSelected
-                                ? LinearGradient(
-                                  colors: [
-                                    Colors.green[600]!,
-                                    Colors.green[700]!,
-                                  ],
-                                )
-                                : null,
-                        color: isSelected ? null : Colors.grey[100],
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color:
-                              isSelected
-                                  ? Colors.green[700]!
-                                  : Colors.grey[300]!,
-                        ),
-                        boxShadow:
-                            isSelected
-                                ? [
-                                  BoxShadow(
-                                    color: Colors.green[600]!.withOpacity(0.4),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ]
-                                : null,
-                      ),
-                      child: Text(
-                        admission.academicYear ?? 'Unknown',
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey[700],
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
+                    border: Border.all(
+                      color: isSelected ? Colors.green[700]! : Colors.grey[300]!,
                     ),
-                  );
-                }).toList(),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: Colors.green[600]!.withOpacity(0.4),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Text(
+                    yearStr,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey[700],
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),
@@ -422,27 +436,22 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     }
 
     return Column(
-      children:
-          steps.asMap().entries.map((entry) {
-            final index = entry.key;
-            final step = entry.value;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 24),
-              child: _buildStepCard(index + 1, step),
-            );
-          }).toList(),
+      children: steps.asMap().entries.map((entry) {
+        final index = entry.key;
+        final step = entry.value;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          child: _buildStepCard(index + 1, step),
+        );
+      }).toList(),
     );
   }
 
   Widget _buildStepCard(int stepNumber, String stepTitle) {
-    // Remove leading numbers like "1. ", "2. ", etc.
-    // Remove prefixes like "1. ", "Step 1: ", "Step 2 - ", etc.
-   final cleanedTitle = stepTitle.replaceFirst(
-  RegExp(r'^(Step\s*\d+[:.\-\s]*)|(^\d+[.:-\s]*)|^\[\d+\]\s*', caseSensitive: false),
-  '',
-);
-
-
+    final cleanedTitle = stepTitle.replaceFirst(
+      RegExp(r'^(Step\s*\d+[:.\-\s]*)|(^\d+[.:-\s]*)|^\[\d+\]\s*', caseSensitive: false),
+      '',
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -468,7 +477,6 @@ class _AdmissionInfoState extends State<AdmissionInfo>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Step number circle
             Container(
               width: 48,
               height: 48,
@@ -499,7 +507,6 @@ class _AdmissionInfoState extends State<AdmissionInfo>
               ),
             ),
             const SizedBox(width: 18),
-            // Step content
             Expanded(
               child: Linkify(
                 text: cleanedTitle,
@@ -525,6 +532,108 @@ class _AdmissionInfoState extends State<AdmissionInfo>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRequirementsSection() {
+    final requirements = _selectedAdmission?.requirements ?? [];
+    if (requirements.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+            spreadRadius: -4,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: Colors.grey[300]!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [primaryGreen.withOpacity(0.9), primaryGreen],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryGreen.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.description_outlined,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Requirements',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey[900],
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          ...requirements.map((requirement) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: primaryGreen,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      requirement,
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.5,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
       ),
     );
   }
@@ -627,31 +736,25 @@ class _AdmissionInfoState extends State<AdmissionInfo>
                 ),
                 const SizedBox(height: 12),
                 ...admission.contact!.map((contact) {
-                  // Detect type
                   bool isEmail = contact.toLowerCase().contains("email:");
                   bool isPhone = contact.toLowerCase().contains("phone:");
 
-                  // Clean prefix
-                  final cleaned =
-                      contact
-                          .replaceAll(
-                            RegExp(
-                              r'^(Email|Phone)\s*:\s*',
-                              caseSensitive: false,
-                            ),
-                            '',
-                          )
-                          .trim();
+                  final cleaned = contact
+                      .replaceAll(
+                        RegExp(
+                          r'^(Email|Phone)\s*:\s*',
+                          caseSensitive: false,
+                        ),
+                        '',
+                      )
+                      .trim();
 
-                  // Choose icon
-                  final icon =
-                      isEmail
-                          ? Icons.email_rounded
-                          : isPhone
+                  final icon = isEmail
+                      ? Icons.email_rounded
+                      : isPhone
                           ? Icons.phone_rounded
                           : Icons.contact_page_rounded;
 
-                  // Build clickable row
                   return InkWell(
                     onTap: () async {
                       if (isEmail) {

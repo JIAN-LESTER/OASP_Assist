@@ -6,6 +6,7 @@ class Placement {
   final List<String> contacts;
   final List<String> positions;
   final bool isRecruiting;
+  final DateTime? deadline;
   final DateTime createdAt;
 
   Placement({
@@ -14,6 +15,7 @@ class Placement {
     required this.positions,
     required this.contacts,
     required this.isRecruiting,
+    this.deadline,
     required this.createdAt,
   });
 
@@ -21,7 +23,7 @@ class Placement {
     return Placement(
       placementID: json['placementID'] ?? '',
       partnerCompany: json['partnerCompany'] ?? '',
-      isRecruiting: json['isRecruiting'] ?? true, 
+      isRecruiting: json['isRecruiting'] ?? true,
       contacts:
           json['contacts'] is List
               ? List<String>.from(json['contacts'].map((e) => e.toString()))
@@ -30,6 +32,13 @@ class Placement {
           json['positions'] is List
               ? List<String>.from(json['positions'].map((e) => e.toString()))
               : <String>[],
+      deadline: json['deadline'] != null
+          ? (json['deadline'] is String
+              ? DateTime.tryParse(json['deadline'])
+              : (json['deadline'] is Timestamp
+                  ? (json['deadline'] as Timestamp).toDate()
+                  : null))
+          : null,
       createdAt:
           json['createdAt'] is String
               ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
@@ -46,7 +55,9 @@ class Placement {
       'isRecruiting': isRecruiting,
       'contacts': contacts,
       'positions': positions,
-      'createdAt': createdAt.toIso8601String(),
+      // ✅ FIX: Store as Firestore Timestamp instead of ISO string
+      'deadline': deadline != null ? Timestamp.fromDate(deadline!) : null,
+      'createdAt': Timestamp.fromDate(createdAt),
     };
   }
 }

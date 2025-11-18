@@ -684,51 +684,78 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Upload button
-                    if (!widget.isEdit)
-                      Center(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0xFF1976D2), Color(0xFF1565C0)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0xFF1976D2).withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: ElevatedButton.icon(
-                            icon: Icon(Icons.upload_file_outlined, size: 20),
-                            label: Text(
-                              'Import from Document/Image',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shadowColor: Colors.transparent,
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 14,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            onPressed: _isProcessing ? null : _showUploadOptionsBottomSheet,
-                          ),
-                        ),
-                      ),
-
+                     if (!widget.isEdit)
+  Container(
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: Color(0xFFFAFBFC),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: _selectedFile != null
+            ? Color(0xFF2E7D32).withOpacity(0.4)
+            : Color(0xFFE5E7EB),
+        width: 2,
+      ),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: _isProcessing ? null : _showUploadOptionsBottomSheet,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 20 : 32,
+            vertical: isMobile ? 24 : 32,
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: isMobile ? 56 : 72,
+                height: isMobile ? 56 : 72,
+                decoration: BoxDecoration(
+                  color: _selectedFile != null
+                      ? Color(0xFF2E7D32)
+                      : Color(0xFF2E7D32).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _selectedFile != null
+                      ? Icons.insert_drive_file
+                      : Icons.upload_file,
+                  color: _selectedFile != null
+                      ? Colors.white
+                      : Color(0xFF2E7D32),
+                  size: isMobile ? 28 : 32,
+                ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                _selectedFile != null
+                    ? _selectedFileName ?? 'File selected'
+                    : 'Click to upload document or image',
+                style: TextStyle(
+                  fontSize: isMobile ? 15 : 16,
+                  color: Color(0xFF1F2937),
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Documents: PDF, TXT, DOC, DOCX • Images: JPG, PNG',
+                style: TextStyle(
+                  fontSize: isMobile ? 13 : 14,
+                  color: Color(0xFF9CA3AF),
+                  fontWeight: FontWeight.w400,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  ),
                     if (_isProcessing)
                       Padding(
                         padding: EdgeInsets.symmetric(vertical: 24),
@@ -1034,4 +1061,29 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
       ],
     );
   }
+}
+
+Widget _buildSectionHeader(String title, IconData icon, bool isMobile) {
+  return Row(
+    children: [
+      Container(
+        padding: EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Color(0xFF2E7D32).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, size: 20, color: Color(0xFF2E7D32)),
+      ),
+      SizedBox(width: 12),
+      Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF1F2937),
+          letterSpacing: -0.2,
+        ),
+      ),
+    ],
+  );
 }
