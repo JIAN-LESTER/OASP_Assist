@@ -1816,7 +1816,7 @@ class UniversalUIComponents {
         return Align(
           alignment: Alignment.topRight,
           child: Padding(
-            padding: const EdgeInsets.only(top: 70, right: 30), //  position
+            padding: const EdgeInsets.only(top: 95, right: 10, left: 10), //  position
             child: Material(
               elevation: 8,
               borderRadius: BorderRadius.circular(12),

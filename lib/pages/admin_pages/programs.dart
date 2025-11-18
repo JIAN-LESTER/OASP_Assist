@@ -3,7 +3,6 @@ import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
-
 import 'package:capstone_project/pages/admin_pages/widgets/pagination.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/search_field.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/empty_state.dart';
@@ -43,7 +42,6 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
     });
 
     try {
-      // Call the getInformationBankData() method
       final data = await statData.getProgramData();
 
       if (!mounted) return;
@@ -210,15 +208,82 @@ class MobileProgramManagement extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return mainContent(
-      context,
-      searchController,
-      currentPage,
-      itemsPerPage,
-      onPageChanged,
-      onItemsPerPageChanged,
-      16.0,
-      program,
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Header section
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _buildMobileHeader(searchController, context, program),
+            ),
+            // Table section with fixed height
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.7,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildTableHeader(),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream:
+                            FirebaseFirestore.instance
+                                .collection('programs')
+                                .orderBy('name')
+                                .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: Text('Error: ${snapshot.error}'),
+                            );
+                          }
+
+                          if (!snapshot.hasData ||
+                              snapshot.data!.docs.isEmpty) {
+                            return buildEmptyState(false, false, "programs");
+                          }
+
+                          return _buildProgramList(
+                            allPrograms: snapshot.data!.docs,
+                            searchQuery: searchController.text,
+                            currentPage: currentPage,
+                            itemsPerPage: itemsPerPage,
+                            onPageChanged: onPageChanged,
+                            onItemsPerPageChanged: onItemsPerPageChanged,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -308,6 +373,68 @@ Widget mainContent(
   );
 }
 
+Widget _buildMobileHeader(
+  TextEditingController searchController,
+  BuildContext context,
+  ProgramData? program,
+) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Title
+      const Text(
+        'Programs Management',
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ),
+      const SizedBox(height: 4),
+      // Subtitle
+      const Text(
+        'Manage academic programs',
+        style: TextStyle(fontSize: 12, color: Colors.grey),
+      ),
+      const SizedBox(height: 12),
+      // Add button aligned to the right
+      Align(
+        alignment: Alignment.centerRight,
+        child: AddProgramButton(
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => AddEditProgramDialog(onSaved: () {}),
+            );
+          },
+        ),
+      ),
+      const SizedBox(height: 16),
+      // Stat Cards Section
+      Column(
+        children: [
+          buildStatCard(
+            'Total Programs',
+            '${program?.totalProgram}',
+            Colors.blue,
+            Icons.message,
+          ),
+          const SizedBox(height: 12),
+          buildStatCard(
+            'Programs with Most Students Registered',
+            '${program?.dominantProgram}',
+            Colors.green,
+            Icons.check_circle,
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      // Search Field
+      buildSearchField('Search programs by name', searchController),
+    ],
+  );
+}
+
 Widget _buildProgramList({
   required List<DocumentSnapshot> allPrograms,
   required String searchQuery,
@@ -352,6 +479,8 @@ Widget _buildProgramList({
                   child: Text('No programs match your search criteria.'),
                 )
                 : ListView.separated(
+                  shrinkWrap: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: currentPagePrograms.length,
                   separatorBuilder:
                       (context, index) => const SizedBox(height: 8),
@@ -694,6 +823,32 @@ Widget _buildTableHeader() {
       double screenWidth = MediaQuery.of(context).size.width;
       bool isMobile = screenWidth < 600;
       bool isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+      if (isMobile) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Row(
+            children: [
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Program Name',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              SizedBox(width: 40),
+            ],
+          ),
+        );
+      }
 
       return Container(
         padding: EdgeInsets.symmetric(

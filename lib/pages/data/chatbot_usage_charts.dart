@@ -1148,7 +1148,7 @@ Widget buildUsersByCourseCard(Map<String, int> usersByCourse) {
 // ============================================
 // 🎨 IMPROVED USERS BY YEAR LEVEL CARD
 // ============================================
-Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
+Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel, {bool isMobile = false}) {
   final entries = usersByYearLevel.entries.toList()
     ..sort((a, b) => a.key.compareTo(b.key));
   
@@ -1159,9 +1159,7 @@ Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-          border: Border(
-        
-      ),
+      border: Border(),
       boxShadow: [
         BoxShadow(
           color: Colors.black.withOpacity(0.06),
@@ -1228,13 +1226,13 @@ Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
                 )
               : Row(
                   children: [
-                    // Pie Chart
+                    // Pie Chart - smaller on mobile
                     Expanded(
-                      flex: 3,
+                      flex: isMobile ? 2 : 3,
                       child: PieChart(
                         PieChartData(
                           sectionsSpace: 3,
-                          centerSpaceRadius: 50,
+                          centerSpaceRadius: isMobile ? 35 : 50,
                           sections: entries.asMap().entries.map((entry) {
                             final percentage = ((entry.value.value / totalUsers) * 100);
                             
@@ -1242,9 +1240,9 @@ Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
                               color: _getYearLevelColor(entry.key),
                               value: entry.value.value.toDouble(),
                               title: '${percentage.toStringAsFixed(1)}%',
-                              radius: 90,
-                              titleStyle: const TextStyle(
-                                fontSize: 13,
+                              radius: isMobile ? 60 : 90,
+                              titleStyle: TextStyle(
+                                fontSize: isMobile ? 11 : 13,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                                 shadows: [
@@ -1270,7 +1268,7 @@ Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
                                       ),
                                       child: Icon(
                                         Icons.star,
-                                        size: 16,
+                                        size: isMobile ? 12 : 16,
                                         color: _getYearLevelColor(entry.key),
                                       ),
                                     )
@@ -1284,62 +1282,84 @@ Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 20),
-                    // Legend
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: entries.map((entry) {
-                          final percentage = ((entry.value / totalUsers) * 100);
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: _getYearLevelColor(entries.indexOf(entry)),
-                                    borderRadius: BorderRadius.circular(4),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: _getYearLevelColor(entries.indexOf(entry))
-                                            .withOpacity(0.3),
-                                        blurRadius: 4,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        entry.key,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${entry.value} (${percentage.toStringAsFixed(1)}%)',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
+                    SizedBox(width: isMobile ? 10 : 20),
+                   // Legend
+Expanded(
+  flex: 2,
+  child: Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    crossAxisAlignment: isMobile ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+    children: entries.map((entry) {
+      final percentage = ((entry.value / totalUsers) * 100);
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: isMobile ? 4 : 6),
+        child: Row(
+          mainAxisSize: isMobile ? MainAxisSize.min : MainAxisSize.max,
+          mainAxisAlignment: isMobile ? MainAxisAlignment.end : MainAxisAlignment.start,
+          children: [
+            Container(
+              width: isMobile ? 12 : 16,
+              height: isMobile ? 12 : 16,
+              decoration: BoxDecoration(
+                color: _getYearLevelColor(entries.indexOf(entry)),
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: [
+                  BoxShadow(
+                    color: _getYearLevelColor(entries.indexOf(entry))
+                        .withOpacity(0.3),
+                    blurRadius: 4,
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: isMobile ? 6 : 8),
+            isMobile
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.key,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
+                      Text(
+                        '${entry.value} (${percentage.toStringAsFixed(1)}%)',
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  )
+                : Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.key,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${entry.value} (${percentage.toStringAsFixed(1)}%)',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+          ],
+        ),
+      );
+    }).toList(),
+  ),
+),
                   ],
                 ),
         ),

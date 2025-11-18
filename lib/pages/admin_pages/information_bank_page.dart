@@ -240,16 +240,87 @@ class MobileInformationBank extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return mainContent(
-      selectedCategory,
-      onCategoryChanged,
-      searchController,
-      currentPage,
-      itemsPerPage,
-      onPageChanged,
-      onItemsPerPageChanged,
-      16.0,
-      ib,
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Header section
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _buildMobileHeader(
+                selectedCategory,
+                onCategoryChanged,
+                searchController,
+                ib,
+              ),
+            ),
+            // Table section with fixed height
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.7,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildTableHeader(),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('information_bank')
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: Text('Error: ${snapshot.error}'),
+                            );
+                          }
+
+                          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                            return const Center(
+                              child: Text('No documents found.'),
+                            );
+                          }
+
+                          return _buildIBList(
+                            getAllDocuments: snapshot.data!.docs,
+                            selectedCategory: selectedCategory,
+                            searchQuery: searchController.text,
+                            currentPage: currentPage,
+                            itemsPerPage: itemsPerPage,
+                            onPageChanged: onPageChanged,
+                            onItemsPerPageChanged: onItemsPerPageChanged,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -300,10 +371,9 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream:
-                          FirebaseFirestore.instance
-                              .collection('information_bank')
-                              .snapshots(),
+                      stream: FirebaseFirestore.instance
+                          .collection('information_bank')
+                          .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -346,6 +416,94 @@ Widget mainContent(
   );
 }
 
+Widget _buildMobileHeader(
+  String selectedCategory,
+  ValueChanged<String> onCategoryChanged,
+  TextEditingController searchController,
+  InformationBankData? ib,
+) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Title
+      const Text(
+        'Information Bank',
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ),
+      const SizedBox(height: 4),
+      // Subtitle
+      const Text(
+        'Centralized document repository for quick reference',
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey,
+        ),
+      ),
+      const SizedBox(height: 12),
+      // Upload button aligned to the right
+      Align(
+        alignment: Alignment.centerRight,
+        child: UploadDocumentButton(),
+      ),
+      const SizedBox(height: 16),
+      // Stat Cards Section
+      Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: buildStatCard(
+                  'Total Documents',
+                  '${ib?.totalDocuments}',
+                  Colors.blue,
+                  Icons.message,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: buildStatCard(
+                  'Most Frequent Category',
+                  ib?.mostFrequentCategory ?? "Unknown",
+                  Colors.green,
+                  Icons.check_circle,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          buildStatCard(
+            'Latest Upload',
+            ib?.latestUpload ?? "Unknown",
+            Colors.red,
+            Icons.group,
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      // Search and Filter
+      buildSearchField(
+        'documents, source or category',
+        searchController,
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: CategoryDropdownButton(
+              initialValue: selectedCategory,
+              onChanged: onCategoryChanged,
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
 Widget _buildHeader(
   String selectedCategory,
   ValueChanged<String> onCategoryChanged,
@@ -355,7 +513,6 @@ Widget _buildHeader(
   return LayoutBuilder(
     builder: (context, constraints) {
       double screenWidth = MediaQuery.of(context).size.width;
-      bool isMobile = screenWidth < 600;
       bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
       return Column(
@@ -371,7 +528,7 @@ Widget _buildHeader(
                   Text(
                     'Information Bank',
                     style: TextStyle(
-                      fontSize: isMobile ? 20 : (isTablet ? 22 : 24),
+                      fontSize: isTablet ? 22 : 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
                     ),
@@ -380,7 +537,7 @@ Widget _buildHeader(
                   Text(
                     'Centralized document repository for quick reference',
                     style: TextStyle(
-                      fontSize: isMobile ? 12 : 14,
+                      fontSize: 14,
                       color: Colors.grey[600],
                     ),
                   ),
@@ -390,114 +547,60 @@ Widget _buildHeader(
             ],
           ),
 
-          // Stat Cards Section - Fixed for Mobile
+          // Stat Cards Section
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child:
-                isMobile
-                    ? Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: buildStatCard(
-                                'Total Documents',
-                                '${ib?.totalDocuments}',
-                                Colors.blue,
-                                Icons.message,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: buildStatCard(
-                                'Most Frequent Category',
-                                ib?.mostFrequentCategory ?? "Unknown",
-                                Colors.green,
-                                Icons.check_circle,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        buildStatCard(
-                          'Latest Upload',
-                          ib?.latestUpload ?? "Unknown",
-                          Colors.red,
-                          Icons.group,
-                        ),
-                      ],
-                    )
-                    : Row(
-                      children: [
-                        Expanded(
-                          child: buildStatCard(
-                            'Total Documents',
-                            '${ib?.totalDocuments}',
-                            Colors.blue,
-                            Icons.message,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Most Frequent Category',
-                            ib?.mostFrequentCategory ?? "Unknown",
-                            Colors.green,
-                            Icons.check_circle,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Latest Upload',
-                            ib?.latestUpload ?? "Unknown",
-                            Colors.red,
-                            Icons.group,
-                          ),
-                        ),
-                      ],
-                    ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: buildStatCard(
+                    'Total Documents',
+                    '${ib?.totalDocuments}',
+                    Colors.blue,
+                    Icons.message,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: buildStatCard(
+                    'Most Frequent Category',
+                    ib?.mostFrequentCategory ?? "Unknown",
+                    Colors.green,
+                    Icons.check_circle,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: buildStatCard(
+                    'Latest Upload',
+                    ib?.latestUpload ?? "Unknown",
+                    Colors.red,
+                    Icons.group,
+                  ),
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: 24),
 
           // Search and Filter Row
-          isMobile
-              ? Column(
-                children: [
-                  buildSearchField(
-                    'documents, source or category',
-                    searchController,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: CategoryDropdownButton(
-                          initialValue: selectedCategory,
-                          onChanged: onCategoryChanged,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              )
-              : Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: buildSearchField(
-                      'documents, source or category',
-                      searchController,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  CategoryDropdownButton(
-                    initialValue: selectedCategory,
-                    onChanged: onCategoryChanged,
-                  ),
-                ],
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: buildSearchField(
+                  'documents, source or category',
+                  searchController,
+                ),
               ),
+              const SizedBox(width: 16),
+              CategoryDropdownButton(
+                initialValue: selectedCategory,
+                onChanged: onCategoryChanged,
+              ),
+            ],
+          ),
         ],
       );
     },
@@ -610,25 +713,24 @@ Widget _buildIBList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  final filtered =
-      getAllDocuments.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final title = (data['ib_title'] ?? '').toString().toLowerCase();
-        final source = (data['source'] ?? '').toString().toLowerCase();
-        final category = (data['category'] ?? '').toString().toLowerCase();
+  final filtered = getAllDocuments.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final title = (data['ib_title'] ?? '').toString().toLowerCase();
+    final source = (data['source'] ?? '').toString().toLowerCase();
+    final category = (data['category'] ?? '').toString().toLowerCase();
 
-        bool matchesCategory =
-            selectedCategory == 'All Categories' ||
+    bool matchesCategory =
+        selectedCategory == 'All Categories' ||
             category == selectedCategory.toLowerCase();
 
-        bool matchesSearch =
-            searchQuery.isEmpty ||
+    bool matchesSearch =
+        searchQuery.isEmpty ||
             title.contains(searchQuery.toLowerCase()) ||
             source.contains(searchQuery.toLowerCase()) ||
             category.contains(searchQuery.toLowerCase());
 
-        return matchesCategory && matchesSearch;
-      }).toList();
+    return matchesCategory && matchesSearch;
+  }).toList();
 
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
@@ -644,38 +746,37 @@ Widget _buildIBList({
   return Column(
     children: [
       Expanded(
-        child:
-            currentPageIB.isEmpty
-                ? const Center(
-                  child: Text('No documents match your search criteria.'),
-                )
-                : ListView.builder(
-                  shrinkWrap: false,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: currentPageIB.length,
-                  itemBuilder: (context, index) {
-                    final doc = currentPageIB[index];
-                    final data = doc.data() as Map<String, dynamic>;
-                    final Timestamp timeStamp =
-                        data['createdAt'] ?? Timestamp.now();
-                    final DateTime date = timeStamp.toDate();
-                    final String formattedDate = DateFormat(
-                      "MMMM d, yyyy 'at' hh:mm a",
-                    ).format(date);
+        child: currentPageIB.isEmpty
+            ? const Center(
+                child: Text('No documents match your search criteria.'),
+              )
+            : ListView.builder(
+                shrinkWrap: false,
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: currentPageIB.length,
+                itemBuilder: (context, index) {
+                  final doc = currentPageIB[index];
+                  final data = doc.data() as Map<String, dynamic>;
+                  final Timestamp timeStamp =
+                      data['createdAt'] ?? Timestamp.now();
+                  final DateTime date = timeStamp.toDate();
+                  final String formattedDate = DateFormat(
+                    "MMMM d, yyyy 'at' hh:mm a",
+                  ).format(date);
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _buildIBRow(
-                        context: context,
-                        doc: doc,
-                        title: data['ib_title'] ?? 'N/A',
-                        source: data['source'] ?? 'N/A',
-                        category: data['category'] ?? 'General',
-                        content: data['content'],
-                      ),
-                    );
-                  },
-                ),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildIBRow(
+                      context: context,
+                      doc: doc,
+                      title: data['ib_title'] ?? 'N/A',
+                      source: data['source'] ?? 'N/A',
+                      category: data['category'] ?? 'General',
+                      content: data['content'],
+                    ),
+                  );
+                },
+              ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -787,29 +888,28 @@ Widget _buildIBRow({
                 );
               }
             },
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, size: 18),
+                    SizedBox(width: 8),
+                    Text('Edit'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, size: 18, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Delete', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

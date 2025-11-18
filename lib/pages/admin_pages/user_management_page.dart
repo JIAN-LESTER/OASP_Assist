@@ -252,18 +252,87 @@ class MobileUserManagement extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return mainContent(
-      context,
-      selectedRole,
-      onRoleChanged,
-      searchController,
-      currentPage,
-      itemsPerPage,
-      onPageChanged,
-      onItemsPerPageChanged,
-      onNavigateToPage,
-      16.0,
-      user,
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Header section
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _buildMobileHeader(
+                selectedRole,
+                onRoleChanged,
+                searchController,
+                onNavigateToPage,
+                user,
+              ),
+            ),
+            // Table section with fixed height
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.7,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildTableHeader(),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: Text('Error: ${snapshot.error}'),
+                            );
+                          }
+
+                          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                            return const Center(child: Text('No users found.'));
+                          }
+
+                          return _buildUserList(
+                            allUsers: snapshot.data!.docs,
+                            selectedRole: selectedRole,
+                            searchQuery: searchController.text,
+                            currentPage: currentPage,
+                            itemsPerPage: itemsPerPage,
+                            onPageChanged: onPageChanged,
+                            onItemsPerPageChanged: onItemsPerPageChanged,
+                            onNavigateToPage: onNavigateToPage,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -298,7 +367,6 @@ Widget mainContent(
           const SizedBox(height: 16),
           Expanded(
             child: Container(
-              height: MediaQuery.of(context).size.height - 200,
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -360,6 +428,107 @@ Widget mainContent(
         ],
       ),
     ),
+  );
+}
+
+Widget _buildMobileHeader(
+  String selectedRole,
+  ValueChanged<String> onRoleChanged,
+  TextEditingController searchController,
+  Function(int)? onNavigateToPage,
+  UserData? user,
+) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Title
+      const Text(
+        'Users Management',
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ),
+      const SizedBox(height: 4),
+      // Subtitle
+      const Text(
+        'Manage accounts and user roles',
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey,
+        ),
+      ),
+      const SizedBox(height: 12),
+      // Add User button aligned to the right
+      Align(
+        alignment: Alignment.centerRight,
+        child: AddUserButton(onNavigateToPage: onNavigateToPage),
+      ),
+      const SizedBox(height: 16),
+      // Stat Cards Section
+      Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: buildStatCard(
+                  'Total Users',
+                  '${user?.totalUsers}',
+                  Colors.blue,
+                  Icons.message,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: buildStatCard(
+                  'Active Users',
+                  '${user?.activeUsers}',
+                  Colors.green,
+                  Icons.check_circle,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: buildStatCard(
+                  'New Users (This Month)',
+                  '${user?.newUsersThisMonth}',
+                  Colors.red,
+                  Icons.group,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: buildStatCard(
+                  'Users Logged in Today',
+                  '${user?.usersLoggedInToday}',
+                  Colors.orange,
+                  Icons.help_outline,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      // Search and Filter
+      buildSearchField('name, email or role', searchController),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: RoleDropdownButton(
+              initialValue: selectedRole,
+              onChanged: onRoleChanged,
+            ),
+          ),
+        ],
+      ),
+    ],
   );
 }
 
@@ -487,7 +656,7 @@ Widget _buildUserRow({
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: Colors.grey[100],
               shape: BoxShape.circle,
@@ -521,40 +690,76 @@ Widget _buildUserRow({
               ],
             ),
           ),
-          Expanded(
-            flex: 3,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color:
-                      role == 'Admin'
-                          ? Colors.red[700]
-                          : role == 'Staff'
-                          ? Colors.orange[700]
-                          : Colors.blue[700],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  role,
-                  style: TextStyle(
-                    fontSize: 12,
+          if (!isMobile)
+            Expanded(
+              flex: 3,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
                     color:
                         role == 'Admin'
-                            ? Colors.red[50]
+                            ? Colors.red[700]
                             : role == 'Staff'
-                            ? Colors.orange[50]
-                            : Colors.blue[50],
-                    fontWeight: FontWeight.w500,
+                            ? Colors.orange[700]
+                            : Colors.blue[700],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    role,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color:
+                          role == 'Admin'
+                              ? Colors.red[50]
+                              : role == 'Staff'
+                              ? Colors.orange[50]
+                              : Colors.blue[50],
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+          if (isMobile)
+            Expanded(
+              flex: 2,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                        role == 'Admin'
+                            ? Colors.red[700]
+                            : role == 'Staff'
+                            ? Colors.orange[700]
+                            : Colors.blue[700],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    role,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color:
+                          role == 'Admin'
+                              ? Colors.red[50]
+                              : role == 'Staff'
+                              ? Colors.orange[50]
+                              : Colors.blue[50],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (!isMobile)
             Expanded(
               flex: 2,
@@ -654,7 +859,6 @@ Widget _buildHeader(
   return LayoutBuilder(
     builder: (context, constraints) {
       double screenWidth = MediaQuery.of(context).size.width;
-      bool isMobile = screenWidth < 600;
       bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
       return Column(
@@ -669,7 +873,7 @@ Widget _buildHeader(
                   Text(
                     'Users Management',
                     style: TextStyle(
-                      fontSize: isMobile ? 20 : (isTablet ? 22 : 24),
+                      fontSize: isTablet ? 22 : 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
                     ),
@@ -678,7 +882,7 @@ Widget _buildHeader(
                   Text(
                     'Manage accounts and user roles',
                     style: TextStyle(
-                      fontSize: isMobile ? 12 : 14,
+                      fontSize: 14,
                       color: Colors.grey[600],
                     ),
                   ),
@@ -690,133 +894,69 @@ Widget _buildHeader(
             ],
           ),
 
-          // Stat Cards Section - Fixed for Mobile (2 per row)
+          // Stat Cards Section
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child:
-                isMobile
-                    ? Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: buildStatCard(
-                                'Total Users',
-                                '${user?.totalUsers}',
-                                Colors.blue,
-                                Icons.message,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: buildStatCard(
-                                'Active Users',
-                                '${user?.activeUsers}',
-                                Colors.green,
-                                Icons.check_circle,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: buildStatCard(
-                                'New Users (This Month)',
-                                '${user?.newUsersThisMonth}',
-                                Colors.red,
-                                Icons.group,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: buildStatCard(
-                                'Users Logged in Today',
-                                '${user?.usersLoggedInToday}',
-                                Colors.orange,
-                                Icons.help_outline,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    )
-                    : Row(
-                      children: [
-                        Expanded(
-                          child: buildStatCard(
-                            'Total Users',
-                            '${user?.totalUsers}',
-                            Colors.blue,
-                            Icons.message,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Active Users',
-                            '${user?.activeUsers}',
-                            Colors.green,
-                            Icons.check_circle,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'New Users (This Month)',
-                            '${user?.newUsersThisMonth}',
-                            Colors.red,
-                            Icons.group,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Users Logged in Today',
-                            '${user?.usersLoggedInToday}',
-                            Colors.orange,
-                            Icons.help_outline,
-                          ),
-                        ),
-                      ],
-                    ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: buildStatCard(
+                    'Total Users',
+                    '${user?.totalUsers}',
+                    Colors.blue,
+                    Icons.message,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: buildStatCard(
+                    'Active Users',
+                    '${user?.activeUsers}',
+                    Colors.green,
+                    Icons.check_circle,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: buildStatCard(
+                    'New Users (This Month)',
+                    '${user?.newUsersThisMonth}',
+                    Colors.red,
+                    Icons.group,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: buildStatCard(
+                    'Users Logged in Today',
+                    '${user?.usersLoggedInToday}',
+                    Colors.orange,
+                    Icons.help_outline,
+                  ),
+                ),
+              ],
+            ),
           ),
 
+          const SizedBox(height: 24),
+
           // Search and Filter Row
-          isMobile
-              ? Column(
-                children: [
-                  buildSearchField('name, email or role', searchController),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: RoleDropdownButton(
-                          initialValue: selectedRole,
-                          onChanged: onRoleChanged,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              )
-              : Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: buildSearchField(
-                      'name, email or role',
-                      searchController,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  RoleDropdownButton(
-                    initialValue: selectedRole,
-                    onChanged: onRoleChanged,
-                  ),
-                ],
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: buildSearchField(
+                  'name, email or role',
+                  searchController,
+                ),
               ),
+              const SizedBox(width: 16),
+              RoleDropdownButton(
+                initialValue: selectedRole,
+                onChanged: onRoleChanged,
+              ),
+            ],
+          ),
         ],
       );
     },
@@ -839,6 +979,7 @@ Widget _buildTableHeader() {
           ),
           child: const Row(
             children: [
+              SizedBox(width: 8),
               Expanded(
                 flex: 3,
                 child: Text(
@@ -902,7 +1043,7 @@ Widget _buildTableHeader() {
               ),
             ),
             Expanded(
-              flex: 2,
+              flex: 3,
               child: Text(
                 'Role',
                 style: TextStyle(

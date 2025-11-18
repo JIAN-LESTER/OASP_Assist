@@ -266,18 +266,62 @@ class MobileScholarshipManagement extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return mainContent(
-      allScholarships,
-      context,
-      selectedProvider,
-      onYearChanged,
-      searchController,
-      currentPage,
-      itemsPerPage,
-      onPageChanged,
-      onItemsPerPageChanged,
-      16.0,
-      sc,
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Header section
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _buildMobileHeader(
+                selectedProvider,
+                allScholarships,
+                onYearChanged,
+                searchController,
+                sc,
+              ),
+            ),
+            // Table section with fixed height
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.7,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildTableHeader(),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: _buildScholarshipList(
+                        allScholarships: allScholarships,
+                        selectedProvider: selectedProvider,
+                        searchQuery: searchController.text,
+                        currentPage: currentPage,
+                        itemsPerPage: itemsPerPage,
+                        onPageChanged: onPageChanged,
+                        onItemsPerPageChanged: onItemsPerPageChanged,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -312,7 +356,6 @@ Widget mainContent(
           const SizedBox(height: 16),
           Expanded(
             child: Container(
-              height: MediaQuery.of(context).size.height - 200,
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -348,6 +391,82 @@ Widget mainContent(
         ],
       ),
     ),
+  );
+}
+
+Widget _buildMobileHeader(
+  String selectedProvider,
+  List<DocumentSnapshot> allScholarships,
+  ValueChanged<String> onYearChanged,
+  TextEditingController searchController,
+  ScholarshipData? sc,
+) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Title
+      const Text(
+        'Scholarship List',
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ),
+      const SizedBox(height: 4),
+      // Subtitle
+      const Text(
+        'Manage scholarship list and its contents',
+        style: TextStyle(fontSize: 12, color: Colors.grey),
+      ),
+      const SizedBox(height: 12),
+      // Upload button aligned to the right
+      Align(
+        alignment: Alignment.centerRight,
+        child: UploadDocumentButton(formType: 'scholarship'),
+      ),
+      const SizedBox(height: 16),
+      // Stat Cards Section
+      Column(
+        children: [
+          buildStatCard(
+            'Total Scholarships',
+            '${sc?.totalScholarship}',
+            Colors.blue,
+            Icons.message,
+          ),
+          const SizedBox(height: 12),
+          buildStatCard(
+            'New Scholarship',
+            sc?.newScholarship ?? "Unknown",
+            Colors.green,
+            Icons.check_circle,
+          ),
+          const SizedBox(height: 12),
+          buildStatCard(
+            'Approaching Deadline',
+            sc?.approachingDeadline ?? "Unknown",
+            const Color.fromARGB(255, 245, 118, 0),
+            Icons.check_circle,
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      // Search and Filter
+      buildSearchField('scholarship name', searchController),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: ScholarshipProviderDropdown(
+              allScholarships: allScholarships,
+              initialValue: selectedProvider,
+              onChanged: onYearChanged,
+            ),
+          ),
+        ],
+      ),
+    ],
   );
 }
 
@@ -517,81 +636,83 @@ Widget _buildScholarshipRow({
               ],
             ),
           ),
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children:
-                  eligibilityRequirements != null &&
-                          eligibilityRequirements.isNotEmpty
-                      ? eligibilityRequirements.map((c) {
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            c,
-                            style: const TextStyle(
+          if (!isMobile)
+            Expanded(
+              flex: 4,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children:
+                    eligibilityRequirements != null &&
+                            eligibilityRequirements.isNotEmpty
+                        ? eligibilityRequirements.map((c) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              c,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          );
+                        }).toList()
+                        : [
+                          Text(
+                            "No eligibility/requirements",
+                            style: TextStyle(
                               fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[600],
                             ),
                           ),
-                        );
-                      }).toList()
-                      : [
-                        Text(
-                          "No eligibility/requirements",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
+                        ],
+              ),
             ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children:
-                  privileges != null && privileges.isNotEmpty
-                      ? privileges.map((c) {
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            c,
-                            style: const TextStyle(
+          if (!isMobile)
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children:
+                    privileges != null && privileges.isNotEmpty
+                        ? privileges.map((c) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              c,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          );
+                        }).toList()
+                        : [
+                          Text(
+                            "No privileges",
+                            style: TextStyle(
                               fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[600],
                             ),
                           ),
-                        );
-                      }).toList()
-                      : [
-                        Text(
-                          "No privileges",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
+                        ],
+              ),
             ),
-          ),
           if (!isMobile)
             Expanded(
               flex: 3,
@@ -661,7 +782,6 @@ Widget _buildHeader(
   return LayoutBuilder(
     builder: (context, constraints) {
       double screenWidth = MediaQuery.of(context).size.width;
-      bool isMobile = screenWidth < 600;
       bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
       return Column(
@@ -676,7 +796,7 @@ Widget _buildHeader(
                   Text(
                     'Scholarship List',
                     style: TextStyle(
-                      fontSize: isMobile ? 20 : (isTablet ? 22 : 24),
+                      fontSize: isTablet ? 22 : 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
                     ),
@@ -684,10 +804,7 @@ Widget _buildHeader(
                   const SizedBox(height: 4),
                   Text(
                     'Manage scholarship list and its contents',
-                    style: TextStyle(
-                      fontSize: isMobile ? 12 : 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -695,103 +812,58 @@ Widget _buildHeader(
             ],
           ),
 
-          // Stat Cards Section - Fixed for Mobile (1 per row)
+          // Stat Cards Section
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child:
-                isMobile
-                    ? Column(
-                      children: [
-                        buildStatCard(
-                          'Total Scholarships',
-                          '${sc?.totalScholarship}',
-                          Colors.blue,
-                          Icons.message,
-                        ),
-                        const SizedBox(height: 12),
-                        buildStatCard(
-                          'New Scholarship',
-                          sc?.newScholarship ?? "Unknown",
-                          Colors.green,
-                          Icons.check_circle,
-                        ),
-                        const SizedBox(height: 12),
-                        buildStatCard(
-                          'Approaching Deadline',
-                          sc?.approachingDeadline ?? "Unknown",
-                          const Color.fromARGB(255, 245, 118, 0),
-                          Icons.check_circle,
-                        ),
-                      ],
-                    )
-                    : Row(
-                      children: [
-                        Expanded(
-                          child: buildStatCard(
-                            'Total Scholarships',
-                            '${sc?.totalScholarship}',
-                            Colors.blue,
-                            Icons.message,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'New Scholarship',
-                            sc?.newScholarship ?? "Unknown",
-                            Colors.green,
-                            Icons.check_circle,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Approaching Deadline',
-                            sc?.approachingDeadline ?? "Unknown",
-                            const Color.fromARGB(255, 245, 118, 0),
-                            Icons.check_circle,
-                          ),
-                        ),
-                      ],
-                    ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: buildStatCard(
+                    'Total Scholarships',
+                    '${sc?.totalScholarship}',
+                    Colors.blue,
+                    Icons.message,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: buildStatCard(
+                    'New Scholarship',
+                    sc?.newScholarship ?? "Unknown",
+                    Colors.green,
+                    Icons.check_circle,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: buildStatCard(
+                    'Approaching Deadline',
+                    sc?.approachingDeadline ?? "Unknown",
+                    const Color.fromARGB(255, 245, 118, 0),
+                    Icons.check_circle,
+                  ),
+                ),
+              ],
+            ),
           ),
 
+          const SizedBox(height: 24),
+
           // Search and Filter Row
-          isMobile
-              ? Column(
-                children: [
-                  buildSearchField('scholarship name', searchController),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ScholarshipProviderDropdown(
-                          allScholarships: allScholarships,
-                          initialValue: selectedProvider,
-                          onChanged: onYearChanged,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              )
-              : Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: buildSearchField(
-                      'scholarship name',
-                      searchController,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  ScholarshipProviderDropdown(
-                    allScholarships: allScholarships,
-                    initialValue: selectedProvider,
-                    onChanged: onYearChanged,
-                  ),
-                ],
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: buildSearchField('scholarship name', searchController),
               ),
+              const SizedBox(width: 16),
+              ScholarshipProviderDropdown(
+                allScholarships: allScholarships,
+                initialValue: selectedProvider,
+                onChanged: onYearChanged,
+              ),
+            ],
+          ),
         ],
       );
     },
@@ -817,29 +889,7 @@ Widget _buildTableHeader() {
               Expanded(
                 flex: 3,
                 child: Text(
-                  'Title',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: 3,
-                child: Text(
-                  'Contact',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'A.Y. Year',
+                  'Scholarship',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,

@@ -14,13 +14,13 @@ class ScholarshipList extends StatefulWidget {
 class _ScholarshipListState extends State<ScholarshipList>
     with TickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedProvider = 'all';
   String _sortBy = 'deadline';
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  // Color scheme using your specified green
   final Color primaryGreen = const Color(0xFF2E7D32);
   final Color lightGreen = const Color(0xFF4CAF50);
   final Color accentGreen = const Color(0xFF81C784);
@@ -41,351 +41,563 @@ class _ScholarshipListState extends State<ScholarshipList>
 
   @override
   void dispose() {
+    _searchController.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
+  Color _getStatusColor(int? daysLeft) {
+    if (daysLeft == null) return const Color(0xFF6B7280);
+    if (daysLeft < 0) return const Color(0xFFEF4444);
+    if (daysLeft <= 7) return const Color(0xFFF59E0B);
+    return const Color(0xFF2E7D32);
+  }
+
+  IconData _getStatusIcon(int? daysLeft) {
+    if (daysLeft == null) return Icons.event_note;
+    if (daysLeft < 0) return Icons.event_busy;
+    if (daysLeft <= 7) return Icons.priority_high;
+    return Icons.event_available;
+  }
+
+  String _formatDeadline(Timestamp? timestamp) {
+    if (timestamp == null) return 'No deadline';
+    final date = timestamp.toDate();
+    final now = DateTime.now();
+    final difference = date.difference(now).inDays;
+
+    if (difference < 0) {
+      return 'Expired';
+    } else if (difference == 0) {
+      return 'Today';
+    } else if (difference == 1) {
+      return 'Tomorrow';
+    } else if (difference <= 7) {
+      return '$difference days left';
+    } else {
+      return DateFormat('dd MMM yyyy').format(date);
+    }
+  }
+
+  bool _matchesSearch(Map<String, dynamic> scholarship) {
+    if (_searchQuery.isEmpty) return true;
+
+    final name = scholarship['name']?.toString().toLowerCase() ?? '';
+    final provider =
+        scholarship['scholarshipProvider']?.toString().toLowerCase() ?? '';
+    final description =
+        scholarship['description']?.toString().toLowerCase() ?? '';
+
+    return name.contains(_searchQuery) ||
+        provider.contains(_searchQuery) ||
+        description.contains(_searchQuery);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ResponsiveLayout(
-      mobileBody: _buildMobileLayout(),
-      tabletBody: _buildTabletLayout(),
-      desktopBody: _buildDesktopLayout(),
-    );
-  }
-
-  Widget _buildMobileLayout() {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FFFE),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildSearchAndFilters(isMobile: true)),
-          _buildScholarshipsList(crossAxisCount: 1, isDesktop: false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabletLayout() {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FFFE),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildSearchAndFilters(isMobile: false)),
-          _buildScholarshipsList(crossAxisCount: 2, isDesktop: false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDesktopLayout() {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FFFE),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildSearchAndFilters(isMobile: false)),
-          _buildScholarshipsList(crossAxisCount: 3, isDesktop: true),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchAndFilters({required bool isMobile}) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firestore.collection('scholarships').snapshots(),
-      builder: (context, snapshot) {
-        // Get unique providers for filter dropdown
-        Set<String> providers = {'all'};
-        if (snapshot.hasData) {
-          for (var doc in snapshot.data!.docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            final provider = data['scholarshipProvider']?.toString();
-            if (provider != null && provider.isNotEmpty) {
-              providers.add(provider);
-            }
-          }
-        }
-
-        return Container(
-          margin: EdgeInsets.all(isMobile ? 16 : 24),
-          padding: EdgeInsets.all(isMobile ? 16 : 20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-            border: Border.all(color: Colors.grey[300]!),
-          ),
-          child: Column(
-            children: [
-              // Search Bar
-              Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Enhanced Header
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFFFFFFF), Color(0xFFF8FAFC)],
                 ),
-                child: TextField(
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value.toLowerCase().trim();
-                    });
-                  },
-                  style: const TextStyle(color: Colors.black87),
-                  decoration: InputDecoration(
-                    hintText: 'Search scholarship names...',
-                    hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      color: Colors.grey[400],
-                      size: 22,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 14,
-                      horizontal: 16,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Filters Row
-              Row(
-                children: [
-                  // Provider Filter
-                  Expanded(
-                    flex: 2,
-                    child: Container(
-                      height: 48,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey[300]!),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.business_rounded,
-                            color: Colors.grey[400],
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: DropdownButton<String>(
-                              value: _selectedProvider,
-                              isExpanded: true,
-                              underline: const SizedBox(),
-                              style: TextStyle(
-                                color: Colors.grey[700],
-                                fontSize: 14,
-                              ),
-                              items:
-                                  providers.map((provider) {
-                                    return DropdownMenuItem(
-                                      value: provider,
-                                      child: Text(
-                                        provider == 'all'
-                                            ? 'All Providers'
-                                            : provider,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    );
-                                  }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedProvider = value!;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-
-                  // Sort Dropdown
-                  Expanded(
-                    child: Container(
-                      height: 48,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey[300]!),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.sort_rounded,
-                            color: Colors.grey[400],
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: DropdownButton<String>(
-                              value: _sortBy,
-                              isExpanded: true,
-                              underline: const SizedBox(),
-                              style: TextStyle(
-                                color: Colors.grey[700],
-                                fontSize: 14,
-                              ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'deadline',
-                                  child: Text('Deadline'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'name',
-                                  child: Text('Name'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'newest',
-                                  child: Text('Newest'),
-                                ),
-                              ],
-                              onChanged: (value) {
-                                setState(() {
-                                  _sortBy = value!;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0x0D000000),
+                    offset: Offset(0, 1),
+                    blurRadius: 3,
                   ),
                 ],
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildScholarshipsList({
-    required int crossAxisCount,
-    required bool isDesktop,
-  }) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firestore.collection('scholarships').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return SliverToBoxAdapter(
-            child: Container(
-              height: 400,
-              child: Center(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircularProgressIndicator(
-                      color: Colors.green[600],
-                      strokeWidth: 3,
+                    // Title and actions
+                    Row(
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Scholarships",
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            Text(
+                              "Explore available scholarship opportunities",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        // Filter button
+                        Container(
+                          decoration: BoxDecoration(
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                offset: const Offset(0, 2),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: PopupMenuButton<String>(
+                            onSelected: (String value) {
+                              setState(() {
+                                if (value.startsWith('sort_')) {
+                                  _sortBy = value.replaceFirst('sort_', '');
+                                } else {
+                                  _selectedProvider = value;
+                                }
+                              });
+                            },
+                            itemBuilder: (BuildContext context) {
+                              return [
+                                const PopupMenuItem<String>(
+                                  enabled: false,
+                                  child: Text(
+                                    'FILTER BY PROVIDER',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                ),
+                                ..._getProviderOptions().map((option) {
+                                  return PopupMenuItem<String>(
+                                    value: option,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            option == 'all'
+                                                ? Icons.list_alt
+                                                : Icons.business,
+                                            color:
+                                                _selectedProvider == option
+                                                    ? primaryGreen
+                                                    : const Color(0xFF64748B),
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            option == 'all'
+                                                ? 'All Providers'
+                                                : option,
+                                            style: TextStyle(
+                                              fontWeight:
+                                                  _selectedProvider == option
+                                                      ? FontWeight.w600
+                                                      : FontWeight.w500,
+                                              color:
+                                                  _selectedProvider == option
+                                                      ? const Color(0xFF0F172A)
+                                                      : const Color(0xFF475569),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                                const PopupMenuDivider(),
+                                const PopupMenuItem<String>(
+                                  enabled: false,
+                                  child: Text(
+                                    'SORT BY',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'sort_deadline',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.event,
+                                        color:
+                                            _sortBy == 'deadline'
+                                                ? primaryGreen
+                                                : const Color(0xFF64748B),
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Deadline',
+                                        style: TextStyle(
+                                          fontWeight:
+                                              _sortBy == 'deadline'
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'sort_name',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.sort_by_alpha,
+                                        color:
+                                            _sortBy == 'name'
+                                                ? primaryGreen
+                                                : const Color(0xFF64748B),
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Name',
+                                        style: TextStyle(
+                                          fontWeight:
+                                              _sortBy == 'name'
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'sort_newest',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.new_releases,
+                                        color:
+                                            _sortBy == 'newest'
+                                                ? primaryGreen
+                                                : const Color(0xFF64748B),
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Newest',
+                                        style: TextStyle(
+                                          fontWeight:
+                                              _sortBy == 'newest'
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ];
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F172A),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.tune,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Loading scholarships...',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                    const SizedBox(height: 24),
+
+                    // Search Bar
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 24),
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            offset: const Offset(0, 2),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value.toLowerCase().trim();
+                          });
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'Search scholarships...',
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: Color(0xFF64748B),
+                          ),
+                          suffixIcon:
+                              _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                    icon: const Icon(
+                                      Icons.clear,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {
+                                        _searchQuery = '';
+                                      });
+                                    },
+                                  )
+                                  : null,
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 18,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          );
-        }
 
-        if (snapshot.hasError) {
-          return SliverToBoxAdapter(child: _buildErrorState());
-        }
+            // List
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _firestore.collection('scholarships').snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF0F172A),
+                        strokeWidth: 3,
+                      ),
+                    );
+                  }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return SliverToBoxAdapter(
-            child: _buildEmptyState(
-              'No scholarships available',
-              'Check back later for new opportunities',
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return _EmptyState(
+                      icon: Icons.card_giftcard_outlined,
+                      title: "No scholarships found",
+                      subtitle: "Check back later for new opportunities",
+                    );
+                  }
+
+                  final scholarships = _processScholarships(
+                    snapshot.data!.docs,
+                  );
+
+                  if (scholarships.isEmpty) {
+                    return _EmptyState(
+                      icon: Icons.search_off,
+                      title: "No matching scholarships",
+                      subtitle:
+                          _searchQuery.isNotEmpty
+                              ? "Try adjusting your search terms"
+                              : "No scholarships from ${_selectedProvider} found",
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(24),
+                    itemCount: scholarships.length,
+                    itemBuilder: (context, index) {
+                      final doc = scholarships[index];
+                      final scholarship = doc.data() as Map<String, dynamic>;
+                      final deadline = scholarship['deadline'] as Timestamp?;
+                      final daysLeft =
+                          deadline != null
+                              ? deadline
+                                  .toDate()
+                                  .difference(DateTime.now())
+                                  .inDays
+                              : null;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              offset: const Offset(0, 2),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () => _showScholarshipDetails(scholarship),
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Row(
+                                children: [
+                                  // Status indicator
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: _getStatusColor(
+                                        daysLeft,
+                                      ).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      _getStatusIcon(daysLeft),
+                                      color: _getStatusColor(daysLeft),
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+
+                                  // Content
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // Scholarship name
+                                        Text(
+                                          scholarship['name'] ??
+                                              'Unnamed Scholarship',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF0F172A),
+                                            height: 1.4,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 12),
+
+                                        // Meta info
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: _getStatusColor(
+                                                  daysLeft,
+                                                ).withOpacity(0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                _formatDeadline(
+                                                  deadline,
+                                                ).toUpperCase(),
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: _getStatusColor(
+                                                    daysLeft,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Icon(
+                                              Icons.business,
+                                              size: 14,
+                                              color: Colors.grey[500],
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                scholarship['scholarshipProvider'] ??
+                                                    'Unknown',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.grey[600],
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+
+                                        if (scholarship['description'] !=
+                                                null &&
+                                            scholarship['description']
+                                                .toString()
+                                                .trim()
+                                                .isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            scholarship['description'],
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey[600],
+                                              height: 1.3,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Arrow
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    color: Colors.grey[400],
+                                    size: 16,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          );
-        }
-
-        var filteredScholarships = _processScholarships(snapshot.data!.docs);
-
-        if (filteredScholarships.isEmpty) {
-          return SliverToBoxAdapter(
-            child: _buildEmptyState(
-              'No matching scholarships',
-              'Try adjusting your search or filter',
-            ),
-          );
-        }
-
-        return SliverPadding(
-          padding: EdgeInsets.fromLTRB(
-            crossAxisCount == 1 ? 16 : 24,
-            0,
-            crossAxisCount == 1 ? 16 : 24,
-            32,
-          ),
-          sliver: SliverGrid(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              childAspectRatio:
-                  crossAxisCount == 1
-                      ? 1.8 // Mobile
-                      : crossAxisCount == 2
-                      ? 1.8 // Tablet
-                      : 1.95, // Desktop
-              crossAxisSpacing: 20,
-              mainAxisSpacing: 20,
-            ),
-            delegate: SliverChildBuilderDelegate((context, index) {
-              return FadeTransition(
-                opacity: _fadeAnimation,
-                child: _buildScholarshipCard(
-                  filteredScholarships[index].data() as Map<String, dynamic>,
-                  index,
-                  isDesktop,
-                ),
-              );
-            }, childCount: filteredScholarships.length),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
+  }
+
+  List<String> _getProviderOptions() {
+    // This should be populated from Firestore in real implementation
+    return ['all'];
   }
 
   List<QueryDocumentSnapshot> _processScholarships(
@@ -397,9 +609,7 @@ class _ScholarshipListState extends State<ScholarshipList>
     if (_searchQuery.isNotEmpty) {
       scholarships =
           scholarships.where((doc) {
-            var data = doc.data() as Map<String, dynamic>;
-            var name = data['name']?.toString().toLowerCase() ?? '';
-            return name.contains(_searchQuery);
+            return _matchesSearch(doc.data() as Map<String, dynamic>);
           }).toList();
     }
 
@@ -443,363 +653,6 @@ class _ScholarshipListState extends State<ScholarshipList>
     });
 
     return scholarships;
-  }
-
-  Widget _buildScholarshipCard(
-    Map<String, dynamic> data,
-    int index,
-    bool isDesktop,
-  ) {
-    final deadline = data['deadline'] as Timestamp?;
-    final daysLeft =
-        deadline != null
-            ? deadline.toDate().difference(DateTime.now()).inDays
-            : null;
-    final isUrgent = daysLeft != null && daysLeft <= 7 && daysLeft >= 0;
-    final isExpired = daysLeft != null && daysLeft < 0;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: -4,
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(
-          color:
-              isUrgent
-                  ? Colors.orange[400]!
-                  : isExpired
-                  ? Colors.red[300]!
-                  : Colors.grey[300]!,
-          width: isUrgent || isExpired ? 2 : 1,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: () => _showScholarshipDetails(data),
-          borderRadius: BorderRadius.circular(12),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header Section with Icon and Click/Tap
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                primaryGreen.withOpacity(0.9),
-                                primaryGreen,
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: primaryGreen.withOpacity(0.3),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.card_giftcard_rounded,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: primaryGreen.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: primaryGreen.withOpacity(0.2),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                isDesktop
-                                    ? Icons.mouse_rounded
-                                    : Icons.touch_app_rounded,
-                                color: primaryGreen,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                isDesktop ? 'Click' : 'Tap',
-                                style: TextStyle(
-                                  color: primaryGreen,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Scholarship Name
-                    Text(
-                      data['name'] ?? 'Unnamed Scholarship',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.grey[900],
-                        height: 1.3,
-                        letterSpacing: -0.3,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Bottom Section: Provider and Deadline
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Divider
-                        Divider(
-                          height: 24,
-                          thickness: 1,
-                          color: Colors.grey[200],
-                        ),
-
-                        // Provider
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.business_rounded,
-                              size: 16,
-                              color: Colors.grey[500],
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                data['scholarshipProvider'] ??
-                                    'Unknown Provider',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // Deadline Badge
-                        if (daysLeft != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  isExpired
-                                      ? Colors.red[50]
-                                      : isUrgent
-                                      ? Colors.orange[50]
-                                      : primaryGreen.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color:
-                                    isExpired
-                                        ? Colors.red[300]!
-                                        : isUrgent
-                                        ? Colors.orange[300]!
-                                        : primaryGreen.withOpacity(0.2),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isExpired
-                                      ? Icons.event_busy_rounded
-                                      : Icons.event_available_rounded,
-                                  color:
-                                      isExpired
-                                          ? Colors.red[700]
-                                          : isUrgent
-                                          ? Colors.orange[700]
-                                          : primaryGreen,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  isExpired
-                                      ? 'Expired'
-                                      : '$daysLeft day${daysLeft == 1 ? '' : 's'} left',
-                                  style: TextStyle(
-                                    color:
-                                        isExpired
-                                            ? Colors.red[700]
-                                            : isUrgent
-                                            ? Colors.orange[700]
-                                            : primaryGreen,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.grey[300]!,
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.event_note_rounded,
-                                  color: Colors.grey[600],
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'No deadline set',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Container(
-      height: 400,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.red[50],
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.error_outline_rounded,
-              size: 48,
-              color: Colors.red[400],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Something went wrong',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Please try again later',
-            style: TextStyle(color: Colors.grey[500]),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(String title, String message) {
-    return Container(
-      height: 300,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.search_off_rounded,
-              size: 48,
-              color: Colors.grey[400],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(message, style: TextStyle(color: Colors.grey[500])),
-        ],
-      ),
-    );
   }
 
   void _showScholarshipDetails(Map<String, dynamic> data) {
@@ -1162,7 +1015,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                               data['applicationLink']
                                   .toString()
                                   .trim()
-                                  .isNotEmpty)
+                                  .isNotEmpty) ...[
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
@@ -1190,6 +1043,36 @@ class _ScholarshipListState extends State<ScholarshipList>
                                 ),
                               ),
                             ),
+                            const SizedBox(height: 12),
+                          ],
+
+                          // Close Button
+                          SizedBox(
+                            width: double.infinity,
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.grey[700],
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                    color: Colors.grey[300]!,
+                                    width: 1,
+                                  ),
+                                ),
+                              ),
+                              child: const Text(
+                                'Close',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1200,76 +1083,50 @@ class _ScholarshipListState extends State<ScholarshipList>
           ),
     );
   }
+}
 
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 15,
-            color: Colors.grey[900],
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        color: Colors.grey[900],
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 48, color: Colors.grey[400]),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF475569),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildBulletList(List<String> items, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children:
-          items.map((item) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 7),
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      item,
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.5,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
     );
   }
 }

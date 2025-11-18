@@ -208,15 +208,84 @@ class MobileAffiliationManagement extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return mainContent(
-      context,
-      searchController,
-      currentPage,
-      itemsPerPage,
-      onPageChanged,
-      onItemsPerPageChanged,
-      16.0,
-      affiliation,
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Header section
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _buildMobileHeader(
+                searchController,
+                context,
+                affiliation,
+              ),
+            ),
+            // Table section with fixed height
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.7,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildTableHeader(),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('affiliations')
+                            .orderBy('name')
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: Text('Error: ${snapshot.error}'),
+                            );
+                          }
+
+                          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                            return buildEmptyState(false, false, "affiliations");
+                          }
+
+                          return _buildAffiliationList(
+                            allAffiliations: snapshot.data!.docs,
+                            searchQuery: searchController.text,
+                            currentPage: currentPage,
+                            itemsPerPage: itemsPerPage,
+                            onPageChanged: onPageChanged,
+                            onItemsPerPageChanged: onItemsPerPageChanged,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -242,7 +311,6 @@ Widget mainContent(
           const SizedBox(height: 16),
           Expanded(
             child: Container(
-              height: MediaQuery.of(context).size.height - 200,
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -303,6 +371,64 @@ Widget mainContent(
         ],
       ),
     ),
+  );
+}
+
+Widget _buildMobileHeader(
+  TextEditingController searchController,
+  BuildContext context,
+  AffiliationData? affiliation,
+) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Title
+      const Text(
+        'Affiliations Management',
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ),
+      const SizedBox(height: 4),
+      // Subtitle
+      const Text(
+        'Manage academic affiliations',
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey,
+        ),
+      ),
+      const SizedBox(height: 12),
+      // Add button aligned to the right
+      Align(
+        alignment: Alignment.centerRight,
+        child: _buildAddButton(context, true, false),
+      ),
+      const SizedBox(height: 16),
+      // Stat Cards Section
+      Column(
+        children: [
+          buildStatCard(
+            'Total Affiliations',
+            '${affiliation?.totalAffiliations}',
+            Colors.blue,
+            Icons.message,
+          ),
+          const SizedBox(height: 12),
+          buildStatCard(
+            'Affiliation where most students are affiliated',
+            '${affiliation?.dominantAffiliation}',
+            Colors.green,
+            Icons.check_circle,
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      // Search field
+      buildSearchField('Search affiliations by name', searchController),
+    ],
   );
 }
 
@@ -491,7 +617,6 @@ Widget _buildHeader(
   return LayoutBuilder(
     builder: (context, constraints) {
       double screenWidth = MediaQuery.of(context).size.width;
-      bool isMobile = screenWidth < 600;
       bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
       return Column(
@@ -506,7 +631,7 @@ Widget _buildHeader(
                   Text(
                     'Affiliations Management',
                     style: TextStyle(
-                      fontSize: isMobile ? 20 : (isTablet ? 22 : 24),
+                      fontSize: isTablet ? 22 : 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
                     ),
@@ -515,60 +640,43 @@ Widget _buildHeader(
                   Text(
                     'Manage academic affiliations',
                     style: TextStyle(
-                      fontSize: isMobile ? 12 : 14,
+                      fontSize: 14,
                       color: Colors.grey[600],
                     ),
                   ),
                 ],
               ),
-              _buildAddButton(context, isMobile, isTablet),
+              _buildAddButton(context, false, isTablet),
             ],
           ),
 
-          // Stat Cards Section - Fixed for Mobile (1 per row)
+          // Stat Cards Section
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child:
-                isMobile
-                    ? Column(
-                      children: [
-                        buildStatCard(
-                          'Total Affiliations',
-                          '${affiliation?.totalAffiliations}',
-                          Colors.blue,
-                          Icons.message,
-                        ),
-                        const SizedBox(height: 12),
-                        buildStatCard(
-                          'Affiliation where most students are affiliated',
-                          '${affiliation?.dominantAffiliation}',
-                          Colors.green,
-                          Icons.check_circle,
-                        ),
-                      ],
-                    )
-                    : Row(
-                      children: [
-                        Expanded(
-                          child: buildStatCard(
-                            'Total Affiliations',
-                            '${affiliation?.totalAffiliations}',
-                            Colors.blue,
-                            Icons.message,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Affiliation where most students are affiliated',
-                            '${affiliation?.dominantAffiliation}',
-                            Colors.green,
-                            Icons.check_circle,
-                          ),
-                        ),
-                      ],
-                    ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: buildStatCard(
+                    'Total Affiliations',
+                    '${affiliation?.totalAffiliations}',
+                    Colors.blue,
+                    Icons.message,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: buildStatCard(
+                    'Affiliation where most students are affiliated',
+                    '${affiliation?.dominantAffiliation}',
+                    Colors.green,
+                    Icons.check_circle,
+                  ),
+                ),
+              ],
+            ),
           ),
+
+          const SizedBox(height: 24),
 
           buildSearchField('Search affiliations by name', searchController),
         ],

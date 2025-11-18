@@ -818,42 +818,119 @@ List<Widget> buildChatbotUsageReport(
 
   final conversationTrend = getConversationTrendData();
 
-  // ✅ Format response time display
+  //  Format response time display
   String formatResponseTime(double seconds) {
     if (seconds == 0) return 'N/A';
     
     if (seconds < 1) {
-      // Show in milliseconds if less than 1 second
       return '${(seconds * 1000).toInt()}ms';
     } else if (seconds < 10) {
-      // Show with 2 decimal places for 1-10 seconds
       return '${seconds.toStringAsFixed(2)}s';
     } else {
-      // Show with 1 decimal place for 10+ seconds
       return '${seconds.toStringAsFixed(1)}s';
     }
   }
 
-  // ✅ Format session length display
+  //  Format session length display
   String formatSessionLength(double seconds) {
     if (seconds == 0) return 'N/A';
     
     if (seconds < 60) {
-      // Show in seconds if less than 1 minute
       return '${seconds.toInt()}s';
     } else if (seconds < 3600) {
-      // Show in minutes and seconds
       final minutes = seconds ~/ 60;
       final remainingSeconds = (seconds % 60).toInt();
       return '${minutes}m ${remainingSeconds}s';
     } else {
-      // Show in hours and minutes
       final hours = seconds ~/ 3600;
       final remainingMinutes = (seconds % 3600) ~/ 60;
       return '${hours}h ${remainingMinutes}m';
     }
   }
 
+  //  MOBILE LAYOUT
+  if (isMobile) {
+    return [
+      // Row 1: Average Response Time
+      buildStatCard(
+        'Average Response Time',
+        formatResponseTime(data?.averageResponseTime ?? 0),
+        Colors.blue,
+        Icons.timer,
+      ),
+      const SizedBox(height: 12),
+      
+      // Row 2: Total Sessions
+      buildStatCard(
+        'Total Sessions',
+        '${data?.totalSessions ?? 0}',
+        Colors.green,
+        Icons.chat,
+      ),
+      const SizedBox(height: 12),
+      
+      // Row 3: Avg Messages/User
+      buildStatCard(
+        'Avg Messages/User',
+        '${(data?.averageMessagesPerUser ?? 0).toStringAsFixed(1)}',
+        Colors.orange,
+        Icons.person,
+      ),
+      const SizedBox(height: 12),
+      
+      // Row 4: Avg Session Length
+      buildStatCard(
+        'Avg Session Length',
+        formatSessionLength(data?.averageSessionLength ?? 0),
+        Colors.purple,
+        Icons.trending_up,
+      ),
+      const SizedBox(height: 24),
+      
+      // Conversations Over Time
+      Container(
+        height: 400,
+        child: buildConversationsOverTimeCard(conversationTrend, timeFrame),
+      ),
+      const SizedBox(height: 16),
+      
+      // Peak Usage Hours
+      Container(
+        height: 400,
+        child: buildPeakUsageHoursCard(data?.peakUsageByHour ?? <int, int>{}),
+      ),
+      const SizedBox(height: 16),
+      
+      // Users by Course 
+      Container(
+        height: 400,
+        child: buildUsersByCourseCard(
+          data?.usersByCourse ?? <String, int>{},
+        ),
+      ),
+      const SizedBox(height: 16),
+      
+      // Users by Year Level 
+      Container(
+        height: 320,
+        child: buildUsersByYearLevelCard(
+          data?.usersByYearLevel ?? <String, int>{},
+          isMobile: true, 
+        ),
+      ),
+      const SizedBox(height: 16),
+      
+      // Response Time Trend
+      Container(
+        height: 400,
+        child: buildResponseTimeTrendCard(
+          data?.responseTimeTrend ?? <ChartData>[],
+        ),
+      ),
+    ];
+  }
+
+  //  DESKTOP/TABLET LAYOUT 
   return [
     SizedBox(
       height: 120,
@@ -862,7 +939,7 @@ List<Widget> buildChatbotUsageReport(
           Expanded(
             child: buildStatCard(
               'Average Response Time',
-              formatResponseTime(data?.averageResponseTime ?? 0), // ✅ Fixed
+              formatResponseTime(data?.averageResponseTime ?? 0),
               Colors.blue,
               Icons.timer,
             ),
@@ -889,7 +966,7 @@ List<Widget> buildChatbotUsageReport(
           Expanded(
             child: buildStatCard(
               'Avg Session Length',
-              formatSessionLength(data?.averageSessionLength ?? 0), // ✅ Fixed
+              formatSessionLength(data?.averageSessionLength ?? 0),
               Colors.purple,
               Icons.trending_up,
             ),
