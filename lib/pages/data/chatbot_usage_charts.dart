@@ -35,10 +35,7 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
             border: Border(
-        left: BorderSide(
-          color: const Color.fromARGB(255, 21, 99, 224),
-          width: 4,
-        ),
+        
       ),
       boxShadow: [
         BoxShadow(
@@ -369,10 +366,7 @@ Widget buildConversationsOverTimeCard(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
             border: Border(
-        left: BorderSide(
-          color: const Color.fromARGB(255, 215, 26, 139),
-          width: 4,
-        ),
+        
       ),
       boxShadow: [
         BoxShadow(
@@ -684,10 +678,7 @@ Widget buildPeakUsageHoursCard(Map<int, int> hourlyData) {
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
           border: Border(
-        left: BorderSide(
-          color: const Color.fromARGB(255, 226, 106, 31),
-          width: 4,
-        ),
+        
       ),
       boxShadow: [
         BoxShadow(
@@ -946,10 +937,7 @@ Widget buildUsersByCourseCard(Map<String, int> usersByCourse) {
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
             border: Border(
-        left: BorderSide(
-          color: const Color(0xff10b981),
-          width: 4,
-        ),
+       
       ),
       boxShadow: [
         BoxShadow(
@@ -1172,10 +1160,7 @@ Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
           border: Border(
-        left: BorderSide(
-          color: const Color.fromARGB(255, 200, 221, 48),
-          width: 4,
-        ),
+        
       ),
       boxShadow: [
         BoxShadow(

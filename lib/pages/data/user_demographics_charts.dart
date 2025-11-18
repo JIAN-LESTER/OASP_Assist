@@ -18,9 +18,7 @@ Widget buildUsersByYearCard(Map<String, int> yearData) {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: const Border(
-            left: BorderSide(color: Colors.indigo, width: 4),
-          ),
+          
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
@@ -332,9 +330,7 @@ Widget buildUsersByProgramCard(Map<String, int> programData) {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: const Border(
-            left: BorderSide(color: Colors.teal, width: 4),
-          ),
+          
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
@@ -593,9 +589,7 @@ Widget buildScholarshipTypesCard(Map<String, int> scholarshipTypes) {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: const Border(
-            left: BorderSide(color: Colors.orange, width: 4),
-          ),
+         
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
@@ -796,9 +790,7 @@ Widget buildUserAffiliationsCard(Map<String, int> userAffiliations) {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: const Border(
-            left: BorderSide(color: Colors.purple, width: 4),
-          ),
+          
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
