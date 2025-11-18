@@ -54,7 +54,6 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
     });
 
     try {
-      // Call the getInformationBankData() method
       final data = await statData.getAdmissionData();
 
       if (!mounted) return;
@@ -117,7 +116,7 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-       if (isLoading) {
+    if (isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return ResponsiveLayout(
@@ -271,18 +270,62 @@ class MobileAdmissionManagement extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return mainContent(
-      allAdmissions,
-      context,
-      selectedYear,
-      onYearChanged,
-      searchController,
-      currentPage,
-      itemsPerPage,
-      onPageChanged,
-      onItemsPerPageChanged,
-      16.0,
-      ad,
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Header section
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _buildMobileHeader(
+                selectedYear,
+                allAdmissions,
+                onYearChanged,
+                searchController,
+                ad,
+              ),
+            ),
+            // Table section with fixed height
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.7,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildTableHeader(),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: _buildAdmissionList(
+                        allAdmissions: allAdmissions,
+                        selectedYear: selectedYear,
+                        searchQuery: searchController.text,
+                        currentPage: currentPage,
+                        itemsPerPage: itemsPerPage,
+                        onPageChanged: onPageChanged,
+                        onItemsPerPageChanged: onItemsPerPageChanged,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -298,7 +341,7 @@ Widget mainContent(
   final ValueChanged<int> onPageChanged,
   final ValueChanged<int> onItemsPerPageChanged,
   final double padding,
-  final AdmissionData? ad
+  final AdmissionData? ad,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -353,6 +396,75 @@ Widget mainContent(
         ],
       ),
     ),
+  );
+}
+
+Widget _buildMobileHeader(
+  String selectedYear,
+  List<DocumentSnapshot> allAdmissions,
+  ValueChanged<String> onYearChanged,
+  TextEditingController searchController,
+  AdmissionData? ad,
+) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Title
+      const Text(
+        'Admission Information',
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ),
+      const SizedBox(height: 4),
+      // Subtitle
+      const Text(
+        'Manage admission processes and procedures',
+        style: TextStyle(fontSize: 12, color: Colors.grey),
+      ),
+      const SizedBox(height: 12),
+      // Upload button aligned to the right
+      Align(
+        alignment: Alignment.centerRight,
+        child: UploadDocumentButton(formType: 'admission'),
+      ),
+      const SizedBox(height: 16),
+      // Stat Cards Section
+      Column(
+        children: [
+          buildStatCard(
+            'Latest Admission Academic Year',
+            '${ad?.latestAdmission}',
+            Colors.blue,
+            Icons.message,
+          ),
+          const SizedBox(height: 12),
+          buildStatCard(
+            'Total Admission Documents',
+            '${ad?.totalAdmission}',
+            Colors.green,
+            Icons.check_circle,
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      // Search and Filter
+      buildSearchField('title', searchController),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: AcademicYearDropdown(
+              allAdmissions: allAdmissions,
+              initialValue: selectedYear,
+              onChanged: onYearChanged,
+            ),
+          ),
+        ],
+      ),
+    ],
   );
 }
 
@@ -453,8 +565,6 @@ Widget _buildAdmissionList({
   );
 }
 
-// Helper to format month names
-
 Widget _buildAdmissionRow({
   required BuildContext context,
   required DocumentSnapshot doc,
@@ -462,7 +572,6 @@ Widget _buildAdmissionRow({
   required String content,
   required String source,
   required String academicYear,
-
   required List<String>? contacts,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
@@ -570,8 +679,6 @@ Widget _buildAdmissionRow({
                 style: const TextStyle(fontSize: 13),
               ),
             ),
-
-          // Created At
 
           // Actions
           SizedBox(width: isTablet ? 60 : 80),
@@ -844,7 +951,7 @@ Widget _buildTableHeader() {
               ),
             ),
             Expanded(
-              flex: 4, // match row
+              flex: 4,
               child: Text(
                 'Contacts',
                 style: TextStyle(

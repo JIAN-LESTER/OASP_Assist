@@ -510,7 +510,7 @@ Widget buildChartCardSkeleton({bool isMobile = false}) {
 // Updated widget signatures to include isLoading
 class DesktopDashboard extends StatelessWidget {
   final String selectedTimeFrame;
-  final String selectedReportType;
+  final String selectedReportType;x``
   final ValueChanged<String> onTimeFrameChanged;
   final ValueChanged<String> onReportTypeChanged;
   final VoidCallback onRefresh;
@@ -1004,36 +1004,30 @@ List<Widget> buildChatbotUsageReport(
 
   final conversationTrend = getConversationTrendData();
 
-  // ✅ Format response time display
+  //  Format response time display
   String formatResponseTime(double seconds) {
     if (seconds == 0) return 'N/A';
     
     if (seconds < 1) {
-      // Show in milliseconds if less than 1 second
       return '${(seconds * 1000).toInt()}ms';
     } else if (seconds < 10) {
-      // Show with 2 decimal places for 1-10 seconds
       return '${seconds.toStringAsFixed(2)}s';
     } else {
-      // Show with 1 decimal place for 10+ seconds
       return '${seconds.toStringAsFixed(1)}s';
     }
   }
 
-  // ✅ Format session length display
+  //  Format session length display
   String formatSessionLength(double seconds) {
     if (seconds == 0) return 'N/A';
     
     if (seconds < 60) {
-      // Show in seconds if less than 1 minute
       return '${seconds.toInt()}s';
     } else if (seconds < 3600) {
-      // Show in minutes and seconds
       final minutes = seconds ~/ 60;
       final remainingSeconds = (seconds % 60).toInt();
       return '${minutes}m ${remainingSeconds}s';
     } else {
-      // Show in hours and minutes
       final hours = seconds ~/ 3600;
       final remainingMinutes = (seconds % 3600) ~/ 60;
       return '${hours}h ${remainingMinutes}m';

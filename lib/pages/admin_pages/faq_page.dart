@@ -240,17 +240,85 @@ class MobileFaqManagement extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return mainContent(
-      selectedCategory,
-      context,
-      onCategoryChanged,
-      searchController,
-      currentPage,
-      itemsPerPage,
-      onPageChanged,
-      onItemsPerPageChanged,
-      16.0,
-      faq,
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Header section
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _buildMobileHeader(
+                selectedCategory,
+                onCategoryChanged,
+                searchController,
+                faq,
+              ),
+            ),
+            // Table section with fixed height
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.5,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildTableHeader(),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('faqs')
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: Text('Error: ${snapshot.error}'),
+                            );
+                          }
+
+                          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                            return const Center(child: Text('No FAQs found.'));
+                          }
+
+                          return _buildFAQList(
+                            getAllFAQs: snapshot.data!.docs,
+                            selectedCategory: selectedCategory,
+                            searchQuery: searchController.text,
+                            currentPage: currentPage,
+                            itemsPerPage: itemsPerPage,
+                            onPageChanged: onPageChanged,
+                            onItemsPerPageChanged: onItemsPerPageChanged,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -302,10 +370,9 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream:
-                          FirebaseFirestore.instance
-                              .collection('faqs')
-                              .snapshots(),
+                      stream: FirebaseFirestore.instance
+                          .collection('faqs')
+                          .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -346,6 +413,90 @@ Widget mainContent(
   );
 }
 
+Widget _buildMobileHeader(
+  String selectedCategory,
+  ValueChanged<String> onCategoryChanged,
+  TextEditingController searchController,
+  FAQsData? faq,
+) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Title
+      const Text(
+        'FAQ Management',
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ),
+      const SizedBox(height: 4),
+      // Subtitle
+      const Text(
+        'Manage questions, answers, and categories',
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey,
+        ),
+      ),
+      const SizedBox(height: 12),
+      // Add FAQ button aligned to the right
+      Align(
+        alignment: Alignment.centerRight,
+        child: AddFaqButton(),
+      ),
+      const SizedBox(height: 16),
+      // Stat Cards Section - 1 per row for mobile
+      Column(
+        children: [
+          buildStatCard(
+            'Total FAQs',
+            '${faq?.totalFAQs}',
+            Colors.blue,
+            Icons.message,
+          ),
+          const SizedBox(height: 12),
+          buildStatCard(
+            'Most Frequent Category',
+            faq?.mostFrequentCategory ?? "Unknown",
+            Colors.green,
+            Icons.check_circle,
+          ),
+          const SizedBox(height: 12),
+          buildStatCard(
+            'Most Asked Question',
+            faq?.mostAskedQuestion ?? 'Unknown',
+            Colors.red,
+            Icons.group,
+          ),
+          const SizedBox(height: 12),
+          buildStatCard(
+            'Latest FAQ',
+            faq?.latestFAQ ?? "Unknown",
+            Colors.orange,
+            Icons.help_outline,
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      // Search and Filter
+      buildSearchField('questions or category', searchController),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: FaqCategoryDropdownButton(
+              initialValue: selectedCategory,
+              onChanged: onCategoryChanged,
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
 Widget _buildHeader(
   String selectedCategory,
   ValueChanged<String> onCategoryChanged,
@@ -355,7 +506,6 @@ Widget _buildHeader(
   return LayoutBuilder(
     builder: (context, constraints) {
       double screenWidth = MediaQuery.of(context).size.width;
-      bool isMobile = screenWidth < 600;
       bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
       return Column(
@@ -371,7 +521,7 @@ Widget _buildHeader(
                   Text(
                     'FAQ Management',
                     style: TextStyle(
-                      fontSize: isMobile ? 20 : (isTablet ? 22 : 24),
+                      fontSize: isTablet ? 22 : 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
                     ),
@@ -380,7 +530,7 @@ Widget _buildHeader(
                   Text(
                     'Manage questions, answers, and categories',
                     style: TextStyle(
-                      fontSize: isMobile ? 12 : 14,
+                      fontSize: 14,
                       color: Colors.grey[600],
                     ),
                   ),
@@ -390,117 +540,67 @@ Widget _buildHeader(
             ],
           ),
 
-          // Stat Cards Section - Fixed for Mobile (1 per row)
+          // Stat Cards Section
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child:
-                isMobile
-                    ? Column(
-                      children: [
-                        buildStatCard(
-                          'Total FAQs',
-                          '${faq?.totalFAQs}',
-                          Colors.blue,
-                          Icons.message,
-                        ),
-                        const SizedBox(height: 12),
-                        buildStatCard(
-                          'Most Frequent Category',
-                          faq?.mostFrequentCategory ?? "Unknown",
-                          Colors.green,
-                          Icons.check_circle,
-                        ),
-                        const SizedBox(height: 12),
-                        buildStatCard(
-                          'Most Asked Question',
-                          faq?.mostAskedQuestion ?? 'Unknown',
-                          Colors.red,
-                          Icons.group,
-                        ),
-                        const SizedBox(height: 12),
-                        buildStatCard(
-                          'Latest FAQ',
-                          faq?.latestFAQ ?? "Unknown",
-                          Colors.orange,
-                          Icons.help_outline,
-                        ),
-                      ],
-                    )
-                    : Row(
-                      children: [
-                        Expanded(
-                          child: buildStatCard(
-                            'Total FAQs',
-                            '${faq?.totalFAQs}',
-                            Colors.blue,
-                            Icons.message,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Most Frequent Category',
-                            faq?.mostFrequentCategory ?? "Unknown",
-                            Colors.green,
-                            Icons.check_circle,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Most Asked Question',
-                            faq?.mostAskedQuestion ?? 'Unknown',
-                            Colors.red,
-                            Icons.group,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Latest FAQ',
-                            faq?.latestFAQ ?? "Unknown",
-                            Colors.orange,
-                            Icons.help_outline,
-                          ),
-                        ),
-                      ],
-                    ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: buildStatCard(
+                    'Total FAQs',
+                    '${faq?.totalFAQs}',
+                    Colors.blue,
+                    Icons.message,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: buildStatCard(
+                    'Most Frequent Category',
+                    faq?.mostFrequentCategory ?? "Unknown",
+                    Colors.green,
+                    Icons.check_circle,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: buildStatCard(
+                    'Most Asked Question',
+                    faq?.mostAskedQuestion ?? 'Unknown',
+                    Colors.red,
+                    Icons.group,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: buildStatCard(
+                    'Latest FAQ',
+                    faq?.latestFAQ ?? "Unknown",
+                    Colors.orange,
+                    Icons.help_outline,
+                  ),
+                ),
+              ],
+            ),
           ),
 
           // Search and Filter Row
-          isMobile
-              ? Column(
-                children: [
-                  buildSearchField('questions or category', searchController),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FaqCategoryDropdownButton(
-                          initialValue: selectedCategory,
-                          onChanged: onCategoryChanged,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              )
-              : Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: buildSearchField(
-                      'questions or category',
-                      searchController,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  FaqCategoryDropdownButton(
-                    initialValue: selectedCategory,
-                    onChanged: onCategoryChanged,
-                  ),
-                ],
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: buildSearchField(
+                  'questions or category',
+                  searchController,
+                ),
               ),
+              const SizedBox(width: 16),
+              FaqCategoryDropdownButton(
+                initialValue: selectedCategory,
+                onChanged: onCategoryChanged,
+              ),
+            ],
+          ),
         ],
       );
     },
@@ -612,23 +712,22 @@ Widget _buildFAQList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  final filtered =
-      getAllFAQs.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final question = (data['question'] ?? '').toString().toLowerCase();
-        final category = (data['category'] ?? '').toString().toLowerCase();
+  final filtered = getAllFAQs.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final question = (data['question'] ?? '').toString().toLowerCase();
+    final category = (data['category'] ?? '').toString().toLowerCase();
 
-        bool matchesCategory =
-            selectedCategory == 'All Categories' ||
+    bool matchesCategory =
+        selectedCategory == 'All Categories' ||
             category == selectedCategory.toLowerCase();
 
-        bool matchesSearch =
-            searchQuery.isEmpty ||
+    bool matchesSearch =
+        searchQuery.isEmpty ||
             question.contains(searchQuery.toLowerCase()) ||
             category.contains(searchQuery.toLowerCase());
 
-        return matchesCategory && matchesSearch;
-      }).toList();
+    return matchesCategory && matchesSearch;
+  }).toList();
 
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
@@ -644,31 +743,30 @@ Widget _buildFAQList({
   return Column(
     children: [
       Expanded(
-        child:
-            currentPageFAQs.isEmpty
-                ? const Center(
-                  child: Text('No FAQs match your search criteria.'),
-                )
-                : ListView.builder(
-                  shrinkWrap: false,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: currentPageFAQs.length,
-                  itemBuilder: (context, index) {
-                    final doc = currentPageFAQs[index];
-                    final data = doc.data() as Map<String, dynamic>;
+        child: currentPageFAQs.isEmpty
+            ? const Center(
+                child: Text('No FAQs match your search criteria.'),
+              )
+            : ListView.builder(
+                shrinkWrap: false,
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: currentPageFAQs.length,
+                itemBuilder: (context, index) {
+                  final doc = currentPageFAQs[index];
+                  final data = doc.data() as Map<String, dynamic>;
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _buildIBRow(
-                        context: context,
-                        doc: doc,
-                        question: data['question'] ?? 'N/A',
-                        answer: data['answer'] ?? 'N/A',
-                        category: data['category'] ?? 'General',
-                      ),
-                    );
-                  },
-                ),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildIBRow(
+                      context: context,
+                      doc: doc,
+                      question: data['question'] ?? 'N/A',
+                      answer: data['answer'] ?? 'N/A',
+                      category: data['category'] ?? 'General',
+                    ),
+                  );
+                },
+              ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -771,29 +869,28 @@ Widget _buildIBRow({
                 );
               }
             },
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, size: 18),
+                    SizedBox(width: 8),
+                    Text('Edit'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, size: 18, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Delete', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

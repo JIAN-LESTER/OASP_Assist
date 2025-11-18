@@ -14,6 +14,7 @@ class PlacementInfo extends StatefulWidget {
 class _PlacementInfoState extends State<PlacementInfo>
     with TickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedProvider = 'all';
   String _sortBy = 'newest';
@@ -22,7 +23,6 @@ class _PlacementInfoState extends State<PlacementInfo>
   bool isLoading = true;
   List<Placement> placements = [];
 
-  // Color scheme using your specified green
   final Color primaryGreen = const Color(0xFF2E7D32);
   final Color lightGreen = const Color(0xFF4CAF50);
   final Color accentGreen = const Color(0xFF81C784);
@@ -43,6 +43,7 @@ class _PlacementInfoState extends State<PlacementInfo>
 
   @override
   void dispose() {
+    _searchController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -106,332 +107,54 @@ class _PlacementInfoState extends State<PlacementInfo>
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return ResponsiveLayout(
-      mobileBody: _buildMobileLayout(),
-      tabletBody: _buildTabletLayout(),
-      desktopBody: _buildDesktopLayout(),
-    );
+  Color _getStatusColor(int daysAgo) {
+    if (daysAgo <= 3) return const Color(0xFF2563EB); // Blue for new
+    if (daysAgo <= 14) return const Color(0xFF2E7D32); // Green for recent
+    return const Color(0xFF6B7280); // Gray for old
   }
 
-  Widget _buildMobileLayout() {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FFFE),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildSearchAndFilters(isMobile: true)),
-          _buildPlacementsList(crossAxisCount: 1, isDesktop: false),
-        ],
-      ),
-    );
+  IconData _getStatusIcon(int daysAgo) {
+    if (daysAgo <= 3) return Icons.fiber_new;
+    if (daysAgo <= 14) return Icons.work;
+    return Icons.business;
   }
 
-  Widget _buildTabletLayout() {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FFFE),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildSearchAndFilters(isMobile: false)),
-          _buildPlacementsList(crossAxisCount: 2, isDesktop: false),
-        ],
-      ),
-    );
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inDays < 30) {
+      final weeks = (difference.inDays / 7).floor();
+      return weeks == 1 ? '1 week ago' : '$weeks weeks ago';
+    } else {
+      final months = (difference.inDays / 30).floor();
+      return months == 1 ? '1 month ago' : '$months months ago';
+    }
   }
 
-  Widget _buildDesktopLayout() {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FFFE),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildSearchAndFilters(isMobile: false)),
-          _buildPlacementsList(crossAxisCount: 3, isDesktop: true),
-        ],
-      ),
-    );
+  bool _matchesSearch(Placement placement) {
+    if (_searchQuery.isEmpty) return true;
+
+    final company = placement.partnerCompany.toLowerCase();
+    final positions = placement.positions.map((p) => p.toLowerCase()).join(' ');
+
+    return company.contains(_searchQuery) || positions.contains(_searchQuery);
   }
 
-  Widget _buildSearchAndFilters({required bool isMobile}) {
-    // Get unique providers for filter dropdown
+  List<String> _getProviderOptions() {
     Set<String> providers = {'all'};
     for (var placement in placements) {
       if (placement.partnerCompany.isNotEmpty) {
         providers.add(placement.partnerCompany);
       }
     }
-
-    return Container(
-      margin: EdgeInsets.all(isMobile ? 16 : 24),
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Column(
-        children: [
-          // Search Bar
-          Container(
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[300]!),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: TextField(
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value.toLowerCase().trim();
-                });
-              },
-              style: const TextStyle(color: Colors.black87),
-              decoration: InputDecoration(
-                hintText: 'Search companies or positions...',
-                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: Colors.grey[400],
-                  size: 22,
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 14,
-                  horizontal: 16,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Filters Row
-          Row(
-            children: [
-              // Provider Filter
-              Expanded(
-                flex: 2,
-                child: Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.business_rounded,
-                        color: Colors.grey[400],
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: DropdownButton<String>(
-                          value:
-                              providers.contains(_selectedProvider)
-                                  ? _selectedProvider
-                                  : 'all',
-                          isExpanded: true,
-                          underline: const SizedBox(),
-                          style: TextStyle(
-                            color: Colors.grey[700],
-                            fontSize: 14,
-                          ),
-                          items:
-                              providers.map((provider) {
-                                return DropdownMenuItem(
-                                  value: provider,
-                                  child: Text(
-                                    provider == 'all'
-                                        ? 'All Companies'
-                                        : provider,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                );
-                              }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedProvider = value!;
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-
-              // Sort Dropdown
-              Expanded(
-                child: Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.sort_rounded,
-                        color: Colors.grey[400],
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: DropdownButton<String>(
-                          value: _sortBy,
-                          isExpanded: true,
-                          underline: const SizedBox(),
-                          style: TextStyle(
-                            color: Colors.grey[700],
-                            fontSize: 14,
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'newest',
-                              child: Text('Newest'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'name',
-                              child: Text('Name'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'oldest',
-                              child: Text('Oldest'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            setState(() {
-                              _sortBy = value!;
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlacementsList({
-    required int crossAxisCount,
-    required bool isDesktop,
-  }) {
-    if (isLoading) {
-      return SliverToBoxAdapter(
-        child: Container(
-          height: 400,
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(
-                  color: Colors.green[600],
-                  strokeWidth: 3,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Loading placements...',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (placements.isEmpty) {
-      return SliverToBoxAdapter(
-        child: _buildEmptyState(
-          'No placement opportunities available',
-          'Check back later for new opportunities',
-        ),
-      );
-    }
-
-    var filteredPlacements = _processPlacement();
-
-    if (filteredPlacements.isEmpty) {
-      return SliverToBoxAdapter(
-        child: _buildEmptyState(
-          'No matching placements',
-          'Try adjusting your search or filter',
-        ),
-      );
-    }
-
-    return SliverPadding(
-      padding: EdgeInsets.fromLTRB(
-        crossAxisCount == 1 ? 16 : 24,
-        0,
-        crossAxisCount == 1 ? 16 : 24,
-        32,
-      ),
-      sliver: SliverGrid(
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossAxisCount,
-          childAspectRatio:
-              crossAxisCount == 1
-                  ? 1.8 // Mobile
-                  : crossAxisCount == 2
-                  ? 1.8 // Tablet
-                  : 1.95, // Desktop
-          crossAxisSpacing: 20,
-          mainAxisSpacing: 20,
-        ),
-        delegate: SliverChildBuilderDelegate((context, index) {
-          return FadeTransition(
-            opacity: _fadeAnimation,
-            child: _buildPlacementCard(
-              filteredPlacements[index],
-              index,
-              isDesktop,
-            ),
-          );
-        }, childCount: filteredPlacements.length),
-      ),
-    );
+    return providers.toList();
   }
 
   List<Placement> _processPlacement() {
@@ -440,14 +163,7 @@ class _PlacementInfoState extends State<PlacementInfo>
     // Apply search filter
     if (_searchQuery.isNotEmpty) {
       filtered =
-          filtered.where((placement) {
-            var company = placement.partnerCompany.toLowerCase();
-            var positions = placement.positions
-                .map((p) => p.toLowerCase())
-                .join(' ');
-            return company.contains(_searchQuery) ||
-                positions.contains(_searchQuery);
-          }).toList();
+          filtered.where((placement) => _matchesSearch(placement)).toList();
     }
 
     // Apply provider filter
@@ -474,288 +190,504 @@ class _PlacementInfoState extends State<PlacementInfo>
     return filtered;
   }
 
-  Widget _buildPlacementCard(Placement placement, int index, bool isDesktop) {
-    final daysAgo = DateTime.now().difference(placement.createdAt).inDays;
-    final isNew = daysAgo <= 3;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: -4,
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(
-          color: isNew ? Colors.blue[400]! : Colors.grey[300]!,
-          width: isNew ? 2 : 1,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: () => _showPlacementDetails(placement),
-          borderRadius: BorderRadius.circular(12),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Enhanced Header
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFFFFFFF), Color(0xFFF8FAFC)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0x0D000000),
+                    offset: Offset(0, 1),
+                    blurRadius: 3,
+                  ),
+                ],
+              ),
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header Section with Icon and Click/Tap
+                    // Title and actions
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                primaryGreen.withOpacity(0.9),
-                                primaryGreen,
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: primaryGreen.withOpacity(0.3),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Job Placements",
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
                               ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.business_rounded,
-                            color: Colors.white,
-                            size: 24,
-                          ),
+                            ),
+                            Text(
+                              "Explore available job opportunities",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
                         ),
                         const Spacer(),
+                        // Filter button
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
                           decoration: BoxDecoration(
-                            color: primaryGreen.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: primaryGreen.withOpacity(0.2),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                isDesktop
-                                    ? Icons.mouse_rounded
-                                    : Icons.touch_app_rounded,
-                                color: primaryGreen,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                isDesktop ? 'Click' : 'Tap',
-                                style: TextStyle(
-                                  color: primaryGreen,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                  letterSpacing: 0.2,
-                                ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                offset: const Offset(0, 2),
+                                blurRadius: 4,
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Company Name
-                    Text(
-                      placement.partnerCompany,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.grey[900],
-                        height: 1.3,
-                        letterSpacing: -0.3,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Bottom Section: Date and Info
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Divider
-                        Divider(
-                          height: 24,
-                          thickness: 1,
-                          color: Colors.grey[200],
-                        ),
-
-                        // Date Posted
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.calendar_today_rounded,
-                              size: 16,
-                              color: Colors.grey[500],
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _formatDate(placement.createdAt),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // Status Badges
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            if (isNew)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.blue[300]!,
-                                    width: 1,
+                          child: PopupMenuButton<String>(
+                            offset: const Offset(0, 50),
+                            onSelected: (String value) {
+                              setState(() {
+                                if (value.startsWith('sort_')) {
+                                  _sortBy = value.replaceFirst('sort_', '');
+                                } else {
+                                  _selectedProvider = value;
+                                }
+                              });
+                            },
+                            itemBuilder: (BuildContext context) {
+                              return [
+                                const PopupMenuItem<String>(
+                                  enabled: false,
+                                  child: Text(
+                                    'FILTER BY COMPANY',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF94A3B8),
+                                    ),
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.fiber_new_rounded,
-                                      color: Colors.blue[700],
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'New',
-                                      style: TextStyle(
-                                        color: Colors.blue[700],
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 12,
+                                ..._getProviderOptions().map((option) {
+                                  return PopupMenuItem<String>(
+                                    value: option,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            option == 'all'
+                                                ? Icons.list_alt
+                                                : Icons.business,
+                                            color:
+                                                _selectedProvider == option
+                                                    ? primaryGreen
+                                                    : const Color(0xFF64748B),
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            option == 'all'
+                                                ? 'All Companies'
+                                                : option,
+                                            style: TextStyle(
+                                              fontWeight:
+                                                  _selectedProvider == option
+                                                      ? FontWeight.w600
+                                                      : FontWeight.w500,
+                                              color:
+                                                  _selectedProvider == option
+                                                      ? const Color(0xFF0F172A)
+                                                      : const Color(0xFF475569),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: primaryGreen.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: primaryGreen.withOpacity(0.2),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.work_rounded,
-                                    color: primaryGreen,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '${placement.positions.length} position${placement.positions.length == 1 ? '' : 's'}',
+                                  );
+                                }).toList(),
+                                const PopupMenuDivider(),
+                                const PopupMenuItem<String>(
+                                  enabled: false,
+                                  child: Text(
+                                    'SORT BY',
                                     style: TextStyle(
-                                      color: primaryGreen,
+                                      fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 12,
+                                      color: Color(0xFF94A3B8),
                                     ),
                                   ),
-                                ],
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'sort_newest',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.new_releases,
+                                        color:
+                                            _sortBy == 'newest'
+                                                ? primaryGreen
+                                                : const Color(0xFF64748B),
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Newest',
+                                        style: TextStyle(
+                                          fontWeight:
+                                              _sortBy == 'newest'
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'sort_name',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.sort_by_alpha,
+                                        color:
+                                            _sortBy == 'name'
+                                                ? primaryGreen
+                                                : const Color(0xFF64748B),
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Name',
+                                        style: TextStyle(
+                                          fontWeight:
+                                              _sortBy == 'name'
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'sort_oldest',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.history,
+                                        color:
+                                            _sortBy == 'oldest'
+                                                ? primaryGreen
+                                                : const Color(0xFF64748B),
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Oldest',
+                                        style: TextStyle(
+                                          fontWeight:
+                                              _sortBy == 'oldest'
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ];
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F172A),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.tune,
+                                color: Colors.white,
+                                size: 20,
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Search Bar
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 24),
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            offset: const Offset(0, 2),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value.toLowerCase().trim();
+                          });
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'Search companies or positions...',
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: Color(0xFF64748B),
+                          ),
+                          suffixIcon:
+                              _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                    icon: const Icon(
+                                      Icons.clear,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {
+                                        _searchQuery = '';
+                                      });
+                                    },
+                                  )
+                                  : null,
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 18,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildEmptyState(String title, String message) {
-    return Container(
-      height: 300,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              shape: BoxShape.circle,
+            // List
+            Expanded(
+              child:
+                  isLoading
+                      ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF0F172A),
+                          strokeWidth: 3,
+                        ),
+                      )
+                      : Builder(
+                        builder: (context) {
+                          if (placements.isEmpty) {
+                            return _EmptyState(
+                              icon: Icons.work_off_outlined,
+                              title: "No placements found",
+                              subtitle:
+                                  "Check back later for new opportunities",
+                            );
+                          }
+
+                          final filteredPlacements = _processPlacement();
+
+                          if (filteredPlacements.isEmpty) {
+                            return _EmptyState(
+                              icon: Icons.search_off,
+                              title: "No matching placements",
+                              subtitle:
+                                  _searchQuery.isNotEmpty
+                                      ? "Try adjusting your search terms"
+                                      : "No placements from $_selectedProvider found",
+                            );
+                          }
+
+                          return ListView.builder(
+                            padding: const EdgeInsets.all(24),
+                            itemCount: filteredPlacements.length,
+                            itemBuilder: (context, index) {
+                              final placement = filteredPlacements[index];
+                              final daysAgo =
+                                  DateTime.now()
+                                      .difference(placement.createdAt)
+                                      .inDays;
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      offset: const Offset(0, 2),
+                                      blurRadius: 8,
+                                    ),
+                                  ],
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(16),
+                                    onTap:
+                                        () => _showPlacementDetails(placement),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(20),
+                                      child: Row(
+                                        children: [
+                                          // Status indicator
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: _getStatusColor(
+                                                daysAgo,
+                                              ).withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            child: Icon(
+                                              _getStatusIcon(daysAgo),
+                                              color: _getStatusColor(daysAgo),
+                                              size: 20,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+
+                                          // Content
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                // Company name
+                                                Text(
+                                                  placement.partnerCompany,
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Color(0xFF0F172A),
+                                                    height: 1.4,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 12),
+
+                                                // Meta info
+                                                Row(
+                                                  children: [
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 10,
+                                                            vertical: 4,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: _getStatusColor(
+                                                          daysAgo,
+                                                        ).withOpacity(0.15),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              8,
+                                                            ),
+                                                      ),
+                                                      child: Text(
+                                                        _formatDate(
+                                                          placement.createdAt,
+                                                        ).toUpperCase(),
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          color:
+                                                              _getStatusColor(
+                                                                daysAgo,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Icon(
+                                                      Icons.work_outline,
+                                                      size: 14,
+                                                      color: Colors.grey[500],
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Expanded(
+                                                      child: Text(
+                                                        '${placement.positions.length} position${placement.positions.length == 1 ? '' : 's'}',
+                                                        style: TextStyle(
+                                                          fontSize: 13,
+                                                          color:
+                                                              Colors.grey[600],
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow:
+                                                            TextOverflow
+                                                                .ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+
+                                                if (placement
+                                                    .positions
+                                                    .isNotEmpty) ...[
+                                                  const SizedBox(height: 8),
+                                                  Text(
+                                                    placement.positions.first,
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      color: Colors.grey[600],
+                                                      height: 1.3,
+                                                    ),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+
+                                          // Arrow
+                                          Icon(
+                                            Icons.arrow_forward_ios,
+                                            color: Colors.grey[400],
+                                            size: 16,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
             ),
-            child: Icon(
-              Icons.work_off_rounded,
-              size: 48,
-              color: Colors.grey[400],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(message, style: TextStyle(color: Colors.grey[500])),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -955,58 +887,82 @@ class _PlacementInfoState extends State<PlacementInfo>
                               ),
                             ),
                             const SizedBox(height: 12),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(16),
+                            ...placement.contacts.map((contact) {
+                              IconData iconData;
+                              if (contact.contains('@')) {
+                                iconData = Icons.email_rounded;
+                              } else if (contact.startsWith('+') ||
+                                  contact.length >= 10) {
+                                iconData = Icons.phone_rounded;
+                              } else {
+                                iconData = Icons.link_rounded;
+                              }
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.only(top: 7),
+                                      width: 5,
+                                      height: 5,
+                                      decoration: BoxDecoration(
+                                        color: Colors.purple[600],
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () => _launchContact(contact),
+                                        child: Text(
+                                          contact,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            height: 1.5,
+                                            color: primaryGreen,
+                                            decoration:
+                                                TextDecoration.underline,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ],
+
+                          const SizedBox(height: 24),
+
+                          // Close Button
+                          SizedBox(
+                            width: double.infinity,
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.grey[700],
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                    color: Colors.grey[300]!,
+                                    width: 1,
+                                  ),
+                                ),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children:
-                                    placement.contacts.map((contact) {
-                                      IconData iconData;
-
-                                      if (contact.contains('@')) {
-                                        iconData = Icons.email_rounded;
-                                      } else if (contact.startsWith('+') ||
-                                          contact.length >= 10) {
-                                        iconData = Icons.phone_rounded;
-                                      } else {
-                                        iconData = Icons.link_rounded;
-                                      }
-
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 12,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              iconData,
-                                              color: Colors.grey[600],
-                                              size: 18,
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                contact,
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey[700],
-                                                  fontWeight: FontWeight.w500,
-                                                  height: 1.5,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }).toList(),
+                              child: const Text(
+                                'Close',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
@@ -1017,23 +973,50 @@ class _PlacementInfoState extends State<PlacementInfo>
           ),
     );
   }
+}
 
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
 
-    if (difference.inDays == 0) {
-      return 'Posted Today';
-    } else if (difference.inDays == 1) {
-      return 'Posted Yesterday';
-    } else if (difference.inDays < 7) {
-      return 'Posted ${difference.inDays} days ago';
-    } else if (difference.inDays < 30) {
-      final weeks = (difference.inDays / 7).floor();
-      return weeks == 1 ? 'Posted 1 week ago' : 'Posted $weeks weeks ago';
-    } else {
-      final months = (difference.inDays / 30).floor();
-      return months == 1 ? 'Posted 1 month ago' : 'Posted $months months ago';
-    }
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 48, color: Colors.grey[400]),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF475569),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
 }

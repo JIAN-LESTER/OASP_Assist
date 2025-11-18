@@ -461,7 +461,7 @@ Widget buildCategoryDistributionCard(Map<String, int> categoryData) {
       final titleFontSize = isMobile ? 16.0 : 18.0;
       final subtitleFontSize = isMobile ? 11.0 : 13.0;
       final borderRadius = isMobile ? 12.0 : 16.0;
-      final pieRadius = isMobile ? 50.0 : 70.0;
+      final pieRadius = isMobile ? 50.0 : 50.0;
       final centerSpaceRadius = isMobile ? 35.0 : 50.0;
 
       return Container(
@@ -470,10 +470,7 @@ Widget buildCategoryDistributionCard(Map<String, int> categoryData) {
           color: Colors.white,
           borderRadius: BorderRadius.circular(borderRadius),
           border: Border(
-            left: BorderSide(
-              color: const Color.fromARGB(255, 37, 31, 212),
-              width: 4,
-            ),
+           
           ),
 
           boxShadow: [
@@ -1006,12 +1003,7 @@ Widget buildInquiryTrendCard(List<ChartData> trendData, String timeFrame) {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      border: Border(
-        left: BorderSide(
-          color: const Color.fromARGB(255, 15, 244, 23),
-          width: 4,
-        ),
-      ),
+      
 
       boxShadow: [
         BoxShadow(

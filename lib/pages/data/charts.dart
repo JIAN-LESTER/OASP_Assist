@@ -169,10 +169,7 @@ Widget buildSystemLogsCard(List<SystemLog> logs) {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
            border: Border(
-        left: BorderSide(
-          color: const Color.fromARGB(255, 221, 48, 192),
-          width: 4,
-        ),
+        
       ),
           boxShadow: [
             BoxShadow(
@@ -265,10 +262,7 @@ Widget buildMessageLogsCard(List<MessageLogs> msgLogs) {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
            border: Border(
-        left: BorderSide(
-          color: const Color.fromARGB(255, 48, 169, 221),
-          width: 4,
-        ),
+        
       ),
           
           boxShadow: [
