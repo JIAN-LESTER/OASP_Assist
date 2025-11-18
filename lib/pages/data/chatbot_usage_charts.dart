@@ -1160,18 +1160,58 @@ Widget buildUsersByCourseCard(Map<String, int> usersByCourse) {
 // ============================================
 // 🎨 IMPROVED USERS BY YEAR LEVEL CARD
 // ============================================
-Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
+Widget buildUsersByYearLevelCard(
+  Map<String, int> usersByYearLevel, {
+  bool isMobile = false,
+}) {
   final entries = usersByYearLevel.entries.toList()
     ..sort((a, b) => a.key.compareTo(b.key));
   
   int totalUsers = entries.fold(0, (sum, entry) => sum + entry.value);
   
+  // ✅ Dynamic sizing based on data volume and screen size
+  double chartRadius;
+  double sectionRadius;
+  double fontSize;
+  
+  if (isMobile) {
+    // Mobile: smaller charts
+    if (totalUsers > 100) {
+      chartRadius = 40;
+      sectionRadius = 70;
+      fontSize = 12;
+    } else if (totalUsers > 50) {
+      chartRadius = 35;
+      sectionRadius = 60;
+      fontSize = 11;
+    } else {
+      chartRadius = 30;
+      sectionRadius = 50;
+      fontSize = 10;
+    }
+  } else {
+    // Desktop/Tablet: larger charts
+    if (totalUsers > 100) {
+      chartRadius = 50;
+      sectionRadius = 90;
+      fontSize = 13;
+    } else if (totalUsers > 50) {
+      chartRadius = 45;
+      sectionRadius = 80;
+      fontSize = 12;
+    } else {
+      chartRadius = 40;
+      sectionRadius = 70;
+      fontSize = 11;
+    }
+  }
+  
   return Container(
-    padding: const EdgeInsets.all(20),
+    padding: EdgeInsets.all(isMobile ? 16 : 20),
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-          border: Border(
+      border: Border(
         left: BorderSide(
           color: const Color.fromARGB(255, 200, 221, 48),
           width: 4,
@@ -1195,10 +1235,10 @@ Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Users by Year Level',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: isMobile ? 16 : 18,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1A1A1A),
                     ),
@@ -1207,7 +1247,7 @@ Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
                   Text(
                     'Distribution of chatbot users across year levels',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: isMobile ? 11 : 12,
                       color: Colors.grey[600],
                     ),
                   ),
@@ -1225,7 +1265,7 @@ Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
                 child: Text(
                   '$totalUsers total',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: isMobile ? 11 : 12,
                     color: Colors.teal[700],
                     fontWeight: FontWeight.w600,
                   ),
@@ -1233,7 +1273,7 @@ Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
               ),
           ],
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: isMobile ? 16 : 20),
         Expanded(
           child: entries.isEmpty
               ? _buildEmptyState(
@@ -1241,122 +1281,194 @@ Widget buildUsersByYearLevelCard(Map<String, int> usersByYearLevel) {
                   message: 'No year level data available',
                   subtitle: 'Year level distribution will appear here',
                 )
-              : Row(
-                  children: [
-                    // Pie Chart
-                    Expanded(
-                      flex: 3,
-                      child: PieChart(
-                        PieChartData(
-                          sectionsSpace: 3,
-                          centerSpaceRadius: 50,
-                          sections: entries.asMap().entries.map((entry) {
-                            final percentage = ((entry.value.value / totalUsers) * 100);
-                            
-                            return PieChartSectionData(
-                              color: _getYearLevelColor(entry.key),
-                              value: entry.value.value.toDouble(),
-                              title: '${percentage.toStringAsFixed(1)}%',
-                              radius: 90,
-                              titleStyle: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black26,
-                                    offset: Offset(1, 1),
-                                    blurRadius: 2,
+              : isMobile
+                  ? Column(
+                      children: [
+                        // Chart takes more space on mobile
+                        Expanded(
+                          flex: 3,
+                          child: PieChart(
+                            PieChartData(
+                              sectionsSpace: 3,
+                              centerSpaceRadius: chartRadius, // ✅ Dynamic radius
+                              sections: entries.asMap().entries.map((entry) {
+                                final percentage = ((entry.value.value / totalUsers) * 100);
+                                
+                                return PieChartSectionData(
+                                  color: _getYearLevelColor(entry.key),
+                                  value: entry.value.value.toDouble(),
+                                  title: '${percentage.toStringAsFixed(1)}%',
+                                  radius: sectionRadius, // ✅ Dynamic section radius
+                                  titleStyle: TextStyle(
+                                    fontSize: fontSize, // ✅ Dynamic font size
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        offset: Offset(1, 1),
+                                        blurRadius: 2,
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              badgeWidget: entry.key == 0
-                                  ? Container(
-                                      padding: const EdgeInsets.all(4),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Legend below chart on mobile
+                        Expanded(
+                          flex: 2,
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: entries.map((entry) {
+                                final percentage = ((entry.value / totalUsers) * 100);
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 14,
+                                        height: 14,
+                                        decoration: BoxDecoration(
+                                          color: _getYearLevelColor(entries.indexOf(entry)),
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '${entry.key}: ${entry.value} (${percentage.toStringAsFixed(1)}%)',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        // Pie Chart
+                        Expanded(
+                          flex: 3,
+                          child: PieChart(
+                            PieChartData(
+                              sectionsSpace: 3,
+                              centerSpaceRadius: chartRadius, // ✅ Dynamic radius
+                              sections: entries.asMap().entries.map((entry) {
+                                final percentage = ((entry.value.value / totalUsers) * 100);
+                                
+                                return PieChartSectionData(
+                                  color: _getYearLevelColor(entry.key),
+                                  value: entry.value.value.toDouble(),
+                                  title: '${percentage.toStringAsFixed(1)}%',
+                                  radius: sectionRadius, // ✅ Dynamic section radius
+                                  titleStyle: TextStyle(
+                                    fontSize: fontSize, // ✅ Dynamic font size
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        offset: Offset(1, 1),
+                                        blurRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  badgeWidget: entry.key == 0
+                                      ? Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.1),
+                                                blurRadius: 4,
+                                              ),
+                                            ],
+                                          ),
+                                          child: Icon(
+                                            Icons.star,
+                                            size: 16,
+                                            color: _getYearLevelColor(entry.key),
+                                          ),
+                                        )
+                                      : null,
+                                  badgePositionPercentageOffset: 1.2,
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        // Legend
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: entries.map((entry) {
+                              final percentage = ((entry.value / totalUsers) * 100);
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 16,
+                                      height: 16,
                                       decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        shape: BoxShape.circle,
+                                        color: _getYearLevelColor(entries.indexOf(entry)),
+                                        borderRadius: BorderRadius.circular(4),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.1),
+                                            color: _getYearLevelColor(entries.indexOf(entry))
+                                                .withOpacity(0.3),
                                             blurRadius: 4,
                                           ),
                                         ],
                                       ),
-                                      child: Icon(
-                                        Icons.star,
-                                        size: 16,
-                                        color: _getYearLevelColor(entry.key),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            entry.key,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${entry.value} (${percentage.toStringAsFixed(1)}%)',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    )
-                                  : null,
-                              badgePositionPercentageOffset: 1.2,
-                            );
-                          }).toList(),
-                          pieTouchData: PieTouchData(
-                            touchCallback: (FlTouchEvent event, pieTouchResponse) {},
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: 20),
-                    // Legend
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: entries.map((entry) {
-                          final percentage = ((entry.value / totalUsers) * 100);
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: _getYearLevelColor(entries.indexOf(entry)),
-                                    borderRadius: BorderRadius.circular(4),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: _getYearLevelColor(entries.indexOf(entry))
-                                            .withOpacity(0.3),
-                                        blurRadius: 4,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        entry.key,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${entry.value} (${percentage.toStringAsFixed(1)}%)',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ],
-                ),
         ),
       ],
     ),

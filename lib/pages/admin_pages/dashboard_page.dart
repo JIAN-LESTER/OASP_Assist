@@ -20,12 +20,7 @@ class SkeletonBox extends StatefulWidget {
   final double? height;
   final BorderRadius? borderRadius;
 
-  const SkeletonBox({
-    super.key,
-    this.width,
-    this.height,
-    this.borderRadius,
-  });
+  const SkeletonBox({super.key, this.width, this.height, this.borderRadius});
 
   @override
   State<SkeletonBox> createState() => _SkeletonBoxState();
@@ -43,9 +38,10 @@ class _SkeletonBoxState extends State<SkeletonBox>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat();
-    _animation = Tween<double>(begin: -1.0, end: 2.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _animation = Tween<double>(
+      begin: -1.0,
+      end: 2.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -67,16 +63,13 @@ class _SkeletonBoxState extends State<SkeletonBox>
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [
-                Colors.grey[300]!,
-                Colors.grey[200]!,
-                Colors.grey[300]!,
-              ],
-              stops: [
-                _animation.value - 0.3,
-                _animation.value,
-                _animation.value + 0.3,
-              ].map((v) => v.clamp(0.0, 1.0)).toList(),
+              colors: [Colors.grey[300]!, Colors.grey[200]!, Colors.grey[300]!],
+              stops:
+                  [
+                    _animation.value - 0.3,
+                    _animation.value,
+                    _animation.value + 0.3,
+                  ].map((v) => v.clamp(0.0, 1.0)).toList(),
             ),
           ),
         );
@@ -247,12 +240,7 @@ class DashboardCache {
   final DateTime timestamp;
   final Map<String, dynamic>? quickStats;
 
-  DashboardCache({
-    this.inq,
-    this.ud,
-    required this.timestamp,
-    this.quickStats,
-  });
+  DashboardCache({this.inq, this.ud, required this.timestamp, this.quickStats});
 
   bool get isValid {
     final now = DateTime.now();
@@ -339,10 +327,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _loadCriticalData() async {
     // Load username and quick stats in parallel
-    final results = await Future.wait([
-      _fetchUserName(),
-      _fetchQuickStats(),
-    ]);
+    final results = await Future.wait([_fetchUserName(), _fetchQuickStats()]);
 
     if (!mounted) return;
 
@@ -357,7 +342,7 @@ class _DashboardPageState extends State<DashboardPage> {
     if (_cache.containsKey(selectedTimeFrame) &&
         _cache[selectedTimeFrame]!.isValid) {
       final cached = _cache[selectedTimeFrame]!;
-      
+
       if (mounted) {
         setState(() {
           inq = cached.inq;
@@ -419,10 +404,11 @@ class _DashboardPageState extends State<DashboardPage> {
     if (currentUser == null) return 'User';
 
     try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
 
       return userDoc.exists ? (userDoc.data()?['name'] ?? 'User') : 'User';
     } catch (e) {
@@ -555,9 +541,7 @@ class _DashboardPageState extends State<DashboardPage> {
           right: 20,
           left: isMobile ? 20 : (screenWidth - (isTablet ? 380 : 420)),
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(4),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
         elevation: 6,
       ),
     );
@@ -706,6 +690,41 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildSkeletonHeader() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    if (isMobile) {
+      // 📱 MOBILE LAYOUT: Dropdown on the left, smaller arrangement
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SkeletonBox(
+                width: 140,
+                height: 38,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              const SizedBox(width: 12),
+              SkeletonBox(
+                width: 38,
+                height: 38,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Title centered or left (depending on your style)
+          const SkeletonBox(width: 180, height: 22),
+
+          const SizedBox(height: 8),
+          const SkeletonBox(width: 250, height: 14),
+        ],
+      );
+    }
+
+    // 💻 DESKTOP LAYOUT (unchanged)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -869,7 +888,8 @@ Widget dashboardContents(
   Map<String, int>? quickStats,
 ) {
   final totalMessages = quickStats?['totalMessages'] ?? inq?.totalMessages ?? 0;
-  final answeredMessages = quickStats?['answered'] ?? inq?.answeredMessages ?? 0;
+  final answeredMessages =
+      quickStats?['answered'] ?? inq?.answeredMessages ?? 0;
   final totalUsers = quickStats?['totalUsers'] ?? ud?.totalUsers ?? 0;
 
   return Scaffold(
@@ -962,7 +982,10 @@ Widget dashboardContents(
                   height: 400,
                   child: LazyLoadWidget(
                     delay: const Duration(milliseconds: 100),
-                    builder: (context) => buildCategoryDistributionCard(inq?.categoryDistribution ?? {}),
+                    builder:
+                        (context) => buildCategoryDistributionCard(
+                          inq?.categoryDistribution ?? {},
+                        ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -970,7 +993,11 @@ Widget dashboardContents(
                   height: 400,
                   child: LazyLoadWidget(
                     delay: const Duration(milliseconds: 200),
-                    builder: (context) => buildInquiryTrendCard(inq?.inquiryTrend ?? [], selectedTimeFrame),
+                    builder:
+                        (context) => buildInquiryTrendCard(
+                          inq?.inquiryTrend ?? [],
+                          selectedTimeFrame,
+                        ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -978,7 +1005,8 @@ Widget dashboardContents(
                   height: 350,
                   child: LazyLoadWidget(
                     delay: const Duration(milliseconds: 300),
-                    builder: (context) => buildSystemLogsCard(inq?.recentLogs ?? []),
+                    builder:
+                        (context) => buildSystemLogsCard(inq?.recentLogs ?? []),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -986,29 +1014,37 @@ Widget dashboardContents(
                   height: 350,
                   child: LazyLoadWidget(
                     delay: const Duration(milliseconds: 400),
-                    builder: (context) => buildMessageLogsCard(inq?.msgLogs ?? []),
+                    builder:
+                        (context) => buildMessageLogsCard(inq?.msgLogs ?? []),
                   ),
                 ),
               ],
             );
-            } else {
-              // Web/Desktop: fixed layout with Expanded
-              return Column(
-                children: [
+          } else {
+            // Web/Desktop: fixed layout with Expanded
+            return Column(
+              children: [
                 Expanded(
                   child: Row(
                     children: [
                       Expanded(
                         child: LazyLoadWidget(
                           delay: const Duration(milliseconds: 100),
-                          builder: (context) => buildCategoryDistributionCard(inq?.categoryDistribution ?? {}),
+                          builder:
+                              (context) => buildCategoryDistributionCard(
+                                inq?.categoryDistribution ?? {},
+                              ),
                         ),
                       ),
                       const SizedBox(width: 20),
                       Expanded(
                         child: LazyLoadWidget(
                           delay: const Duration(milliseconds: 200),
-                          builder: (context) => buildInquiryTrendCard(inq?.inquiryTrend ?? [], selectedTimeFrame),
+                          builder:
+                              (context) => buildInquiryTrendCard(
+                                inq?.inquiryTrend ?? [],
+                                selectedTimeFrame,
+                              ),
                         ),
                       ),
                     ],
@@ -1022,7 +1058,9 @@ Widget dashboardContents(
                         flex: 1,
                         child: LazyLoadWidget(
                           delay: const Duration(milliseconds: 300),
-                          builder: (context) => buildSystemLogsCard(inq?.recentLogs ?? []),
+                          builder:
+                              (context) =>
+                                  buildSystemLogsCard(inq?.recentLogs ?? []),
                         ),
                       ),
                       const SizedBox(width: 20),
@@ -1030,7 +1068,9 @@ Widget dashboardContents(
                         flex: 2,
                         child: LazyLoadWidget(
                           delay: const Duration(milliseconds: 400),
-                          builder: (context) => buildMessageLogsCard(inq?.msgLogs ?? []),
+                          builder:
+                              (context) =>
+                                  buildMessageLogsCard(inq?.msgLogs ?? []),
                         ),
                       ),
                     ],
@@ -1044,29 +1084,42 @@ Widget dashboardContents(
         // --- Return widget ---
         return Padding(
           padding: const EdgeInsets.all(20.0),
-          child: isMobile
-              ? SingleChildScrollView(
-                  child: Column(
+          child:
+              isMobile
+                  ? SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(
+                          selectedTimeFrame,
+                          onTimeFrameChanged,
+                          onRefresh,
+                          isRefreshing,
+                          userName,
+                        ),
+                        const SizedBox(height: 32),
+                        statCards(),
+                        const SizedBox(height: 32),
+                        cardsSection(),
+                      ],
+                    ),
+                  )
+                  : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildHeader(selectedTimeFrame, onTimeFrameChanged, onRefresh, isRefreshing, userName),
+                      _buildHeader(
+                        selectedTimeFrame,
+                        onTimeFrameChanged,
+                        onRefresh,
+                        isRefreshing,
+                        userName,
+                      ),
                       const SizedBox(height: 32),
                       statCards(),
                       const SizedBox(height: 32),
-                      cardsSection(),
+                      Expanded(child: cardsSection()),
                     ],
                   ),
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(selectedTimeFrame, onTimeFrameChanged, onRefresh, isRefreshing, userName),
-                    const SizedBox(height: 32),
-                    statCards(),
-                    const SizedBox(height: 32),
-                    Expanded(child: cardsSection()),
-                  ],
-                ),
         );
       },
     ),
@@ -1090,72 +1143,72 @@ Widget _buildHeader(
         children: [
           isMobile
               ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome back, $userName!',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Welcome back, $userName!',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      CustomDropdownButton(
+                        items: [
+                          'All',
+                          'Today',
+                          'This Week',
+                          'This Month',
+                          'This Year',
+                        ],
+                        initialValue: selectedTimeFrame,
+                        onChanged: onTimeFrameChanged,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        CustomDropdownButton(
-                          items: [
-                            'All',
-                            'Today',
-                            'This Week',
-                            'This Month',
-                            'This Year',
-                          ],
-                          initialValue: selectedTimeFrame,
-                          onChanged: onTimeFrameChanged,
-                        ),
-                        const SizedBox(width: 12),
-                        RefreshButton(
-                          onRefresh: onRefresh,
-                          isRefreshing: isRefreshing,
-                        ),
-                      ],
-                    ),
-                  ],
-                )
+                      const SizedBox(width: 12),
+                      RefreshButton(
+                        onRefresh: onRefresh,
+                        isRefreshing: isRefreshing,
+                      ),
+                    ],
+                  ),
+                ],
+              )
               : Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Welcome back, $userName!',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Welcome back, $userName!',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      CustomDropdownButton(
+                        items: [
+                          'All',
+                          'Today',
+                          'This Week',
+                          'This Month',
+                          'This Year',
+                        ],
+                        initialValue: selectedTimeFrame,
+                        onChanged: onTimeFrameChanged,
                       ),
-                    ),
-                    Row(
-                      children: [
-                        CustomDropdownButton(
-                          items: [
-                            'All',
-                            'Today',
-                            'This Week',
-                            'This Month',
-                            'This Year',
-                          ],
-                          initialValue: selectedTimeFrame,
-                          onChanged: onTimeFrameChanged,
-                        ),
-                        const SizedBox(width: 12),
-                        RefreshButton(
-                          onRefresh: onRefresh,
-                          isRefreshing: isRefreshing,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 12),
+                      RefreshButton(
+                        onRefresh: onRefresh,
+                        isRefreshing: isRefreshing,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
           SizedBox(height: isMobile ? 12 : 8),
           Text(
             "Here's an overview of recent student inquiries for $selectedTimeFrame.",

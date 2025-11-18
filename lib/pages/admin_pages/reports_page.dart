@@ -359,6 +359,154 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 }
 
+// ✅ Skeleton Loader Widget
+class SkeletonLoader extends StatefulWidget {
+  final double height;
+  final double? width;
+  final BorderRadius? borderRadius;
+
+  const SkeletonLoader({
+    super.key,
+    required this.height,
+    this.width,
+    this.borderRadius,
+  });
+
+  @override
+  State<SkeletonLoader> createState() => _SkeletonLoaderState();
+}
+
+class _SkeletonLoaderState extends State<SkeletonLoader>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
+    
+    _animation = Tween<double>(begin: -1.0, end: 2.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Container(
+          height: widget.height,
+          width: widget.width,
+          decoration: BoxDecoration(
+            borderRadius: widget.borderRadius ?? BorderRadius.circular(8),
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                Colors.grey[300]!,
+                Colors.grey[100]!,
+                Colors.grey[300]!,
+              ],
+              stops: [
+                _animation.value - 0.3,
+                _animation.value,
+                _animation.value + 0.3,
+              ].map((e) => e.clamp(0.0, 1.0)).toList(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ✅ Skeleton for Stat Cards
+Widget buildStatCardSkeleton({bool isMobile = false}) {
+  return Container(
+    padding: EdgeInsets.all(isMobile ? 12 : 16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(8),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.1),
+          spreadRadius: 1,
+          blurRadius: 4,
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            SkeletonLoader(
+              height: isMobile ? 14 : 16,
+              width: isMobile ? 80 : 100,
+            ),
+            SkeletonLoader(
+              height: isMobile ? 24 : 32,
+              width: isMobile ? 24 : 32,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SkeletonLoader(
+          height: isMobile ? 24 : 32,
+          width: isMobile ? 60 : 80,
+        ),
+      ],
+    ),
+  );
+}
+
+// ✅ Skeleton for Chart Cards
+Widget buildChartCardSkeleton({bool isMobile = false}) {
+  return Container(
+    padding: EdgeInsets.all(isMobile ? 12 : 16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(8),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.1),
+          spreadRadius: 1,
+          blurRadius: 4,
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SkeletonLoader(
+          height: isMobile ? 18 : 20,
+          width: isMobile ? 120 : 150,
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: SkeletonLoader(
+            height: double.infinity,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 // Updated widget signatures to include isLoading
 class DesktopDashboard extends StatelessWidget {
   final String selectedTimeFrame;
@@ -414,14 +562,9 @@ class DesktopDashboard extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             
-            // ✅ Show loading indicator for current report
+            // ✅ Show skeleton loader for current report
             if (isLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40.0),
-                  child: CircularProgressIndicator(),
-                ),
-              )
+              ...buildSkeletonReport(selectedReportType, isMobile: false)
             else
               ...ReportsHelper.buildReportContent(
                 selectedReportType,
@@ -496,12 +639,7 @@ class TabletDashboard extends StatelessWidget {
             const SizedBox(height: 32),
             
             if (isLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40.0),
-                  child: CircularProgressIndicator(),
-                ),
-              )
+              ...buildSkeletonReport(selectedReportType, isMobile: false)
             else
               ...ReportsHelper.buildReportContent(
                 selectedReportType,
@@ -576,12 +714,7 @@ class MobileDashboard extends StatelessWidget {
             const SizedBox(height: 24),
             
             if (isLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40.0),
-                  child: CircularProgressIndicator(),
-                ),
-              )
+              ...buildSkeletonReport(selectedReportType, isMobile: true)
             else
               ...ReportsHelper.buildReportContent(
                 selectedReportType,
@@ -599,6 +732,60 @@ class MobileDashboard extends StatelessWidget {
       ),
     );
   }
+}
+
+// ✅ Build Skeleton based on Report Type
+List<Widget> buildSkeletonReport(String reportType, {bool isMobile = false}) {
+  if (isMobile) {
+    return [
+      // Stat cards row 1
+      Row(
+        children: [
+          Expanded(child: buildStatCardSkeleton(isMobile: true)),
+          const SizedBox(width: 12),
+          Expanded(child: buildStatCardSkeleton(isMobile: true)),
+        ],
+      ),
+      const SizedBox(height: 12),
+      // Stat cards row 2
+      Row(
+        children: [
+          Expanded(child: buildStatCardSkeleton(isMobile: true)),
+          const SizedBox(width: 12),
+          Expanded(child: buildStatCardSkeleton(isMobile: true)),
+        ],
+      ),
+      const SizedBox(height: 24),
+      // Chart cards
+      SizedBox(height: 400, child: buildChartCardSkeleton(isMobile: true)),
+      const SizedBox(height: 16),
+      SizedBox(height: 400, child: buildChartCardSkeleton(isMobile: true)),
+      const SizedBox(height: 16),
+      SizedBox(height: 400, child: buildChartCardSkeleton(isMobile: true)),
+    ];
+  }
+
+  // Desktop/Tablet skeleton
+  return [
+    SizedBox(
+      height: 120,
+      child: Row(
+        children: [
+          Expanded(child: buildStatCardSkeleton()),
+          const SizedBox(width: 20),
+          Expanded(child: buildStatCardSkeleton()),
+          const SizedBox(width: 20),
+          Expanded(child: buildStatCardSkeleton()),
+          const SizedBox(width: 20),
+          Expanded(child: buildStatCardSkeleton()),
+        ],
+      ),
+    ),
+    const SizedBox(height: 16),
+    SizedBox(height: 400, child: buildChartCardSkeleton()),
+    const SizedBox(height: 16),
+    SizedBox(height: 400, child: buildChartCardSkeleton()),
+  ];
 }
 
 class ReportsHelper {
@@ -687,7 +874,7 @@ List<Widget> buildInquiryTrendsReport(
         ],
       ),
       const SizedBox(height: 24),
-      Container(
+      SizedBox(
         height: 400,
         child: buildInquiryTrendCard(
           data?.inquiryTrend ?? [],
@@ -695,17 +882,17 @@ List<Widget> buildInquiryTrendsReport(
         ),
       ),
       const SizedBox(height: 16),
-      Container(
+      SizedBox(
         height: 400,
         child: buildCategoryDistributionCard(data?.categoryDistribution ?? {}),
       ),
       const SizedBox(height: 16),
-      Container(
+      SizedBox(
         height: 400,
         child: buildHighestFAQCard(data?.highestFAQs ?? {}),
       ),
       const SizedBox(height: 16),
-      Container(
+      SizedBox(
         height: 400,
         child: buildSeasonalTrendsCard(data?.seasonalTrends ?? {}),
       ),
@@ -784,7 +971,6 @@ List<Widget> buildInquiryTrendsReport(
       height: 400,
       child: Row(
         children: [
-        
           Expanded(child: buildSeasonalTrendsCard(data?.seasonalTrends ?? {})),
         ],
       ),
@@ -854,6 +1040,86 @@ List<Widget> buildChatbotUsageReport(
     }
   }
 
+  if (isMobile) {
+    return [
+      Row(
+        children: [
+          Expanded(
+            child: buildStatCard(
+              'Average Response Time',
+              formatResponseTime(data?.averageResponseTime ?? 0),
+              Colors.blue,
+              Icons.timer,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: buildStatCard(
+              'Total Sessions',
+              '${data?.totalSessions ?? 0}',
+              Colors.green,
+              Icons.chat,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: buildStatCard(
+              'Avg Messages/User',
+              '${(data?.averageMessagesPerUser ?? 0).toStringAsFixed(1)}',
+              Colors.orange,
+              Icons.person,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: buildStatCard(
+              'Avg Session Length',
+              formatSessionLength(data?.averageSessionLength ?? 0),
+              Colors.purple,
+              Icons.trending_up,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 24),
+      SizedBox(
+        height: 400,
+        child: buildConversationsOverTimeCard(conversationTrend, timeFrame),
+      ),
+      const SizedBox(height: 16),
+      SizedBox(
+        height: 350,
+        child: buildPeakUsageHoursCard(data?.peakUsageByHour ?? <int, int>{}),
+      ),
+      const SizedBox(height: 16),
+      SizedBox(
+        height: 400,
+        child: buildUsersByCourseCard(
+          data?.usersByCourse ?? <String, int>{},
+        ),
+      ),
+      const SizedBox(height: 16),
+      SizedBox(
+        height: 400,
+        child: buildUsersByYearLevelCard(
+          data?.usersByYearLevel ?? <String, int>{},
+          isMobile: true
+        ),
+      ),
+      const SizedBox(height: 16),
+      SizedBox(
+        height: 400,
+        child: buildResponseTimeTrendCard(
+          data?.responseTimeTrend ?? <ChartData>[],
+        ),
+      ),
+    ];
+  }
+
   return [
     SizedBox(
       height: 120,
@@ -862,7 +1128,7 @@ List<Widget> buildChatbotUsageReport(
           Expanded(
             child: buildStatCard(
               'Average Response Time',
-              formatResponseTime(data?.averageResponseTime ?? 0), // ✅ Fixed
+              formatResponseTime(data?.averageResponseTime ?? 0),
               Colors.blue,
               Icons.timer,
             ),
@@ -889,7 +1155,7 @@ List<Widget> buildChatbotUsageReport(
           Expanded(
             child: buildStatCard(
               'Avg Session Length',
-              formatSessionLength(data?.averageSessionLength ?? 0), // ✅ Fixed
+              formatSessionLength(data?.averageSessionLength ?? 0),
               Colors.purple,
               Icons.trending_up,
             ),
@@ -986,22 +1252,24 @@ List<Widget> buildUserDemographicsReport(
         ],
       ),
       const SizedBox(height: 24),
-      Container(
-        height: 400,
-        child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
-      ),
-      const SizedBox(height: 16),
-      Container(
+           SizedBox(
         height: 400,
         child: buildUsersByYearCard(data?.usersByYear ?? {}),
       ),
+     
       const SizedBox(height: 16),
-      Container(
+         SizedBox(
         height: 400,
         child: buildUsersByProgramCard(data?.usersByProgram ?? {}),
       ),
       const SizedBox(height: 16),
-      Container(
+
+        SizedBox(
+        height: 400,
+        child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
+      ),
+      const SizedBox(height: 16),
+      SizedBox(
         height: 400,
         child: buildScholarshipTypesCard(data?.scholarshipTypes ?? {}),
       ),
@@ -1052,16 +1320,26 @@ List<Widget> buildUserDemographicsReport(
       ),
     ),
     const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
-    ),
+        SizedBox(height: 400, child: buildUsersByYearCard(data?.usersByYear ?? {})),
+
     const SizedBox(height: 16),
-    SizedBox(height: 400, child: buildUsersByYearCard(data?.usersByYear ?? {})),
-    const SizedBox(height: 16),
-    SizedBox(
+        SizedBox(
       height: 400,
-      child: buildUsersByProgramCard(data?.usersByProgram ?? {}),
+      child: Row(
+        children: [
+          Expanded(
+            child: buildUsersByProgramCard(
+              data?.usersByProgram ?? {},
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: buildUserAffiliationsCard(
+              data?.userAffiliations ?? {},
+            ),
+          ),
+        ],
+      ),
     ),
     const SizedBox(height: 16),
     SizedBox(

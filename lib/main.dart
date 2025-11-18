@@ -31,6 +31,63 @@ import 'firebase_options.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+// ✅ NEW: Reusable Loading Overlay Widget
+class LoadingOverlay {
+  static void show(BuildContext context, {String? message}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black54,
+      builder: (context) => PopScope(
+        canPop: false,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
+                  strokeWidth: 3,
+                ),
+                if (message != null) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    message,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static void hide(BuildContext context) {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
+}
+
 class NotificationNavigationHandler {
   final GlobalKey<NavigatorState> navigatorKey;
 
@@ -73,9 +130,13 @@ class NotificationNavigationHandler {
       return;
     }
 
+    // ✅ Show loading overlay
+    LoadingOverlay.show(context, message: 'Loading escalation...');
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
+        LoadingOverlay.hide(context);
         print('⚠️ No user logged in');
         return;
       }
@@ -92,6 +153,8 @@ class NotificationNavigationHandler {
       
       print('📍 Navigating $role to escalations (route: $route, tab: $tabIndex)');
       
+      LoadingOverlay.hide(context);
+      
       Navigator.of(context).pushReplacementNamed(
         route,
         arguments: {
@@ -102,6 +165,7 @@ class NotificationNavigationHandler {
       );
     } catch (e) {
       print('❌ Error determining user role: $e');
+      LoadingOverlay.hide(context);
       Navigator.of(context).pushReplacementNamed(
         '/staff/escalations',
         arguments: {
@@ -124,20 +188,15 @@ class NotificationNavigationHandler {
     }
 
     try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-        ),
-      );
+      // ✅ Use new loading overlay
+      LoadingOverlay.show(context, message: 'Loading response...');
 
       final escalationDoc = await FirebaseFirestore.instance
           .collection('escalations')
           .doc(escalationId)
           .get();
 
-      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) LoadingOverlay.hide(context);
 
       if (!escalationDoc.exists) {
         _showErrorDialog(context, 'Escalation not found');
@@ -276,16 +335,20 @@ class NotificationNavigationHandler {
     } catch (e) {
       print('❌ Error fetching escalation: $e');
       if (context.mounted) {
-        Navigator.of(context).pop();
+        LoadingOverlay.hide(context);
         _showErrorDialog(context, 'Failed to load response');
       }
     }
   }
 
   Future<void> _navigateToAnnouncement(BuildContext context, Map<String, dynamic> data) async {
+    // ✅ Show loading overlay
+    LoadingOverlay.show(context, message: 'Opening announcement...');
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
+        LoadingOverlay.hide(context);
         print('⚠️ No user logged in');
         return;
       }
@@ -300,6 +363,8 @@ class NotificationNavigationHandler {
 
       print('📢 Navigating to announcements for role: $role');
       print('📢 Announcement ID: $announcementId');
+
+      LoadingOverlay.hide(context);
 
       if (role == 'user') {
         Navigator.of(context).pushReplacementNamed(
@@ -328,6 +393,7 @@ class NotificationNavigationHandler {
       }
     } catch (e) {
       print('❌ Error navigating to announcement: $e');
+      LoadingOverlay.hide(context);
       _showErrorDialog(context, 'Failed to navigate to announcement');
     }
   }
@@ -360,25 +426,19 @@ class NotificationNavigationHandler {
   }
 }
 
-// ✅ OPTIMIZED: Single, efficient initialization
 Future<void> initializeServices() async {
   try {
     print('🚀 Initializing services...');
     
-    // Firebase is already initialized in main(), skip here
-    
-    // Register background message handler
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     print('✅ Background handler registered');
     
-    // Initialize notification service (async but don't block)
     NotificationService().initialize().then((_) {
       print('✅ Notifications ready');
     }).catchError((e) {
       print('⚠️ Notification init failed (non-critical): $e');
     });
     
-    // Setup navigation handler
     NotificationNavigationHandler(navigatorKey).setup();
     
     print('✅ Core services initialized');
@@ -390,10 +450,8 @@ Future<void> initializeServices() async {
 
 void main() {
   runZonedGuarded(() async {
-    // ✅ Step 1: Initialize Flutter binding
     WidgetsFlutterBinding.ensureInitialized();
     
-    // ✅ Step 2: Set orientations (fast, synchronous)
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -404,16 +462,13 @@ void main() {
       overlays: [SystemUiOverlay.bottom],
     );
 
-    // ✅ Step 3: Initialize Firebase ONCE (most critical)
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
     print('✅ Firebase initialized');
 
-    // ✅ Step 4: Initialize other services (don't block on notifications)
-    initializeServices(); // Fire and forget - don't await
+    initializeServices();
 
-    // ✅ Step 5: Start app immediately
     runApp(
       MultiProvider(
         providers: [
@@ -607,8 +662,43 @@ class AppInitializer extends StatelessWidget {
   }
 }
 
-class SplashScreen extends StatelessWidget {
+// ✅ IMPROVED: Enhanced splash screen with animation
+class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    );
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -624,25 +714,61 @@ class SplashScreen extends StatelessWidget {
             ],
           ),
         ),
-        child: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.school, size: 80, color: Colors.white),
-              SizedBox(height: 24),
-              Text(
-                'OASP Assist',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+        child: Center(
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.school, size: 80, color: Colors.white),
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'OASP Assist',
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Your Academic Companion',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.white.withOpacity(0.9),
+                      fontWeight: FontWeight.w300,
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+                  const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      strokeWidth: 3,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white.withOpacity(0.8),
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(height: 16),
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -657,31 +783,50 @@ class ErrorScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 80, color: Colors.red),
-            const SizedBox(height: 24),
-            const Text(
-              'Something went wrong',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            const Text('Please try again later', style: TextStyle(fontSize: 16)),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pushReplacementNamed('/auth');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF667EEA),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.error_outline, size: 80, color: Colors.red.shade600),
               ),
-              child: const Text('Continue to App', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            ),
-          ],
+              const SizedBox(height: 32),
+              const Text(
+                'Something went wrong',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'We encountered an error while loading the app. Please try again.',
+                style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 48),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pushReplacementNamed('/auth');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF667EEA),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 4,
+                ),
+                child: const Text(
+                  'Continue to App',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

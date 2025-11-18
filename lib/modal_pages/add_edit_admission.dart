@@ -14,9 +14,8 @@ import 'package:capstone_project/services/file_service2.dart';
 import 'package:uuid/uuid.dart';
 import 'package:capstone_project/models/info_bank.dart';
 
-
 class AdmissionFormDialog extends StatefulWidget {
-  final DocumentSnapshot? doc; // null for add, non-null for edit
+  final DocumentSnapshot? doc;
   final bool isEdit;
 
   const AdmissionFormDialog({
@@ -46,7 +45,6 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
 
   bool _isSubmitting = false;
   bool _isProcessing = false;
-  bool _useOCR = false;
   String? _selectedFileName;
   File? _selectedFile;
 
@@ -65,21 +63,18 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     _sourceController.text = data['source'] ?? '';
     _academicYearController.text = data['academicYear'] ?? '';
 
-    // Load contacts
     if (data['contact'] != null && data['contact'] is List) {
       _contactControllers = (data['contact'] as List)
           .map((c) => TextEditingController(text: c.toString()))
           .toList();
     }
 
-    // Load steps
     if (data['steps'] != null && data['steps'] is List) {
       _stepControllers = (data['steps'] as List)
           .map((s) => TextEditingController(text: s.toString()))
           .toList();
     }
 
-    // Load links
     if (data['links'] != null && data['links'] is List) {
       _linkControllers = (data['links'] as List)
           .map((l) => TextEditingController(text: l.toString()))
@@ -171,14 +166,11 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
       String extractedText;
 
       if (kIsWeb || Platform.isWindows) {
-        // Use Tesseract for web/windows
-
         extractedText = "OCR not yet implemented for web/windows";
         _showAlert('Tesseract OCR not yet implemented', AlertType.warning);
         setState(() => _isProcessing = false);
         return;
       } else {
-        // Use ML Kit for mobile
         final inputImage = InputImage.fromFilePath(image.path);
         final RecognizedText recognizedText = 
             await _textRecognizer.processImage(inputImage);
@@ -218,7 +210,6 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
         _sourceController.text = fileName;
         _academicYearController.text = analysisResult['academicYear'] ?? '';
 
-        // Process contacts
         if (analysisResult['contacts'] is List<Map<String, dynamic>>) {
           List<Map<String, dynamic>> contacts =
               analysisResult['contacts'] as List<Map<String, dynamic>>;
@@ -230,14 +221,12 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
           }
         }
 
-        // Process steps
         if (analysisResult['steps'] is List) {
           _stepControllers = (analysisResult['steps'] as List)
               .map((s) => TextEditingController(text: s.toString()))
               .toList();
         }
 
-        // Process links
         if (analysisResult['links'] is List) {
           _linkControllers = (analysisResult['links'] as List)
               .map((l) => TextEditingController(text: l.toString()))
@@ -253,33 +242,62 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: Offset(0, -2),
+              ),
+            ],
           ),
           child: SafeArea(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(height: 16),
+                SizedBox(height: 12),
                 Container(
-                  width: 40,
-                  height: 4,
+                  width: 48,
+                  height: 5,
                   decoration: BoxDecoration(
                     color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
                 SizedBox(height: 24),
-                Text(
-                  'Choose Input Method',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Choose Input Method',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1F2937),
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Select how you want to add admission information',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 SizedBox(height: 24),
                 _buildUploadOption(
-                  icon: Icons.insert_drive_file,
+                  icon: Icons.insert_drive_file_outlined,
                   title: 'Upload Document',
                   subtitle: 'PDF, TXT, DOC, DOCX',
                   color: Color(0xFF2E7D32),
@@ -289,10 +307,10 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                   },
                 ),
                 _buildUploadOption(
-                  icon: Icons.photo_library,
+                  icon: Icons.photo_library_outlined,
                   title: 'Choose from Gallery',
                   subtitle: 'Extract text from image',
-                  color: Colors.blue,
+                  color: Color(0xFF1976D2),
                   onTap: () {
                     Navigator.pop(context);
                     _pickImageFromGallery();
@@ -300,26 +318,23 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                 ),
                 if (!kIsWeb && !Platform.isWindows)
                   _buildUploadOption(
-                    icon: Icons.camera_alt,
+                    icon: Icons.camera_alt_outlined,
                     title: 'Take Photo',
                     subtitle: 'Capture and extract text',
-                    color: Colors.orange,
+                    color: Color(0xFFED6C02),
                     onTap: () {
                       Navigator.pop(context);
                       _takePhoto();
                     },
                   ),
                 _buildUploadOption(
-                  icon: Icons.edit,
+                  icon: Icons.edit_outlined,
                   title: 'Manual Entry',
                   subtitle: 'Fill in details manually',
-                  color: Colors.purple,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() => _useOCR = false);
-                  },
+                  color: Color(0xFF9C27B0),
+                  onTap: () => Navigator.pop(context),
                 ),
-                SizedBox(height: 16),
+                SizedBox(height: 24),
               ],
             ),
           ),
@@ -338,20 +353,30 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     return InkWell(
       onTap: onTap,
       child: Container(
-        margin: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        margin: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: color.withOpacity(0.2),
+            width: 1.5,
+          ),
         ),
         child: Row(
           children: [
             Container(
-              padding: EdgeInsets.all(12),
+              padding: EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: color,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
               ),
               child: Icon(icon, color: Colors.white, size: 24),
             ),
@@ -365,18 +390,26 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      color: Color(0xFF1F2937),
+                      letterSpacing: -0.2,
                     ),
                   ),
                   SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
+                    ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 18,
+              color: Color(0xFF9CA3AF),
+            ),
           ],
         ),
       ),
@@ -395,7 +428,6 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
       final uuid = Uuid();
       final docId = widget.isEdit ? widget.doc!.id : uuid.v4();
 
-      // Create admission object
       final admission = Admissions(
         id: docId,
         title: _titleController.text.trim(),
@@ -417,10 +449,8 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
         createdAt: DateTime.now(),
       );
 
-      // Save to Firestore
       await _fileService.saveToAdmission(admission);
 
-      // If there's extracted text, save to information bank
       if (_contentController.text.trim().isNotEmpty) {
         final informationBank = InformationBank(
           id: docId,
@@ -433,7 +463,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
         await _fileService.saveToInformationBank(informationBank);
       }
 
-      await _logAction(widget.isEdit ? 'Updated' : 'Added');
+      await _logCreateAction(widget.isEdit ? 'Updated' : 'Added');
 
       _showAlert(
         'Admission ${widget.isEdit ? 'updated' : 'added'} successfully!',
@@ -444,23 +474,26 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     } catch (e) {
       _showAlert('Error: $e', AlertType.error);
     } finally {
-      setState(() => _isSubmitting = false);
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
-  Future<void> _logAction(String action) async {
+  Future<void> _logCreateAction(String action) async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       String actorName = 'Unknown';
 
       if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+        final currentUserDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
+        if (currentUserDoc.exists) {
+          final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
+          actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';
         }
       }
 
@@ -472,7 +505,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
         'time': Timestamp.now(),
       });
     } catch (e) {
-      print('Failed to log action: $e');
+      print('⚠️ Failed to log action: $e');
     }
   }
 
@@ -501,16 +534,47 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
     final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+    double modalWidth;
+    double modalHeight;
+    if (isMobile) {
+      modalWidth = screenWidth * 0.95;
+      modalHeight = screenHeight * 0.90;
+    } else if (isTablet) {
+      modalWidth = screenWidth * 0.80;
+      modalHeight = screenHeight * 0.85;
+    } else {
+      modalWidth = 700;
+      modalHeight = screenHeight * 0.80;
+    }
 
     return Dialog(
       backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 8 : 24,
+        vertical: isMobile ? 16 : 24,
+      ),
       child: Container(
-        width: isMobile ? screenWidth * 0.95 : 700,
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+        width: modalWidth,
+        height: modalHeight,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 32,
+              offset: Offset(0, 16),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -519,7 +583,9 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
               padding: EdgeInsets.all(isMobile ? 20 : 28),
               decoration: BoxDecoration(
                 color: Color(0xFF2E7D32),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(isMobile ? 16 : 20),
+                ),
               ),
               child: Row(
                 children: [
@@ -529,7 +595,11 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                       color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(Icons.school, color: Colors.white, size: 24),
+                    child: Icon(
+                      Icons.school_outlined,
+                      color: Colors.white,
+                      size: isMobile ? 24 : 28,
+                    ),
                   ),
                   SizedBox(width: 16),
                   Expanded(
@@ -542,22 +612,35 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                             fontSize: isMobile ? 20 : 24,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
+                            letterSpacing: -0.5,
                           ),
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Fill in admission details',
+                          'Manage admission information',
                           style: TextStyle(
                             fontSize: isMobile ? 14 : 16,
                             color: Colors.white.withOpacity(0.85),
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(24),
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Container(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.close,
+                          color: Colors.white.withOpacity(0.9),
+                          size: 24,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -566,33 +649,81 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
             // Content
             Expanded(
               child: SingleChildScrollView(
-                padding: EdgeInsets.all(isMobile ? 20 : 28),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 20 : 28,
+                  vertical: isMobile ? 20 : 28,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Upload button
                     if (!widget.isEdit)
                       Center(
-                        child: ElevatedButton.icon(
-                          icon: Icon(Icons.upload_file),
-                          label: Text('Import from Document/Image'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF1976D2), Color(0xFF1565C0)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Color(0xFF1976D2).withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
                           ),
-                          onPressed: _isProcessing ? null : _showUploadOptionsBottomSheet,
+                          child: ElevatedButton.icon(
+                            icon: Icon(Icons.upload_file_outlined, size: 20),
+                            label: Text(
+                              'Import from Document/Image',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shadowColor: Colors.transparent,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: _isProcessing ? null : _showUploadOptionsBottomSheet,
+                          ),
                         ),
                       ),
 
                     if (_isProcessing)
-                      Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(20),
-                          child: CircularProgressIndicator(),
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              CircularProgressIndicator(
+                                strokeWidth: 3,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF2E7D32),
+                                ),
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'Processing document...',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF6B7280),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
 
@@ -604,7 +735,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                       isMobile: isMobile,
                       label: 'Title *',
                       hint: 'Enter admission title',
-                      icon: Icons.title,
+                      icon: Icons.title_outlined,
                     ),
                     SizedBox(height: 16),
 
@@ -613,7 +744,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                       isMobile: isMobile,
                       label: 'Content',
                       hint: 'Enter admission content',
-                      icon: Icons.description,
+                      icon: Icons.description_outlined,
                       maxLines: 5,
                     ),
                     SizedBox(height: 16),
@@ -623,7 +754,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                       isMobile: isMobile,
                       label: 'Source',
                       hint: 'Enter source',
-                      icon: Icons.source,
+                      icon: Icons.source_outlined,
                     ),
                     SizedBox(height: 16),
 
@@ -632,33 +763,33 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                       isMobile: isMobile,
                       label: 'Academic Year',
                       hint: 'e.g., 2024-2025',
-                      icon: Icons.calendar_today,
+                      icon: Icons.calendar_today_outlined,
                     ),
                     SizedBox(height: 24),
 
-                    // Dynamic lists
+                    // Dynamic Lists
                     _buildDynamicListSection(
-                      'Contacts',
+                      'Contact Information',
                       _contactControllers,
-                      Icons.contact_phone,
+                      Icons.contact_phone_outlined,
                       'Email: email@example.com',
                       isMobile,
                     ),
                     SizedBox(height: 24),
 
                     _buildDynamicListSection(
-                      'Steps',
+                      'Application Steps',
                       _stepControllers,
-                      Icons.list,
+                      Icons.list_alt_outlined,
                       'Enter step',
                       isMobile,
                     ),
                     SizedBox(height: 24),
 
                     _buildDynamicListSection(
-                      'Links',
+                      'Relevant Links',
                       _linkControllers,
-                      Icons.link,
+                      Icons.link_outlined,
                       'https://example.com',
                       isMobile,
                     ),
@@ -667,42 +798,89 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
               ),
             ),
 
-            // Footer buttons
+            // Footer
             Container(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 20 : 28,
+                vertical: isMobile ? 16 : 20,
+              ),
               decoration: BoxDecoration(
                 color: Colors.grey[50],
-                border: Border(top: BorderSide(color: Colors.grey[200]!)),
+                border: Border(
+                  top: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+                ),
               ),
               child: Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: _isSubmitting ? null : () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 12),
+                    child: SizedBox(
+                      height: isMobile ? 40 : 46,
+                      child: OutlinedButton(
+                        onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Color(0xFF6B7280),
+                          side: BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: isMobile ? 14 : 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                      child: Text('Cancel'),
                     ),
                   ),
                   SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting ? null : _submitForm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF2E7D32),
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: _isSubmitting
-                          ? SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation(Colors.white),
+                    child: SizedBox(
+                      height: isMobile ? 40 : 46,
+                      child: ElevatedButton(
+                        onPressed: _isSubmitting ? null : _submitForm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF2E7D32),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          disabledBackgroundColor: Color(0xFFE5E7EB),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: _isSubmitting
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    '${widget.isEdit ? 'Updating' : 'Creating'}...',
+                                    style: TextStyle(
+                                      fontSize: isMobile ? 14 : 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                '${widget.isEdit ? 'Update' : 'Add'} Admission',
+                                style: TextStyle(
+                                  fontSize: isMobile ? 14 : 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            )
-                          : Text('${widget.isEdit ? 'Update' : 'Add'} Admission'),
+                      ),
                     ),
                   ),
                 ],
@@ -726,25 +904,34 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
       children: [
         Row(
           children: [
-            Icon(icon, size: 20, color: Color(0xFF2E7D32)),
-            SizedBox(width: 8),
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Color(0xFF2E7D32).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 20, color: Color(0xFF2E7D32)),
+            ),
+            SizedBox(width: 12),
             Text(
               title,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1E293B),
+                color: Color(0xFF1F2937),
+                letterSpacing: -0.2,
               ),
             ),
           ],
         ),
-        SizedBox(height: 12),
+        SizedBox(height: 16),
         ...controllers.asMap().entries.map((entry) {
           final index = entry.key;
           final controller = entry.value;
           return Padding(
             padding: EdgeInsets.only(bottom: 12),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: buildTextField(
@@ -755,24 +942,56 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                     icon: icon,
                   ),
                 ),
-                SizedBox(width: 8),
-                if (controllers.length > 1)
-                  IconButton(
-                    icon: Icon(Icons.remove_circle, color: Colors.red),
-                    onPressed: () {
-                      setState(() {
-                        controller.dispose();
-                        controllers.removeAt(index);
-                      });
-                    },
+                if (controllers.length > 1) ...[
+                  SizedBox(width: 8),
+                  Container(
+                    height: 46,
+                    width: 46,
+                    margin: EdgeInsets.only(top: 0),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () {
+                          setState(() {
+                            controller.dispose();
+                            controllers.removeAt(index);
+                          });
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.red.withOpacity(0.3),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.remove_circle_outline,
+                            color: Colors.red,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
+                ],
               ],
             ),
           );
         }).toList(),
+        SizedBox(height: 8),
         TextButton.icon(
-          icon: Icon(Icons.add),
-          label: Text('Add $title'),
+          icon: Icon(Icons.add_circle_outline, size: 18),
+          label: Text(
+            'Add ${title.split(' ').first}',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          style: TextButton.styleFrom(
+            foregroundColor: Color(0xFF2E7D32),
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
           onPressed: () {
             setState(() {
               controllers.add(TextEditingController());

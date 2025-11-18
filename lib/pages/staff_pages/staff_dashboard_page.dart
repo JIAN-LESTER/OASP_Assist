@@ -695,8 +695,6 @@ class _DashboardPageState extends State<StaffDashboardPage> {
             child: Row(
               children: [
                 Expanded(child: SkeletonLogsCard()),
-                SizedBox(width: 20),
-                Expanded(flex: 2, child: SkeletonLogsCard()),
               ],
             ),
           ),
@@ -705,36 +703,72 @@ class _DashboardPageState extends State<StaffDashboardPage> {
     );
   }
 
-  Widget _buildSkeletonHeader() {
+    Widget _buildSkeletonHeader() {
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isMobile = screenWidth < 600;
+
+  if (isMobile) {
+    // 📱 MOBILE LAYOUT: Dropdown on the left, smaller arrangement
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const SkeletonBox(width: 200, height: 24),
-            Row(
-              children: [
-                SkeletonBox(
-                  width: 120,
-                  height: 40,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                const SizedBox(width: 12),
-                SkeletonBox(
-                  width: 40,
-                  height: 40,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ],
+            SkeletonBox(
+              width: 140,
+              height: 38,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            const SizedBox(width: 12),
+            SkeletonBox(
+              width: 38,
+              height: 38,
+              borderRadius: BorderRadius.circular(8),
             ),
           ],
         ),
+        const SizedBox(height: 20),
+
+        // Title centered or left (depending on your style)
+        const SkeletonBox(width: 180, height: 22),
+
         const SizedBox(height: 8),
-        const SkeletonBox(width: 300, height: 14),
+        const SkeletonBox(width: 250, height: 14),
       ],
     );
   }
+
+  // 💻 DESKTOP LAYOUT (unchanged)
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const SkeletonBox(width: 200, height: 24),
+          Row(
+            children: [
+              SkeletonBox(
+                width: 120,
+                height: 40,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              const SizedBox(width: 12),
+              SkeletonBox(
+                width: 40,
+                height: 40,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ],
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      const SkeletonBox(width: 300, height: 14),
+    ],
+  );
+}
+
 
   @override
   void dispose() {
