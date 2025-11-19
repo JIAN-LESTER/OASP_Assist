@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:capstone_project/models/placement.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 
 class PlacementInfo extends StatefulWidget {
   const PlacementInfo({super.key});
@@ -136,6 +137,10 @@ class _PlacementInfoState extends State<PlacementInfo>
       final months = (difference.inDays / 30).floor();
       return months == 1 ? '1 month ago' : '$months months ago';
     }
+  }
+
+  String _formatFullDate(DateTime date) {
+    return DateFormat('MMMM d, yyyy').format(date);
   }
 
   bool _matchesSearch(Placement placement) {
@@ -770,7 +775,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'PARTNER COMPANY',
+                                  'COMPANY NAME',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
@@ -779,22 +784,28 @@ class _PlacementInfoState extends State<PlacementInfo>
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                Text(
-                                  placement.partnerCompany,
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.grey[900],
-                                    height: 1.2,
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 12),
+                                  child: Text(
+                                    placement.partnerCompany,
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.grey[900],
+                                      height: 1.2,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  _formatDate(placement.createdAt),
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w500,
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 12),
+                                  child: Text(
+                                    'Posted on ${_formatFullDate(placement.createdAt)}',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
                                 ),
                                 if (daysAgo <= 3) ...[
@@ -831,107 +842,94 @@ class _PlacementInfoState extends State<PlacementInfo>
 
                           // Available Positions
                           if (placement.positions.isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            Text(
-                              'AVAILABLE POSITIONS',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[500],
-                                letterSpacing: 0.5,
+                            const SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            ...placement.positions.map((position) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      margin: const EdgeInsets.only(top: 7),
-                                      width: 5,
-                                      height: 5,
-                                      decoration: BoxDecoration(
-                                        color: primaryGreen,
-                                        shape: BoxShape.circle,
-                                      ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'AVAILABLE POSITIONS',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[500],
+                                      letterSpacing: 0.5,
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ...placement.positions.map((position) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 4,
+                                        left: 12,
+                                        top: 4,
+                                      ),
                                       child: Text(
                                         position,
                                         style: TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 15,
                                           height: 1.5,
-                                          color: Colors.grey[700],
+                                          color: Colors.grey[800],
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
+                                    );
+                                  }).toList(),
+                                ],
+                              ),
+                            ),
                           ],
 
                           // Contact Information
                           if (placement.contacts.isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            Text(
-                              'CONTACT INFORMATION',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[500],
-                                letterSpacing: 0.5,
+                            const SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            ...placement.contacts.map((contact) {
-                              IconData iconData;
-                              if (contact.contains('@')) {
-                                iconData = Icons.email_rounded;
-                              } else if (contact.startsWith('+') ||
-                                  contact.length >= 10) {
-                                iconData = Icons.phone_rounded;
-                              } else {
-                                iconData = Icons.link_rounded;
-                              }
-
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      margin: const EdgeInsets.only(top: 7),
-                                      width: 5,
-                                      height: 5,
-                                      decoration: BoxDecoration(
-                                        color: Colors.purple[600],
-                                        shape: BoxShape.circle,
-                                      ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'CONTACT INFORMATION',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[500],
+                                      letterSpacing: 0.5,
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () => _launchContact(contact),
-                                        child: Text(
-                                          contact,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            height: 1.5,
-                                            color: primaryGreen,
-                                            decoration:
-                                                TextDecoration.underline,
-                                          ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ...placement.contacts.map((contact) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 4,
+                                        left: 12,
+                                        top: 4,
+                                      ),
+                                      child: SelectableText(
+                                        contact,
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          height: 1.5,
+                                          color: Colors.grey[800],
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
+                                    );
+                                  }).toList(),
+                                ],
+                              ),
+                            ),
                           ],
 
                           const SizedBox(height: 24),

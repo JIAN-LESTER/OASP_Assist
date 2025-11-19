@@ -146,7 +146,9 @@ class _ScholarshipListState extends State<ScholarshipList>
                           ],
                         ),
                         const Spacer(),
+
                         // Filter button
+                        // Replace the PopupMenuButton section in ScholarshipList with this:
                         Container(
                           decoration: BoxDecoration(
                             boxShadow: [
@@ -158,6 +160,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                             ],
                           ),
                           child: PopupMenuButton<String>(
+                            offset: const Offset(0, 50),
                             onSelected: (String value) {
                               setState(() {
                                 if (value.startsWith('sort_')) {
@@ -746,23 +749,29 @@ class _ScholarshipListState extends State<ScholarshipList>
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                Text(
-                                  data['name'] ?? 'Unnamed Scholarship',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.grey[900],
-                                    height: 1.2,
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 12),
+                                  child: Text(
+                                    data['name'] ?? 'Unnamed Scholarship',
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.grey[900],
+                                      height: 1.2,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  data['scholarshipProvider'] ??
-                                      'Unknown Provider',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w500,
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 12),
+                                  child: Text(
+                                    data['scholarshipProvider'] ??
+                                        'Unknown Provider',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
                                 ),
                                 if (daysLeft != null) ...[
@@ -816,67 +825,61 @@ class _ScholarshipListState extends State<ScholarshipList>
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   if (deadline != null) ...[
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Application Deadline',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey[600],
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                    Text(
+                                      'APPLICATION DEADLINE',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey[500],
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 12),
+                                      child: Text(
+                                        DateFormat(
+                                          'MMMM d, yyyy',
+                                        ).format(deadline.toDate()),
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color: Colors.grey[800],
+                                          fontWeight: FontWeight.w500,
+                                          height: 1.5,
                                         ),
-                                        Text(
-                                          DateFormat(
-                                            'dd MMM yyyy',
-                                          ).format(deadline.toDate()),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[900],
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
+                                      ),
                                     ),
                                   ],
                                   if (deadline != null &&
                                       data['duration'] != null)
+                                    const SizedBox(height: 16),
+                                  if (data['duration'] != null) ...[
+                                    Text(
+                                      'DURATION',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey[500],
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 12,
-                                      ),
-                                      child: Divider(
-                                        height: 1,
-                                        color: Colors.grey[300],
+                                      padding: const EdgeInsets.only(left: 12),
+                                      child: Text(
+                                        data['duration'].toString(),
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color: Colors.grey[800],
+                                          fontWeight: FontWeight.w500,
+                                          height: 1.5,
+                                        ),
                                       ),
                                     ),
-                                  if (data['duration'] != null)
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Duration',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey[600],
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        Text(
-                                          data['duration'].toString(),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[900],
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -888,23 +891,40 @@ class _ScholarshipListState extends State<ScholarshipList>
                                   .toString()
                                   .trim()
                                   .isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            Text(
-                              'DESCRIPTION',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[500],
-                                letterSpacing: 0.5,
+                            const SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              data['description'],
-                              style: TextStyle(
-                                fontSize: 14,
-                                height: 1.6,
-                                color: Colors.grey[700],
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'DESCRIPTION',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[500],
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 12),
+                                    child: Text(
+                                      data['description'],
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        height: 1.5,
+                                        color: Colors.grey[800],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -914,98 +934,100 @@ class _ScholarshipListState extends State<ScholarshipList>
                               data['eligibilityRequirements'] is List &&
                               (data['eligibilityRequirements'] as List)
                                   .isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            Text(
-                              'ELIGIBILITY REQUIREMENTS',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[500],
-                                letterSpacing: 0.5,
+                            const SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            ...List<String>.from(
-                              data['eligibilityRequirements'],
-                            ).map((requirement) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      margin: const EdgeInsets.only(top: 7),
-                                      width: 5,
-                                      height: 5,
-                                      decoration: BoxDecoration(
-                                        color: primaryGreen,
-                                        shape: BoxShape.circle,
-                                      ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'ELIGIBILITY REQUIREMENTS',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[500],
+                                      letterSpacing: 0.5,
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
+                                  ),
+                                  const SizedBox(height: 7),
+                                  ...List<String>.from(
+                                    data['eligibilityRequirements'],
+                                  ).map((requirement) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 6,
+                                        left: 12,
+                                        top: 6,
+                                      ),
                                       child: Text(
                                         requirement,
                                         style: TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 15,
                                           height: 1.5,
-                                          color: Colors.grey[700],
+                                          color: Colors.grey[800],
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
+                                    );
+                                  }).toList(),
+                                ],
+                              ),
+                            ),
                           ],
 
                           // Privileges
                           if (data['privileges'] != null &&
                               data['privileges'] is List &&
                               (data['privileges'] as List).isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            Text(
-                              'PRIVILEGES & BENEFITS',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[500],
-                                letterSpacing: 0.5,
+                            const SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            ...List<String>.from(data['privileges']).map((
-                              privilege,
-                            ) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      margin: const EdgeInsets.only(top: 7),
-                                      width: 5,
-                                      height: 5,
-                                      decoration: BoxDecoration(
-                                        color: Colors.purple[600],
-                                        shape: BoxShape.circle,
-                                      ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'PRIVILEGES & BENEFITS',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[500],
+                                      letterSpacing: 0.5,
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
+                                  ),
+                                  const SizedBox(height: 7),
+                                  ...List<String>.from(data['privileges']).map((
+                                    privilege,
+                                  ) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 6,
+                                        left: 12,
+                                        top: 6,
+                                      ),
                                       child: Text(
                                         privilege,
                                         style: TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 15,
                                           height: 1.5,
-                                          color: Colors.grey[700],
+                                          color: Colors.grey[800],
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
+                                    );
+                                  }).toList(),
+                                ],
+                              ),
+                            ),
                           ],
 
                           const SizedBox(height: 24),
