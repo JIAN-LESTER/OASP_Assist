@@ -69,15 +69,9 @@ class _EditProfileModalState extends State<EditProfileModal> {
   bool _obscureConfirmPassword = true;
 
   String? _role;
-
-  // Enrollment status
-  String? _enrollmentStatus; // "enrolled" or "not_enrolled"
-
-  // Student fields
+  String? _enrollmentStatus;
   String? _selectedYear;
   String? _selectedProgram;
-
-  // Common fields
   bool _hasAffiliation = false;
   bool _hasScholarship = false;
   String? _selectedAffiliation;
@@ -86,7 +80,6 @@ class _EditProfileModalState extends State<EditProfileModal> {
   bool _isLoading = false;
   bool _isSaving = false;
 
-  // Data lists
   List<String> _programs = [];
   List<String> _affiliations = [];
   List<String> _scholarships = [];
@@ -140,7 +133,6 @@ class _EditProfileModalState extends State<EditProfileModal> {
             _selectedAffiliation = data['affiliation'];
             _selectedScholarship = data['scholarship'];
 
-            // Set affiliation and scholarship flags
             _hasAffiliation =
                 data['affiliation'] != null &&
                 data['affiliation'].toString().isNotEmpty;
@@ -148,7 +140,6 @@ class _EditProfileModalState extends State<EditProfileModal> {
                 data['scholarship'] != null &&
                 data['scholarship'].toString().isNotEmpty;
 
-            // Determine enrollment status
             bool isEnrolled = data['isEnrolled'] ?? true;
             _enrollmentStatus = isEnrolled ? 'enrolled' : 'not_enrolled';
           });
@@ -207,13 +198,11 @@ class _EditProfileModalState extends State<EditProfileModal> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        // Update password if provided
         if (_passwordController.text.trim().isNotEmpty) {
           try {
             await user.updatePassword(_passwordController.text.trim());
             _showSnackBar('Password updated successfully!');
           } catch (passwordError) {
-            // If password update fails due to recent login requirement
             if (passwordError.toString().contains('requires-recent-login')) {
               _showSnackBar(
                 'Please log out and log in again to change your password',
@@ -227,7 +216,6 @@ class _EditProfileModalState extends State<EditProfileModal> {
           }
         }
 
-        // Update Firestore data
         Map<String, dynamic> updateData = {
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
@@ -334,7 +322,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
 
   Widget _buildProfileHeader(bool isMobile) {
     return Container(
-      padding: EdgeInsets.all(isMobile ? 24 : 28),
+      padding: EdgeInsets.all(isMobile ? 20 : 28),
       decoration: const BoxDecoration(color: Color(0xFF2E7D32)),
       child: Row(
         children: [
@@ -342,30 +330,34 @@ class _EditProfileModalState extends State<EditProfileModal> {
             Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: IconButton(
                 onPressed: _isSaving ? null : _handleBackButton,
                 icon: const Icon(
                   Icons.arrow_back_rounded,
                   color: Colors.white,
-                  size: 24,
+                  size: 22,
                 ),
-                style: IconButton.styleFrom(padding: const EdgeInsets.all(12)),
+                style: IconButton.styleFrom(
+                  padding: const EdgeInsets.all(8),
+                  minimumSize: Size(40, 40),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
           ],
           Container(
-            width: isMobile ? 72 : 80,
-            height: isMobile ? 72 : 80,
+            width: isMobile ? 60 : 80,
+            height: isMobile ? 60 : 80,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [Color(0xFFECFDF5), Color(0xFFBBF7D0)],
               ),
-              borderRadius: BorderRadius.circular(isMobile ? 36 : 40),
+              borderRadius: BorderRadius.circular(isMobile ? 30 : 40),
               border: Border.all(
                 color: Colors.white.withOpacity(0.4),
                 width: 3,
@@ -381,10 +373,10 @@ class _EditProfileModalState extends State<EditProfileModal> {
             child: Icon(
               Icons.edit_outlined,
               color: const Color(0xFF2E7D32),
-              size: isMobile ? 32 : 36,
+              size: isMobile ? 28 : 36,
             ),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,17 +384,17 @@ class _EditProfileModalState extends State<EditProfileModal> {
                 Text(
                   'Edit Profile',
                   style: TextStyle(
-                    fontSize: isMobile ? 24 : 28,
+                    fontSize: isMobile ? 20 : 28,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                     letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+                    horizontal: 10,
+                    vertical: 5,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
@@ -411,7 +403,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
                   child: const Text(
                     'Update your information',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 12,
                       color: Colors.white,
                       fontWeight: FontWeight.w500,
                     ),
@@ -423,16 +415,20 @@ class _EditProfileModalState extends State<EditProfileModal> {
           Container(
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: IconButton(
               onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
               icon: const Icon(
                 Icons.close_rounded,
                 color: Colors.white,
-                size: 24,
+                size: 22,
               ),
-              style: IconButton.styleFrom(padding: const EdgeInsets.all(12)),
+              style: IconButton.styleFrom(
+                padding: const EdgeInsets.all(8),
+                minimumSize: Size(40, 40),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
             ),
           ),
         ],
@@ -476,40 +472,29 @@ class _EditProfileModalState extends State<EditProfileModal> {
     );
   }
 
-  Widget _buildFormRow({
+  Widget _buildInfoField({
     required String label,
     required Widget child,
-    bool isLast = false,
+    required bool isMobile,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      decoration: BoxDecoration(
-        border:
-            isLast
-                ? null
-                : Border(
-                  bottom: BorderSide(
-                    color: const Color(0xFFE5E7EB).withOpacity(0.6),
-                    width: 1,
-                  ),
-                ),
-      ),
-      child: Row(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 150,
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 15,
+              style: TextStyle(
+                fontSize: isMobile ? 13 : 14,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF374151),
-                letterSpacing: 0.3,
+                color: const Color(0xFF374151),
+                letterSpacing: 0.2,
               ),
             ),
           ),
-          Expanded(flex: 2, child: child),
+          child,
         ],
       ),
     );
@@ -529,14 +514,10 @@ class _EditProfileModalState extends State<EditProfileModal> {
       keyboardType: keyboardType,
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
         prefixIcon: Container(
           padding: const EdgeInsets.all(12),
           margin: const EdgeInsets.only(right: 12),
-          decoration: BoxDecoration(
-            // color: const Color(0xFF2E7D32).withOpacity(0.12),
-            borderRadius: BorderRadius.circular(8),
-          ),
           child: Icon(icon, size: 18, color: const Color(0xFF2E7D32)),
         ),
         border: OutlineInputBorder(
@@ -559,7 +540,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
         fillColor: enabled ? Colors.grey.shade50 : Colors.grey.shade100,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 16,
+          vertical: 14,
         ),
       ),
       validator: validator,
@@ -583,14 +564,10 @@ class _EditProfileModalState extends State<EditProfileModal> {
       obscureText: obscureText,
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
         prefixIcon: Container(
           padding: const EdgeInsets.all(12),
           margin: const EdgeInsets.only(right: 12),
-          decoration: BoxDecoration(
-            // color: const Color(0xFF2E7D32).withOpacity(0.12),
-            borderRadius: BorderRadius.circular(8),
-          ),
           child: Icon(
             Icons.lock_outline,
             size: 18,
@@ -623,7 +600,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
         fillColor: Colors.grey.shade50,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 16,
+          vertical: 14,
         ),
       ),
       validator: validator,
@@ -647,14 +624,10 @@ class _EditProfileModalState extends State<EditProfileModal> {
       value: value,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
         prefixIcon: Container(
           padding: const EdgeInsets.all(12),
           margin: const EdgeInsets.only(right: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF2E7D32).withOpacity(0.12),
-            borderRadius: BorderRadius.circular(8),
-          ),
           child: Icon(icon, size: 18, color: const Color(0xFF2E7D32)),
         ),
         border: OutlineInputBorder(
@@ -673,7 +646,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
         fillColor: Colors.grey.shade50,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 16,
+          vertical: 14,
         ),
       ),
       items:
@@ -708,7 +681,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
     String? subtitle,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color:
             groupValue == value
@@ -727,7 +700,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
         title: Text(
           title,
           style: TextStyle(
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             color:
                 groupValue == value
@@ -740,7 +713,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
                 ? Text(
                   subtitle,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     color: Color(0xFF6B7280),
                   ),
                 )
@@ -749,7 +722,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
         groupValue: groupValue,
         onChanged: onChanged,
         activeColor: const Color(0xFF2E7D32),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       ),
     );
   }
@@ -765,7 +738,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
         Text(
           label,
           style: const TextStyle(
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             color: Color(0xFF374151),
           ),
@@ -788,19 +761,20 @@ class _EditProfileModalState extends State<EditProfileModal> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: RadioListTile<bool>(
-                  title: const Text('Yes', style: TextStyle(fontSize: 14)),
+                  title: const Text('Yes', style: TextStyle(fontSize: 13)),
                   value: true,
                   groupValue: value,
                   onChanged: (val) => onChanged(val ?? false),
                   activeColor: const Color(0xFF2E7D32),
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
+                    horizontal: 8,
+                    vertical: 0,
                   ),
+                  dense: true,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -816,15 +790,16 @@ class _EditProfileModalState extends State<EditProfileModal> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: RadioListTile<bool>(
-                  title: const Text('No', style: TextStyle(fontSize: 14)),
+                  title: const Text('No', style: TextStyle(fontSize: 13)),
                   value: false,
                   groupValue: value,
                   onChanged: (val) => onChanged(val ?? false),
                   activeColor: const Color(0xFF2E7D32),
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
+                    horizontal: 8,
+                    vertical: 0,
                   ),
+                  dense: true,
                 ),
               ),
             ),
@@ -836,7 +811,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
 
   Widget _buildActionButtons(bool isMobile) {
     return Container(
-      padding: EdgeInsets.all(isMobile ? 24 : 28),
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
       decoration: const BoxDecoration(
         color: Color(0xFFFAFAFA),
         borderRadius: BorderRadius.only(
@@ -848,7 +823,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           SizedBox(
-            height: isMobile ? 44 : 48,
+            height: isMobile ? 42 : 48,
             child: OutlinedButton(
               onPressed: _isSaving ? null : _handleBackButton,
               style: OutlinedButton.styleFrom(
@@ -858,29 +833,29 @@ class _EditProfileModalState extends State<EditProfileModal> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
+                  horizontal: 16,
+                  vertical: 10,
                 ),
               ),
               child: Text(widget.showBackButton ? 'Back' : 'Cancel'),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           SizedBox(
-            height: isMobile ? 44 : 48,
+            height: isMobile ? 42 : 48,
             child: ElevatedButton.icon(
               onPressed: _isSaving ? null : _saveProfile,
               icon:
                   _isSaving
                       ? const SizedBox(
-                        width: 18,
-                        height: 18,
+                        width: 16,
+                        height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: Colors.white,
                         ),
                       )
-                      : const Icon(Icons.save_outlined, size: 18),
+                      : const Icon(Icons.save_outlined, size: 16),
               label: Text(_isSaving ? 'Saving...' : 'Save Profile'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2E7D32),
@@ -890,8 +865,8 @@ class _EditProfileModalState extends State<EditProfileModal> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
+                  horizontal: 16,
+                  vertical: 10,
                 ),
               ),
             ),
@@ -953,13 +928,14 @@ class _EditProfileModalState extends State<EditProfileModal> {
                             children: [
                               Flexible(
                                 child: SingleChildScrollView(
-                                  padding: EdgeInsets.all(isMobile ? 24 : 28),
+                                  padding: EdgeInsets.all(isMobile ? 16 : 24),
                                   child: Form(
                                     key: _formKey,
                                     child: Column(
                                       children: [
-                                        _buildFormRow(
+                                        _buildInfoField(
                                           label: 'Full Name',
+                                          isMobile: isMobile,
                                           child: _buildTextFormField(
                                             controller: _nameController,
                                             hintText: 'Enter your full name',
@@ -976,8 +952,10 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                             },
                                           ),
                                         ),
-                                        _buildFormRow(
+
+                                        _buildInfoField(
                                           label: 'Email Address',
+                                          isMobile: isMobile,
                                           child: _buildTextFormField(
                                             controller: _emailController,
                                             hintText:
@@ -1000,9 +978,9 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                           ),
                                         ),
 
-                                        // Password fields
-                                        _buildFormRow(
+                                        _buildInfoField(
                                           label: 'New Password',
+                                          isMobile: isMobile,
                                           child: Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
@@ -1028,11 +1006,11 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                                   return null;
                                                 },
                                               ),
-                                              const SizedBox(height: 8),
+                                              const SizedBox(height: 6),
                                               Text(
                                                 'Leave blank if you don\'t want to change your password',
                                                 style: TextStyle(
-                                                  fontSize: 13,
+                                                  fontSize: 12,
                                                   color: Colors.grey.shade600,
                                                   fontStyle: FontStyle.italic,
                                                 ),
@@ -1041,8 +1019,9 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                           ),
                                         ),
 
-                                        _buildFormRow(
+                                        _buildInfoField(
                                           label: 'Confirm Password',
+                                          isMobile: isMobile,
                                           child: _buildPasswordField(
                                             controller:
                                                 _confirmPasswordController,
@@ -1075,18 +1054,18 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                           ),
                                         ),
 
-                                        // Management buttons for admin/faculty
                                         if (_role != 'user') ...[
-                                          _buildFormRow(
+                                          _buildInfoField(
                                             label: 'Management',
+                                            isMobile: isMobile,
                                             child: _buildManagementButtons(),
                                           ),
                                         ],
 
-                                        // Student enrollment fields
                                         if (_role == 'user') ...[
-                                          _buildFormRow(
+                                          _buildInfoField(
                                             label: 'Enrollment Status',
+                                            isMobile: isMobile,
                                             child: Column(
                                               children: [
                                                 _buildRadioOption(
@@ -1127,11 +1106,11 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                             ),
                                           ),
 
-                                          // Show year and program fields only if enrolled
                                           if (_enrollmentStatus ==
                                               'enrolled') ...[
-                                            _buildFormRow(
+                                            _buildInfoField(
                                               label: 'Year Level',
+                                              isMobile: isMobile,
                                               child: _buildDropdownField(
                                                 value: _selectedYear,
                                                 items: _years,
@@ -1144,8 +1123,9 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                                 icon: Icons.school_outlined,
                                               ),
                                             ),
-                                            _buildFormRow(
+                                            _buildInfoField(
                                               label: 'Program',
+                                              isMobile: isMobile,
                                               child: _buildDropdownField(
                                                 value: _selectedProgram,
                                                 items: _programs,
@@ -1161,9 +1141,9 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                             ),
                                           ],
 
-                                          // Affiliation section (always shown for students)
-                                          _buildFormRow(
+                                          _buildInfoField(
                                             label: 'Affiliation',
+                                            isMobile: isMobile,
                                             child: Column(
                                               children: [
                                                 _buildYesNoRadio(
@@ -1180,7 +1160,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                                   },
                                                 ),
                                                 if (_hasAffiliation) ...[
-                                                  const SizedBox(height: 16),
+                                                  const SizedBox(height: 12),
                                                   _buildDropdownField(
                                                     value: _selectedAffiliation,
                                                     items: _affiliations,
@@ -1199,9 +1179,9 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                             ),
                                           ),
 
-                                          // Scholarship section (always shown for students)
-                                          _buildFormRow(
+                                          _buildInfoField(
                                             label: 'Scholarship',
+                                            isMobile: isMobile,
                                             child: Column(
                                               children: [
                                                 _buildYesNoRadio(
@@ -1218,7 +1198,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                                   },
                                                 ),
                                                 if (_hasScholarship) ...[
-                                                  const SizedBox(height: 16),
+                                                  const SizedBox(height: 12),
                                                   _buildDropdownField(
                                                     value: _selectedScholarship,
                                                     items: _scholarships,
@@ -1237,7 +1217,6 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                                 ],
                                               ],
                                             ),
-                                            isLast: true,
                                           ),
                                         ],
                                       ],
@@ -1260,7 +1239,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
 
 // Management Modal for Programs, Affiliations, and Scholarships
 class ManagementModal extends StatefulWidget {
-  final String type; // 'programs', 'affiliations', or 'scholarships'
+  final String type;
   final VoidCallback onUpdated;
 
   const ManagementModal({
@@ -1443,7 +1422,6 @@ class _ManagementModalState extends State<ManagementModal> {
           borderRadius: BorderRadius.circular(20),
           child: Column(
             children: [
-              // Header
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.all(isMobile ? 20 : 28),
@@ -1503,8 +1481,6 @@ class _ManagementModalState extends State<ManagementModal> {
                   ],
                 ),
               ),
-
-              // Search and Add Section
               Container(
                 padding: EdgeInsets.all(isMobile ? 20 : 28),
                 decoration: const BoxDecoration(
@@ -1569,8 +1545,6 @@ class _ManagementModalState extends State<ManagementModal> {
                   ],
                 ),
               ),
-
-              // Items List
               Expanded(
                 child:
                     isLoading

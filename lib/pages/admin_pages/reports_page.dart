@@ -58,10 +58,10 @@ class _ReportsPageState extends State<ReportsPage> {
   // ✅ Load user name first (always needed)
   Future<void> _loadUserName() async {
     if (!mounted) return;
-    
+
     final name = await _fetchUserName();
     if (!mounted) return;
-    
+
     setState(() {
       userName = name;
       isLoadingUser = false;
@@ -77,7 +77,9 @@ class _ReportsPageState extends State<ReportsPage> {
         if (!inquiryDataLoaded) {
           setState(() => isLoadingInquiry = true);
           try {
-            final data = await _firebaseService.getInquiryReportsData(selectedTimeFrame);
+            final data = await _firebaseService.getInquiryReportsData(
+              selectedTimeFrame,
+            );
             if (!mounted) return;
             setState(() {
               inq = data;
@@ -96,7 +98,9 @@ class _ReportsPageState extends State<ReportsPage> {
         if (!chatbotDataLoaded) {
           setState(() => isLoadingChatbot = true);
           try {
-            final data = await _firebaseService.getChatbotUsageReportsData(selectedTimeFrame);
+            final data = await _firebaseService.getChatbotUsageReportsData(
+              selectedTimeFrame,
+            );
             if (!mounted) return;
             setState(() {
               cb = data;
@@ -115,7 +119,9 @@ class _ReportsPageState extends State<ReportsPage> {
         if (!demographicsDataLoaded) {
           setState(() => isLoadingDemographics = true);
           try {
-            final data = await _firebaseService.getUserDemographicsReportsData(selectedTimeFrame);
+            final data = await _firebaseService.getUserDemographicsReportsData(
+              selectedTimeFrame,
+            );
             if (!mounted) return;
             setState(() {
               ud = data;
@@ -144,7 +150,7 @@ class _ReportsPageState extends State<ReportsPage> {
   void _onTimeFrameChanged(String newValue) {
     setState(() {
       selectedTimeFrame = newValue;
-      
+
       // Invalidate loaded data flags to force reload
       switch (selectedReportType) {
         case 'Inquiry Trends':
@@ -171,7 +177,9 @@ class _ReportsPageState extends State<ReportsPage> {
       // Only refresh the selected report type
       switch (selectedReportType) {
         case 'Inquiry Trends':
-          final data = await _firebaseService.getInquiryReportsData(selectedTimeFrame);
+          final data = await _firebaseService.getInquiryReportsData(
+            selectedTimeFrame,
+          );
           if (!mounted) return;
           setState(() {
             inq = data;
@@ -180,7 +188,9 @@ class _ReportsPageState extends State<ReportsPage> {
           break;
 
         case 'Chatbot Usage':
-          final data = await _firebaseService.getChatbotUsageReportsData(selectedTimeFrame);
+          final data = await _firebaseService.getChatbotUsageReportsData(
+            selectedTimeFrame,
+          );
           if (!mounted) return;
           setState(() {
             cb = data;
@@ -189,7 +199,9 @@ class _ReportsPageState extends State<ReportsPage> {
           break;
 
         case 'User Demographics':
-          final data = await _firebaseService.getUserDemographicsReportsData(selectedTimeFrame);
+          final data = await _firebaseService.getUserDemographicsReportsData(
+            selectedTimeFrame,
+          );
           if (!mounted) return;
           setState(() {
             ud = data;
@@ -211,10 +223,7 @@ class _ReportsPageState extends State<ReportsPage> {
       setState(() => isRefreshing = false);
 
       if (mounted) {
-        _showSnackBar(
-          message: 'Failed to refresh reports',
-          isError: true,
-        );
+        _showSnackBar(message: 'Failed to refresh reports', isError: true);
       }
     }
   }
@@ -230,7 +239,9 @@ class _ReportsPageState extends State<ReportsPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isError ? Icons.error_outline : Icons.check_circle_outline_outlined,
+              isError
+                  ? Icons.error_outline
+                  : Icons.check_circle_outline_outlined,
               color: Colors.white,
               size: isMobile ? 20 : 24,
             ),
@@ -258,9 +269,7 @@ class _ReportsPageState extends State<ReportsPage> {
           right: 20,
           left: isMobile ? 20 : (screenWidth - (isTablet ? 380 : 420)),
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(4),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
         elevation: 6,
       ),
     );
@@ -271,10 +280,11 @@ class _ReportsPageState extends State<ReportsPage> {
     if (currentUser == null) return 'User';
 
     try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
 
       return userDoc.exists ? (userDoc.data()?['name'] ?? 'User') : 'User';
     } catch (e) {
@@ -301,9 +311,7 @@ class _ReportsPageState extends State<ReportsPage> {
   Widget build(BuildContext context) {
     // Only show loading spinner while user name is loading
     if (isLoadingUser) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return ResponsiveLayout(
@@ -388,10 +396,11 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat();
-    
-    _animation = Tween<double>(begin: -1.0, end: 2.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+
+    _animation = Tween<double>(
+      begin: -1.0,
+      end: 2.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -413,16 +422,13 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [
-                Colors.grey[300]!,
-                Colors.grey[100]!,
-                Colors.grey[300]!,
-              ],
-              stops: [
-                _animation.value - 0.3,
-                _animation.value,
-                _animation.value + 0.3,
-              ].map((e) => e.clamp(0.0, 1.0)).toList(),
+              colors: [Colors.grey[300]!, Colors.grey[100]!, Colors.grey[300]!],
+              stops:
+                  [
+                    _animation.value - 0.3,
+                    _animation.value,
+                    _animation.value + 0.3,
+                  ].map((e) => e.clamp(0.0, 1.0)).toList(),
             ),
           ),
         );
@@ -464,10 +470,7 @@ Widget buildStatCardSkeleton({bool isMobile = false}) {
           ],
         ),
         const SizedBox(height: 12),
-        SkeletonLoader(
-          height: isMobile ? 24 : 32,
-          width: isMobile ? 60 : 80,
-        ),
+        SkeletonLoader(height: isMobile ? 24 : 32, width: isMobile ? 60 : 80),
       ],
     ),
   );
@@ -491,10 +494,7 @@ Widget buildChartCardSkeleton({bool isMobile = false}) {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SkeletonLoader(
-          height: isMobile ? 18 : 20,
-          width: isMobile ? 120 : 150,
-        ),
+        SkeletonLoader(height: isMobile ? 18 : 20, width: isMobile ? 120 : 150),
         const SizedBox(height: 16),
         Expanded(
           child: SkeletonLoader(
@@ -510,7 +510,7 @@ Widget buildChartCardSkeleton({bool isMobile = false}) {
 // Updated widget signatures to include isLoading
 class DesktopDashboard extends StatelessWidget {
   final String selectedTimeFrame;
-  final String selectedReportType;x``
+  final String selectedReportType;
   final ValueChanged<String> onTimeFrameChanged;
   final ValueChanged<String> onReportTypeChanged;
   final VoidCallback onRefresh;
@@ -561,7 +561,7 @@ class DesktopDashboard extends StatelessWidget {
               userName,
             ),
             const SizedBox(height: 32),
-            
+
             // ✅ Show skeleton loader for current report
             if (isLoading)
               ...buildSkeletonReport(selectedReportType, isMobile: false)
@@ -637,7 +637,7 @@ class TabletDashboard extends StatelessWidget {
               userName,
             ),
             const SizedBox(height: 32),
-            
+
             if (isLoading)
               ...buildSkeletonReport(selectedReportType, isMobile: false)
             else
@@ -712,7 +712,7 @@ class MobileDashboard extends StatelessWidget {
               userName,
             ),
             const SizedBox(height: 24),
-            
+
             if (isLoading)
               ...buildSkeletonReport(selectedReportType, isMobile: true)
             else
@@ -947,7 +947,12 @@ List<Widget> buildInquiryTrendsReport(
       height: 400,
       child: Row(
         children: [
-          Expanded(child: buildInquiryTrendCard(data?.inquiryTrend ?? [], selectedTimeFrame.toString())),
+          Expanded(
+            child: buildInquiryTrendCard(
+              data?.inquiryTrend ?? [],
+              selectedTimeFrame.toString(),
+            ),
+          ),
         ],
       ),
     ),
@@ -1007,7 +1012,7 @@ List<Widget> buildChatbotUsageReport(
   //  Format response time display
   String formatResponseTime(double seconds) {
     if (seconds == 0) return 'N/A';
-    
+
     if (seconds < 1) {
       return '${(seconds * 1000).toInt()}ms';
     } else if (seconds < 10) {
@@ -1020,7 +1025,7 @@ List<Widget> buildChatbotUsageReport(
   //  Format session length display
   String formatSessionLength(double seconds) {
     if (seconds == 0) return 'N/A';
-    
+
     if (seconds < 60) {
       return '${seconds.toInt()}s';
     } else if (seconds < 3600) {
@@ -1092,16 +1097,14 @@ List<Widget> buildChatbotUsageReport(
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
-        child: buildUsersByCourseCard(
-          data?.usersByCourse ?? <String, int>{},
-        ),
+        child: buildUsersByCourseCard(data?.usersByCourse ?? <String, int>{}),
       ),
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
         child: buildUsersByYearLevelCard(
           data?.usersByYearLevel ?? <String, int>{},
-          isMobile: true
+          isMobile: true,
         ),
       ),
       const SizedBox(height: 16),
@@ -1246,19 +1249,19 @@ List<Widget> buildUserDemographicsReport(
         ],
       ),
       const SizedBox(height: 24),
-           SizedBox(
+      SizedBox(
         height: 400,
         child: buildUsersByYearCard(data?.usersByYear ?? {}),
       ),
-     
+
       const SizedBox(height: 16),
-         SizedBox(
+      SizedBox(
         height: 400,
         child: buildUsersByProgramCard(data?.usersByProgram ?? {}),
       ),
       const SizedBox(height: 16),
 
-        SizedBox(
+      SizedBox(
         height: 400,
         child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
       ),
@@ -1314,23 +1317,17 @@ List<Widget> buildUserDemographicsReport(
       ),
     ),
     const SizedBox(height: 16),
-        SizedBox(height: 400, child: buildUsersByYearCard(data?.usersByYear ?? {})),
+    SizedBox(height: 400, child: buildUsersByYearCard(data?.usersByYear ?? {})),
 
     const SizedBox(height: 16),
-        SizedBox(
+    SizedBox(
       height: 400,
       child: Row(
         children: [
-          Expanded(
-            child: buildUsersByProgramCard(
-              data?.usersByProgram ?? {},
-            ),
-          ),
+          Expanded(child: buildUsersByProgramCard(data?.usersByProgram ?? {})),
           const SizedBox(width: 20),
           Expanded(
-            child: buildUserAffiliationsCard(
-              data?.userAffiliations ?? {},
-            ),
+            child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
           ),
         ],
       ),
