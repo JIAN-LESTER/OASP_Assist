@@ -905,7 +905,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                       hint: 'e.g., 2024-2025',
                       icon: Icons.calendar_today_outlined,
                     ),
-                    SizedBox(height: 24),
+                    SizedBox(height: 10),
 
                     // Dynamic Lists
                     _buildDynamicListSection(
@@ -915,7 +915,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                       'Email: email@example.com',
                       isMobile,
                     ),
-                    SizedBox(height: 24),
+                    SizedBox(height: 10),
 
                     _buildDynamicListSection(
                       'Application Steps',
@@ -924,7 +924,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                       'Enter step',
                       isMobile,
                     ),
-                    SizedBox(height: 24),
+                    SizedBox(height: 10),
                     _buildDynamicListSection(
                       'Requirements',
                       _requirementControllers,
@@ -932,7 +932,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                       'e.g., Form 137, Birth Certificate',
                       isMobile,
                     ),
-                    SizedBox(height: 24),
+                    SizedBox(height: 10),
 
                     _buildDynamicListSection(
                       'Relevant Links',
@@ -1056,28 +1056,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Color(0xFF2E7D32).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, size: 20, color: Color(0xFF2E7D32)),
-            ),
-            SizedBox(width: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1F2937),
-                letterSpacing: -0.2,
-              ),
-            ),
-          ],
-        ),
+       
         SizedBox(height: 16),
         ...controllers.asMap().entries.map((entry) {
           final index = entry.key;
@@ -1091,7 +1070,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                   child: buildTextField(
                     controller: controller,
                     isMobile: isMobile,
-                    label: '',
+                    label: title,
                     hint: hint,
                     icon: icon,
                   ),

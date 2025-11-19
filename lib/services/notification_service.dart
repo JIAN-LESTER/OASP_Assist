@@ -17,6 +17,26 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print('📬 Body: ${message.notification?.body ?? message.data['body']}');
   print('📬 Data: ${message.data}');
   print('📬 ===============================');
+  
+  // ✅ CHECK TARGET ROLE IN BACKGROUND
+  final targetRole = message.data['targetRole'] ?? 'any';
+  
+  if (targetRole != 'any') {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      final currentRole = userDoc.data()?['role'] ?? 'user';
+      
+      if (currentRole != targetRole) {
+        print('⚠️ Background notification filtered: targetRole=$targetRole, currentRole=$currentRole');
+        return; // Don't process notification
+      }
+    }
+  }
 }
 
 class NotificationService {
@@ -266,16 +286,36 @@ class NotificationService {
     await _saveFCMToken();
   }
 
-  Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    print('📬 ===== FOREGROUND MESSAGE =====');
-    print('📬 Message ID: ${message.messageId}');
-    print('📬 Title: ${message.notification?.title ?? message.data['title']}');
-    print('📬 Body: ${message.notification?.body ?? message.data['body']}');
-    print('📬 Data: ${message.data}');
-    print('📬 ===============================');
+Future<void> _handleForegroundMessage(RemoteMessage message) async {
+  print('📬 ===== FOREGROUND MESSAGE =====');
+  print('📬 Message ID: ${message.messageId}');
+  print('📬 Title: ${message.notification?.title ?? message.data['title']}');
+  print('📬 Body: ${message.notification?.body ?? message.data['body']}');
+  print('📬 Data: ${message.data}');
+  print('📬 ===============================');
 
-    await _showLocalNotification(message);
+  // ✅ CHECK TARGET ROLE BEFORE SHOWING
+  final targetRole = message.data['targetRole'] ?? 'any';
+  
+  if (targetRole != 'any') {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      final currentRole = userDoc.data()?['role'] ?? 'user';
+      
+      if (currentRole != targetRole) {
+        print('⚠️ Notification filtered: targetRole=$targetRole, currentRole=$currentRole');
+        return; // Don't show notification
+      }
+    }
   }
+
+  await _showLocalNotification(message);
+}
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
     print('🔔 Showing local notification...');

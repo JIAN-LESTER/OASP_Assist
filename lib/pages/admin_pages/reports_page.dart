@@ -856,8 +856,8 @@ List<Widget> buildInquiryTrendsReport(
         children: [
           Expanded(
             child: buildStatCard(
-              'Unanswered Messages',
-              '${data?.unAnsweredMessages ?? 0}',
+              'Escalated Messages',
+              '${data?.escalatedMessages ?? 0}',
               Colors.red,
               Icons.people,
             ),
@@ -865,8 +865,8 @@ List<Widget> buildInquiryTrendsReport(
           const SizedBox(width: 12),
           Expanded(
             child: buildStatCard(
-              'Escalated Messages',
-              data?.escalatedMessages.toString() ?? '0',
+              'Resolved Messages',
+              data?.resolvedEscalatedMessages.toString() ?? '0',
               Colors.orange,
               Icons.help,
             ),
@@ -924,8 +924,8 @@ List<Widget> buildInquiryTrendsReport(
           const SizedBox(width: 20),
           Expanded(
             child: buildStatCard(
-              'Unanswered Messages',
-              '${data?.unAnsweredMessages ?? 0}',
+              'Escalated Messages',
+              '${data?.escalatedMessages ?? 0}',
               Colors.red,
               Icons.people,
             ),
@@ -933,12 +933,13 @@ List<Widget> buildInquiryTrendsReport(
           const SizedBox(width: 20),
           Expanded(
             child: buildStatCard(
-              'Escalated Messages',
-              data?.escalatedMessages.toString() ?? '0',
+              'Resolved Messages',
+              data?.resolvedEscalatedMessages.toString() ?? '0',
               Colors.orange,
               Icons.help,
             ),
           ),
+      
         ],
       ),
     ),
@@ -1091,7 +1092,7 @@ List<Widget> buildChatbotUsageReport(
       ),
       const SizedBox(height: 16),
       SizedBox(
-        height: 350,
+        height: 400,
         child: buildPeakUsageHoursCard(data?.peakUsageByHour ?? <int, int>{}),
       ),
       const SizedBox(height: 16),
