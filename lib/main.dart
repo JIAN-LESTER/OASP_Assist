@@ -459,7 +459,7 @@ void main() {
     
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.manual,
-      overlays: [SystemUiOverlay.bottom],
+      overlays: [SystemUiOverlay.top],
     );
 
     await Firebase.initializeApp(

@@ -167,14 +167,13 @@ class _AdmissionInfoState extends State<AdmissionInfo>
         padding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
         child: Center(
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 800),
+            constraints: const BoxConstraints(maxWidth: 1200),
             child: FadeTransition(
               opacity: _fadeAnimation,
               child: Column(
                 children: [
                   _buildAcademicYearSelector(),
-                  _buildStepsOverview(),
-                  _buildRequirementsSection(),
+                  _buildStepsAndRequirements(),
                   _buildHelpSection(),
                   const SizedBox(height: 32),
                 ],
@@ -324,57 +323,62 @@ class _AdmissionInfoState extends State<AdmissionInfo>
             spacing: 8,
             runSpacing: 8,
             children: _admissionYears.map((admission) {
-              final yearStr = _formatAcademicYear(admission.academicYear);
-              final isSelected = _isSameAcademicYear(
-                admission.academicYear,
-                _selectedAcademicYear,
-              );
+              try {
+                final yearStr = _formatAcademicYear(admission.academicYear);
+                final isSelected = _isSameAcademicYear(
+                  admission.academicYear,
+                  _selectedAcademicYear,
+                );
 
-              return InkWell(
-                onTap: () {
-                  setState(() {
-                    _selectedAcademicYear = admission.academicYear;
-                    _currentStepIndex = 0;
-                  });
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: isSelected
-                        ? LinearGradient(
-                            colors: [Colors.green[600]!, Colors.green[700]!],
-                          )
-                        : null,
-                    color: isSelected ? null : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? Colors.green[700]! : Colors.grey[300]!,
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedAcademicYear = admission.academicYear;
+                      _currentStepIndex = 0;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
                     ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: Colors.green[600]!.withOpacity(0.4),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Text(
-                    yearStr,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.grey[700],
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                    decoration: BoxDecoration(
+                      gradient: isSelected
+                          ? LinearGradient(
+                              colors: [Colors.green[600]!, Colors.green[700]!],
+                            )
+                          : null,
+                      color: isSelected ? null : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected ? Colors.green[700]! : Colors.grey[300]!,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: Colors.green[600]!.withOpacity(0.4),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      yearStr,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.grey[700],
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
-                ),
-              );
+                );
+              } catch (e) {
+                print('Error displaying academic year: $e');
+                return const SizedBox.shrink();
+              }
             }).toList(),
           ),
         ],
@@ -382,9 +386,12 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     );
   }
 
-  Widget _buildStepsOverview() {
+  Widget _buildStepsAndRequirements() {
     final steps = _selectedAdmission?.steps ?? [];
-    if (steps.isEmpty) {
+    final requirements = _selectedAdmission?.requirements ?? [];
+
+    // Check if both are empty
+    if (steps.isEmpty && requirements.isEmpty) {
       return Center(
         child: Container(
           padding: const EdgeInsets.all(48),
@@ -416,7 +423,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
               ),
               const SizedBox(height: 24),
               Text(
-                'No admission steps available',
+                'No admission information available',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w600,
@@ -435,6 +442,46 @@ class _AdmissionInfoState extends State<AdmissionInfo>
       );
     }
 
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Responsive layout: side by side on desktop/tablet, stacked on mobile
+        final isMobile = constraints.maxWidth < 800;
+
+        if (isMobile) {
+          // Stack vertically on mobile
+          return Column(
+            children: [
+              if (steps.isNotEmpty) _buildStepsSection(steps),
+              if (steps.isNotEmpty && requirements.isNotEmpty) 
+                const SizedBox(height: 24),
+              if (requirements.isNotEmpty) _buildRequirementsCard(requirements),
+            ],
+          );
+        } else {
+          // Side by side on larger screens
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (steps.isNotEmpty)
+                Expanded(
+                  flex: 6,
+                  child: _buildStepsSection(steps),
+                ),
+              if (steps.isNotEmpty && requirements.isNotEmpty)
+                const SizedBox(width: 24),
+              if (requirements.isNotEmpty)
+                Expanded(
+                  flex: 4,
+                  child: _buildRequirementsCard(requirements),
+                ),
+            ],
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildStepsSection(List<String> steps) {
     return Column(
       children: steps.asMap().entries.map((entry) {
         final index = entry.key;
@@ -444,6 +491,105 @@ class _AdmissionInfoState extends State<AdmissionInfo>
           child: _buildStepCard(index + 1, step),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildRequirementsCard(List<String> requirements) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+            spreadRadius: -4,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: Colors.grey[300]!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [primaryGreen.withOpacity(0.9), primaryGreen],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryGreen.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.description_outlined,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Requirements',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey[900],
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          ...requirements.map((requirement) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 6),
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: primaryGreen,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      requirement,
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.5,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
     );
   }
 
@@ -537,105 +683,9 @@ class _AdmissionInfoState extends State<AdmissionInfo>
   }
 
   Widget _buildRequirementsSection() {
-    final requirements = _selectedAdmission?.requirements ?? [];
-    if (requirements.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.only(top: 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: -4,
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey[300]!, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [primaryGreen.withOpacity(0.9), primaryGreen],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryGreen.withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.description_outlined,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Requirements',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.grey[900],
-                  letterSpacing: -0.3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          ...requirements.map((requirement) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 4),
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: primaryGreen,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      requirement,
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.5,
-                        color: Colors.grey[700],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        ],
-      ),
-    );
+    // This method is now handled by _buildStepsAndRequirements
+    // Kept for backwards compatibility but returns empty widget
+    return const SizedBox.shrink();
   }
 
   Widget _buildHelpSection() {

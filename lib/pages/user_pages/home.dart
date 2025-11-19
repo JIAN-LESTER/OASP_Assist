@@ -15,95 +15,186 @@ class _HomeDashboardState extends State<HomeDashboard>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  // Stream controllers for real-time data
-  Stream<List<Map<String, dynamic>>>? _messagesStream;
-  Stream<QuerySnapshot>? _admissionsStream;
-  Stream<QuerySnapshot>? _scholarshipsStream;
-  Stream<QuerySnapshot>? _placementsStream;
-  Stream<QuerySnapshot>? _announcementsStream;
-  
-  // Store the current conversation ID
+  // Cached data for faster subsequent loads
+  Map<String, dynamic>? _cachedUserData;
+  List<Map<String, dynamic>>? _cachedMessages;
+  QuerySnapshot? _cachedAdmissions;
+  QuerySnapshot? _cachedScholarships;
+  QuerySnapshot? _cachedPlacements;
+  QuerySnapshot? _cachedAnnouncements;
+
+  // Loading states for progressive rendering
+  bool _userDataLoaded = false;
+  bool _messagesLoaded = false;
+  bool _admissionsLoaded = false;
+  bool _scholarshipsLoaded = false;
+  bool _placementsLoaded = false;
+  bool _announcementsLoaded = false;
+
   String? _currentConversationId;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
     _animationController.forward();
-    _initializeStreams();
+
+    // Start batch loading immediately
+    _batchLoadData();
   }
 
-  void _initializeStreams() {
+  // Optimized batch loading with priority
+  Future<void> _batchLoadData() async {
     final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-    if (user != null) {
-      _messagesStream = FirebaseFirestore.instance
-          .collection('conversations')
-          .where('userId', isEqualTo: user.uid)
-          .orderBy('createdAt', descending: true)
-          .limit(1)
-          .snapshots()
-          .asyncMap((conversationSnapshot) async {
-            if (conversationSnapshot.docs.isEmpty) {
-              _currentConversationId = null; // No conversation exists
-              return <Map<String, dynamic>>[];
-            }
+    // Priority 1: User data and messages (most important, load first)
+    _loadCriticalData(user);
 
-            final conversationId = conversationSnapshot.docs.first.id;
-            _currentConversationId = conversationId; // Store conversation ID
+    // Priority 2: Services data (load after a brief delay)
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) _loadServicesData();
+    });
+  }
 
-            // Query messages from subcollection
-            final messagesSnapshot = await FirebaseFirestore.instance
-                .collection('conversations')
-                .doc(conversationId)
-                .collection('messages')
-                .orderBy('sent_at', descending: true)
-                .limit(4) // Get last 4 messages (2 user + 2 bot)
-                .get();
-
-            return messagesSnapshot.docs
-                .map((doc) => {
-                      'id': doc.id,
-                      ...doc.data(),
-                    })
-                .toList();
-          });
+  // Load critical data first (user info + chat)
+  Future<void> _loadCriticalData(User user) async {
+    try {
+      // Load user data and messages in parallel
+      await Future.wait([_loadUserData(user.uid), _loadMessages(user.uid)]);
+    } catch (e) {
+      debugPrint('Error loading critical data: $e');
     }
+  }
 
-    // Get latest admissions
-    _admissionsStream = FirebaseFirestore.instance
-        .collection('admissions')
-        .orderBy('createdAt', descending: true)
-        .limit(1)
-        .snapshots();
+  // Load user data
+  Future<void> _loadUserData(String uid) async {
+    try {
+      final doc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
-    // Get latest scholarships
-    _scholarshipsStream = FirebaseFirestore.instance
-        .collection('scholarships')
-        .orderBy('createdAt', descending: true)
-        .limit(3)
-        .snapshots();
+      if (mounted) {
+        setState(() {
+          _cachedUserData = doc.exists ? doc.data() : null;
+          _userDataLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+      if (mounted) setState(() => _userDataLoaded = true);
+    }
+  }
 
-    // Get latest placements
-    _placementsStream = FirebaseFirestore.instance
-        .collection('placements')
-        .orderBy('createdAt', descending: true)
-        .limit(3)
-        .snapshots();
+  // Load messages
+  Future<void> _loadMessages(String uid) async {
+    try {
+      final conversationSnapshot =
+          await FirebaseFirestore.instance
+              .collection('conversations')
+              .where('userId', isEqualTo: uid)
+              .orderBy('createdAt', descending: true)
+              .limit(1)
+              .get();
 
-    // Get latest announcements
-    _announcementsStream = FirebaseFirestore.instance
-        .collection('announcements')
-        .where('deleted', isEqualTo: false)
-        .orderBy('created_time', descending: true)
-        .limit(3)
-        .snapshots();
+      if (conversationSnapshot.docs.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _cachedMessages = [];
+            _messagesLoaded = true;
+          });
+        }
+        return;
+      }
+
+      final conversationId = conversationSnapshot.docs.first.id;
+      _currentConversationId = conversationId;
+
+      final messagesSnapshot =
+          await FirebaseFirestore.instance
+              .collection('conversations')
+              .doc(conversationId)
+              .collection('messages')
+              .orderBy('sent_at', descending: true)
+              .limit(4)
+              .get();
+
+      if (mounted) {
+        setState(() {
+          _cachedMessages =
+              messagesSnapshot.docs
+                  .map((doc) => {'id': doc.id, ...doc.data()})
+                  .toList();
+          _messagesLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading messages: $e');
+      if (mounted) {
+        setState(() {
+          _cachedMessages = [];
+          _messagesLoaded = true;
+        });
+      }
+    }
+  }
+
+  // Load all services data in parallel
+  Future<void> _loadServicesData() async {
+    try {
+      // Load all service data simultaneously
+      final results = await Future.wait([
+        FirebaseFirestore.instance
+            .collection('admissions')
+            .orderBy('createdAt', descending: true)
+            .limit(1)
+            .get(),
+        FirebaseFirestore.instance
+            .collection('scholarships')
+            .orderBy('createdAt', descending: true)
+            .limit(3)
+            .get(),
+        FirebaseFirestore.instance
+            .collection('placements')
+            .orderBy('createdAt', descending: true)
+            .limit(3)
+            .get(),
+        FirebaseFirestore.instance
+            .collection('announcements')
+            .where('deleted', isEqualTo: false)
+            .orderBy('created_time', descending: true)
+            .limit(3)
+            .get(),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _cachedAdmissions = results[0];
+          _admissionsLoaded = true;
+          _cachedScholarships = results[1];
+          _scholarshipsLoaded = true;
+          _cachedPlacements = results[2];
+          _placementsLoaded = true;
+          _cachedAnnouncements = results[3];
+          _announcementsLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading services data: $e');
+      if (mounted) {
+        setState(() {
+          _admissionsLoaded = true;
+          _scholarshipsLoaded = true;
+          _placementsLoaded = true;
+          _announcementsLoaded = true;
+        });
+      }
+    }
   }
 
   @override
@@ -122,7 +213,6 @@ class _HomeDashboardState extends State<HomeDashboard>
 
   bool _isDesktop(BuildContext context) =>
       MediaQuery.of(context).size.width >= 1980;
-
   double _getMaxWidth(BuildContext context) {
     if (_isDesktop(context)) return 1400;
     return double.infinity;
@@ -143,10 +233,10 @@ class _HomeDashboardState extends State<HomeDashboard>
                   // Welcome Header
                   SliverToBoxAdapter(child: _buildWelcomeHeader()),
 
-                  // AI Chat Assistant - Large Preview at Top
+                  // AI Chat Assistant
                   SliverToBoxAdapter(child: _buildChatPreviewSection()),
 
-                  // Service Grid (Admission, Scholarship, Placement, Announcements)
+                  // Service Grid
                   SliverPadding(
                     padding: EdgeInsets.symmetric(
                       horizontal: _isMobile(context) ? 16 : 20,
@@ -172,30 +262,52 @@ class _HomeDashboardState extends State<HomeDashboard>
   }
 
   Widget _buildWelcomeHeader() {
-    final user = FirebaseAuth.instance.currentUser;
+    if (!_userDataLoaded) {
+      return _buildHeaderLoadingSkeleton();
+    }
 
-    return FutureBuilder<DocumentSnapshot>(
-      future:
-          FirebaseFirestore.instance.collection('users').doc(user?.uid).get(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(20),
-              child: CircularProgressIndicator(),
+    final name = _cachedUserData?['name'] ?? 'User';
+    return _buildHeaderUI(name);
+  }
+
+  Widget _buildHeaderLoadingSkeleton() {
+    final isMobile = _isMobile(context);
+    return Container(
+      margin: EdgeInsets.all(isMobile ? 16 : 20),
+      padding: EdgeInsets.all(isMobile ? 20 : 24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2E7D32),
+        borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.school, color: Colors.white, size: isMobile ? 28 : 32),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: isMobile ? 12 : 16),
+          Container(
+            height: 20,
+            width: 150,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(4),
             ),
-          );
-        }
-
-        if (!snapshot.hasData || !snapshot.data!.exists) {
-          return _buildHeaderUI('User');
-        }
-
-        final userData = snapshot.data!.data() as Map<String, dynamic>;
-        final name = userData['name'] ?? 'User';
-
-        return _buildHeaderUI(name);
-      },
+          ),
+        ],
+      ),
     );
   }
 
@@ -281,125 +393,163 @@ class _HomeDashboardState extends State<HomeDashboard>
   Widget _buildChatPreviewSection() {
     final isMobile = _isMobile(context);
 
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _messagesStream,
-      builder: (context, snapshot) {
-        // Determine if there's an existing conversation
-        final hasConversation = snapshot.hasData && snapshot.data!.isNotEmpty;
+    if (!_messagesLoaded) {
+      return _buildChatLoadingSkeleton(isMobile);
+    }
 
-        return GestureDetector(
-          onTap: () => _navigateToChatTab(context, hasConversation),
-          child: Container(
-            margin: EdgeInsets.symmetric(
-              horizontal: isMobile ? 16 : 20,
-              vertical: 8,
+    final hasConversation =
+        _cachedMessages != null && _cachedMessages!.isNotEmpty;
+
+    return GestureDetector(
+      onTap: () => _navigateToChatTab(context, hasConversation),
+      child: Container(
+        margin: EdgeInsets.symmetric(
+          horizontal: isMobile ? 16 : 20,
+          vertical: 8,
+        ),
+        padding: EdgeInsets.all(isMobile ? 16 : 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2E7D32).withOpacity(0.15),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
             ),
-            padding: EdgeInsets.all(isMobile ? 16 : 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF2E7D32).withOpacity(0.15),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2E7D32).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2E7D32).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.smart_toy,
+                    color: const Color(0xFF2E7D32),
+                    size: isMobile ? 24 : 28,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'AI Chat Assistant',
+                        style: TextStyle(
+                          fontSize: isMobile ? 16 : 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
                       ),
-                      child: Icon(
-                        Icons.smart_toy,
-                        color: const Color(0xFF2E7D32),
-                        size: isMobile ? 24 : 28,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(height: 2),
+                      Row(
                         children: [
-                          Text(
-                            'AI Chat Assistant',
-                            style: TextStyle(
-                              fontSize: isMobile ? 16 : 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Colors.green,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Online',
-                                style: TextStyle(
-                                  fontSize: isMobile ? 12 : 13,
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                          const SizedBox(width: 6),
+                          Text(
+                            'Online',
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 13,
+                              color: Colors.green,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 16),
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF2E7D32),
-                      ),
-                    ),
-                  )
-                else if (snapshot.hasError)
-                  _buildErrorState(snapshot.error.toString(), isMobile)
-                else if (!hasConversation)
-                  _buildNoMessagesYet(isMobile)
-                else
-                  _buildRealChatMessages(snapshot.data!, isMobile),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () => _navigateToChatTab(context, hasConversation),
-                    icon: const Icon(Icons.arrow_forward, size: 18),
-                    label: Text(
-                      hasConversation ? 'Continue Chat' : 'Start Chat',
-                    ),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF2E7D32),
-                    ),
+                    ],
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            if (!hasConversation)
+              _buildNoMessagesYet(isMobile)
+            else
+              _buildRealChatMessages(_cachedMessages!, isMobile),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _navigateToChatTab(context, hasConversation),
+                icon: const Icon(Icons.arrow_forward, size: 18),
+                label: Text(hasConversation ? 'Continue Chat' : 'Start Chat'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF2E7D32),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatLoadingSkeleton(bool isMobile) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20, vertical: 8),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 16,
+                      width: 120,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 12,
+                      width: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -441,76 +591,31 @@ class _HomeDashboardState extends State<HomeDashboard>
     );
   }
 
-  Widget _buildErrorState(String error, bool isMobile) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, color: Colors.red.shade600, size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Error loading messages',
-                  style: TextStyle(
-                    fontSize: isMobile ? 13 : 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.red.shade800,
-                  ),
-                ),
-                if (!isMobile) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Please try again later',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.red.shade600,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildRealChatMessages(
     List<Map<String, dynamic>> messages,
     bool isMobile,
   ) {
-    // Show only last 2-3 messages for preview
     final displayMessages = messages.take(3).toList();
 
     return Column(
-      children: displayMessages.reversed.map((message) {
-        final isUser = message['sender'] == 'user';
-        final content = message['content']?.toString() ?? '';
+      children:
+          displayMessages.reversed.map((message) {
+            final isUser = message['sender'] == 'user';
+            final content = message['content']?.toString() ?? '';
 
-        // Skip empty messages
-        if (content.trim().isEmpty) return const SizedBox.shrink();
+            if (content.trim().isEmpty) return const SizedBox.shrink();
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _buildChatBubble(content, isUser, isMobile),
-        );
-      }).toList(),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildChatBubble(content, isUser, isMobile),
+            );
+          }).toList(),
     );
   }
 
   Widget _buildChatBubble(String message, bool isUser, bool isMobile) {
-    // Truncate long messages for preview
-    final displayMessage = message.length > 100
-        ? '${message.substring(0, 100)}...'
-        : message;
+    final displayMessage =
+        message.length > 100 ? '${message.substring(0, 100)}...' : message;
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -523,13 +628,14 @@ class _HomeDashboardState extends State<HomeDashboard>
           vertical: isMobile ? 10 : 12,
         ),
         decoration: BoxDecoration(
-          gradient: isUser
-              ? const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF2E7D32), Color(0xFF388E3C)],
-                )
-              : null,
+          gradient:
+              isUser
+                  ? const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF2E7D32), Color(0xFF388E3C)],
+                  )
+                  : null,
           color: isUser ? null : Colors.grey[100],
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
@@ -539,9 +645,10 @@ class _HomeDashboardState extends State<HomeDashboard>
           ),
           boxShadow: [
             BoxShadow(
-              color: isUser
-                  ? const Color(0xFF2E7D32).withOpacity(0.2)
-                  : Colors.black.withOpacity(0.05),
+              color:
+                  isUser
+                      ? const Color(0xFF2E7D32).withOpacity(0.2)
+                      : Colors.black.withOpacity(0.05),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -561,341 +668,315 @@ class _HomeDashboardState extends State<HomeDashboard>
     );
   }
 
-  // Services Grid
   Widget _buildServicesGrid() {
     final isMobile = _isMobile(context);
 
     return SliverList(
       delegate: SliverChildListDelegate([
-        // Row of 3 cards: Admission, Scholarship, Placement
         !isMobile
             ? IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: _buildAdmissionCard()),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildScholarshipCard()),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildPlacementCard()),
-                  ],
-                ),
-              )
-            : Column(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildAdmissionCard(),
-                  const SizedBox(height: 12),
-                  _buildScholarshipCard(),
-                  const SizedBox(height: 12),
-                  _buildPlacementCard(),
+                  Expanded(child: _buildAdmissionCard()),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildScholarshipCard()),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildPlacementCard()),
                 ],
               ),
+            )
+            : Column(
+              children: [
+                _buildAdmissionCard(),
+                const SizedBox(height: 12),
+                _buildScholarshipCard(),
+                const SizedBox(height: 12),
+                _buildPlacementCard(),
+              ],
+            ),
         const SizedBox(height: 16),
-        // Announcements full width (like chat)
         _buildAnnouncementCard(),
       ]),
     );
   }
 
-  // Admission Card
   Widget _buildAdmissionCard() {
     final isMobile = _isMobile(context);
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: _admissionsStream,
-      builder: (context, snapshot) {
-        List<String> steps = [];
+    if (!_admissionsLoaded) {
+      return _buildCardSkeleton(isMobile, 'Admission Info', Icons.school);
+    }
 
-        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          final doc = snapshot.data!.docs.first;
-          final data = doc.data() as Map<String, dynamic>;
-          steps =
-              (data['steps'] as List<dynamic>?)
-                  ?.map((e) => e.toString())
-                  .take(6)
-                  .toList() ??
-              [];
-        }
+    List<String> steps = [];
+    if (_cachedAdmissions != null && _cachedAdmissions!.docs.isNotEmpty) {
+      final data = _cachedAdmissions!.docs.first.data() as Map<String, dynamic>;
+      steps =
+          (data['steps'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .take(6)
+              .toList() ??
+          [];
+    }
 
-        // Default steps if no data
-        if (steps.isEmpty) {
-          steps = [
-            'Create Account',
-            'Fill Personal Information',
-            'Upload Documents',
-            'Submit Application',
-            'Pay Application Fee',
-          ];
-        }
+    if (steps.isEmpty) {
+      steps = [
+        'Create Account',
+        'Fill Personal Information',
+        'Upload Documents',
+        'Submit Application',
+        'Pay Application Fee',
+      ];
+    }
 
-        return GestureDetector(
-          onTap: () => _navigateToTab(context, 3),
-          child: Container(
-            padding: EdgeInsets.all(isMobile ? 16 : 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF43A047).withOpacity(0.15),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
+    return GestureDetector(
+      onTap: () => _navigateToTab(context, 3),
+      child: Container(
+        padding: EdgeInsets.all(isMobile ? 16 : 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF43A047).withOpacity(0.15),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF43A047).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.school,
+                    color: const Color(0xFF43A047),
+                    size: isMobile ? 20 : 24,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Admission Info',
+                    style: TextStyle(
+                      fontSize: isMobile ? 16 : 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            const SizedBox(height: 16),
+            Text(
+              'Application Steps:',
+              style: TextStyle(
+                fontSize: isMobile ? 13 : 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...steps.map((step) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF43A047).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.school,
-                        color: const Color(0xFF43A047),
-                        size: isMobile ? 20 : 24,
-                      ),
+                    Icon(
+                      Icons.check_circle,
+                      color: const Color(0xFF43A047),
+                      size: isMobile ? 14 : 16,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Admission Info',
+                        step,
                         style: TextStyle(
-                          fontSize: isMobile ? 16 : 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          fontSize: isMobile ? 12 : 13,
+                          color: Colors.black54,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Application Steps:',
-                  style: TextStyle(
-                    fontSize: isMobile ? 13 : 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
+              );
+            }).toList(),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => _navigateToTab(context, 3),
+                child: const Text('See more →'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF43A047),
                 ),
-                const SizedBox(height: 8),
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(),
-                    ),
-                  )
-                else
-                  ...steps.map((step) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: const Color(0xFF43A047),
-                            size: isMobile ? 14 : 16,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              step,
-                              style: TextStyle(
-                                fontSize: isMobile ? 12 : 13,
-                                color: Colors.black54,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => _navigateToTab(context, 3),
-                    child: const Text('See more →'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF43A047),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 
-  // Scholarship Card
   Widget _buildScholarshipCard() {
     final isMobile = _isMobile(context);
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: _scholarshipsStream,
-      builder: (context, snapshot) {
-        List<Map<String, dynamic>> scholarships = [];
+    if (!_scholarshipsLoaded) {
+      return _buildCardSkeleton(isMobile, 'Scholarships', Icons.card_giftcard);
+    }
 
-        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          scholarships = snapshot.data!.docs.map((doc) {
+    List<Map<String, dynamic>> scholarships = [];
+    if (_cachedScholarships != null && _cachedScholarships!.docs.isNotEmpty) {
+      scholarships =
+          _cachedScholarships!.docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
             return {
               'name': data['name'] ?? 'Unnamed Scholarship',
               'provider': data['scholarshipProvider'] ?? 'Unknown',
             };
           }).toList();
-        }
+    }
 
-        // Default scholarships if no data
-        if (scholarships.isEmpty) {
-          scholarships = [
-            {'name': 'Merit-Based Scholarship', 'provider': 'University'},
-            {'name': 'Need-Based Financial Aid', 'provider': 'Foundation'},
-            {'name': 'Athletic Scholarship', 'provider': 'Sports Dept'},
-          ];
-        }
+    if (scholarships.isEmpty) {
+      scholarships = [
+        {'name': 'Merit-Based Scholarship', 'provider': 'University'},
+        {'name': 'Need-Based Financial Aid', 'provider': 'Foundation'},
+        {'name': 'Athletic Scholarship', 'provider': 'Sports Dept'},
+      ];
+    }
 
-        return GestureDetector(
-          onTap: () => _navigateToTab(context, 4),
-          child: Container(
-            padding: EdgeInsets.all(isMobile ? 16 : 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF4CAF50).withOpacity(0.15),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
+    return GestureDetector(
+      onTap: () => _navigateToTab(context, 4),
+      child: Container(
+        padding: EdgeInsets.all(isMobile ? 16 : 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF4CAF50).withOpacity(0.15),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.card_giftcard,
+                    color: const Color(0xFF4CAF50),
+                    size: isMobile ? 20 : 24,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Scholarships',
+                    style: TextStyle(
+                      fontSize: isMobile ? 16 : 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            const SizedBox(height: 16),
+            Text(
+              'Available Scholarships:',
+              style: TextStyle(
+                fontSize: isMobile ? 13 : 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...scholarships.map((scholarship) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: EdgeInsets.all(isMobile ? 10 : 12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.withOpacity(0.2)),
+                ),
+                child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4CAF50).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.card_giftcard,
-                        color: const Color(0xFF4CAF50),
-                        size: isMobile ? 20 : 24,
-                      ),
+                    Icon(
+                      Icons.star,
+                      color: Colors.amber,
+                      size: isMobile ? 16 : 18,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        'Scholarships',
-                        style: TextStyle(
-                          fontSize: isMobile ? 16 : 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            scholarship['name']!,
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 13,
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            scholarship['provider']!,
+                            style: TextStyle(
+                              fontSize: isMobile ? 10 : 11,
+                              color: Colors.black54,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Available Scholarships:',
-                  style: TextStyle(
-                    fontSize: isMobile ? 13 : 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
+              );
+            }).toList(),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => _navigateToTab(context, 4),
+                child: const Text('See more →'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF4CAF50),
                 ),
-                const SizedBox(height: 8),
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(),
-                    ),
-                  )
-                else
-                  ...scholarships.map((scholarship) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: EdgeInsets.all(isMobile ? 10 : 12),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.green.withOpacity(0.2),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.star,
-                            color: Colors.amber,
-                            size: isMobile ? 16 : 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  scholarship['name']!,
-                                  style: TextStyle(
-                                    fontSize: isMobile ? 12 : 13,
-                                    color: Colors.black87,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  scholarship['provider']!,
-                                  style: TextStyle(
-                                    fontSize: isMobile ? 10 : 11,
-                                    color: Colors.black54,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => _navigateToTab(context, 4),
-                    child: const Text('See more →'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF4CAF50),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 
-  // Placement Card
   Widget _buildPlacementCard() {
     final isMobile = _isMobile(context);
+
+    if (!_placementsLoaded) {
+      return _buildCardSkeleton(isMobile, 'Placement Assistance', Icons.work);
+    }
 
     return GestureDetector(
       onTap: () => _navigateToTab(context, 5),
@@ -1022,20 +1103,19 @@ class _HomeDashboardState extends State<HomeDashboard>
     }).toList();
   }
 
-  // Announcement Card - Full Width like Chat
   Widget _buildAnnouncementCard() {
     final isMobile = _isMobile(context);
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: _announcementsStream,
-      builder: (context, snapshot) {
-        List<Map<String, dynamic>> announcements = [];
+    if (!_announcementsLoaded) {
+      return _buildCardSkeleton(isMobile, 'Announcements', Icons.campaign);
+    }
 
-        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          announcements = snapshot.data!.docs.map((doc) {
+    List<Map<String, dynamic>> announcements = [];
+    if (_cachedAnnouncements != null && _cachedAnnouncements!.docs.isNotEmpty) {
+      announcements =
+          _cachedAnnouncements!.docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
 
-            // Get category and determine priority
             String category = data['category']?.toString() ?? 'General';
             String priority = 'low';
             if (category.toLowerCase().contains('urgent') ||
@@ -1045,7 +1125,6 @@ class _HomeDashboardState extends State<HomeDashboard>
               priority = 'medium';
             }
 
-            // Format date
             String date = 'Recent';
             if (data['created_time'] != null) {
               try {
@@ -1064,7 +1143,6 @@ class _HomeDashboardState extends State<HomeDashboard>
               }
             }
 
-            // Get message and truncate for description
             String message = data['message']?.toString() ?? 'No description';
             String title =
                 message.length > 50 ? message.substring(0, 50) : message;
@@ -1080,187 +1158,252 @@ class _HomeDashboardState extends State<HomeDashboard>
               'priority': priority,
             };
           }).toList();
-        }
+    }
 
-        // Default announcements if no data
-        if (announcements.isEmpty) {
-          announcements = [
-            {
-              'title': 'Semester Registration Open',
-              'description':
-                  'Register for next semester courses. Deadline: March 15',
-              'date': 'March 1, 2025',
-              'priority': 'high',
-            },
-            {
-              'title': 'Career Fair Next Week',
-              'description':
-                  'Top companies hiring. Bring your resume and dress professionally.',
-              'date': 'March 5, 2025',
-              'priority': 'medium',
-            },
-            {
-              'title': 'Library Hours Extended',
-              'description': 'Library now open until 11 PM during exam week.',
-              'date': 'March 3, 2025',
-              'priority': 'low',
-            },
-          ];
-        }
+    if (announcements.isEmpty) {
+      announcements = [
+        {
+          'title': 'Semester Registration Open',
+          'description':
+              'Register for next semester courses. Deadline: March 15',
+          'date': 'March 1, 2025',
+          'priority': 'high',
+        },
+        {
+          'title': 'Career Fair Next Week',
+          'description':
+              'Top companies hiring. Bring your resume and dress professionally.',
+          'date': 'March 5, 2025',
+          'priority': 'medium',
+        },
+        {
+          'title': 'Library Hours Extended',
+          'description': 'Library now open until 11 PM during exam week.',
+          'date': 'March 3, 2025',
+          'priority': 'low',
+        },
+      ];
+    }
 
-        return GestureDetector(
-          onTap: () => _navigateToTab(context, 2),
-          child: Container(
-            margin: const EdgeInsets.only(top: 0, bottom: 0),
-            padding: EdgeInsets.all(isMobile ? 16 : 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF388E3C).withOpacity(0.15),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+    return GestureDetector(
+      onTap: () => _navigateToTab(context, 2),
+      child: Container(
+        margin: const EdgeInsets.only(top: 0, bottom: 0),
+        padding: EdgeInsets.all(isMobile ? 16 : 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF388E3C).withOpacity(0.15),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF388E3C).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.campaign,
-                        color: const Color(0xFF388E3C),
-                        size: isMobile ? 24 : 28,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Announcements',
-                            style: TextStyle(
-                              fontSize: isMobile ? 16 : 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${announcements.length} new updates',
-                            style: TextStyle(
-                              fontSize: isMobile ? 12 : 13,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF388E3C).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.campaign,
+                    color: const Color(0xFF388E3C),
+                    size: isMobile ? 24 : 28,
+                  ),
                 ),
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 16),
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  const Center(child: CircularProgressIndicator())
-                else
-                  ...announcements.map((announcement) {
-                    Color priorityColor = announcement['priority'] == 'high'
-                        ? Colors.red
-                        : announcement['priority'] == 'medium'
-                            ? Colors.orange
-                            : Colors.blue;
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: EdgeInsets.all(isMobile ? 12 : 14),
-                      decoration: BoxDecoration(
-                        color: priorityColor.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: priorityColor.withOpacity(0.2),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Announcements',
+                        style: TextStyle(
+                          fontSize: isMobile ? 16 : 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: priorityColor,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  announcement['title']!,
-                                  style: TextStyle(
-                                    fontSize: isMobile ? 14 : 15,
-                                    color: Colors.black87,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              Text(
-                                announcement['date']!,
-                                style: TextStyle(
-                                  fontSize: isMobile ? 11 : 12,
-                                  color: Colors.black45,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 20),
-                            child: Text(
-                              announcement['description']!,
-                              style: TextStyle(
-                                fontSize: isMobile ? 12 : 13,
-                                color: Colors.black54,
-                                height: 1.4,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 2),
+                      Text(
+                        '${announcements.length} new updates',
+                        style: TextStyle(
+                          fontSize: isMobile ? 12 : 13,
+                          color: Colors.black54,
+                        ),
                       ),
-                    );
-                  }).toList(),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () => _navigateToTab(context, 2),
-                    icon: const Icon(Icons.arrow_forward, size: 18),
-                    label: const Text('View All'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF388E3C),
-                    ),
+                    ],
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            ...announcements.map((announcement) {
+              Color priorityColor =
+                  announcement['priority'] == 'high'
+                      ? Colors.red
+                      : announcement['priority'] == 'medium'
+                      ? Colors.orange
+                      : Colors.blue;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.all(isMobile ? 12 : 14),
+                decoration: BoxDecoration(
+                  color: priorityColor.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: priorityColor.withOpacity(0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: priorityColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            announcement['title']!,
+                            style: TextStyle(
+                              fontSize: isMobile ? 14 : 15,
+                              color: Colors.black87,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          announcement['date']!,
+                          style: TextStyle(
+                            fontSize: isMobile ? 11 : 12,
+                            color: Colors.black45,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20),
+                      child: Text(
+                        announcement['description']!,
+                        style: TextStyle(
+                          fontSize: isMobile ? 12 : 13,
+                          color: Colors.black54,
+                          height: 1.4,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _navigateToTab(context, 2),
+                icon: const Icon(Icons.arrow_forward, size: 18),
+                label: const Text('View All'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF388E3C),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardSkeleton(bool isMobile, String title, IconData icon) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
           ),
-        );
-      },
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  color: Colors.grey[400],
+                  size: isMobile ? 20 : 24,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            height: 16,
+            width: 120,
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1339,92 +1482,110 @@ class _HomeDashboardState extends State<HomeDashboard>
     );
   }
 
- void _navigateToTab(BuildContext context, int tabIndex) {
-
-  
-  Navigator.of(context).pushReplacement(
-    MaterialPageRoute(
-      builder: (context) => UserMainPage(initialTabIndex: tabIndex),
-    ),
-  );
-}
-
-  void _navigateToChatTab(BuildContext context, bool hasConversation) {
-  if (hasConversation && _currentConversationId != null) {
+  void _navigateToTab(BuildContext context, int tabIndex) {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => UserMainPage(
-          initialTabIndex: 1, // Chat is always index 1
-          conversationId: _currentConversationId,
-        ),
-      ),
-    );
-  } else {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => UserMainPage(initialTabIndex: 1),
+        builder: (context) => UserMainPage(initialTabIndex: tabIndex),
       ),
     );
   }
-}
 
-
-void _showContactInfo(BuildContext context) {
-  final isMobile = MediaQuery.of(context).size.width < 600;
-
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        backgroundColor: Colors.white,
-        titlePadding: const EdgeInsets.only(top: 20, left: 24, right: 24),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        title: Row(
-          children: [
-            Icon(Icons.support_agent, color: const Color(0xFF2E7D32), size: 26),
-            const SizedBox(width: 10),
-            Text(
-              'Contact Information',
-              style: TextStyle(
-                fontSize: isMobile ? 18 : 20,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF2E7D32),
+  void _navigateToChatTab(BuildContext context, bool hasConversation) {
+    if (hasConversation && _currentConversationId != null) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder:
+              (context) => UserMainPage(
+                initialTabIndex: 1,
+                conversationId: _currentConversationId,
               ),
-            ),
-          ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildContactRow(Icons.access_time, 'Office Hours', '7:00 AM - 5:00 PM'),
-            const SizedBox(height: 10),
-      
-            _buildContactRow(Icons.email_outlined, 'Email', 'oasp@cmu.edu.ph'),
-            const SizedBox(height: 10),
-            _buildContactRow(Icons.email_outlined, 'Website', 'http://www.cmu.edu.ph'),
-            const SizedBox(height: 10),
-            _buildContactRow(Icons.location_on_outlined, 'Address', 'Musuan, Maramag, Philippines, 8714'),
-          ],
-        ),
-        actionsPadding: const EdgeInsets.only(bottom: 12, right: 16),
-        actions: [
-          TextButton.icon(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close, color: Colors.grey),
-            label: const Text(
-              'Close',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ),
-        ],
       );
-    },
-  );
-}
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => UserMainPage(initialTabIndex: 1),
+        ),
+      );
+    }
+  }
+
+  void _showContactInfo(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: Colors.white,
+          titlePadding: const EdgeInsets.only(top: 20, left: 24, right: 24),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 16,
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.support_agent,
+                color: const Color(0xFF2E7D32),
+                size: 26,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Contact Information',
+                style: TextStyle(
+                  fontSize: isMobile ? 18 : 20,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF2E7D32),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildContactRow(
+                Icons.access_time,
+                'Office Hours',
+                '7:00 AM - 5:00 PM',
+              ),
+              const SizedBox(height: 10),
+              _buildContactRow(
+                Icons.email_outlined,
+                'Email',
+                'oasp@cmu.edu.ph',
+              ),
+              const SizedBox(height: 10),
+              _buildContactRow(
+                Icons.email_outlined,
+                'Website',
+                'http://www.cmu.edu.ph',
+              ),
+              const SizedBox(height: 10),
+              _buildContactRow(
+                Icons.location_on_outlined,
+                'Address',
+                'Musuan, Maramag, Philippines, 8714',
+              ),
+            ],
+          ),
+          actionsPadding: const EdgeInsets.only(bottom: 12, right: 16),
+          actions: [
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close, color: Colors.grey),
+              label: const Text('Close', style: TextStyle(color: Colors.grey)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildContactRow(IconData icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1446,10 +1607,7 @@ void _showContactInfo(BuildContext context) {
               const SizedBox(height: 2),
               Text(
                 value,
-                style: const TextStyle(
-                  color: Colors.black54,
-                  fontSize: 13,
-                ),
+                style: const TextStyle(color: Colors.black54, fontSize: 13),
               ),
             ],
           ),
@@ -1458,6 +1616,3 @@ void _showContactInfo(BuildContext context) {
     );
   }
 }
-
-
-

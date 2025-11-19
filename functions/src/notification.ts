@@ -61,7 +61,8 @@ async function sendFCMNotifications(
   userIds: string[],
   title: string,
   body: string,
-  data: { [key: string]: string }
+  data: { [key: string]: string },
+  targetRole?: string // ✅ Role info for CLIENT-SIDE filtering
 ): Promise<void> {
   try {
     const userTokensMap = await getUserFCMTokens(userIds);
@@ -71,7 +72,7 @@ async function sendFCMNotifications(
       return;
     }
 
-    // ✅ FIX: Deduplicate tokens using Set
+    // ✅ Deduplicate tokens using Set
     const allTokens: string[] = [];
     const seenTokens = new Set<string>();
     
@@ -90,8 +91,9 @@ async function sendFCMNotifications(
     }
 
     console.log(
-      `📱 Sending FCM to ${allTokens.length} unique mobile devices (${userTokensMap.size} users)`
+      `📱 Sending FCM to ${allTokens.length} unique mobile devices (targetRole: ${targetRole || 'any'})`
     );
+    
     const message = {
       notification: {
         title: title,
@@ -100,6 +102,7 @@ async function sendFCMNotifications(
       data: {
         ...data,
         click_action: "FLUTTER_NOTIFICATION_CLICK",
+        targetRole: targetRole || "any", // ✅ Include target role for CLIENT-SIDE filtering
       },
       tokens: allTokens,
       android: {
@@ -134,7 +137,7 @@ async function sendFCMNotifications(
 
     const response = await admin.messaging().sendEachForMulticast(message);
     console.log(
-      `✅ FCM sent: ${response.successCount} successful, ${response.failureCount} failed`
+      `✅ FCM sent: ${response.successCount} successful, ${response.failureCount} failed (targetRole: ${targetRole || 'any'})`
     );
 
     if (response.failureCount > 0) {
@@ -406,13 +409,20 @@ export const onAnnouncementCreated = onDocumentCreated(
 
       console.log(`✅ Created ${notificationsCreated} notifications`);
 
-      if (notificationsCreated > 0) {
-        await sendFCMNotifications(userIds, notificationTitle, notificationBody, {
+  if (notificationsCreated > 0) {
+      await sendFCMNotifications(
+        userIds, 
+        notificationTitle, 
+        notificationBody, 
+        {
           type: "announcement",
           announcementId: announcementId,
           category: category,
-        });
+        },
+        "user" // ✅ Mobile app will only show if current user has role "user"
+      );
       }
+    
 
       return { success: true, notificationsCreated, eventId: event.id };
     } catch (error) {
@@ -424,7 +434,8 @@ export const onAnnouncementCreated = onDocumentCreated(
 
 export const checkUpcomingDeadlines = onSchedule(
   {
-    schedule: "0 6,18 * * *",
+    // schedule: "0 6,18 * * *",
+    schedule: "57 19 * * *",
     timeZone: "Asia/Manila",
   },
   async (event) => {
@@ -493,238 +504,256 @@ export const checkUpcomingDeadlines = onSchedule(
       console.log(`👤 Found ${allUserIds.length} active users.`);
 
       // ✅ Check Announcements
-      const announcementsSnapshot = await db
-        .collection("announcements")
-        .where("deleted", "==", false)
-        .where("deadline", "!=", null)
-        .get();
+   const announcementsSnapshot = await db
+  .collection("announcements")
+  .where("deleted", "==", false)
+  .where("deadline", "!=", null)
+  .get();
 
-      console.log(
-        `📋 Found ${announcementsSnapshot.size} announcements with deadlines`
-      );
+console.log(
+  `📋 Found ${announcementsSnapshot.size} announcements with deadlines`
+);
 
-      for (const announcementDoc of announcementsSnapshot.docs) {
-        const data = announcementDoc.data();
-        const announcementId = announcementDoc.id;
-        const { deadline, message = "", category = "General" } = data;
+for (const announcementDoc of announcementsSnapshot.docs) {
+  const data = announcementDoc.data();
+  const announcementId = announcementDoc.id;
+  const { deadline, message = "", category = "General" } = data;
 
-        if (!deadline || typeof deadline.toDate !== 'function') {
-          console.log(`⚠️ Skipping announcement ${announcementId}: invalid deadline`);
-          continue;
-        }
+  if (!deadline || typeof deadline.toDate !== 'function') {
+    console.log(`⚠️ Skipping announcement ${announcementId}: invalid deadline`);
+    continue;
+  }
 
-        const deadlineDate = deadline.toDate();
-        const deadlineLocal = new Date(
-          deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-        );
-        deadlineLocal.setHours(0, 0, 0, 0);
+  const deadlineDate = deadline.toDate();
+  const deadlineLocal = new Date(
+    deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+  );
+  deadlineLocal.setHours(0, 0, 0, 0);
 
-        const diffMs = deadlineLocal.getTime() - now.getTime();
-        const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  const diffMs = deadlineLocal.getTime() - now.getTime();
+  const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-        console.log(`📋 Announcement ${announcementId}: ${daysUntilDeadline} days until deadline`);
+  console.log(`📋 Announcement ${announcementId}: ${daysUntilDeadline} days until deadline`);
 
-        if (daysUntilDeadline === 3) {
-          const title = `⏰ Deadline Reminder: ${category} Announcement`;
-          const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          });
-          const body = `${message.substring(0, 80)}${
-            message.length > 80 ? "..." : ""
-          } | Deadline in 3 days: ${formattedDate}`;
+  if (daysUntilDeadline === 3) {
+    const title = `⏰ Deadline Reminder: ${category} Announcement`;
+    const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const body = `${message.substring(0, 80)}${
+      message.length > 80 ? "..." : ""
+    } | Deadline in 3 days: ${formattedDate}`;
 
-          const notificationsCreated = await createNotificationsForUsers(
-            allUserIds,
-            "user",
-            title,
-            body,
-            "deadline_reminder",
-            {
-              announcementId,
-              category,
-              deadline: deadlineLocal.toISOString(),
-              message,
-              daysUntilDeadline: "3",
-              reminderDate: reminderDateKey, // ✅ Always include this
-            }
-          );
-
-          totalNotificationsCreated += notificationsCreated;
-          processedItems.push({
-            type: 'announcement',
-            id: announcementId,
-            category,
-            deadline: deadlineLocal.toISOString(),
-            notificationsSent: notificationsCreated,
-          });
-
-          if (notificationsCreated > 0) {
-            await sendFCMNotifications(allUserIds, title, body, {
-              type: "deadline_reminder",
-              announcementId,
-              category,
-              daysUntilDeadline: "3",
-            });
-            console.log(`✅ Sent ${notificationsCreated} notifications for announcement ${announcementId}`);
-          }
-        }
+    const notificationsCreated = await createNotificationsForUsers(
+      allUserIds,
+      "user",
+      title,
+      body,
+      "deadline_reminder",
+      {
+        announcementId,
+        category,
+        deadline: deadlineLocal.toISOString(),
+        message,
+        daysUntilDeadline: "3",
+        reminderDate: reminderDateKey,
       }
+    );
 
-      // ✅ Check Scholarships
-      const scholarshipsSnapshot = await db
-        .collection("scholarships")
-        .where("deadline", "!=", null)
-        .get();
+    totalNotificationsCreated += notificationsCreated;
+    processedItems.push({
+      type: 'announcement',
+      id: announcementId,
+      category,
+      deadline: deadlineLocal.toISOString(),
+      notificationsSent: notificationsCreated,
+    });
 
-      console.log(
-        `🎓 Found ${scholarshipsSnapshot.size} scholarships with deadlines`
-      );
+    // ✅ FIX: Send FCM INSIDE the loop for EACH item
+ if (notificationsCreated > 0) {
+  await sendFCMNotifications(
+    allUserIds, 
+    title, 
+    body, 
+    {
+      type: "deadline_reminder",
+      announcementId, // or scholarshipId, placementId
+      category,
+      daysUntilDeadline: "3",
+    },
+    "user" // ✅ Mobile app will only show if current user has role "user"
+  );
+}
+  }
+}
 
-      for (const scholarshipDoc of scholarshipsSnapshot.docs) {
-        const data = scholarshipDoc.data();
-        const scholarshipId = scholarshipDoc.id;
-        const { deadline, name = "", scholarshipProvider = "" } = data;
+// ✅ FIXED: Check Scholarships
+const scholarshipsSnapshot = await db
+  .collection("scholarships")
+  .where("deadline", "!=", null)
+  .get();
 
-        if (!deadline || typeof deadline.toDate !== 'function') {
-          console.log(`⚠️ Skipping scholarship ${scholarshipId}: invalid deadline`);
-          continue;
-        }
+console.log(
+  `🎓 Found ${scholarshipsSnapshot.size} scholarships with deadlines`
+);
 
-        const deadlineDate = deadline.toDate();
-        const deadlineLocal = new Date(
-          deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-        );
-        deadlineLocal.setHours(0, 0, 0, 0);
+for (const scholarshipDoc of scholarshipsSnapshot.docs) {
+  const data = scholarshipDoc.data();
+  const scholarshipId = scholarshipDoc.id;
+  const { deadline, name = "", scholarshipProvider = "" } = data;
 
-        const diffMs = deadlineLocal.getTime() - now.getTime();
-        const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  if (!deadline || typeof deadline.toDate !== 'function') {
+    console.log(`⚠️ Skipping scholarship ${scholarshipId}: invalid deadline`);
+    continue;
+  }
 
-        console.log(`🎓 Scholarship ${scholarshipId} (${name}): ${daysUntilDeadline} days until deadline`);
+  const deadlineDate = deadline.toDate();
+  const deadlineLocal = new Date(
+    deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+  );
+  deadlineLocal.setHours(0, 0, 0, 0);
 
-        if (daysUntilDeadline === 3) {
-          const title = `⏰ Scholarship Deadline Reminder`;
-          const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          });
-          const body = `${name} (${scholarshipProvider}) - Deadline in 3 days: ${formattedDate}`;
+  const diffMs = deadlineLocal.getTime() - now.getTime();
+  const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-          const notificationsCreated = await createNotificationsForUsers(
-            allUserIds,
-            "user",
-            title,
-            body,
-            "deadline_reminder",
-            {
-              scholarshipId,
-              name,
-              scholarshipProvider,
-              deadline: deadlineLocal.toISOString(),
-              daysUntilDeadline: "3",
-              reminderDate: reminderDateKey, // ✅ Always include this
-            }
-          );
+  console.log(`🎓 Scholarship ${scholarshipId} (${name}): ${daysUntilDeadline} days until deadline`);
 
-          totalNotificationsCreated += notificationsCreated;
-          processedItems.push({
-            type: 'scholarship',
-            id: scholarshipId,
-            name,
-            deadline: deadlineLocal.toISOString(),
-            notificationsSent: notificationsCreated,
-          });
+  if (daysUntilDeadline === 3) {
+    const title = `⏰ Scholarship Deadline Reminder`;
+    const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const body = `${name} (${scholarshipProvider}) - Deadline in 3 days: ${formattedDate}`;
 
-          if (notificationsCreated > 0) {
-            await sendFCMNotifications(allUserIds, title, body, {
-              type: "deadline_reminder",
-              scholarshipId,
-              name,
-              daysUntilDeadline: "3",
-            });
-            console.log(`✅ Sent ${notificationsCreated} notifications for scholarship ${scholarshipId}`);
-          }
-        }
+    const notificationsCreated = await createNotificationsForUsers(
+      allUserIds,
+      "user",
+      title,
+      body,
+      "deadline_reminder",
+      {
+        scholarshipId,
+        name,
+        scholarshipProvider,
+        deadline: deadlineLocal.toISOString(),
+        daysUntilDeadline: "3",
+        reminderDate: reminderDateKey,
       }
+    );
 
-      // ✅ Check Placements
-      const placementsSnapshot = await db
-        .collection("placements")
-        .where("deadline", "!=", null)
-        .where("isRecruiting", "==", true)
-        .get();
+    totalNotificationsCreated += notificationsCreated;
+    processedItems.push({
+      type: 'scholarship',
+      id: scholarshipId,
+      name,
+      deadline: deadlineLocal.toISOString(),
+      notificationsSent: notificationsCreated,
+    });
 
-      console.log(
-        `💼 Found ${placementsSnapshot.size} placements with deadlines`
-      );
+    // ✅ FIX: Send FCM INSIDE the loop for EACH item
+   if (notificationsCreated > 0) {
+  await sendFCMNotifications(
+    allUserIds, 
+    title, 
+    body, 
+    {
+      type: "deadline_reminder",
+      scholarshipId, // or scholarshipId, placementId
+      name,
+      daysUntilDeadline: "3",
+    },
+    "user" // ✅ Mobile app will only show if current user has role "user"
+  );
+}
+  }
+}
 
-      for (const placementDoc of placementsSnapshot.docs) {
-        const data = placementDoc.data();
-        const placementId = placementDoc.id;
-        const { deadline, partnerCompany = "" } = data;
+// ✅ FIXED: Check Placements
+const placementsSnapshot = await db
+  .collection("placements")
+  .where("deadline", "!=", null)
+  .where("isRecruiting", "==", true)
+  .get();
 
-        if (!deadline || typeof deadline.toDate !== 'function') {
-          console.log(`⚠️ Skipping placement ${placementId}: invalid deadline`);
-          continue;
-        }
+console.log(
+  `💼 Found ${placementsSnapshot.size} placements with deadlines`
+);
 
-        const deadlineDate = deadline.toDate();
-        const deadlineLocal = new Date(
-          deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-        );
-        deadlineLocal.setHours(0, 0, 0, 0);
+for (const placementDoc of placementsSnapshot.docs) {
+  const data = placementDoc.data();
+  const placementId = placementDoc.id;
+  const { deadline, partnerCompany = "" } = data;
 
-        const diffMs = deadlineLocal.getTime() - now.getTime();
-        const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  if (!deadline || typeof deadline.toDate !== 'function') {
+    console.log(`⚠️ Skipping placement ${placementId}: invalid deadline`);
+    continue;
+  }
 
-        console.log(`💼 Placement ${placementId} (${partnerCompany}): ${daysUntilDeadline} days until deadline`);
+  const deadlineDate = deadline.toDate();
+  const deadlineLocal = new Date(
+    deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+  );
+  deadlineLocal.setHours(0, 0, 0, 0);
 
-        if (daysUntilDeadline === 3) {
-          const title = `⏰ Placement Deadline Reminder`;
-          const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          });
-          const body = `${partnerCompany} placement - Deadline in 3 days: ${formattedDate}`;
+  const diffMs = deadlineLocal.getTime() - now.getTime();
+  const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-          const notificationsCreated = await createNotificationsForUsers(
-            allUserIds,
-            "user",
-            title,
-            body,
-            "deadline_reminder",
-            {
-              placementId,
-              partnerCompany,
-              deadline: deadlineLocal.toISOString(),
-              daysUntilDeadline: "3",
-              reminderDate: reminderDateKey, // ✅ Always include this
-            }
-          );
+  console.log(`💼 Placement ${placementId} (${partnerCompany}): ${daysUntilDeadline} days until deadline`);
 
-          totalNotificationsCreated += notificationsCreated;
-          processedItems.push({
-            type: 'placement',
-            id: placementId,
-            company: partnerCompany,
-            deadline: deadlineLocal.toISOString(),
-            notificationsSent: notificationsCreated,
-          });
+  if (daysUntilDeadline === 3) {
+    const title = `⏰ Placement Deadline Reminder`;
+    const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const body = `${partnerCompany} placement - Deadline in 3 days: ${formattedDate}`;
 
-          if (notificationsCreated > 0) {
-            await sendFCMNotifications(allUserIds, title, body, {
-              type: "deadline_reminder",
-              placementId,
-              partnerCompany,
-              daysUntilDeadline: "3",
-            });
-            console.log(`✅ Sent ${notificationsCreated} notifications for placement ${placementId}`);
-          }
-        }
+    const notificationsCreated = await createNotificationsForUsers(
+      allUserIds,
+      "user",
+      title,
+      body,
+      "deadline_reminder",
+      {
+        placementId,
+        partnerCompany,
+        deadline: deadlineLocal.toISOString(),
+        daysUntilDeadline: "3",
+        reminderDate: reminderDateKey,
       }
+    );
+
+    totalNotificationsCreated += notificationsCreated;
+    processedItems.push({
+      type: 'placement',
+      id: placementId,
+      company: partnerCompany,
+      deadline: deadlineLocal.toISOString(),
+      notificationsSent: notificationsCreated,
+    });
+
+    // ✅ FIX: Send FCM INSIDE the loop for EACH item
+   if (notificationsCreated > 0) {
+  await sendFCMNotifications(
+    allUserIds, 
+    title, 
+    body, 
+    {
+      type: "deadline_reminder",
+      placementId, // or scholarshipId, placementId
+      partnerCompany,
+      daysUntilDeadline: "3",
+    },
+    "user" // ✅ Mobile app will only show if current user has role "user"
+  );
+}
+  }
+}
 
       console.log(
         `✅ Done. Created ${totalNotificationsCreated} notifications in total.`
@@ -1045,6 +1074,7 @@ export const onEscalationCreated = onDocumentCreated(
         }
       );
 
+       if (staffNotifications > 0) {
       await sendFCMNotifications(
         staffIds,
         notificationTitle,
@@ -1053,9 +1083,12 @@ export const onEscalationCreated = onDocumentCreated(
           type: "new_escalation",
           escalationId: escalationId,
           conversationId: conversationId || "",
-        }
+        },
+        "staff" // ✅ Mobile app will only show if current user has role "staff"
       );
+    }
 
+      if (adminNotifications > 0) {
       await sendFCMNotifications(
         adminIds,
         notificationTitle,
@@ -1064,8 +1097,10 @@ export const onEscalationCreated = onDocumentCreated(
           type: "new_escalation",
           escalationId: escalationId,
           conversationId: conversationId || "",
-        }
+        },
+        "admin" // ✅ Mobile app will only show if current user has role "admin"
       );
+    }
 
       console.log(
         `✅ Notifications sent with escalationId: ${escalationId}, conversationId: ${conversationId}`
@@ -1199,6 +1234,7 @@ export const onEscalationReplied = onDocumentUpdated(
         }
       );
 
+if (notificationsCreated > 0) {
       await sendFCMNotifications(
         [userId],
         notificationTitle,
@@ -1207,8 +1243,10 @@ export const onEscalationReplied = onDocumentUpdated(
           type: "escalation_reply",
           escalationId,
           conversationId: conversationId || "",
-        }
+        },
+        "user" // ✅ Mobile app will only show if current user has role "user"
       );
+    }
 
       console.log(
         `✅ Reply notification sent (${responderRole}) with escalationId: ${escalationId}`

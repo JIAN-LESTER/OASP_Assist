@@ -5,6 +5,7 @@ class InquiryReportsData {
   final int answeredMessages;
   final int unAnsweredMessages;
   final int escalatedMessages;
+  final int resolvedEscalatedMessages;
   final String mostFrequentCategory;
   final Map<String, int> categoryDistribution;
   final List<ChartData> inquiryTrend;
@@ -19,6 +20,7 @@ class InquiryReportsData {
     required this.answeredMessages,
     required this.unAnsweredMessages,
     required this.escalatedMessages,
+    required this.resolvedEscalatedMessages,
     required this.mostFrequentCategory,
     required this.categoryDistribution,
     required this.inquiryTrend,
@@ -37,6 +39,7 @@ InquiryReportsData getEmptyInquiryReportsData() {
       answeredMessages: 0,
       unAnsweredMessages: 0,
       escalatedMessages: 0,
+      resolvedEscalatedMessages: 0,
       mostFrequentCategory: 'Unknown',
       categoryDistribution: {},
       inquiryTrend: [],

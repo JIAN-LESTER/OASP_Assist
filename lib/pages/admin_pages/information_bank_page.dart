@@ -474,13 +474,7 @@ Widget _buildMobileHeader(
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          buildStatCard(
-            'Latest Upload',
-            ib?.latestUpload ?? "Unknown",
-            Colors.red,
-            Icons.group,
-          ),
+          
         ],
       ),
       const SizedBox(height: 16),

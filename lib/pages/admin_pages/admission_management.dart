@@ -1,3 +1,4 @@
+import 'package:capstone_project/modal_pages/add_edit_admission.dart';
 import 'package:capstone_project/modal_pages/add_edit_scholarship.dart';
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:capstone_project/pages/data/statcard_management.dart';
@@ -155,6 +156,26 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
       ),
     );
   }
+}
+
+// Helper function to format academic year
+String _formatAcademicYear(dynamic academicYear) {
+  if (academicYear == null) return 'N/A';
+  
+  if (academicYear is Map) {
+    final start = academicYear['start'];
+    final end = academicYear['end'];
+    
+    if (start != null && end != null) {
+      return '$start-$end';
+    } else if (start != null) {
+      return '$start';
+    }
+  } else if (academicYear is String) {
+    return academicYear;
+  }
+  
+  return 'N/A';
 }
 
 // Desktop Admission Management
@@ -478,29 +499,28 @@ Widget _buildAdmissionList({
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
   // Filtering
-  final filtered =
-      allAdmissions.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final title = (data['title'] ?? '').toString().toLowerCase().trim();
-        final academicYear =
-            (data['academicYear'] ?? '').toString().toLowerCase().trim();
-        final query = searchQuery.toLowerCase().trim();
-        final yearFilter = selectedYear.toLowerCase().trim();
+  final filtered = allAdmissions.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final title = (data['title'] ?? '').toString().toLowerCase().trim();
+    final academicYearData = data['academicYear'];
+    final academicYear = _formatAcademicYear(academicYearData).toLowerCase().trim();
+    final query = searchQuery.toLowerCase().trim();
+    final yearFilter = selectedYear.toLowerCase().trim();
 
-        // Filter by selected year (if not "All Year")
-        bool matchesYear =
-            yearFilter == 'all year' ||
-            yearFilter == 'all' ||
-            academicYear == yearFilter;
+    // Filter by selected year (if not "All Year")
+    bool matchesYear =
+        yearFilter == 'all year' ||
+        yearFilter == 'all' ||
+        academicYear == yearFilter;
 
-        // Search filter (check if search matches title or academicYear)
-        bool matchesSearch =
-            query.isEmpty ||
-            title.contains(query) ||
-            academicYear.contains(query);
+    // Search filter (check if search matches title or academicYear)
+    bool matchesSearch =
+        query.isEmpty ||
+        title.contains(query) ||
+        academicYear.contains(query);
 
-        return matchesYear && matchesSearch;
-      }).toList();
+    return matchesYear && matchesSearch;
+  }).toList();
 
   // Calculate pagination
   final totalItems = filtered.length;
@@ -543,9 +563,9 @@ Widget _buildAdmissionList({
                       doc: doc,
                       title: data['title'] ?? 'N/A',
                       source: data['source'] ?? 'N/A',
-                      content: data['content'],
+                      content: data['content'] ?? '',
                       contacts: contacts,
-                      academicYear: data['academicYear'] ?? '-',
+                      academicYear: _formatAcademicYear(data['academicYear']),
                     );
                   },
                 ),
@@ -690,7 +710,7 @@ Widget _buildAdmissionRow({
                   context: context,
                   builder:
                       (context) =>
-                          ScholarshipFormDialog(doc: doc, isEdit: true),
+                          AdmissionFormDialog(doc: doc, isEdit: true),
                 );
               } else if (value == 'delete') {
                 showDeleteConfirmation(

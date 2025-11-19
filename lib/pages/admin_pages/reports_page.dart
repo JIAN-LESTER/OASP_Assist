@@ -510,7 +510,7 @@ Widget buildChartCardSkeleton({bool isMobile = false}) {
 // Updated widget signatures to include isLoading
 class DesktopDashboard extends StatelessWidget {
   final String selectedTimeFrame;
-  final String selectedReportType;x``
+  final String selectedReportType;
   final ValueChanged<String> onTimeFrameChanged;
   final ValueChanged<String> onReportTypeChanged;
   final VoidCallback onRefresh;
@@ -856,8 +856,8 @@ List<Widget> buildInquiryTrendsReport(
         children: [
           Expanded(
             child: buildStatCard(
-              'Unanswered Messages',
-              '${data?.unAnsweredMessages ?? 0}',
+              'Escalated Messages',
+              '${data?.escalatedMessages ?? 0}',
               Colors.red,
               Icons.people,
             ),
@@ -865,8 +865,8 @@ List<Widget> buildInquiryTrendsReport(
           const SizedBox(width: 12),
           Expanded(
             child: buildStatCard(
-              'Escalated Messages',
-              data?.escalatedMessages.toString() ?? '0',
+              'Resolved Messages',
+              data?.resolvedEscalatedMessages.toString() ?? '0',
               Colors.orange,
               Icons.help,
             ),
@@ -924,8 +924,8 @@ List<Widget> buildInquiryTrendsReport(
           const SizedBox(width: 20),
           Expanded(
             child: buildStatCard(
-              'Unanswered Messages',
-              '${data?.unAnsweredMessages ?? 0}',
+              'Escalated Messages',
+              '${data?.escalatedMessages ?? 0}',
               Colors.red,
               Icons.people,
             ),
@@ -933,12 +933,13 @@ List<Widget> buildInquiryTrendsReport(
           const SizedBox(width: 20),
           Expanded(
             child: buildStatCard(
-              'Escalated Messages',
-              data?.escalatedMessages.toString() ?? '0',
+              'Resolved Messages',
+              data?.resolvedEscalatedMessages.toString() ?? '0',
               Colors.orange,
               Icons.help,
             ),
           ),
+      
         ],
       ),
     ),
@@ -1086,7 +1087,7 @@ List<Widget> buildChatbotUsageReport(
       ),
       const SizedBox(height: 16),
       SizedBox(
-        height: 350,
+        height: 400,
         child: buildPeakUsageHoursCard(data?.peakUsageByHour ?? <int, int>{}),
       ),
       const SizedBox(height: 16),

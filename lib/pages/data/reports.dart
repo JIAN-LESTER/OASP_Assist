@@ -142,6 +142,7 @@ class FirebaseService {
         _getFAQs(),
         _getLogs(),
         _getEscalatedMessages(),
+        _getResolvedEscalatedMessages(),
         _getUnansweredMessages(),
         _getMessageLogs(),
       ]);
@@ -151,8 +152,9 @@ class FirebaseService {
         faqs: results[1],
         logs: results[2],
         escalations: results[3],
-        unanswered: results[4],
-        msgLogs: results[5],
+        resolvedEscalations: results[4],
+        unanswered: results[5],
+        msgLogs: results[6],
         startDate: startDate,
         timeFrame: timeFrame,
       );
@@ -300,6 +302,12 @@ class FirebaseService {
     return snapshot.docs;
   }
 
+    Future<List<QueryDocumentSnapshot>> _getResolvedEscalatedMessages() async {
+    final snapshot = await _firestore.collection('escalations').where('status', isEqualTo: 'resolved').get();
+    return snapshot.docs;
+  }
+
+
   Future<List<QueryDocumentSnapshot>> _getFAQs() async {
     final snapshot =
         await _firestore
@@ -387,6 +395,7 @@ class FirebaseService {
 
     required List<QueryDocumentSnapshot> logs,
     required List<QueryDocumentSnapshot> escalations,
+    required List<QueryDocumentSnapshot> resolvedEscalations,
     required List<QueryDocumentSnapshot> unanswered,
     required List<QueryDocumentSnapshot> msgLogs,
     required DateTime startDate,
@@ -440,6 +449,7 @@ class FirebaseService {
       answeredMessages: answeredMessages,
       unAnsweredMessages: unAnsweredMessages,
       escalatedMessages: escalations.length,
+      resolvedEscalatedMessages: resolvedEscalations.length,
       mostFrequentCategory: _getMostFrequentCategory(categoryDistribution),
       categoryDistribution: categoryDistribution,
       inquiryTrend: generateInquiryTrend(messages, startDate, timeFrame),
