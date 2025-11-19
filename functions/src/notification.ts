@@ -434,8 +434,7 @@ export const onAnnouncementCreated = onDocumentCreated(
 
 export const checkUpcomingDeadlines = onSchedule(
   {
-    // schedule: "0 6,18 * * *",
-    schedule: "57 19 * * *",
+    schedule: "0 6,18 * * *",
     timeZone: "Asia/Manila",
   },
   async (event) => {

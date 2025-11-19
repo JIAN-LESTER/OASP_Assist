@@ -76,98 +76,132 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
     return '${date.day}/${date.month}/${date.year} at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _sendReply() async {
-    if (_replyController.text.trim().isEmpty) {
-      _showSnackBar('Please enter a response', Colors.red);
-      return;
-    }
-
-    final data = widget.escalationData;
-    final question = data['question']?.toString() ?? 'unknown';
-    final userId = data['userId'] as String?;
-    final conversationId = data['conversationId'] as String?;
-
-    setState(() => _isSending = true);
-
-    try {
-      // ✅ Get current staff info
-      final currentUser = FirebaseAuth.instance.currentUser;
-      final staffDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser?.uid)
-          .get();
-      
-      final staffName = staffDoc.data()?['name'] ?? 'Staff';
-
-      // ✅ Update escalation status
-      await FirebaseFirestore.instance
-          .collection('escalations')
-          .doc(widget.escalationId)
-          .update({
-        'staffResponse': _replyController.text.trim(),
-        'status': 'resolved',
-        'respondedBy': staffName,
-        'respondedAt': Timestamp.now(),
-      });
-
-      print('✅ Escalation updated successfully');
-
-      // ✅ Create notification for the user
-      if (userId != null && userId.isNotEmpty) {
-        final notificationRef = FirebaseFirestore.instance.collection('notifications').doc();
-        
-        final userNotification = Notifications(
-          notificationId: notificationRef.id,
-          userId: userId,
-          title: 'Staff Response Received',
-          body: 'A staff member has responded to your escalated question: "$question"',
-          type: 'escalation_response',
-          relatedId: widget.escalationId,
-          targetRole: 'user',
-          read: false,
-          createdAt: Timestamp.now(),
-          data: {
-            'escalationId': widget.escalationId,
-            'conversationId': conversationId,
-            'staffResponse': _replyController.text.trim(),
-            'respondedBy': staffName,
-          },
-        );
-
-        await notificationRef.set(userNotification.toMap());
-        print('✅ User notification created');
-      }
-
-      // ✅ Show success message
-      if (mounted) {
-        _showSnackBar('Response sent successfully!', Colors.green);
-        HapticFeedback.lightImpact();
-      }
-
-      // ✅ Wait briefly, then close modal
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      if (mounted) {
-        // Close with animation
-        await _animationController.reverse();
-        if (mounted) {
-          Navigator.of(context).pop(true); // Return true to indicate success
-        }
-      }
-    } catch (e, stackTrace) {
-      print('❌ Error sending response: $e');
-      print('Stack trace: $stackTrace');
-      
-      if (mounted) {
-        _showSnackBar('Failed to send response: ${e.toString()}', Colors.red);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSending = false);
-      }
-    }
+ Future<void> _sendReply() async {
+  if (_replyController.text.trim().isEmpty) {
+    _showSnackBar('Please enter a response', Colors.red);
+    return;
   }
 
+  final data = widget.escalationData;
+  final question = data['question']?.toString() ?? 'unknown';
+  final userId = data['userId'] as String?;
+  final conversationId = data['conversationId'] as String?;
+
+  if (conversationId == null || conversationId.isEmpty) {
+    _showSnackBar('Invalid conversation ID', Colors.red);
+    return;
+  }
+
+  setState(() => _isSending = true);
+
+  try {
+    // Get current staff info
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final staffDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUser?.uid)
+        .get();
+    
+    final staffName = staffDoc.data()?['name'] ?? 'Staff';
+    final staffResponse = _replyController.text.trim();
+
+    // ✅ FIX: Create a batch write to ensure atomicity
+    final batch = FirebaseFirestore.instance.batch();
+
+    // Step 1: Update escalation status
+    final escalationRef = FirebaseFirestore.instance
+        .collection('escalations')
+        .doc(widget.escalationId);
+    
+    batch.update(escalationRef, {
+      'staffResponse': staffResponse,
+      'status': 'resolved',
+      'respondedBy': staffName,
+      'respondedAt': Timestamp.now(),
+    });
+
+    // ✅ Step 2: Create staff message in the conversation
+    final staffMessageRef = FirebaseFirestore.instance
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .doc();
+
+    final staffMessageContent = '**Staff Response from $staffName:**\n\n$staffResponse';
+
+    batch.set(staffMessageRef, {
+      'messageID': staffMessageRef.id,
+      'conversationID': conversationId,
+      'content': staffMessageContent,
+      'sender': 'staff',
+      'userID': userId ?? '',
+      'message_status': 'sent',
+      'message_type': 'text',
+      'sent_at': Timestamp.now(),
+      'responded_at': Timestamp.now(),
+      'isAnswered': true,
+      'category': 'Escalation Response',
+    });
+
+    // Step 3: Create notification for the user
+    if (userId != null && userId.isNotEmpty) {
+      final notificationRef = FirebaseFirestore.instance
+          .collection('notifications')
+          .doc();
+      
+      batch.set(notificationRef, {
+        'notificationId': notificationRef.id,
+        'userId': userId,
+        'title': 'Staff Response Received',
+        'body': 'A staff member has responded to your escalated question: "$question"',
+        'type': 'escalation_response',
+        'relatedId': widget.escalationId,
+        'targetRole': 'user',
+        'read': false,
+        'createdAt': Timestamp.now(),
+        'data': {
+          'escalationId': widget.escalationId,
+          'conversationId': conversationId,
+          'staffResponse': staffResponse,
+          'respondedBy': staffName,
+        },
+      });
+    }
+
+    // ✅ Commit all changes at once
+    await batch.commit();
+
+    print('✅ Escalation resolved and message created');
+    print('   - Escalation ID: ${widget.escalationId}');
+    print('   - Conversation ID: $conversationId');
+    print('   - Staff Message ID: ${staffMessageRef.id}');
+
+    if (mounted) {
+      _showSnackBar('Response sent successfully!', Colors.green);
+      HapticFeedback.lightImpact();
+    }
+
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    if (mounted) {
+      await _animationController.reverse();
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    }
+  } catch (e, stackTrace) {
+    print('❌ Error sending response: $e');
+    print('Stack trace: $stackTrace');
+    
+    if (mounted) {
+      _showSnackBar('Failed to send response: ${e.toString()}', Colors.red);
+    }
+  } finally {
+    if (mounted) {
+      setState(() => _isSending = false);
+    }
+  }
+}
   void _showSnackBar(String message, Color color) {
     if (!mounted) return;
     

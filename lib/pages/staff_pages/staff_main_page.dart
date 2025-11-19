@@ -100,9 +100,9 @@ class _StaffMainPageState extends State<StaffMainPage> {
 
   List<Widget> _getPages() {
     return [
-      // const StaffDashboardPage(),
-      // const StaffReportsPage(),
-      // ✅ Pass the stored escalation details to HumanEscalation
+      const StaffDashboardPage(),
+      const StaffReportsPage(),
+   
       HumanEscalation(
         key: ValueKey('escalation_$_escalationId'), // ✅ Force rebuild when escalationId changes
         initialEscalationId: _escalationId,

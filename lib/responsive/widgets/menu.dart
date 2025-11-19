@@ -541,15 +541,14 @@ class UniversalUIComponents {
           );
 
           // Add New Chat and Chat History section
-          menuItems.add(
-            _buildNewChatAndHistorySection(
-              context,
-              recentConversations ?? [],
-              selectedConversationId,
-              onConversationSelected,
-              setDrawerState,
-            ),
-          );
+        menuItems.add(
+  _buildNewChatAndHistorySection(
+    context,
+    selectedConversationId,
+    onConversationSelected,
+    setDrawerState,
+  ),
+);
         }
       } else {
         menuItems.add(
@@ -824,300 +823,336 @@ class UniversalUIComponents {
     );
   }
 
-  static Widget _buildNewChatAndHistorySection(
-    BuildContext context,
-    List<Map<String, dynamic>> recentConversations,
-    String? selectedConversationId,
-    Function(BuildContext, String?)? onConversationSelected,
-    StateSetter? setDrawerState,
-  ) {
-    bool isExpanded = UserConstant.isOASPAssistExpanded;
+static Widget _buildNewChatAndHistorySection(
+  BuildContext context,
+  String? selectedConversationId,
+  Function(BuildContext, String?)? onConversationSelected,
+  StateSetter? setDrawerState,
+) {
+  bool isExpanded = UserConstant.isOASPAssistExpanded;
 
-    return StatefulBuilder(
-      builder: (context, setLocalState) {
-        return Column(
-          children: [
-            // New Chat Button
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              height: 44,
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    Navigator.of(context).pop(); // Close drawer
+  return StatefulBuilder(
+    builder: (context, setLocalState) {
+      return Column(
+        children: [
+          // New Chat Button
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            height: 44,
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  HapticFeedback.mediumImpact();
+                  Navigator.of(context).pop();
+                  await Future.delayed(Duration(milliseconds: 300));
 
-                    // ✅ FIX: Wait for drawer animation
-                    await Future.delayed(Duration(milliseconds: 300));
-
-                    if (context.mounted) {
-                      // ✅ Find parent state and call method
-                      final parentState =
-                          context.findAncestorStateOfType<State>();
-                      if (parentState != null && parentState is dynamic) {
-                        if (parentState.widget.runtimeType.toString() ==
-                            '_UserMainPageState') {
-                          await (parentState as dynamic)._onNewChatPressed();
-                        }
+                  if (context.mounted) {
+                    final parentState = context.findAncestorStateOfType<State>();
+                    if (parentState != null && parentState is dynamic) {
+                      if (parentState.widget.runtimeType.toString() == '_UserMainPageState') {
+                        await (parentState as dynamic)._onNewChatPressed();
                       }
                     }
-                  },
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text(
-                    'New Chat',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  }
+                },
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text(
+                  'New Chat',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: UniversalUIComponents.primaryGreen,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: UniversalUIComponents.primaryGreen,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 0,
-                  ),
+                  elevation: 0,
                 ),
               ),
             ),
+          ),
 
-            // ... rest of chat history section (keep existing code)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  dividerColor: Colors.transparent,
-                  expansionTileTheme: ExpansionTileThemeData(
-                    backgroundColor: Colors.transparent,
-                    collapsedBackgroundColor: Colors.transparent,
+          // Chat History with StreamBuilder
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                dividerColor: Colors.transparent,
+                expansionTileTheme: ExpansionTileThemeData(
+                  backgroundColor: Colors.transparent,
+                  collapsedBackgroundColor: Colors.transparent,
+                  tilePadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 0,
+                  ),
+                  childrenPadding: const EdgeInsets.only(left: 0, top: 4),
+                  iconColor: Colors.grey[600],
+                  collapsedIconColor: Colors.grey[600],
+                  textColor: Colors.grey[700],
+                  collapsedTextColor: Colors.grey[700],
+                  expansionAnimationStyle: AnimationStyle(
+                    duration: Duration.zero,
+                  ),
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: ExpansionTile(
+                    minTileHeight: 44,
                     tilePadding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 0,
                     ),
-                    childrenPadding: const EdgeInsets.only(left: 0, top: 4),
-                    iconColor: Colors.grey[600],
-                    collapsedIconColor: Colors.grey[600],
-                    textColor: Colors.grey[700],
-                    collapsedTextColor: Colors.grey[700],
-                    expansionAnimationStyle: AnimationStyle(
-                      duration: Duration.zero,
+                    leading: Container(
+                      width: 20,
+                      height: 20,
+                      margin: const EdgeInsets.only(left: 12),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.history,
+                        color: Colors.grey[600],
+                        size: 20,
+                      ),
                     ),
-                  ),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: ExpansionTile(
-                      minTileHeight: 44,
-                      tilePadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 0,
-                      ),
-                      leading: Container(
-                        width: 20,
-                        height: 20,
-                        margin: const EdgeInsets.only(left: 12),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Icons.history,
-                          color: Colors.grey[600],
-                          size: 20,
+                    title: Container(
+                      margin: const EdgeInsets.only(left: 4),
+                      child: Text(
+                        'Chat History',
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w400,
+                          fontSize: 14,
                         ),
                       ),
-                      title: Container(
-                        margin: const EdgeInsets.only(left: 4),
-                        child: Text(
-                          'Chat History',
-                          style: TextStyle(
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.w400,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      initiallyExpanded: isExpanded,
-                      onExpansionChanged: (expanded) {
-                        setDrawerState?.call(() {
-                          UserConstant.isOASPAssistExpanded = expanded;
-                        });
-                        setLocalState(() {
-                          isExpanded = expanded;
-                        });
-                      },
-                      children: [
-                        _buildChatHistoryList(
-                          context,
-                          recentConversations,
-                          selectedConversationId,
-                          onConversationSelected,
-                        ),
-                      ],
                     ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  static Widget _buildChatHistoryList(
-    BuildContext context,
-    List<Map<String, dynamic>> conversations,
-    String? selectedConversationId,
-    Function(BuildContext, String?)? onConversationSelected,
-  ) {
-    if (conversations.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.chat_outlined, color: Colors.grey[400], size: 30),
-              const SizedBox(height: 8),
-              Text(
-                'No conversations yet',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 200),
-      child: ListView.builder(
-        shrinkWrap: true,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        itemCount: conversations.length,
-        itemBuilder: (context, index) {
-          final conv = conversations[index];
-          final isSelected = conv['id'] == selectedConversationId;
-
-          return Container(
-            margin: const EdgeInsets.symmetric(vertical: 2),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color:
-                  isSelected
-                      ? primaryGreen.withOpacity(0.1)
-                      : Colors.transparent,
-              border:
-                  isSelected
-                      ? Border.all(
-                        color: primaryGreen.withOpacity(0.3),
-                        width: 1,
-                      )
-                      : null,
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () async {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).pop(); // Close drawer
-
-                  // Set the selected conversation
-                  await UserConstant.setSelectedConversation(conv['id']);
-
-                  // SAFELY call the parent's callback - only if provided
-                  if (onConversationSelected != null && context.mounted) {
-                    await Future.delayed(Duration(milliseconds: 100));
-                    onConversationSelected(context, conv['id']);
-                  } else {
-                    // Fallback: If no callback provided, just log
-                    print('DEBUG: No conversation selection callback provided');
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  child: Row(
+                    initiallyExpanded: isExpanded,
+                    onExpansionChanged: (expanded) {
+                      setDrawerState?.call(() {
+                        UserConstant.isOASPAssistExpanded = expanded;
+                      });
+                      setLocalState(() {
+                        isExpanded = expanded;
+                      });
+                    }, // <-- **Missing closing parenthesis and semicolon added here**
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color:
-                              isSelected
-                                  ? primaryGreen.withOpacity(0.2)
-                                  : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Icon(
-                          Icons.chat_bubble_outline,
-                          color:
-                              isSelected ? Colors.green[700] : Colors.grey[500],
-                          size: 14,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          conv['title'] ?? 'Untitled',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight:
-                                isSelected ? FontWeight.w600 : FontWeight.w400,
-                            color:
-                                isSelected
-                                    ? Colors.green[800]
-                                    : Colors.grey[700],
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      PopupMenuButton<String>(
-                        icon: Icon(
-                          Icons.more_vert,
-                          size: 18,
-                          color: Colors.grey[600],
-                        ),
-                        padding: EdgeInsets.zero,
-                        onSelected: (value) {
-                          if (value == 'delete') {
-                            _deleteConversation(context, conv['id']);
-                          }
-                        },
-                        itemBuilder:
-                            (context) => [
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.delete_outline,
-                                      color: Colors.red,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Delete',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                      _buildChatHistoryList(
+                        context,
+                        [], // Empty list since StreamBuilder handles data
+                        selectedConversationId,
+                        onConversationSelected,
                       ),
                     ],
                   ),
                 ),
               ),
             ),
-          );
-        },
+          ),
+        ],
+      );
+    },
+  );
+}
+
+ static Widget _buildChatHistoryList(
+  BuildContext context,
+  List<Map<String, dynamic>> conversations,
+  String? selectedConversationId,
+  Function(BuildContext, String?)? onConversationSelected,
+) {
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  
+  if (userId == null) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      child: Center(
+        child: Text(
+          'Please log in',
+          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+        ),
       ),
     );
   }
+
+  return StreamBuilder<QuerySnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('conversations')
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
+              ),
+            ),
+          ),
+        );
+      }
+
+      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.chat_outlined, color: Colors.grey[400], size: 30),
+                const SizedBox(height: 8),
+                Text(
+                  'No conversations yet',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      final conversations = snapshot.data!.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return {
+          'id': doc.id,
+          'title': data['title'] ?? 'Untitled',
+          'status': data['status'] ?? 'unknown',
+          'createdAt': data['createdAt'],
+        };
+      }).toList();
+
+      return Container(
+        constraints: const BoxConstraints(maxHeight: 200),
+        child: ListView.builder(
+          shrinkWrap: true,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          itemCount: conversations.length,
+          itemBuilder: (context, index) {
+            final conv = conversations[index];
+            final isSelected = conv['id'] == UserConstant.selectedConversationId;
+
+            return Container(
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: isSelected
+                    ? primaryGreen.withOpacity(0.1)
+                    : Colors.transparent,
+                border: isSelected
+                    ? Border.all(
+                        color: primaryGreen.withOpacity(0.3),
+                        width: 1,
+                      )
+                    : null,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () async {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(context).pop(); // Close drawer
+
+                    await UserConstant.setSelectedConversation(conv['id']);
+
+                    if (onConversationSelected != null && context.mounted) {
+                      await Future.delayed(Duration(milliseconds: 100));
+                      onConversationSelected(context, conv['id']);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? primaryGreen.withOpacity(0.2)
+                                : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(
+                            Icons.chat_bubble_outline,
+                            color: isSelected
+                                ? Colors.green[700]
+                                : Colors.grey[500],
+                            size: 14,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            conv['title'] ?? 'Untitled',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              color: isSelected
+                                  ? Colors.green[800]
+                                  : Colors.grey[700],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        PopupMenuButton<String>(
+                          icon: Icon(
+                            Icons.more_vert,
+                            size: 18,
+                            color: Colors.grey[600],
+                          ),
+                          padding: EdgeInsets.zero,
+                          onSelected: (value) {
+                            if (value == 'delete') {
+                              _deleteConversation(context, conv['id']);
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.red,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Delete',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    },
+  );
+}
 
   static Future<void> _deleteConversation(
     BuildContext context,

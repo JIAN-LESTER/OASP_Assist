@@ -931,8 +931,8 @@ Widget dashboardContents(
                     const SizedBox(width: 12),
                     Expanded(
                       child: buildStatCard(
-                        'Answered Messages',
-                        '$answeredMessages',
+                        'Escalated Messages',
+                        '$escalatedMessages',
                         Colors.green,
                         Icons.check_circle,
                       ),
@@ -944,8 +944,8 @@ Widget dashboardContents(
                   children: [
                     Expanded(
                       child: buildStatCard(
-                        'Escalated Messages',
-                        '$escalatedMessages',
+                        'Resolved Escalated Messages',
+                        '${inq?.resolvedEscalatedMessages ?? 0}',
                         Colors.red,
                         Icons.people,
                       ),
@@ -968,20 +968,20 @@ Widget dashboardContents(
                 SizedBox(width: isTablet ? 12 : 20),
                 Expanded(
                   child: buildStatCard(
-                    'Answered Messages',
-                    '$answeredMessages',
-                    Colors.green,
-                    Icons.check_circle,
-                  ),
+                        'Escalated Messages',
+                        '$escalatedMessages',
+                        Colors.green,
+                        Icons.check_circle,
+                      ),
                 ),
                 SizedBox(width: isTablet ? 12 : 20),
                 Expanded(
                   child: buildStatCard(
-                    'Escalated Messages',
-                    '$escalatedMessages',
-                    Colors.red,
-                    Icons.people,
-                  ),
+                        'Resolved Escalated Messages',
+                        '${inq?.resolvedEscalatedMessages ?? 0}',
+                        Colors.red,
+                        Icons.people,
+                      ),
                 ),
               ],
             );

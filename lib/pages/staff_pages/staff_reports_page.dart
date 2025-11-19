@@ -13,36 +13,24 @@ import 'package:capstone_project/pages/data/reports.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 
-class ReportsPage extends StatefulWidget {
-  const ReportsPage({super.key});
+class StaffReportsPage extends StatefulWidget {
+  const StaffReportsPage({super.key});
 
   @override
-  State<ReportsPage> createState() => _ReportsPageState();
+  State<StaffReportsPage> createState() => _StaffReportsPageState();
 }
 
-class _ReportsPageState extends State<ReportsPage> {
+class _StaffReportsPageState extends State<StaffReportsPage> {
   String selectedTimeFrame = 'This Month';
-  String selectedReportType = 'Inquiry Trends';
   final currentUser = FirebaseAuth.instance.currentUser;
   final FirebaseService _firebaseService = FirebaseService();
 
-  // Separate data for each report type
   InquiryReportsData? inq;
-  ChatbotUsageReportsData? cb;
-  UserDemographicsReportsData? ud;
   String? userName;
 
-  // Separate loading states for each report type
   bool isLoadingUser = true;
   bool isLoadingInquiry = false;
-  bool isLoadingChatbot = false;
-  bool isLoadingDemographics = false;
   bool isRefreshing = false;
-
-  // Track which data has been loaded
-  bool inquiryDataLoaded = false;
-  bool chatbotDataLoaded = false;
-  bool demographicsDataLoaded = false;
 
   DateTime startDate = DateTime.now();
   String timeFrame = "This Month";
@@ -52,10 +40,9 @@ class _ReportsPageState extends State<ReportsPage> {
   void initState() {
     super.initState();
     _loadUserName();
-    _loadDataForSelectedReport();
+    _loadInquiryData();
   }
 
-  // ✅ Load user name first (always needed)
   Future<void> _loadUserName() async {
     if (!mounted) return;
     
@@ -68,137 +55,44 @@ class _ReportsPageState extends State<ReportsPage> {
     });
   }
 
-  // ✅ LAZY LOADING: Only load data for the selected report type
-  Future<void> _loadDataForSelectedReport() async {
+  Future<void> _loadInquiryData() async {
     if (!mounted) return;
 
-    switch (selectedReportType) {
-      case 'Inquiry Trends':
-        if (!inquiryDataLoaded) {
-          setState(() => isLoadingInquiry = true);
-          try {
-            final data = await _firebaseService.getInquiryReportsData(selectedTimeFrame);
-            if (!mounted) return;
-            setState(() {
-              inq = data;
-              isLoadingInquiry = false;
-              inquiryDataLoaded = true;
-            });
-          } catch (e) {
-            print('Error loading inquiry data: $e');
-            if (!mounted) return;
-            setState(() => isLoadingInquiry = false);
-          }
-        }
-        break;
-
-      case 'Chatbot Usage':
-        if (!chatbotDataLoaded) {
-          setState(() => isLoadingChatbot = true);
-          try {
-            final data = await _firebaseService.getChatbotUsageReportsData(selectedTimeFrame);
-            if (!mounted) return;
-            setState(() {
-              cb = data;
-              isLoadingChatbot = false;
-              chatbotDataLoaded = true;
-            });
-          } catch (e) {
-            print('Error loading chatbot data: $e');
-            if (!mounted) return;
-            setState(() => isLoadingChatbot = false);
-          }
-        }
-        break;
-
-      case 'User Demographics':
-        if (!demographicsDataLoaded) {
-          setState(() => isLoadingDemographics = true);
-          try {
-            final data = await _firebaseService.getUserDemographicsReportsData(selectedTimeFrame);
-            if (!mounted) return;
-            setState(() {
-              ud = data;
-              isLoadingDemographics = false;
-              demographicsDataLoaded = true;
-            });
-          } catch (e) {
-            print('Error loading demographics data: $e');
-            if (!mounted) return;
-            setState(() => isLoadingDemographics = false);
-          }
-        }
-        break;
+    setState(() => isLoadingInquiry = true);
+    try {
+      final data = await _firebaseService.getInquiryReportsData(selectedTimeFrame);
+      if (!mounted) return;
+      setState(() {
+        inq = data;
+        isLoadingInquiry = false;
+      });
+    } catch (e) {
+      print('Error loading inquiry data: $e');
+      if (!mounted) return;
+      setState(() => isLoadingInquiry = false);
     }
   }
 
-  // ✅ When report type changes, load only that data
-  void _onReportTypeChanged(String newValue) {
-    setState(() {
-      selectedReportType = newValue;
-    });
-    _loadDataForSelectedReport();
-  }
-
-  // ✅ When timeframe changes, invalidate and reload current report
   void _onTimeFrameChanged(String newValue) {
     setState(() {
       selectedTimeFrame = newValue;
-      
-      // Invalidate loaded data flags to force reload
-      switch (selectedReportType) {
-        case 'Inquiry Trends':
-          inquiryDataLoaded = false;
-          break;
-        case 'Chatbot Usage':
-          chatbotDataLoaded = false;
-          break;
-        case 'User Demographics':
-          demographicsDataLoaded = false;
-          break;
-      }
     });
-    _loadDataForSelectedReport();
+    _loadInquiryData();
   }
 
-  // ✅ Refresh only the currently visible report
   Future<void> _refreshData() async {
     if (!mounted || isRefreshing) return;
 
     setState(() => isRefreshing = true);
 
     try {
-      // Only refresh the selected report type
-      switch (selectedReportType) {
-        case 'Inquiry Trends':
-          final data = await _firebaseService.getInquiryReportsData(selectedTimeFrame);
-          if (!mounted) return;
-          setState(() {
-            inq = data;
-            isRefreshing = false;
-          });
-          break;
+      final data = await _firebaseService.getInquiryReportsData(selectedTimeFrame);
+      if (!mounted) return;
+      setState(() {
+        inq = data;
+        isRefreshing = false;
+      });
 
-        case 'Chatbot Usage':
-          final data = await _firebaseService.getChatbotUsageReportsData(selectedTimeFrame);
-          if (!mounted) return;
-          setState(() {
-            cb = data;
-            isRefreshing = false;
-          });
-          break;
-
-        case 'User Demographics':
-          final data = await _firebaseService.getUserDemographicsReportsData(selectedTimeFrame);
-          if (!mounted) return;
-          setState(() {
-            ud = data;
-            isRefreshing = false;
-          });
-          break;
-      }
-
-      // Show success feedback
       if (mounted) {
         _showSnackBar(
           message: 'Reports refreshed successfully',
@@ -283,23 +177,8 @@ class _ReportsPageState extends State<ReportsPage> {
     }
   }
 
-  // ✅ Check if current report is loading
-  bool get isCurrentReportLoading {
-    switch (selectedReportType) {
-      case 'Inquiry Trends':
-        return isLoadingInquiry;
-      case 'Chatbot Usage':
-        return isLoadingChatbot;
-      case 'User Demographics':
-        return isLoadingDemographics;
-      default:
-        return false;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Only show loading spinner while user name is loading
     if (isLoadingUser) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -309,14 +188,11 @@ class _ReportsPageState extends State<ReportsPage> {
     return ResponsiveLayout(
       mobileBody: MobileDashboard(
         selectedTimeFrame: selectedTimeFrame,
-        selectedReportType: selectedReportType,
         onTimeFrameChanged: _onTimeFrameChanged,
-        onReportTypeChanged: _onReportTypeChanged,
         onRefresh: _refreshData,
         isRefreshing: isRefreshing,
-        isLoading: isCurrentReportLoading,
+        isLoading: isLoadingInquiry,
         inq: inq,
-
         userName: userName!,
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
@@ -324,14 +200,11 @@ class _ReportsPageState extends State<ReportsPage> {
       ),
       tabletBody: TabletDashboard(
         selectedTimeFrame: selectedTimeFrame,
-        selectedReportType: selectedReportType,
         onTimeFrameChanged: _onTimeFrameChanged,
-        onReportTypeChanged: _onReportTypeChanged,
         onRefresh: _refreshData,
         isRefreshing: isRefreshing,
-        isLoading: isCurrentReportLoading,
+        isLoading: isLoadingInquiry,
         inq: inq,
-
         userName: userName!,
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
@@ -339,14 +212,11 @@ class _ReportsPageState extends State<ReportsPage> {
       ),
       desktopBody: DesktopDashboard(
         selectedTimeFrame: selectedTimeFrame,
-        selectedReportType: selectedReportType,
         onTimeFrameChanged: _onTimeFrameChanged,
-        onReportTypeChanged: _onReportTypeChanged,
         onRefresh: _refreshData,
         isRefreshing: isRefreshing,
-        isLoading: isCurrentReportLoading,
+        isLoading: isLoadingInquiry,
         inq: inq,
-
         userName: userName!,
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
@@ -356,7 +226,7 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 }
 
-// ✅ Skeleton Loader Widget
+// Skeleton Loader Widget
 class SkeletonLoader extends StatefulWidget {
   final double height;
   final double? width;
@@ -428,7 +298,7 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
   }
 }
 
-// ✅ Skeleton for Stat Cards
+// Skeleton for Stat Cards
 Widget buildStatCardSkeleton({bool isMobile = false}) {
   return Container(
     padding: EdgeInsets.all(isMobile ? 12 : 16),
@@ -470,7 +340,7 @@ Widget buildStatCardSkeleton({bool isMobile = false}) {
   );
 }
 
-// ✅ Skeleton for Chart Cards
+// Skeleton for Chart Cards
 Widget buildChartCardSkeleton({bool isMobile = false}) {
   return Container(
     padding: EdgeInsets.all(isMobile ? 12 : 16),
@@ -504,17 +374,13 @@ Widget buildChartCardSkeleton({bool isMobile = false}) {
   );
 }
 
-// Updated widget signatures to include isLoading
 class DesktopDashboard extends StatelessWidget {
   final String selectedTimeFrame;
-  final String selectedReportType;
   final ValueChanged<String> onTimeFrameChanged;
-  final ValueChanged<String> onReportTypeChanged;
   final VoidCallback onRefresh;
   final bool isRefreshing;
   final bool isLoading;
   final InquiryReportsData? inq;
-
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -523,9 +389,7 @@ class DesktopDashboard extends StatelessWidget {
   const DesktopDashboard({
     super.key,
     required this.selectedTimeFrame,
-    required this.selectedReportType,
     required this.onTimeFrameChanged,
-    required this.onReportTypeChanged,
     required this.onRefresh,
     required this.isRefreshing,
     required this.isLoading,
@@ -547,28 +411,19 @@ class DesktopDashboard extends StatelessWidget {
           children: [
             buildHeader(
               selectedTimeFrame,
-              selectedReportType,
               onTimeFrameChanged,
-              onReportTypeChanged,
               onRefresh,
               isRefreshing,
               userName,
             ),
             const SizedBox(height: 32),
             
-            // ✅ Show skeleton loader for current report
             if (isLoading)
-              ...buildSkeletonReport(selectedReportType, isMobile: false)
+              ...buildSkeletonReport(isMobile: false)
             else
-              ...ReportsHelper.buildReportContent(
-                selectedReportType,
+              ...buildInquiryTrendsReport(
                 inq,
-
-                selectedTimeFrame,
-
-                startDate,
-                timeFrame,
-                timeCategoryCounts,
+                selectedTimeFrame: selectedTimeFrame,
                 isMobile: false,
               ),
           ],
@@ -580,14 +435,11 @@ class DesktopDashboard extends StatelessWidget {
 
 class TabletDashboard extends StatelessWidget {
   final String selectedTimeFrame;
-  final String selectedReportType;
   final ValueChanged<String> onTimeFrameChanged;
-  final ValueChanged<String> onReportTypeChanged;
   final VoidCallback onRefresh;
   final bool isRefreshing;
   final bool isLoading;
   final InquiryReportsData? inq;
-
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -596,14 +448,11 @@ class TabletDashboard extends StatelessWidget {
   const TabletDashboard({
     super.key,
     required this.selectedTimeFrame,
-    required this.selectedReportType,
     required this.onTimeFrameChanged,
-    required this.onReportTypeChanged,
     required this.onRefresh,
     required this.isRefreshing,
     required this.isLoading,
     this.inq,
-  
     required this.startDate,
     required this.timeCategoryCounts,
     required this.timeFrame,
@@ -621,9 +470,7 @@ class TabletDashboard extends StatelessWidget {
           children: [
             buildHeader(
               selectedTimeFrame,
-              selectedReportType,
               onTimeFrameChanged,
-              onReportTypeChanged,
               onRefresh,
               isRefreshing,
               userName,
@@ -631,17 +478,11 @@ class TabletDashboard extends StatelessWidget {
             const SizedBox(height: 32),
             
             if (isLoading)
-              ...buildSkeletonReport(selectedReportType, isMobile: false)
+              ...buildSkeletonReport(isMobile: false)
             else
-              ...ReportsHelper.buildReportContent(
-                selectedReportType,
+              ...buildInquiryTrendsReport(
                 inq,
-   
-                selectedTimeFrame,
-    
-                startDate,
-                timeFrame,
-                timeCategoryCounts,
+                selectedTimeFrame: selectedTimeFrame,
                 isMobile: false,
               ),
           ],
@@ -653,14 +494,11 @@ class TabletDashboard extends StatelessWidget {
 
 class MobileDashboard extends StatelessWidget {
   final String selectedTimeFrame;
-  final String selectedReportType;
   final ValueChanged<String> onTimeFrameChanged;
-  final ValueChanged<String> onReportTypeChanged;
   final VoidCallback onRefresh;
   final bool isRefreshing;
   final bool isLoading;
   final InquiryReportsData? inq;
-
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -669,14 +507,11 @@ class MobileDashboard extends StatelessWidget {
   const MobileDashboard({
     super.key,
     required this.selectedTimeFrame,
-    required this.selectedReportType,
     required this.onTimeFrameChanged,
-    required this.onReportTypeChanged,
     required this.onRefresh,
     required this.isRefreshing,
     required this.isLoading,
     this.inq,
-
     required this.userName,
     required this.startDate,
     required this.timeCategoryCounts,
@@ -694,9 +529,7 @@ class MobileDashboard extends StatelessWidget {
           children: [
             buildHeader(
               selectedTimeFrame,
-              selectedReportType,
               onTimeFrameChanged,
-              onReportTypeChanged,
               onRefresh,
               isRefreshing,
               userName,
@@ -704,17 +537,11 @@ class MobileDashboard extends StatelessWidget {
             const SizedBox(height: 24),
             
             if (isLoading)
-              ...buildSkeletonReport(selectedReportType, isMobile: true)
+              ...buildSkeletonReport(isMobile: true)
             else
-              ...ReportsHelper.buildReportContent(
-                selectedReportType,
+              ...buildInquiryTrendsReport(
                 inq,
-
-                selectedTimeFrame,
-
-                startDate,
-                timeFrame,
-                timeCategoryCounts,
+                selectedTimeFrame: selectedTimeFrame,
                 isMobile: true,
               ),
           ],
@@ -724,11 +551,9 @@ class MobileDashboard extends StatelessWidget {
   }
 }
 
-// ✅ Build Skeleton based on Report Type
-List<Widget> buildSkeletonReport(String reportType, {bool isMobile = false}) {
+List<Widget> buildSkeletonReport({bool isMobile = false}) {
   if (isMobile) {
     return [
-      // Stat cards row 1
       Row(
         children: [
           Expanded(child: buildStatCardSkeleton(isMobile: true)),
@@ -737,7 +562,6 @@ List<Widget> buildSkeletonReport(String reportType, {bool isMobile = false}) {
         ],
       ),
       const SizedBox(height: 12),
-      // Stat cards row 2
       Row(
         children: [
           Expanded(child: buildStatCardSkeleton(isMobile: true)),
@@ -746,7 +570,6 @@ List<Widget> buildSkeletonReport(String reportType, {bool isMobile = false}) {
         ],
       ),
       const SizedBox(height: 24),
-      // Chart cards
       SizedBox(height: 400, child: buildChartCardSkeleton(isMobile: true)),
       const SizedBox(height: 16),
       SizedBox(height: 400, child: buildChartCardSkeleton(isMobile: true)),
@@ -755,7 +578,6 @@ List<Widget> buildSkeletonReport(String reportType, {bool isMobile = false}) {
     ];
   }
 
-  // Desktop/Tablet skeleton
   return [
     SizedBox(
       height: 120,
@@ -776,31 +598,6 @@ List<Widget> buildSkeletonReport(String reportType, {bool isMobile = false}) {
     const SizedBox(height: 16),
     SizedBox(height: 400, child: buildChartCardSkeleton()),
   ];
-}
-
-class ReportsHelper {
-  static List<Widget> buildReportContent(
-    String reportType,
-    InquiryReportsData? inq,
-
-    String selectedTimeFrame,
-
-    DateTime startDate,
-    String timeFrame,
-    Map<String, Map<String, int>> timeCategoryCounts, {
-    bool isMobile = false,
-  }) {
-    switch (reportType) {
-      case 'Inquiry Trends':
-        return buildInquiryTrendsReport(
-          inq,
-          selectedTimeFrame: selectedTimeFrame,
-          isMobile: isMobile,
-        );
-      default:
-        return buildInquiryTrendsReport(inq, isMobile: isMobile);
-    }
-  }
 }
 
 List<Widget> buildInquiryTrendsReport(
@@ -957,11 +754,10 @@ List<Widget> buildInquiryTrendsReport(
     ),
   ];
 }
+
 Widget buildHeader(
   String selectedTimeFrame,
-  String selectedReportType,
   ValueChanged<String> onTimeFrameChanged,
-  ValueChanged<String> onReportTypeChanged,
   VoidCallback onRefresh,
   bool isRefreshing,
   String userName,
@@ -979,7 +775,7 @@ Widget buildHeader(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Reports and Analytics',
+                    'Inquiry Trends Report',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
@@ -988,12 +784,14 @@ Widget buildHeader(
                       Expanded(
                         child: CustomDropdownButton(
                           items: [
-                            'Inquiry Trends',
-                            'Chatbot Usage',
-                            'User Demographics',
+                            'All',
+                            'Today',
+                            'This Week',
+                            'This Month',
+                            'This Year',
                           ],
-                          initialValue: selectedReportType,
-                          onChanged: onReportTypeChanged,
+                          initialValue: selectedTimeFrame,
+                          onChanged: onTimeFrameChanged,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1003,40 +801,18 @@ Widget buildHeader(
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  CustomDropdownButton(
-                    items: [
-                      'All',
-                      'Today',
-                      'This Week',
-                      'This Month',
-                      'This Year',
-                    ],
-                    initialValue: selectedTimeFrame,
-                    onChanged: onTimeFrameChanged,
-                  ),
                 ],
               )
               : Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Reports and Analytics',
+                    'Inquiry Trends Report',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      CustomDropdownButton(
-                        items: [
-                          'Inquiry Trends',
-                          'Chatbot Usage',
-                          'User Demographics',
-                        ],
-                        initialValue: selectedReportType,
-                        onChanged: onReportTypeChanged,
-                      ),
-                      const SizedBox(width: 12),
                       CustomDropdownButton(
                         items: [
                           'All',
@@ -1059,24 +835,11 @@ Widget buildHeader(
               ),
           SizedBox(height: isMobile ? 12 : 8),
           Text(
-            _getReportDescription(selectedReportType, selectedTimeFrame),
+            "Detailed analysis of inquiry patterns and trends for $selectedTimeFrame.",
             style: TextStyle(fontSize: isMobile ? 13 : 14, color: Colors.grey),
           ),
         ],
       );
     },
   );
-}
-
-String _getReportDescription(String reportType, String timeFrame) {
-  switch (reportType) {
-    case 'Inquiry Trends':
-      return "Detailed analysis of inquiry patterns and trends for $timeFrame.";
-    case 'Chatbot Usage':
-      return "Chatbot performance metrics and usage statistics for $timeFrame.";
-    case 'User Demographics':
-      return "User demographics and engagement patterns for $timeFrame.";
-    default:
-      return "Here's a complete reports and analytics of OASP Assist for $timeFrame.";
-  }
 }

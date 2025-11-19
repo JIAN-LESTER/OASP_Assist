@@ -302,113 +302,86 @@ import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
     }
 
     Future<void> _checkAndAddEscalationResponses(
-      String conversationId,
-      ChatProvider chatProvider,
-    ) async {
-      try {
-        print(
-          '🔍 Checking for escalation responses in conversation: $conversationId',
-        );
+  String conversationId,
+  ChatProvider chatProvider,
+) async {
+  try {
+    print('🔍 Initial escalation check for: $conversationId');
 
-        final escalationsSnapshot =
-            await _firestore
-                .collection('escalations')
-                .where('conversationId', isEqualTo: conversationId)
-                .where('status', isEqualTo: 'resolved')
-                .get();
+    final escalationsSnapshot = await _firestore
+        .collection('escalations')
+        .where('conversationId', isEqualTo: conversationId)
+        .where('status', isEqualTo: 'resolved')
+        .get();
 
-        if (escalationsSnapshot.docs.isEmpty) {
-          print('ℹ️ No resolved escalations found');
-          return;
-        }
-
-        print('✅ Found ${escalationsSnapshot.docs.length} resolved escalations');
-
-        for (var escalationDoc in escalationsSnapshot.docs) {
-          final escalation = escalationDoc.data();
-          final staffResponse = escalation['staffResponse'] as String?;
-          final respondedBy = escalation['respondedBy'] as String? ?? 'Staff';
-          final messageId = escalation['messageId'] as String?;
-          final escalationId = escalationDoc.id;
-
-          if (staffResponse == null || staffResponse.isEmpty) {
-            print('⚠️ Escalation $escalationId has no staff response');
-            continue;
-          }
-
-          // ✅ CRITICAL FIX: Check Firestore first, not just memory
-          final existingStaffMessages =
-              await _firestore
-                  .collection('conversations')
-                  .doc(conversationId)
-                  .collection('messages')
-                  .where('sender', isEqualTo: 'staff')
-                  .where(
-                    'content',
-                    isEqualTo:
-                        '**Staff Response from $respondedBy:**\n\n$staffResponse',
-                  )
-                  .limit(1)
-                  .get();
-
-          if (existingStaffMessages.docs.isNotEmpty) {
-            print(
-              'ℹ️ Staff response already exists in Firestore for escalation $escalationId',
-            );
-            continue;
-          }
-
-          print('📝 Adding staff response to chat for escalation $escalationId');
-
-          final staffMessageRef =
-              _firestore
-                  .collection('conversations')
-                  .doc(conversationId)
-                  .collection('messages')
-                  .doc();
-
-          final staffMessage = Message(
-            id: staffMessageRef.id,
-            conversationId: conversationId,
-            content: '**Staff Response from $respondedBy:**\n\n$staffResponse',
-            sender: 'staff',
-            status: 'sent',
-            type: 'text',
-            sentAt: DateTime.now(),
-          );
-
-          await chatProvider.saveMessageToFirebase(conversationId, staffMessage);
-
-          if (messageId != null && messageId.isNotEmpty) {
-            try {
-              await _firestore
-                  .collection('conversations')
-                  .doc(conversationId)
-                  .collection('messages')
-                  .doc(messageId)
-                  .update({
-                    'escalationResolved': true,
-                    'escalationResponse': staffResponse,
-                    'escalationRespondedBy': respondedBy,
-                    'escalationRespondedAt': Timestamp.now(),
-                    'escalationId': escalationId,
-                  });
-
-              print(
-                '✅ Updated original message $messageId with escalation response',
-              );
-            } catch (e) {
-              print('⚠️ Could not update original message: $e');
-            }
-          }
-        }
-
-        await chatProvider.loadExistingMessages();
-      } catch (e) {
-        print('❌ Error checking escalation responses: $e');
-      }
+    if (escalationsSnapshot.docs.isEmpty) {
+      print('ℹ️ No resolved escalations found');
+      return;
     }
 
+    print('✅ Found ${escalationsSnapshot.docs.length} resolved escalations');
+
+    for (var escalationDoc in escalationsSnapshot.docs) {
+      final escalation = escalationDoc.data();
+      final staffResponse = escalation['staffResponse'] as String?;
+      final respondedBy = escalation['respondedBy'] as String? ?? 'Staff';
+      final escalationId = escalationDoc.id;
+
+      if (staffResponse == null || staffResponse.isEmpty) continue;
+
+      final staffMessageContent = '**Staff Response from $respondedBy:**\n\n$staffResponse';
+
+      // Check Firestore first
+      final existingStaffMessages = await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages')
+          .where('sender', isEqualTo: 'staff')
+          .where('content', isEqualTo: staffMessageContent)
+          .limit(1)
+          .get();
+
+      if (existingStaffMessages.docs.isNotEmpty) {
+        print('ℹ️ Staff response already exists for escalation $escalationId');
+        continue;
+      }
+
+      // Check in-memory
+      final existingInMemory = chatProvider.messages.any(
+        (msg) => msg.content.contains(staffResponse) && msg.sender == 'staff',
+      );
+
+      if (existingInMemory) {
+        print('ℹ️ Staff response already in memory for escalation $escalationId');
+        continue;
+      }
+
+      print('📝 Adding staff response for escalation $escalationId');
+
+      final staffMessageRef = _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages')
+          .doc();
+
+      final staffMessage = Message(
+        id: staffMessageRef.id,
+        conversationId: conversationId,
+        content: staffMessageContent,
+        sender: 'staff',
+        status: 'sent',
+        type: 'text',
+        sentAt: DateTime.now(),
+      );
+
+      await chatProvider.saveMessageToFirebase(conversationId, staffMessage);
+    }
+
+    await chatProvider.loadExistingMessages();
+  } catch (e) {
+    print('❌ Error checking escalation responses: $e');
+  }
+}
   Future<void> _initializeConversationId() async {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
