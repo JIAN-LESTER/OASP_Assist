@@ -836,6 +836,7 @@ Widget _buildLogsRow({
                     fontSize: 14,
                   ),
                   overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                 ),
                 if (!isMobile && msglogs.id.isNotEmpty && msglogs.id != 'N/A')
                   Padding(
@@ -844,7 +845,9 @@ Widget _buildLogsRow({
                       "Log ID: $msglogs.id",
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
                     ),
+                    
                   ),
               ],
             ),
@@ -871,10 +874,13 @@ Widget _buildLogsRow({
                     fontWeight: FontWeight.w500,
                     color: Colors.black,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
           ),
+          const SizedBox(width: 8),
 
           // Timestamp
           Expanded(
@@ -888,16 +894,9 @@ Widget _buildLogsRow({
                     msglogs.time,
                     style: const TextStyle(fontSize: 13, color: Colors.black87),
                     overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
-                  if (isMobile && msglogs.id.isNotEmpty && msglogs.id != 'N/A')
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        "ID: $msglogs.id",
-                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
+
                 ],
               ),
             ),
