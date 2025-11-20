@@ -7,10 +7,11 @@ class Admissions {
   final String title;
   final String content;
   final List<String>? contact;
-  final Map<String, int>? academicYear; // ✅ Changed to map for range
+  final Map<String, int>? academicYear;
   final List<String>? links;
   final String source;
   final DateTime createdAt;
+  final List<Map<String, dynamic>>? schedules; // ✅ NEW: Add schedules field
 
   Admissions({
     required this.id,
@@ -23,6 +24,7 @@ class Admissions {
     this.links,
     required this.source,
     required this.createdAt,
+    this.schedules, // ✅ NEW
   });
 
   factory Admissions.fromJson(Map<String, dynamic> json) {
@@ -79,6 +81,14 @@ class Admissions {
       // Parse academic year
       Map<String, int>? academicYearMap = parseAcademicYear(json['academicYear']?.toString());
 
+      // ✅ NEW: Parse schedules
+      List<Map<String, dynamic>>? schedulesList;
+      if (json['schedules'] is List) {
+        schedulesList = (json['schedules'] as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+
       return Admissions(
         id: json['id']?.toString() ?? 'unknown',
         steps: stepsList,
@@ -94,6 +104,7 @@ class Admissions {
             : (json['createdAt'] is Timestamp
                 ? (json['createdAt'] as Timestamp).toDate()
                 : DateTime.now()),
+        schedules: schedulesList, // ✅ NEW
       );
     } catch (e) {
       print("❌ Error in Admissions.fromJson: $e");
@@ -120,6 +131,7 @@ class Admissions {
       'links': links,
       'source': source,
       'createdAt': createdAt.toIso8601String(),
+      'schedules': schedules, // ✅ NEW
     };
   }
 }

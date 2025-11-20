@@ -279,27 +279,28 @@ Future<void> batchUploadToInformationBank(List<InformationBank> documents) async
     rethrow;
   }
 }
+
 Future<void> saveToAdmission(Admissions ad) async {
   try {
     final sanitizedId = sanitizeId(ad.id);
 
-    // Prepare data map
     final Map<String, dynamic> admissionData = {
       'admissionID': sanitizedId,
       'title': ad.title,
       'content': ad.content,
       'source': ad.source,
-      'academicYear': ad.academicYear, // This is now Map<String, int>?
+      'academicYear': ad.academicYear,
       'steps': ad.steps,
       'contact': ad.contact,
-      'requirements': ad.requirements ?? [], // Add requirements field
+      'requirements': ad.requirements ?? [],
       'links': ad.links,
+      'schedules': ad.schedules, // ✅ NEW
       'createdAt': FieldValue.serverTimestamp(),
     };
 
     await firestore.collection('admissions').doc(sanitizedId).set(admissionData);
 
-    print('✅ Admission document saved successfully with ${ad.requirements?.length ?? 0} requirements');
+    print('✅ Admission document saved successfully with ${ad.schedules?.length ?? 0} schedules');
   } catch (e) {
     print('❌ Error saving admission document: $e');
     rethrow;

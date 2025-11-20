@@ -874,12 +874,18 @@ Widget _buildIBRow({
                 showEditIBModal(context, doc);
               } else if (value == 'delete') {
                 showDeleteConfirmation(
-                  context,
-                  doc,
-                  DeleteConfigs.document,
-                  'information_bank',
-                  customDeleteHandler: handleComplexDocumentDelete,
-                );
+  context,
+  doc,
+  DeleteConfigs.document,
+  'information_bank',
+  customDeleteHandler: (context, doc) async {
+    await handleComplexDocumentDelete(
+      context,
+      doc,
+      'information_bank', // ✅ Pass the collection name
+    );
+  },
+);
               }
             },
             itemBuilder: (context) => [

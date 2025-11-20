@@ -594,161 +594,14 @@ Widget _buildAdmissionRow({
   required String academicYear,
   required List<String>? contacts,
 }) {
-  double screenWidth = MediaQuery.of(context).size.width;
-  bool isMobile = screenWidth < 600;
-  bool isTablet = screenWidth >= 600 && screenWidth < 1100;
-
-  return Container(
-    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: Colors.grey[200]!),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: InkWell(
-      onTap: () => showADInfoModal(context, doc),
-      child: Row(
-        children: [
-          // Title + Source
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (!isMobile && source.isNotEmpty)
-                  Text(
-                    source,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
-          ),
-          if (!isMobile)
-            Expanded(
-              flex: 3,
-              child: Text(
-                content,
-                style: const TextStyle(fontSize: 13),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children:
-                  contacts != null && contacts.isNotEmpty
-                      ? contacts.map((c) {
-                        String displayValue = c;
-
-                        if (c.contains(":")) {
-                          final parts = c.split(":");
-                          // Join everything after the first colon → keeps full URL
-                          final value = parts.sublist(1).join(":").trim();
-                          displayValue = value;
-                        }
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            displayValue,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        );
-                      }).toList()
-                      : [
-                        Text(
-                          "No contacts",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-            ),
-          ),
-
-          // Academic Year
-          if (!isMobile)
-            Expanded(
-              flex: 2,
-              child: Text(
-                academicYear.isNotEmpty ? academicYear : "N/A",
-                style: const TextStyle(fontSize: 13),
-              ),
-            ),
-
-          // Actions
-          SizedBox(width: isTablet ? 60 : 80),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz),
-            onSelected: (value) {
-              if (value == 'edit') {
-                showDialog(
-                  context: context,
-                  builder:
-                      (context) =>
-                          AdmissionFormDialog(doc: doc, isEdit: true),
-                );
-              } else if (value == 'delete') {
-                showDeleteConfirmation(
-                  context,
-                  doc,
-                  DeleteConfigs.admissions,
-                  'admissions',
-                  customDeleteHandler: handleComplexDocumentDelete,
-                );
-              }
-            },
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18),
-                        SizedBox(width: 8),
-                        Text('Delete'),
-                      ],
-                    ),
-                  ),
-                ],
-          ),
-        ],
-      ),
-    ),
+  return _AdmissionRowWidget(
+    context: context,
+    doc: doc,
+    title: title,
+    content: content,
+    source: source,
+    academicYear: academicYear,
+    contacts: contacts,
   );
 }
 
@@ -911,18 +764,7 @@ Widget _buildTableHeader() {
               Expanded(
                 flex: 3,
                 child: Text(
-                  'Contact',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'A.Y. Year',
+                  'Steps',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
@@ -971,6 +813,28 @@ Widget _buildTableHeader() {
               ),
             ),
             Expanded(
+              flex: 3,
+              child: Text(
+                'Steps',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: isTablet ? 13 : 14,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(
+                'Requirements',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: isTablet ? 13 : 14,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            Expanded(
               flex: 4,
               child: Text(
                 'Contacts',
@@ -981,22 +845,301 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            Expanded(
-              flex: 2,
-              child: Text(
-                'A.Y. Year',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-
             SizedBox(width: isTablet ? 60 : 80), // Actions space
           ],
         ),
       );
     },
   );
+}
+
+Widget _buildExpandableList({
+  required List<String> items,
+  required String emptyText,
+  bool isExpanded = false,
+  required Function(bool) onToggle,
+}) {
+  if (items.isEmpty) {
+    return Text(
+      emptyText,
+      style: TextStyle(
+        fontSize: 12,
+        color: Colors.grey[600],
+        fontStyle: FontStyle.italic,
+      ),
+    );
+  }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // First item (always visible)
+      Container(
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.blue[50],
+          border: Border.all(color: Colors.blue[200]!),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          items[0],
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.blue[900],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      
+      // Expanded items
+      if (isExpanded && items.length > 1)
+        ...items.skip(1).map((item) => Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.blue[50],
+            border: Border.all(color: Colors.blue[200]!),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            item,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.blue[900],
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        )),
+      
+      // Toggle button
+      if (items.length > 1)
+        InkWell(
+          onTap: () => onToggle(!isExpanded),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 16,
+                  color: Colors.blue[700],
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  isExpanded ? 'Show less' : '+${items.length - 1} more',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.blue[700],
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
+class _AdmissionRowWidget extends StatefulWidget {
+  final BuildContext context;
+  final DocumentSnapshot doc;
+  final String title;
+  final String content;
+  final String source;
+  final String academicYear;
+  final List<String>? contacts;
+
+  const _AdmissionRowWidget({
+    required this.context,
+    required this.doc,
+    required this.title,
+    required this.content,
+    required this.source,
+    required this.academicYear,
+    required this.contacts,
+  });
+
+  @override
+  State<_AdmissionRowWidget> createState() => _AdmissionRowWidgetState();
+}
+
+class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
+  bool stepsExpanded = false;
+  bool requirementsExpanded = false;
+  bool contactsExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    double screenWidth = MediaQuery.of(context).size.width;
+    bool isMobile = screenWidth < 600;
+    bool isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+    // Get data from document
+    final data = widget.doc.data() as Map<String, dynamic>;
+    final List<String> steps = (data['steps'] as List<dynamic>?)
+        ?.map((s) => s.toString())
+        .toList() ?? [];
+    final List<String> requirements = (data['requirements'] as List<dynamic>?)
+        ?.map((r) => r.toString())
+        .toList() ?? [];
+    
+    // Process contacts to extract display values
+    final List<String> processedContacts = widget.contacts?.map((c) {
+      if (c.contains(":")) {
+        final parts = c.split(":");
+        return parts.sublist(1).join(":").trim();
+      }
+      return c;
+    }).toList() ?? [];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: InkWell(
+        onTap: () => showADInfoModal(context, widget.doc),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (isMobile && widget.academicYear.isNotEmpty)
+                    Text(
+                      widget.academicYear,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            
+            // Content
+            if (!isMobile)
+              Expanded(
+                flex: 3,
+                child: Text(
+                  widget.content,
+                  style: const TextStyle(fontSize: 13),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+
+            // Steps
+            if (!isMobile)
+              Expanded(
+                flex: 3,
+                child: _buildExpandableList(
+                  items: steps,
+                  emptyText: 'No steps',
+                  isExpanded: stepsExpanded,
+                  onToggle: (value) => setState(() => stepsExpanded = value),
+                ),
+              ),
+
+            // Requirements or Steps (mobile)
+            Expanded(
+              flex: isMobile ? 3 : 3,
+              child: isMobile
+                  ? _buildExpandableList(
+                      items: steps,
+                      emptyText: 'No steps',
+                      isExpanded: stepsExpanded,
+                      onToggle: (value) => setState(() => stepsExpanded = value),
+                    )
+                  : _buildExpandableList(
+                      items: requirements,
+                      emptyText: 'No requirements',
+                      isExpanded: requirementsExpanded,
+                      onToggle: (value) => setState(() => requirementsExpanded = value),
+                    ),
+            ),
+
+            // Contacts
+            Expanded(
+              flex: 4,
+              child: _buildExpandableList(
+                items: processedContacts,
+                emptyText: 'No contacts',
+                isExpanded: contactsExpanded,
+                onToggle: (value) => setState(() => contactsExpanded = value),
+              ),
+            ),
+
+            // Actions
+            SizedBox(width: isTablet ? 60 : 80),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_horiz),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AdmissionFormDialog(doc: widget.doc, isEdit: true),
+                  );
+                } else if (value == 'delete') {
+                  showDeleteConfirmation(
+                    context,
+                    widget.doc,
+                    DeleteConfigs.admissions,
+                    'admissions',
+                    customDeleteHandler: (context, doc) async {
+                      await handleComplexDocumentDelete(
+                        context,
+                        doc,
+                        'admissions',
+                      );
+                    },
+                  );
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18),
+                      SizedBox(width: 8),
+                      Text('Delete'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

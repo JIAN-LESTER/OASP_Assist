@@ -543,7 +543,9 @@ Future<void> handleUserDelete(
 Future<void> handleComplexDocumentDelete(
   BuildContext context,
   DocumentSnapshot doc,
-) async {
+  String collectionName, {
+  List<String>? additionalCollections,
+}) async {
   try {
     final currentUser = FirebaseAuth.instance.currentUser;
     String actorName = 'Unknown';
@@ -562,124 +564,174 @@ Future<void> handleComplexDocumentDelete(
     }
 
     final docData = doc.data() as Map<String, dynamic>;
-    String deletedTitle = docData['ib_title'] ?? 'Unknown';
+    String deletedTitle = docData['ib_title'] ?? docData['title'] ?? docData['name'] ?? 'Unknown';
     final pineconeNamespace = docData['pinecone_namespace'];
 
     final firestore = FirebaseFirestore.instance;
 
-    // --- Delete related scholarships ---
-    final scholarshipsSnap =
-        await firestore
-            .collection('scholarships')
-            .where('sourceId', isEqualTo: doc.id)
-            .get();
+    // Determine what to delete based on collection
+    if (collectionName == 'information_bank') {
+      // --- Delete related scholarships ---
+      final scholarshipsSnap =
+          await firestore
+              .collection('scholarships')
+              .where('sourceId', isEqualTo: doc.id)
+              .get();
 
-    List<String> failedScholarshipDeletes = [];
-    for (final scholarshipDoc in scholarshipsSnap.docs) {
+      List<String> failedScholarshipDeletes = [];
+      for (final scholarshipDoc in scholarshipsSnap.docs) {
+        try {
+          await firestore
+              .collection('scholarships')
+              .doc(scholarshipDoc.id)
+              .delete();
+          print("✅ Deleted scholarship ${scholarshipDoc.id}");
+        } catch (e) {
+          print("❌ Failed to delete scholarship ${scholarshipDoc.id}: $e");
+          failedScholarshipDeletes.add(scholarshipDoc.id);
+        }
+      }
+
+      // --- Delete related admissions ---
+      final admissionsSnap =
+          await firestore
+              .collection('admissions')
+              .where('sourceId', isEqualTo: doc.id)
+              .get();
+
+      List<String> failedAdmissionDeletes = [];
+      for (final admissionDoc in admissionsSnap.docs) {
+        try {
+          await firestore.collection('admissions').doc(admissionDoc.id).delete();
+          print("✅ Deleted admission ${admissionDoc.id}");
+        } catch (e) {
+          print("❌ Failed to delete admission ${admissionDoc.id}: $e");
+          failedAdmissionDeletes.add(admissionDoc.id);
+        }
+      }
+
+      // --- Delete related placements ---
+      final placementsSnap =
+          await firestore
+              .collection('placements')
+              .where('sourceId', isEqualTo: doc.id)
+              .get();
+
+      List<String> failedPlacementDeletes = [];
+      for (final placementDoc in placementsSnap.docs) {
+        try {
+          await firestore.collection('placements').doc(placementDoc.id).delete();
+          print("✅ Deleted placement ${placementDoc.id}");
+        } catch (e) {
+          print("❌ Failed to delete placement ${placementDoc.id}: $e");
+          failedPlacementDeletes.add(placementDoc.id);
+        }
+      }
+
+      // --- Delete the main information_bank doc ---
+      await firestore.collection('information_bank').doc(doc.id).delete();
+      print("✅ Deleted information_bank document");
+
+      // Delete vectors in Pinecone in the background
+      _deleteFromPineconeInBackground(docData, pineconeNamespace);
+
+      // Close dialogs and show feedback
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close loading
+        Navigator.of(context).pop(); // Close confirmation
+
+        int totalFailures =
+            failedScholarshipDeletes.length +
+            failedAdmissionDeletes.length +
+            failedPlacementDeletes.length;
+
+        if (totalFailures == 0) {
+          SnackbarUtil.showSuccess(context, 'Document deleted successfully');
+        } else {
+          SnackbarUtil.showWarning(
+            context,
+            'Document deleted successfully ($totalFailures related docs could not be deleted)',
+          );
+        }
+      }
+
+      // Log the action
       try {
-        await firestore
-            .collection('scholarships')
-            .doc(scholarshipDoc.id)
-            .delete();
-        print("✅ Deleted scholarship ${scholarshipDoc.id}");
+        final logRef = firestore.collection('logs').doc();
+        await logRef.set({
+          'logId': logRef.id,
+          'user': actorName,
+          'action': 'Deleted document: $deletedTitle',
+          'time': Timestamp.now(),
+          'scholarships_deleted':
+              scholarshipsSnap.docs.length - failedScholarshipDeletes.length,
+          'scholarships_failed': failedScholarshipDeletes.length,
+          'admissions_deleted':
+              admissionsSnap.docs.length - failedAdmissionDeletes.length,
+          'admissions_failed': failedAdmissionDeletes.length,
+          'placements_deleted':
+              placementsSnap.docs.length - failedPlacementDeletes.length,
+          'placements_failed': failedPlacementDeletes.length,
+        });
       } catch (e) {
-        print("❌ Failed to delete scholarship ${scholarshipDoc.id}: $e");
-        failedScholarshipDeletes.add(scholarshipDoc.id);
+        print("⚠️ Failed to log action: $e");
       }
-    }
+    } else if (collectionName == 'admissions') {
+      // ✅ NEW: Handle admission deletion
+      final docId = doc.id;
 
-    // --- Delete related admissions ---
-    final admissionsSnap =
-        await firestore
-            .collection('admissions')
-            .where('sourceId', isEqualTo: doc.id)
-            .get();
-
-    List<String> failedAdmissionDeletes = [];
-    for (final admissionDoc in admissionsSnap.docs) {
+      // 1. Delete from information_bank if exists
       try {
-        await firestore.collection('admissions').doc(admissionDoc.id).delete();
-        print("✅ Deleted admission ${admissionDoc.id}");
+        final ibDoc = await firestore.collection('information_bank').doc(docId).get();
+        
+        if (ibDoc.exists) {
+          final ibData = ibDoc.data() as Map<String, dynamic>;
+          
+          // Delete from Pinecone
+          _deleteFromPineconeInBackground(ibData, ibData['pinecone_namespace']);
+          
+          // Delete from information_bank
+          await firestore.collection('information_bank').doc(docId).delete();
+          print('✅ Deleted from information_bank');
+        }
       } catch (e) {
-        print("❌ Failed to delete admission ${admissionDoc.id}: $e");
-        failedAdmissionDeletes.add(admissionDoc.id);
+        print('⚠️ Error deleting from information_bank: $e');
       }
-    }
 
-    final placementsSnap =
-        await firestore
-            .collection('placements')
-            .where('sourceId', isEqualTo: doc.id)
-            .get();
+      // 2. Delete from admissions collection
+      await firestore.collection('admissions').doc(docId).delete();
+      print('✅ Deleted from admissions');
 
-    List<String> failedPlacementDeletes = [];
-    for (final placementDoc in placementsSnap.docs) {
+      // Close dialogs and show feedback
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close loading
+        Navigator.of(context).pop(); // Close confirmation or info modal
+
+        SnackbarUtil.showSuccess(context, 'Admission deleted successfully');
+      }
+
+      // Log the action
       try {
-        await firestore.collection('placements').doc(placementDoc.id).delete();
-        print("✅ Deleted placement ${placementDoc.id}");
+        final logRef = firestore.collection('logs').doc();
+        await logRef.set({
+          'logId': logRef.id,
+          'user': actorName,
+          'action': 'Deleted admission: $deletedTitle',
+          'time': Timestamp.now(),
+        });
       } catch (e) {
-        print("❌ Failed to delete placement ${placementDoc.id}: $e");
-        failedPlacementDeletes.add(placementDoc.id);
+        print("⚠️ Failed to log action: $e");
       }
+    } else {
+      // Handle other complex deletions
+      throw Exception('Unsupported collection type for complex delete: $collectionName');
     }
-
-    // --- Delete the main information_bank doc ---
-    await firestore.collection('information_bank').doc(doc.id).delete();
-    print("✅ Deleted information_bank document");
-
-    // Close dialogs and show feedback
-    if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
-      Navigator.of(context).pop(); // Close confirmation
-
-      int totalFailures =
-          failedScholarshipDeletes.length +
-          failedAdmissionDeletes.length +
-          failedPlacementDeletes.length;
-
-      if (totalFailures == 0) {
-        // Use consistent success snackbar
-        SnackbarUtil.showSuccess(context, 'Document deleted successfully');
-      } else {
-        // Use warning snackbar for partial success
-        SnackbarUtil.showWarning(
-          context,
-          'Document deleted successfully ($totalFailures related docs could not be deleted)',
-        );
-      }
-    }
-
-    // Log the action
-    try {
-      final logRef = firestore.collection('logs').doc();
-      await logRef.set({
-        'logId': logRef.id,
-        'user': actorName,
-        'action': 'Deleted document: $deletedTitle',
-        'time': Timestamp.now(),
-        'scholarships_deleted':
-            scholarshipsSnap.docs.length - failedScholarshipDeletes.length,
-        'scholarships_failed': failedScholarshipDeletes.length,
-        'admissions_deleted':
-            admissionsSnap.docs.length - failedAdmissionDeletes.length,
-        'admissions_failed': failedAdmissionDeletes.length,
-        'placements_deleted':
-            placementsSnap.docs.length - failedPlacementDeletes.length,
-        'placements_failed': failedPlacementDeletes.length,
-      });
-    } catch (e) {
-      print("⚠️ Failed to log action: $e");
-    }
-
-    // Delete vectors in Pinecone in the background
-    _deleteFromPineconeInBackground(docData, pineconeNamespace);
   } catch (error) {
     print("❌ Delete operation failed: $error");
 
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
 
-      // Use consistent error snackbar
       SnackbarUtil.showError(context, 'Delete failed: $error');
     }
   }

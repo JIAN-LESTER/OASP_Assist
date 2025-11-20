@@ -870,25 +870,19 @@ Widget _buildMobileLayout(List<Widget> pages) {
       profileKey: _profileKey,
     ),
     drawer: isChatPage ? _buildMobileChatDrawer() : null,
-   body: Stack(
-  children: [
-    pages[_selectedIndex],
-
-    if (_isNavigating || _isLoading)
-      buildContentLoadingOverlay(_navigationLoadingTextForIndex(_selectedIndex)),
-
-    // 🔽 Put bottom nav here instead of bottomNavigationBar:
-    Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
+    body: Stack(
+      children: [
+        pages[_selectedIndex],
+        if (_isNavigating || _isLoading)
+          buildContentLoadingOverlay(_navigationLoadingTextForIndex(_selectedIndex)),
+      ],
+    ),
+    bottomNavigationBar: Container(
+      key: _bottomNavKey,
       child: _buildBottomNavigationBar(),
     ),
-  ],
-),
   );
 }
-
 
   // ✅ Update tablet/desktop layout
   Widget _buildTabletDesktopLayout(List<Widget> pages) {

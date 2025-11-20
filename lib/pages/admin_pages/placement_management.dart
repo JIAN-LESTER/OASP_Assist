@@ -458,175 +458,15 @@ Widget _buildPlacementRow({
   required List<String>? contacts,
   required List<String>? positions,
 }) {
-  double screenWidth = MediaQuery.of(context).size.width;
-  bool isMobile = screenWidth < 600;
-  bool isTablet = screenWidth >= 600 && screenWidth < 1100;
-
-  return Container(
-    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: Colors.grey[200]!),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: InkWell(
-      onTap: () => showPLInfoModal(context, doc),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  partnerCompany,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children:
-                  positions != null && positions.isNotEmpty
-                      ? positions.map((c) {
-                        String displayValue = c;
-
-                        if (c.contains(":")) {
-                          final parts = c.split(":");
-                          final value = parts.sublist(1).join(":").trim();
-                          displayValue = value;
-                        }
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            displayValue,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        );
-                      }).toList()
-                      : [
-                        Text(
-                          "No Vacancy",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-            ),
-          ),
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children:
-                  contacts != null && contacts.isNotEmpty
-                      ? contacts.map((c) {
-                        String displayValue = c;
-
-                        if (c.contains(":")) {
-                          final parts = c.split(":");
-                          final value = parts.sublist(1).join(":").trim();
-                          displayValue = value;
-                        }
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            displayValue,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        );
-                      }).toList()
-                      : [
-                        Text(
-                          "No Contacts",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-            ),
-          ),
-          SizedBox(width: isTablet ? 60 : 80),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz),
-            onSelected: (value) {
-              if (value == 'edit') {
-                showDialog(
-                  context: context,
-                  builder:
-                      (context) => PlacementFormDialog(doc: doc, isEdit: true),
-                );
-              } else if (value == 'delete') {
-                showDeleteConfirmation(
-                  context,
-                  doc,
-                  DeleteConfigs.admissions,
-                  'placements',
-                );
-              }
-            },
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18),
-                        SizedBox(width: 8),
-                        Text('Delete'),
-                      ],
-                    ),
-                  ),
-                ],
-          ),
-        ],
-      ),
-    ),
+  return _PlacementRowWidget(
+    context: context,
+    doc: doc,
+    partnerCompany: partnerCompany,
+    contacts: contacts,
+    positions: positions,
   );
 }
+
 
 Widget _buildHeader(
   String selectedCompany,
@@ -878,4 +718,238 @@ Widget _buildTableHeader() {
       );
     },
   );
+}
+
+Widget _buildExpandableListYellow({
+  required List<String> items,
+  required String emptyText,
+  bool isExpanded = false,
+  required Function(bool) onToggle,
+}) {
+  if (items.isEmpty) {
+    return Text(
+      emptyText,
+      style: TextStyle(
+        fontSize: 12,
+        color: Colors.grey[600],
+        fontStyle: FontStyle.italic,
+      ),
+    );
+  }
+
+  // Process items to extract display values
+  final processedItems = items.map((c) {
+    String displayValue = c;
+    if (c.contains(":")) {
+      final parts = c.split(":");
+      displayValue = parts.sublist(1).join(":").trim();
+    }
+    return displayValue;
+  }).toList();
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // First item (always visible)
+      Container(
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.amber[50],
+          border: Border.all(color: Colors.amber[300]!),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          processedItems[0],
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.amber[900],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      
+      // Expanded items
+      if (isExpanded && processedItems.length > 1)
+        ...processedItems.skip(1).map((item) => Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.amber[50],
+            border: Border.all(color: Colors.amber[300]!),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            item,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.amber[900],
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        )),
+      
+      // Toggle button
+      if (processedItems.length > 1)
+        InkWell(
+          onTap: () => onToggle(!isExpanded),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 16,
+                  color: Colors.amber[800],
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  isExpanded ? 'Show less' : '+${processedItems.length - 1} more',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.amber[800],
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
+class _PlacementRowWidget extends StatefulWidget {
+  final BuildContext context;
+  final DocumentSnapshot doc;
+  final String partnerCompany;
+  final List<String>? contacts;
+  final List<String>? positions;
+
+  const _PlacementRowWidget({
+    required this.context,
+    required this.doc,
+    required this.partnerCompany,
+    required this.contacts,
+    required this.positions,
+  });
+
+  @override
+  State<_PlacementRowWidget> createState() => _PlacementRowWidgetState();
+}
+
+class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
+  bool positionsExpanded = false;
+  bool contactsExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    double screenWidth = MediaQuery.of(context).size.width;
+    bool isMobile = screenWidth < 600;
+    bool isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: InkWell(
+        onTap: () => showPLInfoModal(context, widget.doc),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Company Name
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.partnerCompany,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            
+            // Positions (Yellow badges)
+            Expanded(
+              flex: 4,
+              child: _buildExpandableListYellow(
+                items: widget.positions ?? [],
+                emptyText: 'No Vacancy',
+                isExpanded: positionsExpanded,
+                onToggle: (value) => setState(() => positionsExpanded = value),
+              ),
+            ),
+
+            // Contacts (Yellow badges)
+            Expanded(
+              flex: 4,
+              child: _buildExpandableListYellow(
+                items: widget.contacts ?? [],
+                emptyText: 'No Contacts',
+                isExpanded: contactsExpanded,
+                onToggle: (value) => setState(() => contactsExpanded = value),
+              ),
+            ),
+
+            // Actions
+            SizedBox(width: isTablet ? 60 : 80),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_horiz),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  showDialog(
+                    context: context,
+                    builder: (context) => PlacementFormDialog(doc: widget.doc, isEdit: true),
+                  );
+                } else if (value == 'delete') {
+                  showDeleteConfirmation(
+                    context,
+                    widget.doc,
+                    DeleteConfigs.admissions,
+                    'placements',
+                  );
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18),
+                      SizedBox(width: 8),
+                      Text('Delete'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

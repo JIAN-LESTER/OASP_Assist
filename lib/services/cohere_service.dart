@@ -95,7 +95,7 @@ Future<Map<String, dynamic>> analyzeAdmission(String message) async {
     print("📄 Admission input message length: ${message.length}");
 
     final prompt = '''
-Analyze the following admission document and extract the academic year, ALL contact information, ALL admission steps, ALL requirements, and ALL links.
+Analyze the following admission document and extract the academic year, ALL contact information, ALL admission steps, ALL requirements, ALL links, and ANY schedules if present.
 
 Admission Document: "$message"
 
@@ -103,9 +103,10 @@ CRITICAL INSTRUCTIONS:
 - Extract EVERY SINGLE step mentioned (usually numbered [1] to [11])
 - Extract ALL requirements (documents needed: Form 137, Form 138, NSO Birth Certificate, Certificate of Good Moral, Medical Certificate, ID Pictures, etc.)
 - Preserve the original order and numbering
-- For academic year, find "S.Y." followed by a year range like "2024-2025"
+- For academic year, find "S.Y." or "A.Y." followed by a year range like "2024-2025" or "2026-2027"
 - Extract only valid contact information (emails, phone numbers)
 - Extract all valid websites separately into the "links" field
+- If there are schedules with dates and locations (like exam schedules), extract them in the schedules array
 
 Return valid JSON only in this exact format:
 {
@@ -129,8 +130,22 @@ Return valid JSON only in this exact format:
   "links": [
     "https://cmu.edu.ph",
     "https://devops.cmu.edu.ph/doorstep/"
+  ],
+  "schedules": [
+    {
+      "date": "OCT 4, 2025",
+      "dayOfWeek": "SATURDAY",
+      "locations": ["Kalilangan, Bukidnon", "Impasug-ong, Bukidnon"]
+    },
+    {
+      "date": "OCT 11, 2025",
+      "dayOfWeek": "SATURDAY",
+      "locations": ["Quezon, Bukidnon", "Malaybalay City, Bukidnon"]
+    }
   ]
 }
+
+If no schedules are found, return an empty schedules array.
 ''';
 
     final response = await http.post(
@@ -142,7 +157,7 @@ Return valid JSON only in this exact format:
       body: jsonEncode({
         'model': 'command-r-08-2024',
         'message': prompt,
-        'max_tokens': 3000,
+        'max_tokens': 3500, // Increased for schedules
         'temperature': 0.0,
       }),
     );
@@ -177,6 +192,22 @@ Return valid JSON only in this exact format:
       List<String> links = (result['links'] is List)
           ? List<String>.from(result['links'].map((e) => e.toString()))
           : [];
+      
+      // ✅ NEW: Process schedules
+      List<Map<String, dynamic>> schedules = [];
+      if (result['schedules'] is List) {
+        for (var schedule in result['schedules']) {
+          if (schedule is Map) {
+            schedules.add({
+              'date': schedule['date']?.toString() ?? '',
+              'dayOfWeek': schedule['dayOfWeek']?.toString() ?? '',
+              'locations': schedule['locations'] is List
+                  ? List<String>.from(schedule['locations'].map((e) => e.toString()))
+                  : [],
+            });
+          }
+        }
+      }
 
       // Convert academic year to numeric map
       Map<String, int>? academicYearMap = parseAcademicYear(
@@ -203,7 +234,13 @@ Return valid JSON only in this exact format:
         links = fallbackResult['links'] as List<String>;
       }
 
-      print("✅ Extracted: ${steps.length} steps, ${requirements.length} requirements, ${contacts.length} contacts");
+      // ✅ NEW: If no schedules from AI, try fallback extraction
+      if (schedules.isEmpty) {
+        final fallbackResult = _fallbackAdmissionExtraction(message);
+        schedules = fallbackResult['schedules'] as List<Map<String, dynamic>>? ?? [];
+      }
+
+      print("✅ Extracted: ${steps.length} steps, ${requirements.length} requirements, ${contacts.length} contacts, ${schedules.length} schedules");
 
       return {
         'contacts': contacts,
@@ -211,6 +248,7 @@ Return valid JSON only in this exact format:
         'requirements': requirements,
         'academicYear': academicYearMap,
         'links': links,
+        'schedules': schedules, // ✅ NEW
       };
     } else {
       print("❌ Cohere API error: ${response.statusCode}");
@@ -231,6 +269,7 @@ Map<String, dynamic> _fallbackAdmissionExtraction(String text) {
   List<String> requirements = <String>[];
   List<Map<String, dynamic>> contacts = <Map<String, dynamic>>[];
   List<String> links = <String>[];
+  List<Map<String, dynamic>> schedules = <Map<String, dynamic>>[]; // ✅ NEW
   Map<String, int>? academicYear;
 
   final requirementKeywords = [
@@ -280,7 +319,7 @@ Map<String, dynamic> _fallbackAdmissionExtraction(String text) {
   }
 
   // Extract academic year as numeric map
-  final yearRegex = RegExp(r'S\.Y\.\s*(20\d{2}\s*[-–]?\s*20\d{2}?)', caseSensitive: false);
+  final yearRegex = RegExp(r'(?:S\.Y\.|A\.Y\.)\s*(20\d{2}\s*[-–]?\s*20\d{2}?)', caseSensitive: false);
   final yearMatch = yearRegex.firstMatch(text);
   if (yearMatch != null) {
     final rangeRegex = RegExp(r'(\d{4})\s*[-–]\s*(\d{4})');
@@ -301,7 +340,56 @@ Map<String, dynamic> _fallbackAdmissionExtraction(String text) {
     }
   }
 
-  print("🔧 Fallback extracted ${steps.length} steps, ${requirements.length} requirements, ${contacts.length} contacts");
+  // ✅ NEW: Extract schedules
+  final monthRegex = RegExp(r'(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d{1,2})', caseSensitive: false);
+  final dayRegex = RegExp(r'(MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY)', caseSensitive: false);
+  
+  String? currentDate;
+  String? currentDay;
+  List<String> currentLocations = [];
+
+  for (String line in lines) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) continue;
+
+    // Check for date pattern
+    final dateMatch = monthRegex.firstMatch(trimmed);
+    if (dateMatch != null) {
+      // Save previous schedule if exists
+      if (currentDate != null && currentLocations.isNotEmpty) {
+        schedules.add({
+          'date': currentDate,
+          'dayOfWeek': currentDay ?? '',
+          'locations': List<String>.from(currentLocations),
+        });
+        currentLocations = [];
+      }
+      
+      currentDate = '${dateMatch.group(1)!.toUpperCase()} ${dateMatch.group(2)}';
+      
+      // Check for day of week
+      final dayMatch = dayRegex.firstMatch(trimmed);
+      if (dayMatch != null) {
+        currentDay = dayMatch.group(1)!.toUpperCase();
+      }
+    } else if (currentDate != null && trimmed.isNotEmpty && !trimmed.contains('2025') && !trimmed.contains('2026')) {
+      // This might be a location
+      if (trimmed.length > 3 && !trimmed.toLowerCase().contains('schedule')) {
+        currentLocations.add(trimmed);
+      }
+    }
+  }
+
+  // Add last schedule if exists
+  if (currentDate != null && currentLocations.isNotEmpty) {
+    schedules.add({
+      'date': currentDate,
+      'dayOfWeek': currentDay ?? '',
+      'locations': List<String>.from(currentLocations),
+    });
+  }
+
+  print("🔧 Fallback extracted ${steps.length} steps, ${requirements.length} requirements, ${contacts.length} contacts, ${schedules.length} schedules");
 
   return {
     'contacts': contacts,
@@ -309,9 +397,9 @@ Map<String, dynamic> _fallbackAdmissionExtraction(String text) {
     'requirements': requirements,
     'academicYear': academicYear,
     'links': links,
+    'schedules': schedules, // ✅ NEW
   };
 }
-
   String _extractJsonFromResponse(String response) {
     // Remove markdown code blocks and extra text
     String cleaned = response

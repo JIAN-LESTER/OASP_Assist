@@ -149,6 +149,8 @@ class _AddFaqContentState extends State<AddFaqContent> {
     super.dispose();
   }
 
+  
+
   Future<void> _saveFaq() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -168,36 +170,87 @@ class _AddFaqContentState extends State<AddFaqContent> {
       _isSubmitting = true;
     });
 
-    try {
-      final faqData = {
-        'question': _questionController.text.trim(),
-        'answer': _answerController.text.trim(),
-        'category': _selectedCategory,
-        'isPredefined': true,
-        'createdAt': Timestamp.now(),
-      };
+   try {
+  final faqData = {
+    'question': _questionController.text.trim(),
+    'answer': _answerController.text.trim(),
+    'category': _selectedCategory,
+    'isPredefined': true,
+    'createdAt': Timestamp.now(),
+  };
 
-      await FirebaseFirestore.instance.collection('faqs').add(faqData);
+  await FirebaseFirestore.instance.collection('faqs').add(faqData);
 
-      // Log the action
-      await _logCreateAction();
+  // Log the action
+  await _logCreateAction();
 
-      if (context.mounted) {
-        SnackbarUtil.showSuccess(context, 'FAQ created successfully!');
-        Navigator.of(context).pop(true);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        SnackbarUtil.showError(context, 'Failed to create FAQ: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
-    }
+  // Pop the modal immediately
+  Navigator.of(context).pop(true);
+
+  // Show success snackbar after modal is closed
+  SnackbarUtil.showSuccess(context, 'FAQ created successfully!');
+} catch (e) {
+  SnackbarUtil.showError(context, 'Failed to create FAQ: $e');
+} finally {
+  if (mounted) setState(() => _isSubmitting = false);
+}
+
   }
+
+//   Future<void> _saveFaq() async {
+//    setState(() => _isSubmitting = true);
+
+//   try {
+//     final db = FirebaseFirestore.instance;
+//     final conversationsSnapshot = await db.collection('conversations').get();
+
+//     if (conversationsSnapshot.docs.isEmpty) {
+//       if (context.mounted) SnackbarUtil.showInfo(context, 'No conversations found.');
+//       return;
+//     }
+
+//     for (final conversationDoc in conversationsSnapshot.docs) {
+//       final conversationId = conversationDoc.id;
+//       final messagesRef = db.collection('conversations').doc(conversationId).collection('messages');
+
+//       bool hasMore = true;
+//       while (hasMore) {
+//         final messagesSnapshot = await messagesRef.limit(100).get();
+
+//         if (messagesSnapshot.docs.isEmpty) {
+//           hasMore = false;
+//           break;
+//         }
+
+//         // Process in smaller batches of 50
+//         for (int i = 0; i < messagesSnapshot.docs.length; i += 50) {
+//           final batch = db.batch();
+//           final end = (i + 50 < messagesSnapshot.docs.length) 
+//               ? i + 50 
+//               : messagesSnapshot.docs.length;
+
+//           for (int j = i; j < end; j++) {
+//             batch.delete(messagesSnapshot.docs[j].reference);
+//           }
+
+//           await batch.commit();
+          
+//           // Small delay to prevent rate limits
+//           await Future.delayed(const Duration(milliseconds: 50));
+//         }
+//       }
+
+//       print('Deleted all messages for conversation $conversationId');
+//     }
+
+//     if (context.mounted) SnackbarUtil.showSuccess(context, 'All messages deleted!');
+//   } catch (e) {
+//     print('Error deleting messages: $e');
+//     if (context.mounted) SnackbarUtil.showError(context, 'Failed to delete messages: $e');
+//   } finally {
+//     if (mounted) setState(() => _isSubmitting = false);
+//   }
+// }
 
   Future<void> _logCreateAction() async {
     try {

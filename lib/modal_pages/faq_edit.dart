@@ -495,13 +495,19 @@ Future<void> _handleSaveChanges(
       'time': Timestamp.now(),
     });
 
+    // Fetch the updated document
+    final updatedDoc = await FirebaseFirestore.instance
+        .collection('faqs')
+        .doc(userDoc.id)
+        .get();
+
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
       Navigator.of(context).pop(); // Close edit modal
 
       Future.delayed(const Duration(milliseconds: 200), () {
-        if (previousModal == 'info') {
-          showFAQInfoModal(context, userDoc, fromEdit: true);
+        if (previousModal == 'info' && updatedDoc.exists) {
+          showFAQInfoModal(context, updatedDoc, fromEdit: true);
         }
       });
 
@@ -514,3 +520,4 @@ Future<void> _handleSaveChanges(
     }
   }
 }
+

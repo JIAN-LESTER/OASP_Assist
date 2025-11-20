@@ -53,15 +53,19 @@ class _AdmissionInfoState extends State<AdmissionInfo>
         _error = null;
       });
 
-      final querySnapshot = await _firestore
-          .collection('admissions')
-          .orderBy('createdAt', descending: true)
-          .get();
+      final querySnapshot =
+          await _firestore
+              .collection('admissions')
+              .orderBy('createdAt', descending: true)
+              .get();
 
       if (querySnapshot.docs.isNotEmpty) {
-        final List<Admissions> admissions = querySnapshot.docs
-            .map((doc) => Admissions.fromJson({...doc.data(), 'id': doc.id}))
-            .toList();
+        final List<Admissions> admissions =
+            querySnapshot.docs
+                .map(
+                  (doc) => Admissions.fromJson({...doc.data(), 'id': doc.id}),
+                )
+                .toList();
 
         // Group by academic year and keep one admission per year
         final Map<String, Admissions> yearMap = {};
@@ -73,12 +77,12 @@ class _AdmissionInfoState extends State<AdmissionInfo>
         }
 
         // Sort descending (most recent first)
-        final sortedAdmissions = yearMap.values.toList()
-          ..sort((a, b) {
-            final aStart = a.academicYear?['start'] ?? 0;
-            final bStart = b.academicYear?['start'] ?? 0;
-            return bStart.compareTo(aStart);
-          });
+        final sortedAdmissions =
+            yearMap.values.toList()..sort((a, b) {
+              final aStart = a.academicYear?['start'] ?? 0;
+              final bStart = b.academicYear?['start'] ?? 0;
+              return bStart.compareTo(aStart);
+            });
 
         setState(() {
           _admissionYears = sortedAdmissions;
@@ -113,13 +117,13 @@ class _AdmissionInfoState extends State<AdmissionInfo>
 
   bool _isSameAcademicYear(Map<String, int>? year1, Map<String, int>? year2) {
     if (year1 == null || year2 == null) return false;
-    return year1['start'] == year2['start'] && 
-           year1['end'] == year2['end'];
+    return year1['start'] == year2['start'] && year1['end'] == year2['end'];
   }
 
   Admissions? get _selectedAdmission {
     return _admissionYears.firstWhere(
-      (admission) => _isSameAcademicYear(admission.academicYear, _selectedAcademicYear),
+      (admission) =>
+          _isSameAcademicYear(admission.academicYear, _selectedAcademicYear),
       orElse: () => _admissionYears.first,
     );
   }
@@ -173,6 +177,8 @@ class _AdmissionInfoState extends State<AdmissionInfo>
               child: Column(
                 children: [
                   _buildAcademicYearSelector(),
+                  // ✅ NEW: Add schedule section
+                  _buildScheduleSection(),
                   _buildStepsAndRequirements(),
                   _buildHelpSection(),
                   const SizedBox(height: 32),
@@ -322,65 +328,291 @@ class _AdmissionInfoState extends State<AdmissionInfo>
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _admissionYears.map((admission) {
-              try {
-                final yearStr = _formatAcademicYear(admission.academicYear);
-                final isSelected = _isSameAcademicYear(
-                  admission.academicYear,
-                  _selectedAcademicYear,
-                );
+            children:
+                _admissionYears.map((admission) {
+                  try {
+                    final yearStr = _formatAcademicYear(admission.academicYear);
+                    final isSelected = _isSameAcademicYear(
+                      admission.academicYear,
+                      _selectedAcademicYear,
+                    );
 
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      _selectedAcademicYear = admission.academicYear;
-                      _currentStepIndex = 0;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: isSelected
-                          ? LinearGradient(
-                              colors: [Colors.green[600]!, Colors.green[700]!],
-                            )
-                          : null,
-                      color: isSelected ? null : Colors.grey[100],
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedAcademicYear = admission.academicYear;
+                          _currentStepIndex = 0;
+                        });
+                      },
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected ? Colors.green[700]! : Colors.grey[300]!,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient:
+                              isSelected
+                                  ? LinearGradient(
+                                    colors: [
+                                      Colors.green[600]!,
+                                      Colors.green[700]!,
+                                    ],
+                                  )
+                                  : null,
+                          color: isSelected ? null : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color:
+                                isSelected
+                                    ? Colors.green[700]!
+                                    : Colors.grey[300]!,
+                          ),
+                          boxShadow:
+                              isSelected
+                                  ? [
+                                    BoxShadow(
+                                      color: Colors.green[600]!.withOpacity(
+                                        0.4,
+                                      ),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ]
+                                  : null,
+                        ),
+                        child: Text(
+                          yearStr,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.grey[700],
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
                       ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: Colors.green[600]!.withOpacity(0.4),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Text(
-                      yearStr,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.grey[700],
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                );
-              } catch (e) {
-                print('Error displaying academic year: $e');
-                return const SizedBox.shrink();
-              }
-            }).toList(),
+                    );
+                  } catch (e) {
+                    print('Error displaying academic year: $e');
+                    return const SizedBox.shrink();
+                  }
+                }).toList(),
           ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NEW: Build schedule section
+  Widget _buildScheduleSection() {
+    final schedules = _selectedAdmission?.schedules;
+
+    if (schedules == null || schedules.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+            spreadRadius: -4,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: Colors.grey[300]!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [primaryGreen.withOpacity(0.9), primaryGreen],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryGreen.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.event_note_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Exam Schedule',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey[900],
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          ...schedules.map((schedule) {
+            final date = schedule['date']?.toString() ?? '';
+            final dayOfWeek = schedule['dayOfWeek']?.toString() ?? '';
+            final locations = schedule['locations'] as List<dynamic>? ?? [];
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    accentGreen.withOpacity(0.1),
+                    accentGreen.withOpacity(0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: accentGreen.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Date and Day
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: primaryGreen,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.calendar_today,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              date,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.grey[900],
+                              ),
+                            ),
+                            if (dayOfWeek.isNotEmpty)
+                              Text(
+                                dayOfWeek,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Locations
+                  if (locations.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey[300]!, width: 1),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on_rounded,
+                                size: 16,
+                                color: primaryGreen,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Locations:',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ...locations.map((location) {
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                left: 24,
+                                bottom: 4,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 8),
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: primaryGreen,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      location.toString(),
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[700],
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }).toList(),
         ],
       ),
     );
@@ -452,7 +684,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
           return Column(
             children: [
               if (steps.isNotEmpty) _buildStepsSection(steps),
-              if (steps.isNotEmpty && requirements.isNotEmpty) 
+              if (steps.isNotEmpty && requirements.isNotEmpty)
                 const SizedBox(height: 24),
               if (requirements.isNotEmpty) _buildRequirementsCard(requirements),
             ],
@@ -463,17 +695,11 @@ class _AdmissionInfoState extends State<AdmissionInfo>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (steps.isNotEmpty)
-                Expanded(
-                  flex: 6,
-                  child: _buildStepsSection(steps),
-                ),
+                Expanded(flex: 6, child: _buildStepsSection(steps)),
               if (steps.isNotEmpty && requirements.isNotEmpty)
                 const SizedBox(width: 24),
               if (requirements.isNotEmpty)
-                Expanded(
-                  flex: 4,
-                  child: _buildRequirementsCard(requirements),
-                ),
+                Expanded(flex: 4, child: _buildRequirementsCard(requirements)),
             ],
           );
         }
@@ -483,14 +709,15 @@ class _AdmissionInfoState extends State<AdmissionInfo>
 
   Widget _buildStepsSection(List<String> steps) {
     return Column(
-      children: steps.asMap().entries.map((entry) {
-        final index = entry.key;
-        final step = entry.value;
-        return Container(
-          margin: const EdgeInsets.only(bottom: 24),
-          child: _buildStepCard(index + 1, step),
-        );
-      }).toList(),
+      children:
+          steps.asMap().entries.map((entry) {
+            final index = entry.key;
+            final step = entry.value;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 24),
+              child: _buildStepCard(index + 1, step),
+            );
+          }).toList(),
     );
   }
 
@@ -595,7 +822,10 @@ class _AdmissionInfoState extends State<AdmissionInfo>
 
   Widget _buildStepCard(int stepNumber, String stepTitle) {
     final cleanedTitle = stepTitle.replaceFirst(
-      RegExp(r'^(Step\s*\d+[:.\-\s]*)|(^\d+[.:-\s]*)|^\[\d+\]\s*', caseSensitive: false),
+      RegExp(
+        r'^(Step\s*\d+[:.\-\s]*)|(^\d+[.:-\s]*)|^\[\d+\]\s*',
+        caseSensitive: false,
+      ),
       '',
     );
 
@@ -680,12 +910,6 @@ class _AdmissionInfoState extends State<AdmissionInfo>
         ),
       ),
     );
-  }
-
-  Widget _buildRequirementsSection() {
-    // This method is now handled by _buildStepsAndRequirements
-    // Kept for backwards compatibility but returns empty widget
-    return const SizedBox.shrink();
   }
 
   Widget _buildHelpSection() {
@@ -788,20 +1012,21 @@ class _AdmissionInfoState extends State<AdmissionInfo>
                 ...admission.contact!.map((contact) {
                   bool isEmail = contact.toLowerCase().contains("email:");
                   bool isPhone = contact.toLowerCase().contains("phone:");
+                  final cleaned =
+                      contact
+                          .replaceAll(
+                            RegExp(
+                              r'^(Email|Phone)\s*:\s*',
+                              caseSensitive: false,
+                            ),
+                            '',
+                          )
+                          .trim();
 
-                  final cleaned = contact
-                      .replaceAll(
-                        RegExp(
-                          r'^(Email|Phone)\s*:\s*',
-                          caseSensitive: false,
-                        ),
-                        '',
-                      )
-                      .trim();
-
-                  final icon = isEmail
-                      ? Icons.email_rounded
-                      : isPhone
+                  final icon =
+                      isEmail
+                          ? Icons.email_rounded
+                          : isPhone
                           ? Icons.phone_rounded
                           : Icons.contact_page_rounded;
 

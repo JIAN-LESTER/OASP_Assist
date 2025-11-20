@@ -40,6 +40,29 @@ void showADInfoModal(
           .toList() ??
       [];
 
+  // ✅ NEW: Parse schedules list
+  final List<Map<String, dynamic>> schedules =
+      (data['schedules'] as List<dynamic>?)
+          ?.map((s) => Map<String, dynamic>.from(s as Map))
+          .toList() ??
+      [];
+
+  // ✅ NEW: Parse requirements list
+  final List<String> requirements =
+      (data['requirements'] as List<dynamic>?)
+          ?.map((r) => r.toString().trim())
+          .where((r) => r.isNotEmpty)
+          .toList() ??
+      [];
+
+  // ✅ NEW: Parse links list
+  final List<String> links =
+      (data['links'] as List<dynamic>?)
+          ?.map((l) => l.toString().trim())
+          .where((l) => l.isNotEmpty)
+          .toList() ??
+      [];
+
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -243,6 +266,126 @@ void showADInfoModal(
 
                         const SizedBox(height: 24),
 
+                        // ✅ NEW: Schedules Section
+                        if (schedules.isNotEmpty) ...[
+                          buildSectionHeader('Exam Schedule', Icons.event_note),
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                                width: 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: schedules.map((schedule) {
+                                final date = schedule['date']?.toString() ?? '';
+                                final dayOfWeek = schedule['dayOfWeek']?.toString() ?? '';
+                                final locations = schedule['locations'] as List<dynamic>? ?? [];
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: const Color(0xFF2E7D32).withOpacity(0.2),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF2E7D32),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Icon(
+                                              Icons.calendar_today,
+                                              color: Colors.white,
+                                              size: 14,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  date,
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFF1F2937),
+                                                  ),
+                                                ),
+                                                if (dayOfWeek.isNotEmpty)
+                                                  Text(
+                                                    dayOfWeek,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w500,
+                                                      color: Color(0xFF6B7280),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (locations.isNotEmpty) ...[
+                                        const SizedBox(height: 12),
+                                        const Divider(height: 1),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Icon(
+                                              Icons.location_on,
+                                              size: 14,
+                                              color: Color(0xFF2E7D32),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: locations.map((location) {
+                                                  return Padding(
+                                                    padding: const EdgeInsets.only(bottom: 4),
+                                                    child: Text(
+                                                      '• ${location.toString()}',
+                                                      style: const TextStyle(
+                                                        fontSize: 13,
+                                                        color: Color(0xFF475569),
+                                                        height: 1.5,
+                                                      ),
+                                                    ),
+                                                  );
+                                                }).toList(),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+
                         // Steps Section
                         if (steps.isNotEmpty) ...[
                           buildSectionHeader('Steps', Icons.list_alt_outlined),
@@ -317,6 +460,113 @@ void showADInfoModal(
                           const SizedBox(height: 24),
                         ],
 
+                        // ✅ NEW: Requirements Section
+                        if (requirements.isNotEmpty) ...[
+                          buildSectionHeader('Requirements', Icons.checklist_outlined),
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                                width: 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: requirements.map((requirement) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        margin: const EdgeInsets.only(top: 6),
+                                        width: 6,
+                                        height: 6,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF2E7D32),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          requirement,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Color(0xFF475569),
+                                            height: 1.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+
+                        // ✅ NEW: Links Section
+                        if (links.isNotEmpty) ...[
+                          buildSectionHeader('Related Links', Icons.link_outlined),
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                                width: 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: links.map((link) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: InkWell(
+                                    onTap: () async {
+                                      // Handle link click - you can use url_launcher here
+                                      print('Link clicked: $link');
+                                    },
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.open_in_new,
+                                          size: 14,
+                                          color: Color(0xFF2E7D32),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            link,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Color(0xFF2563EB),
+                                              decoration: TextDecoration.underline,
+                                              height: 1.5,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+
                         // Metadata Section
                         buildSectionHeader(
                           'Additional Info',
@@ -344,7 +594,7 @@ void showADInfoModal(
                               const SizedBox(height: 16),
                               _buildMetadataRow(
                                 'Academic Year',
-                                data['academicYear'] ?? 'Not specified',
+                                _formatAcademicYear(data['academicYear']),
                                 Icons.calendar_today_outlined,
                               ),
                               const SizedBox(height: 16),
@@ -413,20 +663,38 @@ void showADInfoModal(
   );
 }
 
+// ✅ NEW: Helper function to format academic year
+String _formatAcademicYear(dynamic academicYear) {
+  if (academicYear == null) return 'Not specified';
+  
+  if (academicYear is Map) {
+    final start = academicYear['start'];
+    final end = academicYear['end'];
+    
+    if (start != null && end != null) {
+      return '$start-$end';
+    } else if (start != null) {
+      return '$start';
+    }
+  } else if (academicYear is String) {
+    return academicYear;
+  }
+  
+  return 'Not specified';
+}
+
 Widget _buildActionButtons(
   BuildContext context,
   DocumentSnapshot doc,
   bool isMobile,
   bool isTablet,
 ) {
-  // Professional button sizing
   double buttonHeight = isMobile ? 44 : 48;
   double fontSize = isMobile ? 14 : 15;
   double borderRadius = 10;
 
   return Row(
     children: [
-      // Delete Button
       Expanded(
         child: SizedBox(
           height: buttonHeight,
@@ -436,7 +704,13 @@ Widget _buildActionButtons(
               doc,
               DeleteConfigs.admissions,
               'admissions',
-              customDeleteHandler: handleComplexDocumentDelete,
+              customDeleteHandler: (context, doc) async {
+                await handleComplexDocumentDelete(
+                  context,
+                  doc,
+                  'admissions',
+                );
+              },
             ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
@@ -455,7 +729,6 @@ Widget _buildActionButtons(
         ),
       ),
       const SizedBox(width: 12),
-      // Edit Button
       Expanded(
         child: SizedBox(
           height: buttonHeight,
@@ -487,7 +760,6 @@ Widget _buildActionButtons(
     ],
   );
 }
-
 void _showFullContentModal(
   BuildContext context,
   Map<String, dynamic> data,
@@ -744,12 +1016,18 @@ Widget _buildFullContentActionButtons(
           height: buttonHeight,
           child: OutlinedButton.icon(
             onPressed: () => showDeleteConfirmation(
-              context,
-              doc,
-              DeleteConfigs.admissions,
-              'admissions',
-              customDeleteHandler: handleComplexDocumentDelete,
-            ),
+  context,
+  doc,
+  DeleteConfigs.admissions,
+  'admissions',
+  customDeleteHandler: (context, doc) async {
+    await handleComplexDocumentDelete(
+      context,
+      doc,
+      'admissions', // ✅ Pass the collection name
+    );
+  },
+),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
               'Delete',

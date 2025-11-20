@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -25,11 +26,48 @@ class AdmissionFormDialog extends StatefulWidget {
   State<AdmissionFormDialog> createState() => _AdmissionFormDialogState();
 }
 
+class ScheduleController {
+  final TextEditingController dateController;
+  final TextEditingController dayController;
+  final List<TextEditingController> locationControllers;
+
+  ScheduleController({
+    String date = '',
+    String day = '',
+    List<String>? locations,
+  })  : dateController = TextEditingController(text: date),
+        dayController = TextEditingController(text: day),
+        locationControllers = (locations ?? [''])
+            .map((loc) => TextEditingController(text: loc))
+            .toList();
+
+  void dispose() {
+    dateController.dispose();
+    dayController.dispose();
+    for (var controller in locationControllers) {
+      controller.dispose();
+    }
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'date': dateController.text.trim(),
+      'dayOfWeek': dayController.text.trim(),
+      'locations': locationControllers
+          .map((c) => c.text.trim())
+          .where((t) => t.isNotEmpty)
+          .toList(),
+    };
+  }
+}
+
 class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
   final FileService _fileService = FileService();
   final CohereService _cohereService = CohereService();
   final ImagePicker _imagePicker = ImagePicker();
   final TextRecognizer _textRecognizer = TextRecognizer();
+List<Map<String, dynamic>> _extractedSchedules = []; // Store extracted schedules
+  List<ScheduleController> _scheduleControllers = []; 
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
@@ -57,65 +95,80 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
   }
 
   void _loadExistingData() {
-    final data = widget.doc!.data() as Map<String, dynamic>;
-    _titleController.text = data['title'] ?? '';
-    _contentController.text = data['content'] ?? '';
-    _sourceController.text = data['source'] ?? '';
+  final data = widget.doc!.data() as Map<String, dynamic>;
+  _titleController.text = data['title'] ?? '';
+  _contentController.text = data['content'] ?? '';
+  _sourceController.text = data['source'] ?? '';
 
-    // Format academic year for display
-    if (data['academicYear'] is Map) {
-      final yearMap = Map<String, dynamic>.from(data['academicYear']);
-      if (yearMap.containsKey('end')) {
-        _academicYearController.text = '${yearMap['start']}-${yearMap['end']}';
-      } else {
-        _academicYearController.text = '${yearMap['start']}';
-      }
-    } else if (data['academicYear'] is String) {
-      _academicYearController.text = data['academicYear'];
+  // Format academic year for display
+  if (data['academicYear'] is Map) {
+    final yearMap = Map<String, dynamic>.from(data['academicYear']);
+    if (yearMap.containsKey('end')) {
+      _academicYearController.text = '${yearMap['start']}-${yearMap['end']}';
+    } else {
+      _academicYearController.text = '${yearMap['start']}';
     }
-
-    if (data['contact'] != null && data['contact'] is List) {
-      _contactControllers =
-          (data['contact'] as List)
-              .map((c) => TextEditingController(text: c.toString()))
-              .toList();
-    }
-
-    if (data['steps'] != null && data['steps'] is List) {
-      _stepControllers =
-          (data['steps'] as List)
-              .map((s) => TextEditingController(text: s.toString()))
-              .toList();
-    }
-
-    if (data['requirements'] != null && data['requirements'] is List) {
-      _requirementControllers =
-          (data['requirements'] as List)
-              .map((r) => TextEditingController(text: r.toString()))
-              .toList();
-    }
-
-    if (data['links'] != null && data['links'] is List) {
-      _linkControllers =
-          (data['links'] as List)
-              .map((l) => TextEditingController(text: l.toString()))
-              .toList();
-    }
+  } else if (data['academicYear'] is String) {
+    _academicYearController.text = data['academicYear'];
   }
 
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _contentController.dispose();
-    _sourceController.dispose();
-    _academicYearController.dispose();
-    for (var c in _contactControllers) c.dispose();
-    for (var s in _stepControllers) s.dispose();
-    for (var r in _requirementControllers) r.dispose();
-    for (var l in _linkControllers) l.dispose();
-    _textRecognizer.close();
-    super.dispose();
+  if (data['contact'] != null && data['contact'] is List) {
+    _contactControllers =
+        (data['contact'] as List)
+            .map((c) => TextEditingController(text: c.toString()))
+            .toList();
   }
+
+  if (data['steps'] != null && data['steps'] is List) {
+    _stepControllers =
+        (data['steps'] as List)
+            .map((s) => TextEditingController(text: s.toString()))
+            .toList();
+  }
+
+  if (data['requirements'] != null && data['requirements'] is List) {
+    _requirementControllers =
+        (data['requirements'] as List)
+            .map((r) => TextEditingController(text: r.toString()))
+            .toList();
+  }
+
+  if (data['links'] != null && data['links'] is List) {
+    _linkControllers =
+        (data['links'] as List)
+            .map((l) => TextEditingController(text: l.toString()))
+            .toList();
+  }
+
+  // ✅ NEW: Load schedules
+  if (data['schedules'] != null && data['schedules'] is List) {
+    _scheduleControllers = (data['schedules'] as List).map((schedule) {
+      final scheduleMap = Map<String, dynamic>.from(schedule);
+      return ScheduleController(
+        date: scheduleMap['date']?.toString() ?? '',
+        day: scheduleMap['dayOfWeek']?.toString() ?? '',
+        locations: scheduleMap['locations'] is List
+            ? List<String>.from(scheduleMap['locations'])
+            : null,
+      );
+    }).toList();
+  }
+}
+
+ @override
+void dispose() {
+  _titleController.dispose();
+  _contentController.dispose();
+  _sourceController.dispose();
+  _academicYearController.dispose();
+  for (var c in _contactControllers) c.dispose();
+  for (var s in _stepControllers) s.dispose();
+  for (var r in _requirementControllers) r.dispose();
+  for (var l in _linkControllers) l.dispose();
+  for (var sc in _scheduleControllers) sc.dispose(); // ✅ NEW
+  _textRecognizer.close();
+  super.dispose();
+}
 
   Future<void> _pickFile() async {
     try {
@@ -221,68 +274,85 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     }
   }
 
-  Future<void> _processExtractedText(String text, String fileName) async {
-    try {
-      final analysisResult = await _cohereService.analyzeAdmission(text);
+ Future<void> _processExtractedText(String text, String fileName) async {
+  try {
+    final analysisResult = await _cohereService.analyzeAdmission(text);
 
-      setState(() {
-        if (_titleController.text.isEmpty) {
-          _titleController.text = fileName.split('.').first;
+    setState(() {
+      if (_titleController.text.isEmpty) {
+        _titleController.text = fileName.split('.').first;
+      }
+      _contentController.text = text;
+      _sourceController.text = fileName;
+
+      // Format academic year for display
+      if (analysisResult['academicYear'] is Map) {
+        final yearMap = analysisResult['academicYear'] as Map<String, int>;
+        if (yearMap.containsKey('end')) {
+          _academicYearController.text =
+              '${yearMap['start']}-${yearMap['end']}';
+        } else {
+          _academicYearController.text = '${yearMap['start']}';
         }
-        _contentController.text = text;
-        _sourceController.text = fileName;
+      }
 
-        // Format academic year for display
-        if (analysisResult['academicYear'] is Map) {
-          final yearMap = analysisResult['academicYear'] as Map<String, int>;
-          if (yearMap.containsKey('end')) {
-            _academicYearController.text =
-                '${yearMap['start']}-${yearMap['end']}';
-          } else {
-            _academicYearController.text = '${yearMap['start']}';
-          }
-        }
-
-        if (analysisResult['contacts'] is List<Map<String, dynamic>>) {
-          List<Map<String, dynamic>> contacts =
-              analysisResult['contacts'] as List<Map<String, dynamic>>;
-          if (contacts.isNotEmpty) {
-            _contactControllers =
-                contacts
-                    .map(
-                      (c) => TextEditingController(
-                        text: '${c['type']}: ${c['value']}',
-                      ),
-                    )
-                    .toList();
-          }
-        }
-
-        if (analysisResult['steps'] is List) {
-          _stepControllers =
-              (analysisResult['steps'] as List)
-                  .map((s) => TextEditingController(text: s.toString()))
+      if (analysisResult['contacts'] is List<Map<String, dynamic>>) {
+        List<Map<String, dynamic>> contacts =
+            analysisResult['contacts'] as List<Map<String, dynamic>>;
+        if (contacts.isNotEmpty) {
+          _contactControllers =
+              contacts
+                  .map(
+                    (c) => TextEditingController(
+                      text: '${c['type']}: ${c['value']}',
+                    ),
+                  )
                   .toList();
         }
+      }
 
-        if (analysisResult['requirements'] is List) {
-          _requirementControllers =
-              (analysisResult['requirements'] as List)
-                  .map((r) => TextEditingController(text: r.toString()))
-                  .toList();
-        }
+      if (analysisResult['steps'] is List) {
+        _stepControllers =
+            (analysisResult['steps'] as List)
+                .map((s) => TextEditingController(text: s.toString()))
+                .toList();
+      }
 
-        if (analysisResult['links'] is List) {
-          _linkControllers =
-              (analysisResult['links'] as List)
-                  .map((l) => TextEditingController(text: l.toString()))
-                  .toList();
-        }
-      });
-    } catch (e) {
-      print('Error analyzing admission: $e');
-    }
+      if (analysisResult['requirements'] is List) {
+        _requirementControllers =
+            (analysisResult['requirements'] as List)
+                .map((r) => TextEditingController(text: r.toString()))
+                .toList();
+      }
+
+      if (analysisResult['links'] is List) {
+        _linkControllers =
+            (analysisResult['links'] as List)
+                .map((l) => TextEditingController(text: l.toString()))
+                .toList();
+      }
+
+      // ✅ NEW: Handle schedules
+      if (analysisResult['schedules'] is List && 
+          (analysisResult['schedules'] as List).isNotEmpty) {
+        _scheduleControllers = (analysisResult['schedules'] as List).map((schedule) {
+          final scheduleMap = Map<String, dynamic>.from(schedule);
+          return ScheduleController(
+            date: scheduleMap['date']?.toString() ?? '',
+            day: scheduleMap['dayOfWeek']?.toString() ?? '',
+            locations: scheduleMap['locations'] is List
+                ? List<String>.from(scheduleMap['locations'])
+                : null,
+          );
+        }).toList();
+        
+        print("📅 Extracted ${_scheduleControllers.length} schedules");
+      }
+    });
+  } catch (e) {
+    print('Error analyzing admission: $e');
   }
+}
 
   Map<String, int>? parseAcademicYear(
     String? yearStr, [
@@ -485,77 +555,84 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     );
   }
 
-  Future<void> _submitForm() async {
-    if (_titleController.text.trim().isEmpty) {
-      _showAlert('Please enter a title', AlertType.warning);
-      return;
-    }
+ Future<void> _submitForm() async {
+  if (_titleController.text.trim().isEmpty) {
+    _showAlert('Please enter a title', AlertType.warning);
+    return;
+  }
 
-    setState(() => _isSubmitting = true);
+  setState(() => _isSubmitting = true);
 
-    try {
-      final uuid = Uuid();
-      final docId = widget.isEdit ? widget.doc!.id : uuid.v4();
+  try {
+    final uuid = Uuid();
+    final docId = widget.isEdit ? widget.doc!.id : uuid.v4();
 
-      final admission = Admissions(
+    // ✅ Convert schedule controllers to list of maps
+    final schedulesList = _scheduleControllers
+        .map((sc) => sc.toMap())
+        .where((s) => s['date'].toString().isNotEmpty)
+        .toList();
+
+    final admission = Admissions(
+      id: docId,
+      title: _titleController.text.trim(),
+      content: _contentController.text.trim(),
+      source: _sourceController.text.trim(),
+      academicYear: parseAcademicYear(_academicYearController.text.trim()),
+      contact:
+          _contactControllers
+              .map((c) => c.text.trim())
+              .where((t) => t.isNotEmpty)
+              .toList(),
+      steps:
+          _stepControllers
+              .map((s) => s.text.trim())
+              .where((t) => t.isNotEmpty)
+              .toList(),
+      requirements:
+          _requirementControllers
+              .map((r) => r.text.trim())
+              .where((t) => t.isNotEmpty)
+              .toList(),
+      links:
+          _linkControllers
+              .map((l) => l.text.trim())
+              .where((t) => t.isNotEmpty)
+              .toList(),
+      schedules: schedulesList.isNotEmpty ? schedulesList : null, // ✅ Use converted schedules
+      createdAt: DateTime.now(),
+    );
+
+    await _fileService.saveToAdmission(admission);
+
+    if (_contentController.text.trim().isNotEmpty) {
+      final informationBank = InformationBank(
         id: docId,
         title: _titleController.text.trim(),
         content: _contentController.text.trim(),
+        embedding: [],
         source: _sourceController.text.trim(),
-        academicYear: parseAcademicYear(_academicYearController.text.trim()),
-        contact:
-            _contactControllers
-                .map((c) => c.text.trim())
-                .where((t) => t.isNotEmpty)
-                .toList(),
-        steps:
-            _stepControllers
-                .map((s) => s.text.trim())
-                .where((t) => t.isNotEmpty)
-                .toList(),
-        requirements:
-            _requirementControllers
-                .map((r) => r.text.trim())
-                .where((t) => t.isNotEmpty)
-                .toList(),
-        links:
-            _linkControllers
-                .map((l) => l.text.trim())
-                .where((t) => t.isNotEmpty)
-                .toList(),
-        createdAt: DateTime.now(),
+        category: 'Admission',
       );
+      await _fileService.saveToInformationBank(informationBank);
+    }
 
-      await _fileService.saveToAdmission(admission);
+    await _logCreateAction(widget.isEdit ? 'Updated' : 'Added');
 
-      if (_contentController.text.trim().isNotEmpty) {
-        final informationBank = InformationBank(
-          id: docId,
-          title: _titleController.text.trim(),
-          content: _contentController.text.trim(),
-          embedding: [],
-          source: _sourceController.text.trim(),
-          category: 'Admission',
-        );
-        await _fileService.saveToInformationBank(informationBank);
-      }
+    _showAlert(
+      'Admission ${widget.isEdit ? 'updated' : 'added'} successfully with ${schedulesList.length} schedule(s)!',
+      AlertType.success,
+    );
 
-      await _logCreateAction(widget.isEdit ? 'Updated' : 'Added');
-
-      _showAlert(
-        'Admission ${widget.isEdit ? 'updated' : 'added'} successfully!',
-        AlertType.success,
-      );
-
-      Navigator.of(context).pop(true);
-    } catch (e) {
-      _showAlert('Error: $e', AlertType.error);
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+    Navigator.of(context).pop(true);
+  } catch (e) {
+    _showAlert('Error: $e', AlertType.error);
+  } finally {
+    if (mounted) {
+      setState(() => _isSubmitting = false);
     }
   }
+}
 
   Future<void> _logCreateAction(String action) async {
     try {
@@ -933,6 +1010,18 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                       isMobile,
                     ),
                     SizedBox(height: 10),
+                      _buildDynamicListSection(
+        'Relevant Links',
+        _linkControllers,
+        Icons.link_outlined,
+        'https://example.com',
+        isMobile,
+      ),
+      
+      SizedBox(height: 24), // ✅ Add spacing
+      
+      // ✅ NEW: Schedule Section
+      _buildScheduleSection(isMobile),
 
                     _buildDynamicListSection(
                       'Relevant Links',
@@ -1045,6 +1134,273 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
       ),
     );
   }
+
+  Widget _buildScheduleSection(bool isMobile) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      buildSectionHeader('Schedule', Icons.calendar_month_outlined),
+      SizedBox(height: 16),
+      
+      if (_scheduleControllers.isEmpty)
+        Container(
+          padding: EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: Color(0xFF64748B), size: 20),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'No schedule entries. Click "Add Schedule" to create one.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        )
+      else
+        ..._scheduleControllers.asMap().entries.map((entry) {
+          final index = entry.key;
+          final scheduleController = entry.value;
+          
+          return Container(
+            margin: EdgeInsets.only(bottom: 16),
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Color(0xFFFAFBFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Color(0xFFE2E8F0), width: 1.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with delete button
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF2E7D32).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Schedule ${index + 1}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ),
+                    Spacer(),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          setState(() {
+                            scheduleController.dispose();
+                            _scheduleControllers.removeAt(index);
+                          });
+                        },
+                        child: Container(
+                          padding: EdgeInsets.all(6),
+                          child: Icon(
+                            Icons.delete_outline,
+                            color: Colors.red,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                SizedBox(height: 12),
+                
+                // Date field
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: buildTextField(
+                        controller: scheduleController.dateController,
+                        isMobile: isMobile,
+                        label: 'Date',
+                        hint: 'e.g., OCT 4, 2025',
+                        icon: Icons.event,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: buildTextField(
+                        controller: scheduleController.dayController,
+                        isMobile: isMobile,
+                        label: 'Day',
+                        hint: 'SATURDAY',
+                        icon: Icons.today,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                SizedBox(height: 12),
+                
+                // Locations
+                Text(
+                  'Locations',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                SizedBox(height: 8),
+                
+                ...scheduleController.locationControllers.asMap().entries.map((locEntry) {
+                  final locIndex = locEntry.key;
+                  final locController = locEntry.value;
+                  
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: locController,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Enter location',
+                              prefixIcon: Icon(
+                                Icons.location_on_outlined,
+                                size: 18,
+                                color: Color(0xFF64748B),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: Color(0xFFE2E8F0)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: Color(0xFFE2E8F0)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(
+                                  color: Color(0xFF2E7D32),
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (scheduleController.locationControllers.length > 1) ...[
+                          SizedBox(width: 8),
+                          Container(
+                            height: 42,
+                            width: 42,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () {
+                                  setState(() {
+                                    locController.dispose();
+                                    scheduleController.locationControllers.removeAt(locIndex);
+                                  });
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.red.withOpacity(0.3),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.remove_circle_outline,
+                                    color: Colors.red,
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }).toList(),
+                
+                // Add location button
+                TextButton.icon(
+                  icon: Icon(Icons.add_location_outlined, size: 16),
+                  label: Text(
+                    'Add Location',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Color(0xFF2E7D32),
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      scheduleController.locationControllers.add(TextEditingController());
+                    });
+                  },
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      
+      SizedBox(height: 12),
+      
+      // Add schedule button
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          icon: Icon(Icons.add_circle_outline, size: 20),
+          label: Text(
+            'Add Schedule Entry',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Color(0xFF2E7D32),
+            side: BorderSide(color: Color(0xFF2E7D32), width: 1.5),
+            padding: EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          onPressed: () {
+            setState(() {
+              _scheduleControllers.add(ScheduleController());
+            });
+          },
+        ),
+      ),
+    ],
+  );
+}
 
   Widget _buildDynamicListSection(
     String title,

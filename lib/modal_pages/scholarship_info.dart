@@ -492,12 +492,18 @@ Widget _buildActionButtons(
           height: buttonHeight,
           child: OutlinedButton.icon(
             onPressed: () => showDeleteConfirmation(
-              context,
-              doc,
-              DeleteConfigs.scholarships,
-              'scholarships',
-              customDeleteHandler: handleComplexDocumentDelete,
-            ),
+  context,
+  doc,
+  DeleteConfigs.scholarships,
+  'scholarships',
+  customDeleteHandler: (context, doc) async {
+    await handleComplexDocumentDelete(
+      context,
+      doc,
+      'scholarships', // ✅ Pass the collection name
+    );
+  },
+),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
               'Delete',

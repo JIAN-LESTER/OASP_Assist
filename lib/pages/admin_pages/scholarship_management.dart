@@ -599,179 +599,17 @@ Widget _buildScholarshipRow({
   required String deadline,
   required List<String>? privileges,
 }) {
-  double screenWidth = MediaQuery.of(context).size.width;
-  bool isMobile = screenWidth < 600;
-  bool isTablet = screenWidth >= 600 && screenWidth < 1100;
-
-  return Container(
-    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: Colors.grey[200]!),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: InkWell(
-      onTap: () => showSCInfoModal(context, doc),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (!isMobile && scholarshipProvider.isNotEmpty)
-                  Text(
-                    scholarshipProvider,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
-          ),
-          if (!isMobile)
-            Expanded(
-              flex: 4,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children:
-                    eligibilityRequirements != null &&
-                            eligibilityRequirements.isNotEmpty
-                        ? eligibilityRequirements.map((c) {
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 4),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              c,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          );
-                        }).toList()
-                        : [
-                          Text(
-                            "No eligibility/requirements",
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-              ),
-            ),
-          if (!isMobile)
-            Expanded(
-              flex: 3,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children:
-                    privileges != null && privileges.isNotEmpty
-                        ? privileges.map((c) {
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 4),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              c,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          );
-                        }).toList()
-                        : [
-                          Text(
-                            "No privileges",
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-              ),
-            ),
-          if (!isMobile)
-            Expanded(
-              flex: 3,
-              child: Text(
-                deadline.isNotEmpty ? deadline : "N/A",
-                style: const TextStyle(fontSize: 13),
-              ),
-            ),
-          SizedBox(width: isTablet ? 60 : 80),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz),
-            onSelected: (value) {
-              if (value == 'edit') {
-                showDialog(
-                  context: context,
-                  builder:
-                      (context) =>
-                          ScholarshipFormDialog(doc: doc, isEdit: true),
-                );
-              } else if (value == 'delete') {
-                showDeleteConfirmation(
-                  context,
-                  doc,
-                  DeleteConfigs.scholarships,
-                  'scholarships',
-                  customDeleteHandler: handleComplexDocumentDelete,
-                );
-              }
-            },
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18),
-                        SizedBox(width: 8),
-                        Text('Delete'),
-                      ],
-                    ),
-                  ),
-                ],
-          ),
-        ],
-      ),
-    ),
+  return _ScholarshipRowWidget(
+    context: context,
+    doc: doc,
+    name: name,
+    scholarshipProvider: scholarshipProvider,
+    description: description,
+    eligibilityRequirements: eligibilityRequirements,
+    deadline: deadline,
+    privileges: privileges,
   );
 }
-
 Widget _buildHeader(
   String selectedProvider,
   List<DocumentSnapshot> allScholarships,
@@ -965,4 +803,259 @@ Widget _buildTableHeader() {
       );
     },
   );
+}
+
+Widget _buildExpandableList({
+  required List<String> items,
+  required String emptyText,
+  bool isExpanded = false,
+  required Function(bool) onToggle,
+}) {
+  if (items.isEmpty) {
+    return Text(
+      emptyText,
+      style: TextStyle(
+        fontSize: 12,
+        color: Colors.grey[600],
+        fontStyle: FontStyle.italic,
+      ),
+    );
+  }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // First item (always visible)
+      Container(
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.red[50],
+          border: Border.all(color: Colors.red[200]!),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          items[0],
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.red[900],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      
+      // Expanded items
+      if (isExpanded && items.length > 1)
+        ...items.skip(1).map((item) => Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.red[50],
+            border: Border.all(color: Colors.red[200]!),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            item,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.red[900],
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        )),
+      
+      // Toggle button
+      if (items.length > 1)
+        InkWell(
+          onTap: () => onToggle(!isExpanded),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 16,
+                  color: Colors.red[700],
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  isExpanded ? 'Show less' : '+${items.length - 1} more',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.red[700],
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
+class _ScholarshipRowWidget extends StatefulWidget {
+  final BuildContext context;
+  final DocumentSnapshot doc;
+  final String name;
+  final String scholarshipProvider;
+  final String description;
+  final List<String>? eligibilityRequirements;
+  final String deadline;
+  final List<String>? privileges;
+
+  const _ScholarshipRowWidget({
+    required this.context,
+    required this.doc,
+    required this.name,
+    required this.scholarshipProvider,
+    required this.description,
+    required this.eligibilityRequirements,
+    required this.deadline,
+    required this.privileges,
+  });
+
+  @override
+  State<_ScholarshipRowWidget> createState() => _ScholarshipRowWidgetState();
+}
+
+class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
+  bool eligibilityExpanded = false;
+  bool benefitsExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    double screenWidth = MediaQuery.of(context).size.width;
+    bool isMobile = screenWidth < 600;
+    bool isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: InkWell(
+        onTap: () => showSCInfoModal(context, widget.doc),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Scholarship Name
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (!isMobile && widget.scholarshipProvider.isNotEmpty)
+                    Text(
+                      widget.scholarshipProvider,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            
+            // Eligibility/Requirements
+            if (!isMobile)
+              Expanded(
+                flex: 4,
+                child: _buildExpandableList(
+                  items: widget.eligibilityRequirements ?? [],
+                  emptyText: 'No eligibility/requirements',
+                  isExpanded: eligibilityExpanded,
+                  onToggle: (value) => setState(() => eligibilityExpanded = value),
+                ),
+              ),
+
+            // Benefits/Privileges
+            if (!isMobile)
+              Expanded(
+                flex: 3,
+                child: _buildExpandableList(
+                  items: widget.privileges ?? [],
+                  emptyText: 'No benefits',
+                  isExpanded: benefitsExpanded,
+                  onToggle: (value) => setState(() => benefitsExpanded = value),
+                ),
+              ),
+
+            // Deadline
+            if (!isMobile)
+              Expanded(
+                flex: 3,
+                child: Text(
+                  widget.deadline.isNotEmpty ? widget.deadline : "N/A",
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+
+            // Actions
+            SizedBox(width: isTablet ? 60 : 80),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_horiz),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  showDialog(
+                    context: context,
+                    builder: (context) => ScholarshipFormDialog(doc: widget.doc, isEdit: true),
+                  );
+                } else if (value == 'delete') {
+                  showDeleteConfirmation(
+                    context,
+                    widget.doc,
+                    DeleteConfigs.scholarships,
+                    'scholarships',
+                    customDeleteHandler: (context, doc) async {
+                      await handleComplexDocumentDelete(
+                        context,
+                        doc,
+                        'scholarships',
+                      );
+                    },
+                  );
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18),
+                      SizedBox(width: 8),
+                      Text('Delete'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

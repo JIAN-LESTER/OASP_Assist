@@ -614,11 +614,7 @@ class StatDataManagement {
     );
   }
 
-  // ==================== CHATBOT USAGE REPORTS ====================
-  // Add your existing chatbot usage methods here
 
-  // ==================== USER DEMOGRAPHICS REPORTS ====================
-  // Add your existing user demographics methods here
 
   // ==================== FIRESTORE QUERY METHODS ====================
   Future<List<QueryDocumentSnapshot>> _getUsersOptimized() async {
