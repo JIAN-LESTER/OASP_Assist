@@ -313,7 +313,7 @@ class FirebaseService {
         await _firestore
             .collection('faqs')
             .orderBy('similarityCount', descending: true)
-            .limit(10)
+            .limit(5)
             .get();
     return snapshot.docs;
   }

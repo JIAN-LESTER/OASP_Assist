@@ -428,14 +428,7 @@ Widget buildUsersByProgramCard(Map<String, int> programData) {
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
                                   ),
-                                  badgeWidget: percentage >= 10
-                                      ? _buildPieBadge(
-                                          DashboardWidgets.shortenProgram(entry.key),
-                                          entry.value,
-                                          isMobile,
-                                        )
-                                      : null,
-                                  badgePositionPercentageOffset: 1.3,
+                                
                                 );
                               }).toList(),
                               centerSpaceRadius: isMobile ? 25 : 35,
@@ -466,32 +459,7 @@ Widget buildUsersByProgramCard(Map<String, int> programData) {
   );
 }
 
-Widget _buildPieBadge(String text, int count, bool isMobile) {
-  return Container(
-    padding: EdgeInsets.symmetric(
-      horizontal: isMobile ? 4 : 6,
-      vertical: isMobile ? 2 : 4,
-    ),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(4),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.1),
-          blurRadius: 4,
-        ),
-      ],
-    ),
-    child: Text(
-      text,
-      style: TextStyle(
-        fontSize: isMobile ? 9 : 10,
-        fontWeight: FontWeight.bold,
-        color: Colors.grey[800],
-      ),
-    ),
-  );
-}
+
 
 Widget _buildProgramLegend(Map<String, int> programData, int totalUsers, bool isMobile) {
   final sortedEntries = programData.entries.toList()
@@ -888,13 +856,7 @@ Widget buildUserAffiliationsCard(Map<String, int> userAffiliations) {
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
                                   ),
-                                  badgeWidget: percentage >= 12
-                                      ? _buildAffiliationBadge(
-                                          _shortenAffiliation(entry.key),
-                                          isMobile,
-                                        )
-                                      : null,
-                                  badgePositionPercentageOffset: 1.3,
+                              
                                 );
                               }).toList(),
                               centerSpaceRadius: isMobile ? 25 : 35,
@@ -991,35 +953,6 @@ Widget _buildAffiliationLegend(Map<String, int> affiliations, int totalUsers, bo
     ),
   );
 }
-
-Widget _buildAffiliationBadge(String text, bool isMobile) {
-  return Container(
-    padding: EdgeInsets.symmetric(
-      horizontal: isMobile ? 4 : 6,
-      vertical: isMobile ? 2 : 4,
-    ),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(4),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.1),
-          blurRadius: 4,
-        ),
-      ],
-    ),
-    child: Text(
-      text,
-      style: TextStyle(
-        fontSize: isMobile ? 9 : 10,
-        fontWeight: FontWeight.bold,
-        color: Colors.grey[800],
-      ),
-    ),
-  );
-}
-
-
 
 
 // ==================== UTILITY FUNCTIONS ====================

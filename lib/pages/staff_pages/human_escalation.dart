@@ -29,15 +29,25 @@ class _HumanEscalationState extends State<HumanEscalation>
     'resolved',
   ];
 
- @override
+  @override
   void initState() {
     super.initState();
+    
+    _refreshAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.toLowerCase();
+      });
+    });
     
     print('📄 HumanEscalation initState:');
     print('   - initialEscalationId: ${widget.initialEscalationId}');
     print('   - autoOpen: ${widget.autoOpen}');
     
-    // ✅ Auto-open escalation if specified
     if (widget.autoOpen && widget.initialEscalationId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         print('⏰ Post-frame callback: Opening escalation ${widget.initialEscalationId}');
@@ -56,7 +66,6 @@ class _HumanEscalationState extends State<HumanEscalation>
     print('   - old autoOpen: ${oldWidget.autoOpen}');
     print('   - new autoOpen: ${widget.autoOpen}');
     
-    // ✅ Handle updates to escalation ID
     if (widget.autoOpen && 
         widget.initialEscalationId != null && 
         widget.initialEscalationId != oldWidget.initialEscalationId) {
@@ -69,7 +78,6 @@ class _HumanEscalationState extends State<HumanEscalation>
     }
   }
 
-// ✅ ADD THIS METHOD:
   Future<void> _openEscalationById(String escalationId) async {
     try {
       print('📂 Opening escalation: $escalationId');
@@ -184,6 +192,14 @@ class _HumanEscalationState extends State<HumanEscalation>
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600;
+    final isDesktop = screenWidth >= 900;
+    
+    // Responsive padding
+    final horizontalPadding = isDesktop ? 32.0 : (isTablet ? 24.0 : 16.0);
+    final verticalPadding = isDesktop ? 24.0 : (isTablet ? 20.0 : 16.0);
+    
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
@@ -206,36 +222,45 @@ class _HumanEscalationState extends State<HumanEscalation>
                 ],
               ),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding, 
+                  verticalPadding, 
+                  horizontalPadding, 
+                  0
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Enhanced title and actions
                     Row(
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Escalations",
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
-                      
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Escalations",
+                                style: TextStyle(
+                                  fontSize: isDesktop ? 26 : (isTablet ? 24 : 20),
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF0F172A),
+                                ),
                               ),
-                            ),
-                            Text(
-                              "Manage and resolve user escalations",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ],
+                              if (isTablet) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Manage and resolve user escalations",
+                                  style: TextStyle(
+                                    fontSize: isDesktop ? 15 : 14,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
-                        const Spacer(),
+                        const SizedBox(width: 12),
                         // Enhanced action buttons
                         Container(
                           decoration: BoxDecoration(
@@ -300,30 +325,30 @@ class _HumanEscalationState extends State<HumanEscalation>
                               }).toList();
                             },
                             child: Container(
-                              padding: const EdgeInsets.all(12),
+                              padding: EdgeInsets.all(isTablet ? 12 : 10),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF0F172A),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.tune,
                                 color: Colors.white,
-                                size: 20,
+                                size: isTablet ? 20 : 18,
                               ),
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: isTablet ? 24 : 16),
                     
-                    // Search Bar - Always visible
+                    // Search Bar - Responsive
                     Container(
-                      margin: const EdgeInsets.only(bottom: 24),
+                      margin: EdgeInsets.only(bottom: isTablet ? 24 : 16),
                       decoration: BoxDecoration(
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withOpacity(0.08),
                             offset: const Offset(0, 2),
                             blurRadius: 8,
                           ),
@@ -334,34 +359,54 @@ class _HumanEscalationState extends State<HumanEscalation>
                         decoration: InputDecoration(
                           hintText: 'Search escalations...',
                           hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                          prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
+                          prefixIcon: Icon(
+                            Icons.search, 
+                            color: const Color(0xFF64748B),
+                            size: isTablet ? 22 : 20,
+                          ),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear, color: Color(0xFF64748B)),
-                                  onPressed: () => _searchController.clear(),
+                                  icon: Icon(
+                                    Icons.clear, 
+                                    color: const Color(0xFF64748B),
+                                    size: isTablet ? 22 : 20,
+                                  ),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {
+                                      _searchQuery = '';
+                                    });
+                                  },
                                 )
                               : null,
                           filled: true,
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(isTablet ? 16 : 14),
                             borderSide: BorderSide.none,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: isTablet ? 20 : 16, 
+                            vertical: isTablet ? 18 : 14,
+                          ),
+                        ),
+                        style: TextStyle(
+                          fontSize: isTablet ? 15 : 14,
                         ),
                       ),
-                    ),                    // Active filters with improved design
-                        // Enhanced Stats Row
+                    ),
+                    
+                    // Enhanced Stats Row - Responsive
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance.collection('escalations').snapshots(),
                       builder: (context, snapshot) {
                         if (!snapshot.hasData) {
                           return Container(
-                            height: 90,
-                            margin: const EdgeInsets.only(bottom: 24),
+                            height: isTablet ? 90 : 80,
+                            margin: EdgeInsets.only(bottom: isTablet ? 24 : 16),
                             decoration: BoxDecoration(
                               color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
                             ),
                           );
                         }
@@ -372,7 +417,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                         final resolved = docs.where((doc) => (doc.data() as Map)['status'] == 'resolved').length;
 
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 24),
+                          margin: EdgeInsets.only(bottom: isTablet ? 24 : 16),
                           child: Row(
                             children: [
                               Expanded(
@@ -383,9 +428,10 @@ class _HumanEscalationState extends State<HumanEscalation>
                                   icon: Icons.inbox,
                                   isSelected: _selectedFilter == 'all',
                                   onTap: () => setState(() => _selectedFilter = 'all'),
+                                  isCompact: !isTablet,
                                 ),
                               ),
-                              const SizedBox(width: 16),
+                              SizedBox(width: isTablet ? 16 : 8),
                               Expanded(
                                 child: _StatCard(
                                   title: "Pending",
@@ -394,9 +440,10 @@ class _HumanEscalationState extends State<HumanEscalation>
                                   icon: Icons.schedule,
                                   isSelected: _selectedFilter == 'pending',
                                   onTap: () => setState(() => _selectedFilter = 'pending'),
+                                  isCompact: !isTablet,
                                 ),
                               ),
-                              const SizedBox(width: 16),
+                              SizedBox(width: isTablet ? 16 : 8),
                               Expanded(
                                 child: _StatCard(
                                   title: "Resolved",
@@ -405,6 +452,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                                   icon: Icons.check_circle,
                                   isSelected: _selectedFilter == 'resolved',
                                   onTap: () => setState(() => _selectedFilter = 'resolved'),
+                                  isCompact: !isTablet,
                                 ),
                               ),
                             ],
@@ -412,14 +460,12 @@ class _HumanEscalationState extends State<HumanEscalation>
                         );
                       },
                     ),
-
-            
                   ],
                 ),
               ),
             ),
 
-            // Enhanced List
+            // Enhanced List - Responsive
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
@@ -441,6 +487,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                       icon: Icons.inbox_outlined,
                       title: "No escalations found",
                       subtitle: "All caught up! No escalations to review.",
+                      isCompact: !isTablet,
                     );
                   }
 
@@ -463,11 +510,12 @@ class _HumanEscalationState extends State<HumanEscalation>
                       subtitle: _searchQuery.isNotEmpty 
                           ? "Try adjusting your search terms"
                           : "No ${_selectedFilter} escalations found",
+                      isCompact: !isTablet,
                     );
                   }
 
                   return ListView.builder(
-                    padding: const EdgeInsets.all(24),
+                    padding: EdgeInsets.all(horizontalPadding),
                     itemCount: escalations.length,
                     itemBuilder: (context, index) {
                       final doc = escalations[index];
@@ -475,10 +523,10 @@ class _HumanEscalationState extends State<HumanEscalation>
                       final status = escalation['status']?.toString() ?? 'unknown';
 
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 16),
+                        margin: EdgeInsets.only(bottom: isTablet ? 16 : 12),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.05),
@@ -490,7 +538,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
                             onTap: () {
                               showDialog(
                                 context: context,
@@ -502,23 +550,24 @@ class _HumanEscalationState extends State<HumanEscalation>
                               );
                             },
                             child: Padding(
-                              padding: const EdgeInsets.all(20),
+                              padding: EdgeInsets.all(isTablet ? 20 : 14),
                               child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // Enhanced status indicator
                                   Container(
-                                    padding: const EdgeInsets.all(8),
+                                    padding: EdgeInsets.all(isTablet ? 10 : 8),
                                     decoration: BoxDecoration(
                                       color: _getStatusColor(status).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(isTablet ? 12 : 10),
                                     ),
                                     child: Icon(
                                       _getStatusIcon(status),
                                       color: _getStatusColor(status),
-                                      size: 20,
+                                      size: isTablet ? 22 : 18,
                                     ),
                                   ),
-                                  const SizedBox(width: 16),
+                                  SizedBox(width: isTablet ? 16 : 12),
                                   
                                   // Enhanced content
                                   Expanded(
@@ -528,22 +577,27 @@ class _HumanEscalationState extends State<HumanEscalation>
                                         // Question
                                         Text(
                                           escalation['question'] ?? 'No question provided',
-                                          style: const TextStyle(
-                                            fontSize: 16,
+                                          style: TextStyle(
+                                            fontSize: isTablet ? 16 : 15,
                                             fontWeight: FontWeight.w600,
-                                            color: Color(0xFF0F172A),
+                                            color: const Color(0xFF0F172A),
                                             height: 1.4,
                                           ),
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                        const SizedBox(height: 12),
+                                        SizedBox(height: isTablet ? 12 : 8),
                                         
                                         // Enhanced meta info
-                                        Row(
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
                                           children: [
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: isTablet ? 10 : 8, 
+                                                vertical: isTablet ? 5 : 4,
+                                              ),
                                               decoration: BoxDecoration(
                                                 color: _getStatusColor(status).withOpacity(0.15),
                                                 borderRadius: BorderRadius.circular(8),
@@ -551,31 +605,36 @@ class _HumanEscalationState extends State<HumanEscalation>
                                               child: Text(
                                                 status.toUpperCase(),
                                                 style: TextStyle(
-                                                  fontSize: 11,
+                                                  fontSize: isTablet ? 11 : 10,
                                                   fontWeight: FontWeight.w700,
                                                   color: _getStatusColor(status),
+                                                  letterSpacing: 0.5,
                                                 ),
                                               ),
                                             ),
-                                            const SizedBox(width: 12),
-                                            Icon(
-                                              Icons.schedule,
-                                              size: 14,
-                                              color: Colors.grey[500],
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              _formatDate(escalation['createdAt'] as Timestamp?),
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.grey[600],
-                                                fontWeight: FontWeight.w500,
-                                              ),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.schedule,
+                                                  size: isTablet ? 14 : 12,
+                                                  color: Colors.grey[500],
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  _formatDate(escalation['createdAt'] as Timestamp?),
+                                                  style: TextStyle(
+                                                    fontSize: isTablet ? 13 : 12,
+                                                    color: Colors.grey[600],
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
                                         
-                                        if (escalation['reason'] != null) ...[
+                                        if (escalation['reason'] != null && isTablet) ...[
                                           const SizedBox(height: 8),
                                           Text(
                                             escalation['reason'],
@@ -592,11 +651,13 @@ class _HumanEscalationState extends State<HumanEscalation>
                                     ),
                                   ),
                                   
+                                  SizedBox(width: isTablet ? 12 : 8),
+                                  
                                   // Enhanced arrow
                                   Icon(
                                     Icons.arrow_forward_ios,
                                     color: Colors.grey[400],
-                                    size: 16,
+                                    size: isTablet ? 16 : 14,
                                   ),
                                 ],
                               ),
@@ -623,6 +684,7 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
+  final bool isCompact;
 
   const _StatCard({
     required this.title,
@@ -631,6 +693,7 @@ class _StatCard extends StatelessWidget {
     required this.icon,
     required this.isSelected,
     required this.onTap,
+    this.isCompact = false,
   });
 
   @override
@@ -639,10 +702,10 @@ class _StatCard extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(isCompact ? 12 : 16),
         decoration: BoxDecoration(
           color: isSelected ? color.withOpacity(0.1) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(isCompact ? 10 : 12),
           border: Border.all(
             color: isSelected ? color : Colors.grey[200]!,
             width: isSelected ? 2 : 1,
@@ -657,99 +720,55 @@ class _StatCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
                 Icon(
                   icon,
                   color: isSelected ? color : Colors.grey[600],
-                  size: 20,
+                  size: isCompact ? 16 : 20,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
+                if (!isCompact) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? color : Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            SizedBox(height: isCompact ? 6 : 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (isCompact)
+                  Text(
                     title,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 10,
                       fontWeight: FontWeight.w600,
                       color: isSelected ? color : Colors.grey[600],
                     ),
                   ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: isCompact ? 20 : 24,
+                    fontWeight: FontWeight.w800,
+                    color: isSelected ? color : const Color(0xFF0F172A),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: isSelected ? color : const Color(0xFF0F172A),
-              ),
-            ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  final IconData icon;
-  final VoidCallback onRemove;
-
-  const _FilterChip({
-    required this.label,
-    required this.color,
-    required this.icon,
-    required this.onRemove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 14,
-            color: color,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: onRemove,
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.close,
-                size: 12,
-                color: color,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -759,50 +778,56 @@ class _EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final bool isCompact;
 
   const _EmptyState({
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.isCompact = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              shape: BoxShape.circle,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: EdgeInsets.all(isCompact ? 20 : 24),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: isCompact ? 40 : 48,
+                color: Colors.grey[400],
+              ),
             ),
-            child: Icon(
-              icon,
-              size: 48,
-              color: Colors.grey[400],
+            SizedBox(height: isCompact ? 16 : 24),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: isCompact ? 18 : 20,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF475569),
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF475569),
+            SizedBox(height: isCompact ? 6 : 8),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: isCompact ? 13 : 14,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

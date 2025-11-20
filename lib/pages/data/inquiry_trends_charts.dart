@@ -858,23 +858,27 @@ Widget buildHighestFAQCard(Map<String, int> highestFAQ) {
                                         ? '${entry.key.substring(0, 17)}...'
                                         : entry.key;
 
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: SizedBox(
-                                    width: 90,
-                                    child: Text(
-                                      question,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey[700],
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                      maxLines: 3,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                );
+                                return Transform.rotate(
+  angle: -0.5, // slant angle (negative = tilt left)
+  child: Padding(
+    padding: const EdgeInsets.only(top: 8),
+    child: SizedBox(
+      width: 90,
+      child: Text(
+        question,
+        style: TextStyle(
+          fontSize: 10,
+          color: Colors.grey[700],
+          fontWeight: FontWeight.w600,
+        ),
+        textAlign: TextAlign.center,
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
+      ),
+    ),
+  ),
+);
+
                               }
                               return const SizedBox.shrink();
                             },
