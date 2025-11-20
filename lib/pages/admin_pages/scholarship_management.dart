@@ -405,53 +405,31 @@ Widget _buildMobileHeader(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       // Title
-      const Text(
-        'Scholarship List',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
-      const SizedBox(height: 4),
-      // Subtitle
-      const Text(
-        'Manage scholarship list and its contents',
-        style: TextStyle(fontSize: 12, color: Colors.grey),
-      ),
-      const SizedBox(height: 12),
-      // Upload button aligned to the right
-      Align(
-        alignment: Alignment.centerRight,
-        child: UploadDocumentButton(formType: 'scholarship'),
-      ),
-      const SizedBox(height: 16),
-      // Stat Cards Section
-      Column(
-        children: [
-          buildStatCard(
-            'Total Scholarships',
-            '${sc?.totalScholarship}',
-            Colors.blue,
-            Icons.message,
+       Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Scholarship List',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ), 
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Manage scholarship list and its contents',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              Row(children: [UploadDocumentButton(formType: 'scholarship')]),
+            ],
           ),
-          const SizedBox(height: 12),
-          buildStatCard(
-            'New Scholarship',
-            sc?.newScholarship ?? "Unknown",
-            Colors.green,
-            Icons.check_circle,
-          ),
-          const SizedBox(height: 12),
-          buildStatCard(
-            'Approaching Deadline',
-            sc?.approachingDeadline ?? "Unknown",
-            const Color.fromARGB(255, 245, 118, 0),
-            Icons.check_circle,
-          ),
-        ],
-      ),
-      const SizedBox(height: 16),
+       const SizedBox(height: 16),
       // Search and Filter
       buildSearchField('scholarship name', searchController),
       const SizedBox(height: 12),
@@ -733,6 +711,18 @@ Widget _buildTableHeader() {
                     fontSize: 12,
                     color: Colors.black87,
                   ),
+                  
+                ),
+              ),
+               Expanded(
+                flex: 3,
+                child: Text(
+                  'Eligibility/Requirements',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: Colors.black87,
+                  ),
                 ),
               ),
               SizedBox(width: 40),
@@ -776,7 +766,7 @@ Widget _buildTableHeader() {
               ),
             ),
             Expanded(
-              flex: 3,
+              flex: 4,
               child: Text(
                 'Benefits',
                 style: TextStyle(
@@ -787,7 +777,7 @@ Widget _buildTableHeader() {
               ),
             ),
             Expanded(
-              flex: 3,
+              flex: 4,
               child: Text(
                 'Deadline',
                 style: TextStyle(
@@ -830,8 +820,8 @@ Widget _buildExpandableList({
         margin: const EdgeInsets.only(bottom: 4),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.red[50],
-          border: Border.all(color: Colors.red[200]!),
+          color: Colors.purple[50],
+          border: Border.all(color: Colors.purple[200]!),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
@@ -839,9 +829,9 @@ Widget _buildExpandableList({
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: Colors.red[900],
+            color: Colors.purple[900],
           ),
-          maxLines: 1,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
       ),
@@ -852,8 +842,8 @@ Widget _buildExpandableList({
           margin: const EdgeInsets.only(bottom: 4),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.red[50],
-            border: Border.all(color: Colors.red[200]!),
+            color: Colors.purple[50],
+            border: Border.all(color: Colors.purple[200]!),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
@@ -861,7 +851,7 @@ Widget _buildExpandableList({
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: Colors.red[900],
+              color: Colors.purple[900],
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -880,14 +870,14 @@ Widget _buildExpandableList({
                 Icon(
                   isExpanded ? Icons.expand_less : Icons.expand_more,
                   size: 16,
-                  color: Colors.red[700],
+                  color: Colors.purple[700],
                 ),
                 const SizedBox(width: 4),
                 Text(
                   isExpanded ? 'Show less' : '+${items.length - 1} more',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.red[700],
+                    color: Colors.purple[700],
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -934,8 +924,119 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
     bool isMobile = screenWidth < 600;
     bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
+    if (isMobile) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.grey[200]!),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: InkWell(
+          onTap: () => showSCInfoModal(context, widget.doc),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Scholarship Name Column
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (widget.scholarshipProvider.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          widget.scholarshipProvider,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Eligibility Column
+              Expanded(
+                flex: 3,
+                child: _buildExpandableList(
+                  items: widget.eligibilityRequirements ?? [],
+                  emptyText: 'No eligibility',
+                  isExpanded: eligibilityExpanded,
+                  onToggle: (value) => setState(() => eligibilityExpanded = value),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Actions
+              PopupMenuButton<String>(
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.more_vert, size: 20),
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    showDialog(
+                      context: context,
+                      builder: (context) => ScholarshipFormDialog(
+                        doc: widget.doc,
+                        isEdit: true,
+                      ),
+                    );
+                  } else if (value == 'delete') {
+                    showDeleteConfirmation(
+                      context,
+                      widget.doc,
+                      DeleteConfigs.scholarships,
+                      'scholarships',
+                    );
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18),
+                        SizedBox(width: 8),
+                        Text('Delete'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Tablet & Desktop View
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      padding: EdgeInsets.symmetric(
+        vertical: isTablet ? 14 : 16,
+        horizontal: isTablet ? 12 : 16,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: Colors.grey[200]!),
@@ -958,61 +1059,70 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (!isMobile && widget.scholarshipProvider.isNotEmpty)
-                    Text(
-                      widget.scholarshipProvider,
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      overflow: TextOverflow.ellipsis,
+                  if (widget.scholarshipProvider.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        widget.scholarshipProvider,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                 ],
               ),
             ),
-            
+            const SizedBox(width: 16),
             // Eligibility/Requirements
-            if (!isMobile)
-              Expanded(
-                flex: 4,
-                child: _buildExpandableList(
-                  items: widget.eligibilityRequirements ?? [],
-                  emptyText: 'No eligibility/requirements',
-                  isExpanded: eligibilityExpanded,
-                  onToggle: (value) => setState(() => eligibilityExpanded = value),
-                ),
+            Expanded(
+              flex: 4,
+              child: _buildExpandableList(
+                items: widget.eligibilityRequirements ?? [],
+                emptyText: 'No eligibility/requirements',
+                isExpanded: eligibilityExpanded,
+                onToggle: (value) => setState(() => eligibilityExpanded = value),
               ),
-
+            ),
+            const SizedBox(width: 16),
             // Benefits/Privileges
-            if (!isMobile)
-              Expanded(
-                flex: 3,
-                child: _buildExpandableList(
-                  items: widget.privileges ?? [],
-                  emptyText: 'No benefits',
-                  isExpanded: benefitsExpanded,
-                  onToggle: (value) => setState(() => benefitsExpanded = value),
-                ),
+            Expanded(
+              flex: 5,
+              child: _buildExpandableList(
+                items: widget.privileges ?? [],
+                emptyText: 'No benefits',
+                isExpanded: benefitsExpanded,
+                onToggle: (value) => setState(() => benefitsExpanded = value),
               ),
-
+            ),
+            const SizedBox(width: 16),
             // Deadline
-            if (!isMobile)
-              Expanded(
-                flex: 3,
-                child: Text(
-                  widget.deadline.isNotEmpty ? widget.deadline : "N/A",
-                  style: const TextStyle(fontSize: 13),
-                ),
+            Expanded(
+              flex: 5,
+              child: Text(
+                widget.deadline.isNotEmpty ? widget.deadline : "N/A",
+                style: const TextStyle(fontSize: 13),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-
+            ),
+            const SizedBox(width: 12),
             // Actions
-            SizedBox(width: isTablet ? 60 : 80),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_horiz),
               onSelected: (value) {
                 if (value == 'edit') {
                   showDialog(
                     context: context,
-                    builder: (context) => ScholarshipFormDialog(doc: widget.doc, isEdit: true),
+                    builder: (context) => ScholarshipFormDialog(
+                      doc: widget.doc,
+                      isEdit: true,
+                    ),
                   );
                 } else if (value == 'delete') {
                   showDeleteConfirmation(
@@ -1020,13 +1130,6 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                     widget.doc,
                     DeleteConfigs.scholarships,
                     'scholarships',
-                    customDeleteHandler: (context, doc) async {
-                      await handleComplexDocumentDelete(
-                        context,
-                        doc,
-                        'scholarships',
-                      );
-                    },
                   );
                 }
               },
@@ -1059,3 +1162,4 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
     );
   }
 }
+

@@ -3,18 +3,14 @@ import 'package:capstone_project/modal_pages/add_edit_scholarship.dart';
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'package:capstone_project/modal_pages/admission_info.dart';
 import 'package:capstone_project/modal_pages/admission_edit.dart';
-
 import 'package:capstone_project/pages/admin_pages/buttons/upload_document_button.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/admission_year_dropdown.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/pagination.dart';
-
 import 'package:capstone_project/pages/admin_pages/widgets/search_field.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
-
 import '../../crud/delete/delete.dart';
 
 class AdmissionManagementPage extends StatefulWidget {
@@ -30,7 +26,6 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
   final TextEditingController _searchController = TextEditingController();
   List<DocumentSnapshot> allAdmissions = [];
 
-  // Pagination variables
   int currentPage = 1;
   int itemsPerPage = 10;
 
@@ -158,14 +153,13 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
   }
 }
 
-// Helper function to format academic year
 String _formatAcademicYear(dynamic academicYear) {
   if (academicYear == null) return 'N/A';
-  
+
   if (academicYear is Map) {
     final start = academicYear['start'];
     final end = academicYear['end'];
-    
+
     if (start != null && end != null) {
       return '$start-$end';
     } else if (start != null) {
@@ -174,11 +168,10 @@ String _formatAcademicYear(dynamic academicYear) {
   } else if (academicYear is String) {
     return academicYear;
   }
-  
+
   return 'N/A';
 }
 
-// Desktop Admission Management
 class DesktopAdmissionManagement extends StatelessWidget {
   final List<DocumentSnapshot> allAdmissions;
   final String selectedYear;
@@ -221,7 +214,6 @@ class DesktopAdmissionManagement extends StatelessWidget {
   }
 }
 
-// Tablet Admission Management
 class TabletAdmissionManagement extends StatelessWidget {
   final List<DocumentSnapshot> allAdmissions;
   final String selectedYear;
@@ -264,7 +256,6 @@ class TabletAdmissionManagement extends StatelessWidget {
   }
 }
 
-// Mobile Admission Management
 class MobileAdmissionManagement extends StatelessWidget {
   final List<DocumentSnapshot> allAdmissions;
   final String selectedYear;
@@ -296,7 +287,6 @@ class MobileAdmissionManagement extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header section
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: _buildMobileHeader(
@@ -307,7 +297,6 @@ class MobileAdmissionManagement extends StatelessWidget {
                 ad,
               ),
             ),
-            // Table section with fixed height
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Container(
@@ -351,6 +340,57 @@ class MobileAdmissionManagement extends StatelessWidget {
   }
 }
 
+Widget _buildMobileHeader(
+  String selectedYear,
+  List<DocumentSnapshot> allAdmissions,
+  ValueChanged<String> onYearChanged,
+  TextEditingController searchController,
+  AdmissionData? ad,
+) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Admission Information',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Manage admission processes and procedures',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          UploadDocumentButton(formType: 'admission'),
+        ],
+      ),
+      const SizedBox(height: 16),
+      buildSearchField('title', searchController),
+      const SizedBox(height: 12),
+      AcademicYearDropdown(
+        allAdmissions: allAdmissions,
+        initialValue: selectedYear,
+        onChanged: onYearChanged,
+      ),
+    ],
+  );
+}
+
 Widget mainContent(
   List<DocumentSnapshot> allAdmissions,
   BuildContext context,
@@ -381,7 +421,6 @@ Widget mainContent(
           const SizedBox(height: 16),
           Expanded(
             child: Container(
-              height: MediaQuery.of(context).size.height - 200,
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -420,75 +459,6 @@ Widget mainContent(
   );
 }
 
-Widget _buildMobileHeader(
-  String selectedYear,
-  List<DocumentSnapshot> allAdmissions,
-  ValueChanged<String> onYearChanged,
-  TextEditingController searchController,
-  AdmissionData? ad,
-) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      // Title
-      const Text(
-        'Admission Information',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
-      const SizedBox(height: 4),
-      // Subtitle
-      const Text(
-        'Manage admission processes and procedures',
-        style: TextStyle(fontSize: 12, color: Colors.grey),
-      ),
-      const SizedBox(height: 12),
-      // Upload button aligned to the right
-      Align(
-        alignment: Alignment.centerRight,
-        child: UploadDocumentButton(formType: 'admission'),
-      ),
-      const SizedBox(height: 16),
-      // Stat Cards Section
-      Column(
-        children: [
-          buildStatCard(
-            'Latest Admission Academic Year',
-            '${ad?.latestAdmission}',
-            Colors.blue,
-            Icons.message,
-          ),
-          const SizedBox(height: 12),
-          buildStatCard(
-            'Total Admission Documents',
-            '${ad?.totalAdmission}',
-            Colors.green,
-            Icons.check_circle,
-          ),
-        ],
-      ),
-      const SizedBox(height: 16),
-      // Search and Filter
-      buildSearchField('title', searchController),
-      const SizedBox(height: 12),
-      Row(
-        children: [
-          Expanded(
-            child: AcademicYearDropdown(
-              allAdmissions: allAdmissions,
-              initialValue: selectedYear,
-              onChanged: onYearChanged,
-            ),
-          ),
-        ],
-      ),
-    ],
-  );
-}
-
 Widget _buildAdmissionList({
   required List<DocumentSnapshot> allAdmissions,
   required String selectedYear,
@@ -498,7 +468,6 @@ Widget _buildAdmissionList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  // Filtering
   final filtered = allAdmissions.where((doc) {
     final data = doc.data() as Map<String, dynamic>;
     final title = (data['title'] ?? '').toString().toLowerCase().trim();
@@ -507,27 +476,20 @@ Widget _buildAdmissionList({
     final query = searchQuery.toLowerCase().trim();
     final yearFilter = selectedYear.toLowerCase().trim();
 
-    // Filter by selected year (if not "All Year")
-    bool matchesYear =
-        yearFilter == 'all year' ||
+    bool matchesYear = yearFilter == 'all year' ||
         yearFilter == 'all' ||
         academicYear == yearFilter;
 
-    // Search filter (check if search matches title or academicYear)
     bool matchesSearch =
-        query.isEmpty ||
-        title.contains(query) ||
-        academicYear.contains(query);
+        query.isEmpty || title.contains(query) || academicYear.contains(query);
 
     return matchesYear && matchesSearch;
   }).toList();
 
-  // Calculate pagination
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
   final safeCurrentPage = currentPage.clamp(1, totalPages);
 
-  // Pagination
   final startIndex = (safeCurrentPage - 1) * itemsPerPage;
   final endIndex = (startIndex + itemsPerPage).clamp(0, filtered.length);
   final currentPageAdmissions = filtered.sublist(
@@ -537,40 +499,35 @@ Widget _buildAdmissionList({
 
   return Column(
     children: [
-      // Admission List
       Expanded(
-        child:
-            currentPageAdmissions.isEmpty
-                ? const Center(
-                  child: Text('No admissions match your criteria.'),
-                )
-                : ListView.separated(
-                  itemCount: currentPageAdmissions.length,
-                  separatorBuilder:
-                      (context, index) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final doc = currentPageAdmissions[index];
-                    final data = doc.data() as Map<String, dynamic>;
+        child: currentPageAdmissions.isEmpty
+            ? const Center(
+                child: Text('No admissions match your criteria.'),
+              )
+            : ListView.separated(
+                itemCount: currentPageAdmissions.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final doc = currentPageAdmissions[index];
+                  final data = doc.data() as Map<String, dynamic>;
 
-                    final List<String> contacts =
-                        (data['contact'] as List<dynamic>?)
-                            ?.map((c) => c.toString())
-                            .toList() ??
-                        [];
+                  final List<String> contacts = (data['contact'] as List<dynamic>?)
+                          ?.map((c) => c.toString())
+                          .toList() ??
+                      [];
 
-                    return _buildAdmissionRow(
-                      context: context,
-                      doc: doc,
-                      title: data['title'] ?? 'N/A',
-                      source: data['source'] ?? 'N/A',
-                      content: data['content'] ?? '',
-                      contacts: contacts,
-                      academicYear: _formatAcademicYear(data['academicYear']),
-                    );
-                  },
-                ),
+                  return _buildAdmissionRow(
+                    context: context,
+                    doc: doc,
+                    title: data['title'] ?? 'N/A',
+                    source: data['source'] ?? 'N/A',
+                    content: data['content'] ?? '',
+                    contacts: contacts,
+                    academicYear: _formatAcademicYear(data['academicYear']),
+                  );
+                },
+              ),
       ),
-      // Pagination
       if (totalItems > 0)
         buildPagination(
           currentPage: safeCurrentPage,
@@ -621,113 +578,103 @@ Widget _buildHeader(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title and Add Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Admission Information',
-                    style: TextStyle(
-                      fontSize: isMobile ? 20 : (isTablet ? 22 : 24),
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Admission Information',
+                      style: TextStyle(
+                        fontSize: isMobile ? 20 : (isTablet ? 22 : 24),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Manage admission processes and procedures',
-                    style: TextStyle(
-                      fontSize: isMobile ? 12 : 14,
-                      color: Colors.grey[600],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Manage admission processes and procedures',
+                      style: TextStyle(
+                        fontSize: isMobile ? 12 : 14,
+                        color: Colors.grey[600],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              Row(children: [UploadDocumentButton(formType: 'admission')]),
+              UploadDocumentButton(formType: 'admission'),
             ],
           ),
-
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child:
-                isMobile
-                    ? Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
-                      children: [
-                        buildStatCard(
+            child: isMobile
+                ? Column(
+                    children: [
+                      buildStatCard(
+                        'Latest Admission Academic Year',
+                        '${ad?.latestAdmission}',
+                        Colors.blue,
+                        Icons.message,
+                      ),
+                      const SizedBox(height: 12),
+                      buildStatCard(
+                        'Total Admission Documents',
+                        '${ad?.totalAdmission}',
+                        Colors.green,
+                        Icons.check_circle,
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: buildStatCard(
                           'Latest Admission Academic Year',
                           '${ad?.latestAdmission}',
                           Colors.blue,
                           Icons.message,
                         ),
-                        buildStatCard(
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
                           'Total Admission Documents',
                           '${ad?.totalAdmission}',
                           Colors.green,
                           Icons.check_circle,
                         ),
-                      ],
-                    )
-                    : Row(
-                      children: [
-                        Expanded(
-                          child: buildStatCard(
-                            'Latest Admission Academic Year',
-                            '${ad?.latestAdmission}',
-                            Colors.blue,
-                            Icons.message,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Total Admission Documents',
-                            '${ad?.totalAdmission}',
-                            Colors.green,
-                            Icons.check_circle,
-                          ),
-                        ),
-                      ],
-                    ),
-          ),
-
-          // Search and Filter Row
-          isMobile
-              ? Column(
-                children: [
-                  buildSearchField('title', searchController),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AcademicYearDropdown(
-                          allAdmissions: allAdmissions,
-                          initialValue: selectedYear,
-                          onChanged: onYearChanged,
-                        ),
                       ),
                     ],
                   ),
-                ],
-              )
+          ),
+          isMobile
+              ? Column(
+                  children: [
+                    buildSearchField('title', searchController),
+                    const SizedBox(height: 12),
+                    AcademicYearDropdown(
+                      allAdmissions: allAdmissions,
+                      initialValue: selectedYear,
+                      onChanged: onYearChanged,
+                    ),
+                  ],
+                )
               : Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: buildSearchField('title', searchController),
-                  ),
-                  const SizedBox(width: 16),
-                  AcademicYearDropdown(
-                    allAdmissions: allAdmissions,
-                    initialValue: selectedYear,
-                    onChanged: onYearChanged,
-                  ),
-                ],
-              ),
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: buildSearchField('title', searchController),
+                    ),
+                    const SizedBox(width: 16),
+                    AcademicYearDropdown(
+                      allAdmissions: allAdmissions,
+                      initialValue: selectedYear,
+                      onChanged: onYearChanged,
+                    ),
+                  ],
+                ),
         ],
       );
     },
@@ -743,7 +690,7 @@ Widget _buildTableHeader() {
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           decoration: BoxDecoration(
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(6),
@@ -751,28 +698,29 @@ Widget _buildTableHeader() {
           child: const Row(
             children: [
               Expanded(
-                flex: 3,
+                flex: 4,
                 child: Text(
                   'Title',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 12,
+                    fontSize: 13,
                     color: Colors.black87,
                   ),
                 ),
               ),
+              SizedBox(width: 12),
               Expanded(
-                flex: 3,
+                flex: 5,
                 child: Text(
                   'Steps',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 12,
+                    fontSize: 13,
                     color: Colors.black87,
                   ),
                 ),
               ),
-              SizedBox(width: 40), // Actions space
+              SizedBox(width: 50),
             ],
           ),
         );
@@ -781,73 +729,64 @@ Widget _buildTableHeader() {
       return Container(
         padding: EdgeInsets.symmetric(
           vertical: isTablet ? 14 : 16,
-          horizontal: isTablet ? 12 : 16,
+          horizontal: 16,
         ),
         decoration: BoxDecoration(
           color: Colors.grey[50],
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
-          children: [
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 3,
-              child: Text(
-                'Title',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 3,
-              child: Text(
-                'Content',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 3,
-              child: Text(
-                'Steps',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 3,
-              child: Text(
-                'Requirements',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 4,
-              child: Text(
-                'Contacts',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-            SizedBox(width: isTablet ? 60 : 80), // Actions space
-          ],
+  children: [
+    Expanded(
+      flex: 3,
+      child: Text(
+        'Title',
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: isTablet ? 13 : 14,
+          color: Colors.black87,
         ),
+      ),
+    ),
+    const SizedBox(width: 16),
+    Expanded(
+      flex: 3,
+      child: Text(
+        'Steps',
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: isTablet ? 13 : 14,
+          color: Colors.black87,
+        ),
+      ),
+    ),
+    const SizedBox(width: 16),
+    Expanded(
+      flex: 3,
+      child: Text(
+        'Requirements',
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: isTablet ? 13 : 14,
+          color: Colors.black87,
+        ),
+      ),
+    ),
+    const SizedBox(width: 16),
+    Expanded(
+      flex: 3,
+      child: Text(
+        'Contacts',
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: isTablet ? 13 : 14,
+          color: Colors.black87,
+        ),
+      ),
+    ),
+    const SizedBox(width: 60), // space for action buttons
+  ],
+)
       );
     },
   );
@@ -873,7 +812,6 @@ Widget _buildExpandableList({
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // First item (always visible)
       Container(
         margin: const EdgeInsets.only(bottom: 4),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -889,34 +827,30 @@ Widget _buildExpandableList({
             fontWeight: FontWeight.w500,
             color: Colors.blue[900],
           ),
-          maxLines: 1,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
       ),
-      
-      // Expanded items
       if (isExpanded && items.length > 1)
         ...items.skip(1).map((item) => Container(
-          margin: const EdgeInsets.only(bottom: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.blue[50],
-            border: Border.all(color: Colors.blue[200]!),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            item,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Colors.blue[900],
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        )),
-      
-      // Toggle button
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                border: Border.all(color: Colors.blue[200]!),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                item,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.blue[900],
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            )),
       if (items.length > 1)
         InkWell(
           onTap: () => onToggle(!isExpanded),
@@ -981,26 +915,142 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
     bool isMobile = screenWidth < 600;
     bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
-    // Get data from document
     final data = widget.doc.data() as Map<String, dynamic>;
     final List<String> steps = (data['steps'] as List<dynamic>?)
-        ?.map((s) => s.toString())
-        .toList() ?? [];
+            ?.map((s) => s.toString())
+            .toList() ??
+        [];
     final List<String> requirements = (data['requirements'] as List<dynamic>?)
-        ?.map((r) => r.toString())
-        .toList() ?? [];
-    
-    // Process contacts to extract display values
-    final List<String> processedContacts = widget.contacts?.map((c) {
-      if (c.contains(":")) {
-        final parts = c.split(":");
-        return parts.sublist(1).join(":").trim();
-      }
-      return c;
-    }).toList() ?? [];
+            ?.map((r) => r.toString())
+            .toList() ??
+        [];
 
+    final List<String> processedContacts = widget.contacts?.map((c) {
+          if (c.contains(":")) {
+            final parts = c.split(":");
+            return parts.sublist(1).join(":").trim();
+          }
+          return c;
+        }).toList() ??
+        [];
+
+    if (isMobile) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.grey[200]!),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: InkWell(
+          onTap: () => showADInfoModal(context, widget.doc),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title Column
+              Expanded(
+                flex: 4,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (widget.academicYear.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          widget.academicYear,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Steps Column
+              Expanded(
+                flex: 5,
+                child: _buildExpandableList(
+                  items: steps,
+                  emptyText: 'No steps',
+                  isExpanded: stepsExpanded,
+                  onToggle: (value) => setState(() => stepsExpanded = value),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Actions
+              PopupMenuButton<String>(
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.more_vert, size: 20),
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AdmissionFormDialog(
+                        doc: widget.doc,
+                        isEdit: true,
+                      ),
+                    );
+                  } else if (value == 'delete') {
+                    showDeleteConfirmation(
+                      context,
+                      widget.doc,
+                      DeleteConfigs.admissions,
+                      'admissions',
+                      customDeleteHandler: (context, doc) async {
+                        await handleComplexDocumentDelete(
+                          context,
+                          doc,
+                          'admissions',
+                        );
+                      },
+                    );
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18),
+                        SizedBox(width: 8),
+                        Text('Delete'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Tablet & Desktop View
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      padding: EdgeInsets.all(isTablet ? 14 : 16),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: Colors.grey[200]!),
@@ -1009,137 +1059,115 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
       child: InkWell(
         onTap: () => showADInfoModal(context, widget.doc),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title
-            Expanded(
-              flex: 3,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (isMobile && widget.academicYear.isNotEmpty)
-                    Text(
-                      widget.academicYear,
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
-              ),
-            ),
-            
-            // Content
-            if (!isMobile)
-              Expanded(
-                flex: 3,
-                child: Text(
-                  widget.content,
-                  style: const TextStyle(fontSize: 13),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-
-            // Steps
-            if (!isMobile)
-              Expanded(
-                flex: 3,
-                child: _buildExpandableList(
-                  items: steps,
-                  emptyText: 'No steps',
-                  isExpanded: stepsExpanded,
-                  onToggle: (value) => setState(() => stepsExpanded = value),
-                ),
-              ),
-
-            // Requirements or Steps (mobile)
-            Expanded(
-              flex: isMobile ? 3 : 3,
-              child: isMobile
-                  ? _buildExpandableList(
-                      items: steps,
-                      emptyText: 'No steps',
-                      isExpanded: stepsExpanded,
-                      onToggle: (value) => setState(() => stepsExpanded = value),
-                    )
-                  : _buildExpandableList(
-                      items: requirements,
-                      emptyText: 'No requirements',
-                      isExpanded: requirementsExpanded,
-                      onToggle: (value) => setState(() => requirementsExpanded = value),
-                    ),
-            ),
-
-            // Contacts
-            Expanded(
-              flex: 4,
-              child: _buildExpandableList(
-                items: processedContacts,
-                emptyText: 'No contacts',
-                isExpanded: contactsExpanded,
-                onToggle: (value) => setState(() => contactsExpanded = value),
-              ),
-            ),
-
-            // Actions
-            SizedBox(width: isTablet ? 60 : 80),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_horiz),
-              onSelected: (value) {
-                if (value == 'edit') {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AdmissionFormDialog(doc: widget.doc, isEdit: true),
-                  );
-                } else if (value == 'delete') {
-                  showDeleteConfirmation(
-                    context,
-                    widget.doc,
-                    DeleteConfigs.admissions,
-                    'admissions',
-                    customDeleteHandler: (context, doc) async {
-                      await handleComplexDocumentDelete(
-                        context,
-                        doc,
-                        'admissions',
-                      );
-                    },
-                  );
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18),
-                      SizedBox(width: 8),
-                      Text('Delete'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    // Title
+    Expanded(
+      flex: 3,
+      child: Text(
+        widget.title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
         ),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+    ),
+    const SizedBox(width: 16),
+
+    // Steps
+    Expanded(
+      flex: 3,
+      child: _buildExpandableList(
+        items: steps,
+        emptyText: 'No steps',
+        isExpanded: stepsExpanded,
+        onToggle: (value) => setState(() => stepsExpanded = value),
+      ),
+    ),
+    const SizedBox(width: 16),
+
+    // Requirements
+    Expanded(
+      flex: 3,
+      child: _buildExpandableList(
+        items: requirements,
+        emptyText: 'No requirements',
+        isExpanded: requirementsExpanded,
+        onToggle: (value) => setState(() => requirementsExpanded = value),
+      ),
+    ),
+    const SizedBox(width: 16),
+
+    // Contacts
+    Expanded(
+      flex: 3,
+      child: _buildExpandableList(
+        items: processedContacts,
+        emptyText: 'No contacts',
+        isExpanded: contactsExpanded,
+        onToggle: (value) => setState(() => contactsExpanded = value),
+      ),
+    ),
+
+    const SizedBox(width: 12),
+
+    // Actions
+    PopupMenuButton<String>(
+      icon: const Icon(Icons.more_horiz),
+      onSelected: (value) {
+        if (value == 'edit') {
+          showDialog(
+            context: context,
+            builder: (context) => AdmissionFormDialog(
+              doc: widget.doc,
+              isEdit: true,
+            ),
+          );
+        } else if (value == 'delete') {
+          showDeleteConfirmation(
+            context,
+            widget.doc,
+            DeleteConfigs.admissions,
+            'admissions',
+            customDeleteHandler: (context, doc) async {
+              await handleComplexDocumentDelete(
+                context,
+                doc,
+                'admissions',
+              );
+            },
+          );
+        }
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'edit',
+          child: Row(
+            children: [
+              Icon(Icons.edit, size: 18),
+              SizedBox(width: 8),
+              Text('Edit'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete, size: 18),
+              SizedBox(width: 8),
+              Text('Delete'),
+            ],
+          ),
+        ),
+      ],
+    ),
+  ],
+)
       ),
     );
   }
 }
+

@@ -1,3 +1,4 @@
+import 'package:capstone_project/modal_pages/add_edit_scholarship.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flutter/material.dart';
@@ -522,7 +523,7 @@ Widget _buildActionButtons(
       ),
       const SizedBox(width: 12),
       // Edit Button
-      Expanded(
+     Expanded(
         child: SizedBox(
           height: buttonHeight,
           child: ElevatedButton.icon(
@@ -530,7 +531,13 @@ Widget _buildActionButtons(
               Navigator.of(context).pop();
               Future.delayed(
                 const Duration(milliseconds: 200),
-                () => showEditSCModal(context, doc, previousModal: 'info'),
+                () => showDialog(
+                  context: context,
+                  builder: (context) => ScholarshipFormDialog(
+                    doc: doc,
+                    isEdit: true,
+                  ),
+                ),
               );
             },
             icon: const Icon(Icons.edit_outlined, size: 18),
@@ -842,7 +849,7 @@ Widget _buildFullDescriptionActionButtons(
               Navigator.of(context).pop();
               Future.delayed(
                 const Duration(milliseconds: 200),
-                () => showEditSCModal(context, doc, previousModal: 'fullDescription'),
+                () => ScholarshipFormDialog(),
               );
             },
             icon: const Icon(Icons.edit_outlined, size: 18),

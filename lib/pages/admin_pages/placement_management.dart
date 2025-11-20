@@ -3,18 +3,13 @@ import 'package:capstone_project/pages/data/charts.dart';
 import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:capstone_project/modal_pages/pl_info.dart';
-
 import 'package:capstone_project/modal_pages/placement_edit.dart';
-
 import 'package:capstone_project/pages/admin_pages/buttons/upload_document_button.dart';
-
 import 'package:capstone_project/pages/admin_pages/widgets/company_dropdown.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/pagination.dart';
-
 import 'package:capstone_project/pages/admin_pages/widgets/search_field.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
-
 import '../../crud/delete/delete.dart';
 
 class PlacementManagementPage extends StatefulWidget {
@@ -266,20 +261,113 @@ class MobilePlacementManagement extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return mainContent(
-      allPlacements,
-      context,
-      selectedCompany,
-      onCompanyChanged,
-      searchController,
-      currentPage,
-      itemsPerPage,
-      onPageChanged,
-      onItemsPerPageChanged,
-      16.0,
-      pl,
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _buildMobileHeader(
+                selectedCompany,
+                allPlacements,
+                onCompanyChanged,
+                searchController,
+                pl,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.7,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildTableHeader(),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: _buildPlacementList(
+                        allPlacements: allPlacements,
+                        selectedCompany: selectedCompany,
+                        searchQuery: searchController.text,
+                        currentPage: currentPage,
+                        itemsPerPage: itemsPerPage,
+                        onPageChanged: onPageChanged,
+                        onItemsPerPageChanged: onItemsPerPageChanged,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
+}
+
+Widget _buildMobileHeader(
+  String selectedCompany,
+  List<DocumentSnapshot> allPlacements,
+  ValueChanged<String> onCompanyChanged,
+  TextEditingController searchController,
+  PlacementData? pl,
+) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Placement Companies',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Manage companies and job vacancies',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          UploadDocumentButton(formType: 'placement'),
+        ],
+      ),
+      const SizedBox(height: 16),
+      buildSearchField('positions', searchController),
+      const SizedBox(height: 12),
+      PlacementCompanyDropdown(
+        allPlacements: allPlacements,
+        initialValue: selectedCompany,
+        onChanged: onCompanyChanged,
+      ),
+    ],
+  );
 }
 
 Widget mainContent(
@@ -312,7 +400,6 @@ Widget mainContent(
           const SizedBox(height: 16),
           Expanded(
             child: Container(
-              height: MediaQuery.of(context).size.height - 200,
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -360,32 +447,24 @@ Widget _buildPlacementList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  final filtered =
-      allPlacements.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final company =
-            (data['partnerCompany'] ?? '').toString().toLowerCase().trim();
+  final filtered = allPlacements.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final company = (data['partnerCompany'] ?? '').toString().toLowerCase().trim();
+    final List<String> positionsList = (data['positions'] is List)
+        ? List<String>.from(data['positions'].map((e) => e.toString()))
+        : <String>[];
+    final query = searchQuery.toLowerCase().trim();
+    final companyFilter = selectedCompany.toLowerCase().trim();
 
-        final List<String> positionsList =
-            (data['positions'] is List)
-                ? List<String>.from(data['positions'].map((e) => e.toString()))
-                : <String>[];
+    bool matchesCompany = companyFilter == 'all company' ||
+        companyFilter == 'all' ||
+        company == companyFilter;
+    bool matchesSearch = query.isEmpty ||
+        company.contains(query) ||
+        positionsList.any((pos) => pos.toLowerCase().contains(query));
 
-        final query = searchQuery.toLowerCase().trim();
-        final companyFilter = selectedCompany.toLowerCase().trim();
-
-        bool matchesCompany =
-            companyFilter == 'all company' ||
-            companyFilter == 'all' ||
-            company == companyFilter;
-
-        bool matchesSearch =
-            query.isEmpty ||
-            company.contains(query) ||
-            positionsList.any((pos) => pos.toLowerCase().contains(query));
-
-        return matchesCompany && matchesSearch;
-      }).toList();
+    return matchesCompany && matchesSearch;
+  }).toList();
 
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
@@ -401,41 +480,38 @@ Widget _buildPlacementList({
   return Column(
     children: [
       Expanded(
-        child:
-            currentPagePlacements.isEmpty
-                ? const Center(child: Text('No companies match your criteria.'))
-                : ListView.builder(
-                  shrinkWrap: false,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: currentPagePlacements.length,
-                  itemBuilder: (context, index) {
-                    final doc = currentPagePlacements[index];
-                    final data = doc.data() as Map<String, dynamic>;
+        child: currentPagePlacements.isEmpty
+            ? const Center(child: Text('No companies match your criteria.'))
+            : ListView.builder(
+                shrinkWrap: false,
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: currentPagePlacements.length,
+                itemBuilder: (context, index) {
+                  final doc = currentPagePlacements[index];
+                  final data = doc.data() as Map<String, dynamic>;
 
-                    final List<String> contacts =
-                        (data['contacts'] as List<dynamic>?)
-                            ?.map((c) => c.toString())
-                            .toList() ??
-                        [];
+                  final List<String> contacts = (data['contacts'] as List<dynamic>?)
+                          ?.map((c) => c.toString())
+                          .toList() ??
+                      [];
 
-                    final List<String> positions =
-                        (data['positions'] as List<dynamic>?)
-                            ?.map((c) => c.toString())
-                            .toList() ??
-                        [];
+                  final List<String> positions = (data['positions'] as List<dynamic>?)
+                          ?.map((c) => c.toString())
+                          .toList() ??
+                      [];
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _buildPlacementRow(
-                        context: context,
-                        doc: doc,
-                        partnerCompany: data['partnerCompany'] ?? 'N/A',
-                        contacts: contacts,
-                        positions: positions,
-                      ),
-                    );
-                  },
-                ),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildPlacementRow(
+                      context: context,
+                      doc: doc,
+                      partnerCompany: data['partnerCompany'] ?? 'N/A',
+                      contacts: contacts,
+                      positions: positions,
+                    ),
+                  );
+                },
+              ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -467,7 +543,6 @@ Widget _buildPlacementRow({
   );
 }
 
-
 Widget _buildHeader(
   String selectedCompany,
   List<DocumentSnapshot> allPlacements,
@@ -487,125 +562,116 @@ Widget _buildHeader(
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Placement Companies',
-                    style: TextStyle(
-                      fontSize: isMobile ? 20 : (isTablet ? 22 : 24),
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Placement Companies',
+                      style: TextStyle(
+                        fontSize: isMobile ? 20 : (isTablet ? 22 : 24),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Manage companies and job vacancies',
-                    style: TextStyle(
-                      fontSize: isMobile ? 12 : 14,
-                      color: Colors.grey[600],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Manage companies and job vacancies',
+                      style: TextStyle(
+                        fontSize: isMobile ? 12 : 14,
+                        color: Colors.grey[600],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              Row(children: [UploadDocumentButton(formType: 'placement')]),
+              UploadDocumentButton(formType: 'placement'),
             ],
           ),
-
-          // Stat Cards Section - Fixed for Mobile (1 per row)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child:
-                isMobile
-                    ? Column(
-                      children: [
-                        buildStatCard(
+            child: isMobile
+                ? Column(
+                    children: [
+                      buildStatCard(
+                        'Total Companies',
+                        '${pl?.totalCompanies ?? 0}',
+                        Colors.blue,
+                        Icons.message,
+                      ),
+                      const SizedBox(height: 12),
+                      buildStatCard(
+                        'Companies Looking for Vacancy',
+                        '${pl?.vacantCompanies ?? 0}',
+                        Colors.green,
+                        Icons.check_circle,
+                      ),
+                      const SizedBox(height: 12),
+                      buildStatCard(
+                        'Approaching Deadline',
+                        pl?.approachingDeadline ?? 'Unknown',
+                        Colors.red,
+                        Icons.group,
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: buildStatCard(
                           'Total Companies',
                           '${pl?.totalCompanies ?? 0}',
                           Colors.blue,
                           Icons.message,
                         ),
-                        const SizedBox(height: 12),
-                        buildStatCard(
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
                           'Companies Looking for Vacancy',
                           '${pl?.vacantCompanies ?? 0}',
                           Colors.green,
                           Icons.check_circle,
                         ),
-                        const SizedBox(height: 12),
-                        buildStatCard(
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
                           'Approaching Deadline',
                           pl?.approachingDeadline ?? 'Unknown',
                           Colors.red,
                           Icons.group,
                         ),
-                      ],
-                    )
-                    : Row(
-                      children: [
-                        Expanded(
-                          child: buildStatCard(
-                            'Total Companies',
-                            '${pl?.totalCompanies ?? 0}',
-                            Colors.blue,
-                            Icons.message,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Companies Looking for Vacancy',
-                            '${pl?.vacantCompanies ?? 0}',
-                            Colors.green,
-                            Icons.check_circle,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Approaching Deadline',
-                            pl?.approachingDeadline ?? 'Unknown',
-                            Colors.red,
-                            Icons.group,
-                          ),
-                        ),
-                      ],
-                    ),
-          ),
-
-          // Search and Filter Row
-          isMobile
-              ? Column(
-                children: [
-                  buildSearchField('positions', searchController),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: PlacementCompanyDropdown(
-                          allPlacements: allPlacements,
-                          initialValue: selectedCompany,
-                          onChanged: onCompanyChanged,
-                        ),
                       ),
                     ],
                   ),
-                ],
-              )
+          ),
+          isMobile
+              ? Column(
+                  children: [
+                    buildSearchField('positions', searchController),
+                    const SizedBox(height: 12),
+                    PlacementCompanyDropdown(
+                      allPlacements: allPlacements,
+                      initialValue: selectedCompany,
+                      onChanged: onCompanyChanged,
+                    ),
+                  ],
+                )
               : Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: buildSearchField('positions', searchController),
-                  ),
-                  const SizedBox(width: 16),
-                  PlacementCompanyDropdown(
-                    allPlacements: allPlacements,
-                    initialValue: selectedCompany,
-                    onChanged: onCompanyChanged,
-                  ),
-                ],
-              ),
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: buildSearchField('positions', searchController),
+                    ),
+                    const SizedBox(width: 16),
+                    PlacementCompanyDropdown(
+                      allPlacements: allPlacements,
+                      initialValue: selectedCompany,
+                      onChanged: onCompanyChanged,
+                    ),
+                  ],
+                ),
         ],
       );
     },
@@ -621,7 +687,7 @@ Widget _buildTableHeader() {
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           decoration: BoxDecoration(
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(6),
@@ -629,39 +695,29 @@ Widget _buildTableHeader() {
           child: const Row(
             children: [
               Expanded(
-                flex: 3,
+                flex: 4,
                 child: Text(
                   'Company',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 12,
+                    fontSize: 13,
                     color: Colors.black87,
                   ),
                 ),
               ),
+              SizedBox(width: 12),
               Expanded(
-                flex: 3,
+                flex: 5,
                 child: Text(
                   'Positions',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 12,
+                    fontSize: 13,
                     color: Colors.black87,
                   ),
                 ),
               ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'Contacts',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-              SizedBox(width: 40),
+              SizedBox(width: 50),
             ],
           ),
         );
@@ -670,7 +726,7 @@ Widget _buildTableHeader() {
       return Container(
         padding: EdgeInsets.symmetric(
           vertical: isTablet ? 14 : 16,
-          horizontal: isTablet ? 12 : 16,
+          horizontal: 16,
         ),
         decoration: BoxDecoration(
           color: Colors.grey[50],
@@ -678,7 +734,6 @@ Widget _buildTableHeader() {
         ),
         child: Row(
           children: [
-            const SizedBox(width: 8),
             Expanded(
               flex: 3,
               child: Text(
@@ -690,6 +745,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
+            const SizedBox(width: 16),
             Expanded(
               flex: 4,
               child: Text(
@@ -701,6 +757,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
+            const SizedBox(width: 16),
             Expanded(
               flex: 4,
               child: Text(
@@ -712,7 +769,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            SizedBox(width: isTablet ? 60 : 80),
+            SizedBox(width: isTablet ? 70 : 80),
           ],
         ),
       );
@@ -737,7 +794,6 @@ Widget _buildExpandableListYellow({
     );
   }
 
-  // Process items to extract display values
   final processedItems = items.map((c) {
     String displayValue = c;
     if (c.contains(":")) {
@@ -750,7 +806,6 @@ Widget _buildExpandableListYellow({
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // First item (always visible)
       Container(
         margin: const EdgeInsets.only(bottom: 4),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -766,34 +821,30 @@ Widget _buildExpandableListYellow({
             fontWeight: FontWeight.w500,
             color: Colors.amber[900],
           ),
-          maxLines: 1,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
       ),
-      
-      // Expanded items
       if (isExpanded && processedItems.length > 1)
         ...processedItems.skip(1).map((item) => Container(
-          margin: const EdgeInsets.only(bottom: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.amber[50],
-            border: Border.all(color: Colors.amber[300]!),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            item,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Colors.amber[900],
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        )),
-      
-      // Toggle button
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.amber[50],
+                border: Border.all(color: Colors.amber[300]!),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                item,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.amber[900],
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            )),
       if (processedItems.length > 1)
         InkWell(
           onTap: () => onToggle(!isExpanded),
@@ -854,7 +905,7 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
     bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: Colors.grey[200]!),
@@ -865,27 +916,21 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Company Name
             Expanded(
-              flex: 3,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.partnerCompany,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+              flex: isMobile ? 4 : 3,
+              child: Text(
+                widget.partnerCompany,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            
-            // Positions (Yellow badges)
+            SizedBox(width: isMobile ? 12 : 16),
             Expanded(
-              flex: 4,
+              flex: isMobile ? 5 : 4,
               child: _buildExpandableListYellow(
                 items: widget.positions ?? [],
                 emptyText: 'No Vacancy',
@@ -893,27 +938,27 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
                 onToggle: (value) => setState(() => positionsExpanded = value),
               ),
             ),
-
-            // Contacts (Yellow badges)
-            Expanded(
-              flex: 4,
-              child: _buildExpandableListYellow(
-                items: widget.contacts ?? [],
-                emptyText: 'No Contacts',
-                isExpanded: contactsExpanded,
-                onToggle: (value) => setState(() => contactsExpanded = value),
+            if (!isMobile) ...[
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 4,
+                child: _buildExpandableListYellow(
+                  items: widget.contacts ?? [],
+                  emptyText: 'No Contacts',
+                  isExpanded: contactsExpanded,
+                  onToggle: (value) => setState(() => contactsExpanded = value),
+                ),
               ),
-            ),
-
-            // Actions
-            SizedBox(width: isTablet ? 60 : 80),
+            ],
+            SizedBox(width: isMobile ? 8 : (isTablet ? 16 : 20)),
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_horiz),
+              icon: const Icon(Icons.more_horiz, size: 20),
               onSelected: (value) {
                 if (value == 'edit') {
                   showDialog(
                     context: context,
-                    builder: (context) => PlacementFormDialog(doc: widget.doc, isEdit: true),
+                    builder: (context) =>
+                        PlacementFormDialog(doc: widget.doc, isEdit: true),
                   );
                 } else if (value == 'delete') {
                   showDeleteConfirmation(

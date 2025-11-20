@@ -1,3 +1,4 @@
+import 'package:capstone_project/modal_pages/add_edit_admission.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -737,7 +738,13 @@ Widget _buildActionButtons(
               Navigator.of(context).pop();
               Future.delayed(
                 const Duration(milliseconds: 200),
-                () => showEditAdmissionDialog(context, doc, previousModal: 'info'),
+                () => showDialog(
+                  context: context,
+                  builder: (context) => AdmissionFormDialog(
+                    doc: doc,
+                    isEdit: true,
+                  ),
+                ),
               );
             },
             icon: const Icon(Icons.edit_outlined, size: 18),
@@ -760,6 +767,7 @@ Widget _buildActionButtons(
     ],
   );
 }
+
 void _showFullContentModal(
   BuildContext context,
   Map<String, dynamic> data,
@@ -1003,31 +1011,29 @@ Widget _buildFullContentActionButtons(
   bool isMobile,
   bool isTablet,
 ) {
-  // Professional button sizing
   double buttonHeight = isMobile ? 44 : 48;
   double fontSize = isMobile ? 14 : 15;
   double borderRadius = 10;
 
   return Row(
     children: [
-      // Delete Button
       Expanded(
         child: SizedBox(
           height: buttonHeight,
           child: OutlinedButton.icon(
             onPressed: () => showDeleteConfirmation(
-  context,
-  doc,
-  DeleteConfigs.admissions,
-  'admissions',
-  customDeleteHandler: (context, doc) async {
-    await handleComplexDocumentDelete(
-      context,
-      doc,
-      'admissions', // ✅ Pass the collection name
-    );
-  },
-),
+              context,
+              doc,
+              DeleteConfigs.admissions,
+              'admissions',
+              customDeleteHandler: (context, doc) async {
+                await handleComplexDocumentDelete(
+                  context,
+                  doc,
+                  'admissions',
+                );
+              },
+            ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
               'Delete',
@@ -1045,7 +1051,6 @@ Widget _buildFullContentActionButtons(
         ),
       ),
       const SizedBox(width: 12),
-      // Edit Button
       Expanded(
         child: SizedBox(
           height: buttonHeight,
@@ -1053,9 +1058,14 @@ Widget _buildFullContentActionButtons(
             onPressed: () {
               Navigator.of(context).pop();
               Future.delayed(
-                const Duration(milliseconds: 200),
-                () =>
-                    showEditAdmissionDialog(context, doc, previousModal: 'fullContent'),
+                const Duration(milliseconds: 1),
+                () => showDialog(
+                  context: context,
+                  builder: (context) => AdmissionFormDialog(
+                    doc: doc,
+                    isEdit: true,
+                  ),
+                ),
               );
             },
             icon: const Icon(Icons.edit_outlined, size: 18),

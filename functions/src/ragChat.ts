@@ -407,17 +407,34 @@ ${documentContext}
 Based on the conversation history and document context above, provide a helpful and contextually aware answer:`;
 }
 
+// Replace the findMatchingFAQ function in your Cloud Function with this:
+
 async function findMatchingFAQ(
   query: string,
   queryEmbedding: number[],
   cohereApiKey: string,
-  similarityThreshold = 0.9
+  similarityThreshold = 0.75 // ✅ LOWERED from 0.85
 ): Promise<{ question: string; answer: string; similarity: number } | null> {
   try {
+    console.log(`🔍 ===========================================`);
+    console.log(`🔍 FAQ MATCHING START`);
+    console.log(`🔍 Query: "${query}"`);
+    console.log(`🔍 Threshold: ${similarityThreshold}`);
+    console.log(`🔍 Query embedding dimensions: ${queryEmbedding.length}`);
+    console.log(`🔍 ===========================================`);
+
+    // ✅ Only fetch FAQs with non-empty answers
     const faqSnapshot = await db
       .collection("faqs")
       .where("answer", "!=", "")
       .get();
+
+    console.log(`📚 Total FAQs retrieved from Firestore: ${faqSnapshot.docs.length}`);
+
+    if (faqSnapshot.docs.length === 0) {
+      console.log(`❌ No FAQs found in database!`);
+      return null;
+    }
 
     let bestMatch: {
       question: string;
@@ -425,28 +442,88 @@ async function findMatchingFAQ(
       similarity: number;
     } | null = null;
     let highestSimilarity = 0;
+    let processedCount = 0;
+    let skippedCount = 0;
+    const allSimilarities: Array<{ 
+      id: string;
+      question: string; 
+      similarity: number;
+      hasAnswer: boolean;
+      hasEmbedding: boolean;
+    }> = [];
 
     for (const doc of faqSnapshot.docs) {
       const data = doc.data();
       const faqQuestion = data.question as string;
       const faqAnswer = data.answer as string;
 
-      if (!faqQuestion || !faqAnswer) continue;
-
-      let faqEmbedding: number[];
-      if (data.embedding && Array.isArray(data.embedding)) {
-        faqEmbedding = data.embedding;
-      } else {
-        faqEmbedding = await generateCohereEmbedding(
-          faqQuestion,
-          cohereApiKey,
-          "search_document"
-        );
-
-        await doc.ref.update({ embedding: faqEmbedding });
+      // ✅ CRITICAL: Validate all required fields
+      if (!faqQuestion || faqQuestion.trim().length === 0) {
+        console.log(`⚠️ [${doc.id}] Skipping: No question`);
+        skippedCount++;
+        continue;
       }
 
+      if (!faqAnswer || faqAnswer.trim().length === 0) {
+        console.log(`⚠️ [${doc.id}] Skipping: Empty answer for "${faqQuestion.substring(0, 50)}..."`);
+        skippedCount++;
+        continue;
+      }
+
+      let faqEmbedding: number[];
+      
+      // Check if embedding exists
+      if (data.embedding && Array.isArray(data.embedding) && data.embedding.length > 0) {
+        faqEmbedding = data.embedding;
+        console.log(`✅ [${doc.id}] Using existing embedding (${faqEmbedding.length} dimensions)`);
+      } else {
+        console.log(`🔧 [${doc.id}] Generating new embedding for: "${faqQuestion.substring(0, 50)}..."`);
+        
+        try {
+          // ✅ IMPORTANT: Use "search_document" for FAQs to match the query type
+          faqEmbedding = await generateCohereEmbedding(
+            faqQuestion,
+            cohereApiKey,
+            "search_document"
+          );
+
+          // Save the embedding
+          await doc.ref.update({ 
+            embedding: faqEmbedding,
+            embeddingUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          console.log(`✅ [${doc.id}] Embedding generated and saved (${faqEmbedding.length} dimensions)`);
+        } catch (embError) {
+          console.error(`❌ [${doc.id}] Failed to generate embedding:`, embError);
+          skippedCount++;
+          continue;
+        }
+      }
+
+      // ✅ Verify embedding dimensions match
+      if (faqEmbedding.length !== queryEmbedding.length) {
+        console.log(`⚠️ [${doc.id}] Dimension mismatch: FAQ=${faqEmbedding.length}, Query=${queryEmbedding.length}`);
+        skippedCount++;
+        continue;
+      }
+
+      // Calculate similarity
       const similarity = cosineSimilarity(queryEmbedding, faqEmbedding);
+      processedCount++;
+
+      // Store for analysis
+      allSimilarities.push({
+        id: doc.id,
+        question: faqQuestion.substring(0, 60),
+        similarity: similarity,
+        hasAnswer: !!faqAnswer,
+        hasEmbedding: !!data.embedding,
+      });
+
+      console.log(`📊 [${doc.id}]`);
+      console.log(`   Question: "${faqQuestion.substring(0, 60)}..."`);
+      console.log(`   Answer: ${faqAnswer.length} chars`);
+      console.log(`   Similarity: ${similarity.toFixed(4)} ${similarity >= similarityThreshold ? "✅ ABOVE THRESHOLD" : "❌ BELOW THRESHOLD"}`);
 
       if (similarity > highestSimilarity && similarity >= similarityThreshold) {
         highestSimilarity = similarity;
@@ -455,16 +532,41 @@ async function findMatchingFAQ(
           answer: faqAnswer,
           similarity: similarity,
         };
+        console.log(`🎯 [${doc.id}] NEW BEST MATCH! Similarity: ${similarity.toFixed(4)}`);
       }
     }
 
-    if (bestMatch) {
-      console.log(
-        `Found FAQ match: "${
-          bestMatch.question
-        }" (similarity: ${bestMatch.similarity.toFixed(3)})`
-      );
+    // Summary
+    console.log(`📊 ===========================================`);
+    console.log(`📊 FAQ MATCHING SUMMARY`);
+    console.log(`📊 Total FAQs in DB: ${faqSnapshot.docs.length}`);
+    console.log(`📊 Processed: ${processedCount}`);
+    console.log(`📊 Skipped: ${skippedCount}`);
+    console.log(`📊 Highest Similarity: ${highestSimilarity.toFixed(4)}`);
+    console.log(`📊 Threshold: ${similarityThreshold}`);
+    console.log(`📊 ===========================================`);
 
+    // Show top 5 matches with more details
+    console.log(`🏆 TOP 5 CLOSEST MATCHES:`);
+    allSimilarities
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 5)
+      .forEach((item, index) => {
+        const status = item.hasAnswer ? "✅" : "❌";
+        const embStatus = item.hasEmbedding ? "✅" : "❌";
+        console.log(`   ${index + 1}. [${item.similarity.toFixed(4)}] ${status}Answer ${embStatus}Emb - ${item.question}`);
+      });
+
+    if (bestMatch) {
+      console.log(`✅ ===========================================`);
+      console.log(`✅ FAQ MATCH FOUND!`);
+      console.log(`✅ Question: "${bestMatch.question}"`);
+      console.log(`✅ Similarity: ${bestMatch.similarity.toFixed(4)}`);
+      console.log(`✅ Answer length: ${bestMatch.answer.length} chars`);
+      console.log(`✅ Answer preview: "${bestMatch.answer.substring(0, 100)}..."`);
+      console.log(`✅ ===========================================`);
+
+      // Update FAQ stats
       const faqDoc = faqSnapshot.docs.find(
         (doc) => doc.data().question === bestMatch!.question
       );
@@ -473,15 +575,25 @@ async function findMatchingFAQ(
           similarityCount: admin.firestore.FieldValue.increment(1),
           lastAsked: admin.firestore.FieldValue.serverTimestamp(),
         });
+        console.log(`✅ Updated FAQ stats`);
       }
+    } else {
+      console.log(`❌ ===========================================`);
+      console.log(`❌ NO FAQ MATCH FOUND`);
+      console.log(`❌ Best similarity: ${highestSimilarity.toFixed(4)}`);
+      console.log(`❌ Required: ${similarityThreshold}`);
+      console.log(`❌ Gap: ${(similarityThreshold - highestSimilarity).toFixed(4)}`);
+      console.log(`❌ ===========================================`);
     }
 
     return bestMatch;
   } catch (error) {
-    console.error("Error finding matching FAQ:", error);
+    console.error("❌ Error in findMatchingFAQ:", error);
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
     return null;
   }
 }
+
 
 async function retrieveRelevantDocuments(
   query: string,
@@ -709,7 +821,7 @@ export const generateAnswer = onRequest(
         conversationHistory = [],
         topK = 5,
         minSimilarityScore = 0.3,
-        stream = true, // New parameter for streaming
+        stream = true,
       } = req.body;
 
       if (!query || typeof query !== "string" || query.trim().length === 0) {
@@ -720,53 +832,53 @@ export const generateAnswer = onRequest(
         return;
       }
 
-      console.log(
-        `🤖 Generating answer for: "${query}" (streaming: ${stream})`
-      );
+      console.log(`🤖 Generating answer for: "${query}" (streaming: ${stream})`);
 
       const pineconeKey = PINECONE_API_KEY.value();
       const cohereKey = COHERE_API_KEY.value();
 
-      const pineconeClient = new Pinecone({ apiKey: pineconeKey });
-      const pineconeIndex = pineconeClient.Index("oasp-assist");
-
-      const contextHistory = buildConversationContext(conversationHistory);
-
+      // ✅ Generate embedding FIRST
+      console.log("🔧 Generating query embedding...");
       const queryEmbedding = await generateCohereEmbedding(
         query,
         cohereKey,
         "search_query"
       );
 
-      console.log(
-        `✅ Generated embedding with ${queryEmbedding.length} dimensions`
-      );
+      console.log(`✅ Generated embedding with ${queryEmbedding.length} dimensions`);
 
-      // Check FAQ first
+      // ✅ Check FAQ IMMEDIATELY with lower threshold
+      console.log("🔍 Checking FAQ database...");
       const faqMatch = await findMatchingFAQ(
         query,
         queryEmbedding,
         cohereKey,
-        0.9
+        0.85 // ✅ Lower threshold for better matching
       );
 
       if (faqMatch) {
-        console.log("✅ Using FAQ answer");
+        console.log(`✅ Using FAQ answer (similarity: ${faqMatch.similarity.toFixed(3)})`);
+        console.log(`📝 FAQ Question: "${faqMatch.question}"`);
+        console.log(`📝 Answer length: ${faqMatch.answer.length} characters`);
 
         if (stream) {
-          // For FAQ, simulate streaming by sending the answer in chunks
+          // Streaming response for FAQ
           res.setHeader("Content-Type", "text/event-stream");
           res.setHeader("Cache-Control", "no-cache");
           res.setHeader("Connection", "keep-alive");
+          res.setHeader("X-Accel-Buffering", "no");
 
           const answer = faqMatch.answer;
-          const chunkSize = 10; // characters per chunk
+          const chunkSize = 10;
+
+          console.log(`🌊 Starting FAQ streaming (${answer.length} chars)...`);
 
           for (let i = 0; i < answer.length; i += chunkSize) {
             const chunk = answer.substring(
               i,
               Math.min(i + chunkSize, answer.length)
             );
+            
             res.write(
               `data: ${JSON.stringify({
                 type: "content-delta",
@@ -778,26 +890,55 @@ export const generateAnswer = onRequest(
             await new Promise((resolve) => setTimeout(resolve, 30));
           }
 
-          res.write(`data: ${JSON.stringify({ type: "message-end" })}\n\n`);
+          // Send metadata and end signal
+          res.write(
+            `data: ${JSON.stringify({
+              type: "message-end",
+              metadata: {
+                source: "faq",
+                faqQuestion: faqMatch.question,
+                similarity: faqMatch.similarity,
+                answerLength: faqMatch.answer.length,
+              },
+            })}\n\n`
+          );
           res.write("data: [DONE]\n\n");
           res.end();
+
+          console.log("✅ FAQ streaming complete");
         } else {
+          // Non-streaming response for FAQ
           res.json({
             answer: faqMatch.answer,
             source: "faq",
+            faqQuestion: faqMatch.question,
             similarity: faqMatch.similarity,
           });
+
+          console.log("✅ FAQ response sent (non-streaming)");
         }
         return;
       }
 
-      // Retrieve documents
+      console.log("ℹ️ No FAQ match found, proceeding with document retrieval...");
+
+      // ✅ Initialize Pinecone
+      const pineconeClient = new Pinecone({ apiKey: pineconeKey });
+      const pineconeIndex = pineconeClient.Index("oasp-assist");
+
+      // ✅ Build conversation context
+      const contextHistory = buildConversationContext(conversationHistory);
+
+      // ✅ Enhance query with context
       const contextualQuery = await enhanceQueryWithContext(
         query,
         contextHistory,
         cohereKey
       );
 
+      console.log(`🔍 Enhanced query: "${contextualQuery}"`);
+
+      // ✅ Retrieve relevant documents
       const results = await retrieveRelevantDocuments(
         contextualQuery,
         queryEmbedding,
@@ -813,13 +954,22 @@ export const generateAnswer = onRequest(
 
         if (stream) {
           res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("X-Accel-Buffering", "no");
+
           res.write(
             `data: ${JSON.stringify({
               type: "content-delta",
               delta: { message: { content: { text: errorMsg } } },
             })}\n\n`
           );
-          res.write(`data: ${JSON.stringify({ type: "message-end" })}\n\n`);
+          res.write(
+            `data: ${JSON.stringify({
+              type: "message-end",
+              metadata: { source: "no_documents" },
+            })}\n\n`
+          );
           res.write("data: [DONE]\n\n");
           res.end();
         } else {
@@ -833,6 +983,7 @@ export const generateAnswer = onRequest(
 
       console.log(`📚 Using ${results.length} documents for context`);
 
+      // ✅ Build document context and prompt
       const documentContext = buildDocumentContext(results);
       const prompt = buildContextAwarePrompt(
         query,
@@ -840,12 +991,14 @@ export const generateAnswer = onRequest(
         contextHistory
       );
 
-      // Generate response (streaming or non-streaming)
+      console.log("🤖 Generating AI response...");
+
+      // ✅ Generate response (streaming or non-streaming)
       if (stream) {
         res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
-        res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
+        res.setHeader("X-Accel-Buffering", "no");
 
         console.log("🌊 Starting streaming response...");
 
@@ -881,6 +1034,7 @@ export const generateAnswer = onRequest(
                 delta: { message: { content: { text: fallbackMsg } } },
               })}\n\n`
             );
+            fullResponse = fallbackMsg;
           }
 
           // Send metadata and end signal
@@ -888,9 +1042,16 @@ export const generateAnswer = onRequest(
             `data: ${JSON.stringify({
               type: "message-end",
               metadata: {
+                source: "knowledge_base",
                 documentsUsed: results.length,
                 documentTitles: results.map((r) => r.ib_title),
                 responseLength: fullResponse.length,
+                topDocumentScores: results
+                  .slice(0, 3)
+                  .map((r) => ({
+                    title: r.ib_title,
+                    score: r.similarity_score,
+                  })),
               },
             })}\n\n`
           );
@@ -924,6 +1085,8 @@ export const generateAnswer = onRequest(
         }
       } else {
         // Non-streaming response
+        console.log("📝 Generating non-streaming response...");
+
         const answer = await generateCohereResponse(prompt, cohereKey);
 
         if (!answer || answer.trim().length === 0) {
@@ -936,12 +1099,17 @@ export const generateAnswer = onRequest(
           return;
         }
 
-        console.log("✅ Generated contextual answer");
+        console.log(`✅ Generated answer (${answer.length} chars)`);
+        
         res.json({
           answer: answer.trim(),
           source: "knowledge_base",
           documentsUsed: results.length,
           documentTitles: results.map((r) => r.ib_title),
+          topDocumentScores: results.slice(0, 3).map((r) => ({
+            title: r.ib_title,
+            score: r.similarity_score,
+          })),
         });
       }
     } catch (error) {
@@ -950,22 +1118,114 @@ export const generateAnswer = onRequest(
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
 
+      console.error("Error details:", {
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
       if (req.body.stream) {
-        res.setHeader("Content-Type", "text/event-stream");
-        res.write(
-          `data: ${JSON.stringify({
-            error: errorMessage,
-          })}\n\n`
-        );
-        res.end();
+        try {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+
+          const errorMsg =
+            "I encountered an error while processing your question. Please try again or contact OASP staff for assistance.";
+
+          res.write(
+            `data: ${JSON.stringify({
+              type: "content-delta",
+              delta: { message: { content: { text: errorMsg } } },
+            })}\n\n`
+          );
+          res.write(
+            `data: ${JSON.stringify({
+              type: "error",
+              error: errorMessage,
+            })}\n\n`
+          );
+          res.write("data: [DONE]\n\n");
+          res.end();
+        } catch (writeError) {
+          console.error("❌ Error writing error response:", writeError);
+          if (!res.headersSent) {
+            res.status(500).json({
+              answer:
+                "I encountered an error while processing your question. Please try again or contact OASP staff for assistance.",
+              source: "error",
+              error: errorMessage,
+            });
+          }
+        }
       } else {
-        res.status(500).json({
-          answer:
-            "I encountered an error while processing your question. Please try again or contact OASP staff for assistance.",
-          source: "error",
-          error: errorMessage,
-        });
+        if (!res.headersSent) {
+          res.status(500).json({
+            answer:
+              "I encountered an error while processing your question. Please try again or contact OASP staff for assistance.",
+            source: "error",
+            error: errorMessage,
+          });
+        }
       }
+    }
+  }
+);
+
+export const debugFAQs = onRequest(
+  {
+    cors: true,
+  },
+  async (req, res) => {
+    try {
+      const db = admin.firestore();
+      
+      console.log("🔍 Checking FAQ collection...");
+      
+      const allFAQs = await db.collection("faqs").get();
+      console.log(`📚 Total documents in 'faqs' collection: ${allFAQs.docs.length}`);
+
+      const faqsWithAnswers = await db
+        .collection("faqs")
+        .where("answer", "!=", "")
+        .get();
+      console.log(`✅ FAQs with non-empty answers: ${faqsWithAnswers.docs.length}`);
+
+      const report = {
+        total: allFAQs.docs.length,
+        withAnswers: faqsWithAnswers.docs.length,
+        withoutAnswers: allFAQs.docs.length - faqsWithAnswers.docs.length,
+        faqs: [] as any[],
+      };
+
+      for (const doc of allFAQs.docs) {
+        const data = doc.data();
+        const faqInfo = {
+          id: doc.id,
+          question: data.question || "NO QUESTION",
+          hasAnswer: !!(data.answer && data.answer.trim().length > 0),
+          answerLength: data.answer ? data.answer.length : 0,
+          hasEmbedding: !!(data.embedding && Array.isArray(data.embedding) && data.embedding.length > 0),
+          embeddingDimensions: data.embedding ? data.embedding.length : 0,
+          category: data.category || "NO CATEGORY",
+          similarityCount: data.similarityCount || 0,
+        };
+
+        report.faqs.push(faqInfo);
+
+        console.log(`
+📄 FAQ: ${doc.id}
+   Question: ${data.question ? data.question.substring(0, 60) : "MISSING"}...
+   Has Answer: ${faqInfo.hasAnswer} (${faqInfo.answerLength} chars)
+   Has Embedding: ${faqInfo.hasEmbedding} (${faqInfo.embeddingDimensions} dimensions)
+   Category: ${faqInfo.category}
+   Times Asked: ${faqInfo.similarityCount}
+        `);
+      }
+
+      res.json(report);
+    } catch (error) {
+      console.error("Error debugging FAQs:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }
   }
 );

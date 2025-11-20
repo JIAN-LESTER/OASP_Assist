@@ -16,7 +16,7 @@ CategoryStyle getCategoryStyle(String category) {
     case 'admission':
       return CategoryStyle('Admission', Colors.blue, Colors.white);
     case 'scholarship':
-      return CategoryStyle('Scholarship', Colors.red, Colors.white);
+      return CategoryStyle('Scholarship', Colors.purple, Colors.white);
     case 'placement':
       return CategoryStyle('Placement', Colors.yellow, Colors.black);
     case 'general':
@@ -109,7 +109,7 @@ IconData getCategoryIcon(String? category) {
       case 'scholarship':
         return Colors.purple;
       case 'placement':
-        return Colors.red;
+        return Colors.yellow;
       case 'general':
         return Colors.green;
       default:

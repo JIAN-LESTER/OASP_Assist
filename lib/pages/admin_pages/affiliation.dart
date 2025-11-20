@@ -383,48 +383,35 @@ Widget _buildMobileHeader(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       // Title
-      const Text(
-        'Affiliations Management',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
-      const SizedBox(height: 4),
-      // Subtitle
-      const Text(
-        'Manage academic affiliations',
-        style: TextStyle(
-          fontSize: 12,
-          color: Colors.grey,
-        ),
-      ),
-      const SizedBox(height: 12),
-      // Add button aligned to the right
-      Align(
-        alignment: Alignment.centerRight,
-        child: _buildAddButton(context, true, false),
-      ),
-      const SizedBox(height: 16),
-      // Stat Cards Section
-      Column(
-        children: [
-          buildStatCard(
-            'Total Affiliations',
-            '${affiliation?.totalAffiliations}',
-            Colors.blue,
-            Icons.message,
+      Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Affiliations Management',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Manage academic affiliations',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+              _buildAddButton(context, false, true),
+            ],
           ),
-          const SizedBox(height: 12),
-          buildStatCard(
-            'Affiliation where most students are affiliated',
-            '${affiliation?.dominantAffiliation}',
-            Colors.green,
-            Icons.check_circle,
-          ),
-        ],
-      ),
+
+     
       const SizedBox(height: 16),
       // Search field
       buildSearchField('Search affiliations by name', searchController),
@@ -646,7 +633,7 @@ Widget _buildHeader(
                   ),
                 ],
               ),
-              _buildAddButton(context, false, isTablet),
+              _buildAddButton(context, true, isTablet),
             ],
           ),
 
@@ -676,7 +663,7 @@ Widget _buildHeader(
             ),
           ),
 
-          const SizedBox(height: 24),
+     
 
           buildSearchField('Search affiliations by name', searchController),
         ],

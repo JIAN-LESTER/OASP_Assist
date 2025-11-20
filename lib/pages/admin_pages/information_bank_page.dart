@@ -259,7 +259,7 @@ class MobileInformationBank extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Container(
-                height: MediaQuery.of(context).size.height * 0.7,
+                height: MediaQuery.of(context).size.height * 0.8,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -279,9 +279,10 @@ class MobileInformationBank extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('information_bank')
-                            .snapshots(),
+                        stream:
+                            FirebaseFirestore.instance
+                                .collection('information_bank')
+                                .snapshots(),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -296,7 +297,8 @@ class MobileInformationBank extends StatelessWidget {
                             );
                           }
 
-                          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          if (!snapshot.hasData ||
+                              snapshot.data!.docs.isEmpty) {
                             return const Center(
                               child: Text('No documents found.'),
                             );
@@ -371,9 +373,10 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('information_bank')
-                          .snapshots(),
+                      stream:
+                          FirebaseFirestore.instance
+                              .collection('information_bank')
+                              .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -426,72 +429,28 @@ Widget _buildMobileHeader(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       // Title
-      const Text(
-        'Information Bank',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
-      const SizedBox(height: 4),
-      // Subtitle
-      const Text(
-        'Centralized document repository for quick reference',
-        style: TextStyle(
-          fontSize: 12,
-          color: Colors.grey,
-        ),
-      ),
-      const SizedBox(height: 12),
-      // Upload button aligned to the right
-      Align(
-        alignment: Alignment.centerRight,
-        child: UploadDocumentButton(),
-      ),
-      const SizedBox(height: 16),
-      // Stat Cards Section
-      Column(
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: buildStatCard(
-                  'Total Documents',
-                  '${ib?.totalDocuments}',
-                  Colors.blue,
-                  Icons.message,
+              Text(
+                'Information Bank',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: buildStatCard(
-                  'Most Frequent Category',
-                  ib?.mostFrequentCategory ?? "Unknown",
-                  Colors.green,
-                  Icons.check_circle,
-                ),
+              const SizedBox(height: 4),
+              Text(
+                'Centralized document repository',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
           ),
-          
-        ],
-      ),
-      const SizedBox(height: 16),
-      // Search and Filter
-      buildSearchField(
-        'documents, source or category',
-        searchController,
-      ),
-      const SizedBox(height: 12),
-      Row(
-        children: [
-          Expanded(
-            child: CategoryDropdownButton(
-              initialValue: selectedCategory,
-              onChanged: onCategoryChanged,
-            ),
-          ),
+          UploadDocumentButton(),
         ],
       ),
     ],
@@ -530,10 +489,7 @@ Widget _buildHeader(
                   const SizedBox(height: 4),
                   Text(
                     'Centralized document repository for quick reference',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -618,7 +574,7 @@ Widget _buildTableHeader() {
           child: const Row(
             children: [
               Expanded(
-                flex: 2,
+                flex: 4,
                 child: Text(
                   'Document',
                   style: TextStyle(
@@ -629,7 +585,7 @@ Widget _buildTableHeader() {
                 ),
               ),
               Expanded(
-                flex: 2,
+                flex: 3,
                 child: Text(
                   'Category',
                   style: TextStyle(
@@ -639,7 +595,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 40),
+              SizedBox(width: 40), // space for actions
             ],
           ),
         );
@@ -707,24 +663,25 @@ Widget _buildIBList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  final filtered = getAllDocuments.where((doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final title = (data['ib_title'] ?? '').toString().toLowerCase();
-    final source = (data['source'] ?? '').toString().toLowerCase();
-    final category = (data['category'] ?? '').toString().toLowerCase();
+  final filtered =
+      getAllDocuments.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final title = (data['ib_title'] ?? '').toString().toLowerCase();
+        final source = (data['source'] ?? '').toString().toLowerCase();
+        final category = (data['category'] ?? '').toString().toLowerCase();
 
-    bool matchesCategory =
-        selectedCategory == 'All Categories' ||
+        bool matchesCategory =
+            selectedCategory == 'All Categories' ||
             category == selectedCategory.toLowerCase();
 
-    bool matchesSearch =
-        searchQuery.isEmpty ||
+        bool matchesSearch =
+            searchQuery.isEmpty ||
             title.contains(searchQuery.toLowerCase()) ||
             source.contains(searchQuery.toLowerCase()) ||
             category.contains(searchQuery.toLowerCase());
 
-    return matchesCategory && matchesSearch;
-  }).toList();
+        return matchesCategory && matchesSearch;
+      }).toList();
 
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
@@ -740,37 +697,38 @@ Widget _buildIBList({
   return Column(
     children: [
       Expanded(
-        child: currentPageIB.isEmpty
-            ? const Center(
-                child: Text('No documents match your search criteria.'),
-              )
-            : ListView.builder(
-                shrinkWrap: false,
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: currentPageIB.length,
-                itemBuilder: (context, index) {
-                  final doc = currentPageIB[index];
-                  final data = doc.data() as Map<String, dynamic>;
-                  final Timestamp timeStamp =
-                      data['createdAt'] ?? Timestamp.now();
-                  final DateTime date = timeStamp.toDate();
-                  final String formattedDate = DateFormat(
-                    "MMMM d, yyyy 'at' hh:mm a",
-                  ).format(date);
+        child:
+            currentPageIB.isEmpty
+                ? const Center(
+                  child: Text('No documents match your search criteria.'),
+                )
+                : ListView.builder(
+                  shrinkWrap: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: currentPageIB.length,
+                  itemBuilder: (context, index) {
+                    final doc = currentPageIB[index];
+                    final data = doc.data() as Map<String, dynamic>;
+                    final Timestamp timeStamp =
+                        data['createdAt'] ?? Timestamp.now();
+                    final DateTime date = timeStamp.toDate();
+                    final String formattedDate = DateFormat(
+                      "MMMM d, yyyy 'at' hh:mm a",
+                    ).format(date);
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _buildIBRow(
-                      context: context,
-                      doc: doc,
-                      title: data['ib_title'] ?? 'N/A',
-                      source: data['source'] ?? 'N/A',
-                      category: data['category'] ?? 'General',
-                      content: data['content'],
-                    ),
-                  );
-                },
-              ),
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildIBRow(
+                        context: context,
+                        doc: doc,
+                        title: data['ib_title'] ?? 'N/A',
+                        source: data['source'] ?? 'N/A',
+                        category: data['category'] ?? 'General',
+                        content: data['content'],
+                      ),
+                    );
+                  },
+                ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -812,7 +770,7 @@ Widget _buildIBRow({
       child: Row(
         children: [
           Expanded(
-            flex: 2,
+            flex: 4,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -823,18 +781,13 @@ Widget _buildIBRow({
                     fontSize: 14,
                   ),
                   overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.justify,
+                  textAlign: TextAlign.left,
+                  maxLines: 2,
                 ),
-                if (!isMobile && source.isNotEmpty)
-                  Text(
-                    source,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.justify,
-                  ),
               ],
             ),
           ),
+
           if (!isMobile)
             Expanded(
               flex: 3,
@@ -845,8 +798,10 @@ Widget _buildIBRow({
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            const SizedBox(width: 16),
+
           Expanded(
-            flex: 1,
+            flex: 3,
             child: Align(
               alignment: Alignment.centerLeft,
               child: Container(
@@ -866,7 +821,7 @@ Widget _buildIBRow({
               ),
             ),
           ),
-          SizedBox(width: isTablet ? 60 : 80),
+          SizedBox(width: isTablet ? 40: 5),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {
@@ -874,42 +829,43 @@ Widget _buildIBRow({
                 showEditIBModal(context, doc);
               } else if (value == 'delete') {
                 showDeleteConfirmation(
-  context,
-  doc,
-  DeleteConfigs.document,
-  'information_bank',
-  customDeleteHandler: (context, doc) async {
-    await handleComplexDocumentDelete(
-      context,
-      doc,
-      'information_bank', // ✅ Pass the collection name
-    );
-  },
-);
+                  context,
+                  doc,
+                  DeleteConfigs.document,
+                  'information_bank',
+                  customDeleteHandler: (context, doc) async {
+                    await handleComplexDocumentDelete(
+                      context,
+                      doc,
+                      'information_bank', // ✅ Pass the collection name
+                    );
+                  },
+                );
               }
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, size: 18),
-                    SizedBox(width: 8),
-                    Text('Edit'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete, size: 18, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Delete', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
           ),
         ],
       ),

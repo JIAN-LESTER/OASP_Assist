@@ -259,7 +259,7 @@ class MobileFaqManagement extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Container(
-                height: MediaQuery.of(context).size.height * 0.5,
+                height: MediaQuery.of(context).size.height * 0.8,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -422,77 +422,33 @@ Widget _buildMobileHeader(
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // Title
-      const Text(
-        'FAQ Management',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
-      const SizedBox(height: 4),
-      // Subtitle
-      const Text(
-        'Manage questions, answers, and categories',
-        style: TextStyle(
-          fontSize: 12,
-          color: Colors.grey,
-        ),
-      ),
-      const SizedBox(height: 12),
-      // Add FAQ button aligned to the right
-      Align(
-        alignment: Alignment.centerRight,
-        child: AddFaqButton(),
-      ),
-      const SizedBox(height: 16),
-      // Stat Cards Section - 1 per row for mobile
-      Column(
-        children: [
-          buildStatCard(
-            'Total FAQs',
-            '${faq?.totalFAQs}',
-            Colors.blue,
-            Icons.message,
+           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'FAQ Management',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Manage questions, answers, and categories',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+              AddFaqButton(),
+            ],
           ),
-          const SizedBox(height: 12),
-          buildStatCard(
-            'Most Frequent Category',
-            faq?.mostFrequentCategory ?? "Unknown",
-            Colors.green,
-            Icons.check_circle,
-          ),
-          const SizedBox(height: 12),
-          buildStatCard(
-            'Most Asked Question',
-            faq?.mostAskedQuestion ?? 'Unknown',
-            Colors.red,
-            Icons.group,
-          ),
-          const SizedBox(height: 12),
-          buildStatCard(
-            'Latest FAQ',
-            faq?.latestFAQ ?? "Unknown",
-            Colors.orange,
-            Icons.help_outline,
-          ),
-        ],
-      ),
-      const SizedBox(height: 16),
-      // Search and Filter
-      buildSearchField('questions or category', searchController),
-      const SizedBox(height: 12),
-      Row(
-        children: [
-          Expanded(
-            child: FaqCategoryDropdownButton(
-              initialValue: selectedCategory,
-              onChanged: onCategoryChanged,
-            ),
-          ),
-        ],
-      ),
     ],
   );
 }
@@ -567,7 +523,7 @@ Widget _buildHeader(
                   child: buildStatCard(
                     'Most Asked Question',
                     faq?.mostAskedQuestion ?? 'Unknown',
-                    Colors.red,
+                    Colors.purple,
                     Icons.group,
                   ),
                 ),
@@ -812,8 +768,9 @@ Widget _buildIBRow({
               question,
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
               softWrap: true,
+              overflow: TextOverflow.ellipsis,
               maxLines: 2,
-              textAlign: TextAlign.justify,
+              textAlign: TextAlign.left,
             ),
           ),
           const SizedBox(width: 12),
@@ -824,7 +781,7 @@ Widget _buildIBRow({
               style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
               softWrap: true,
               maxLines: 2,
-              textAlign: TextAlign.justify,
+              textAlign: TextAlign.left,
               overflow: TextOverflow.ellipsis,
             ),
           ),

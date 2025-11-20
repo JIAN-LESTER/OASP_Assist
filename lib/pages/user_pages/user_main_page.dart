@@ -118,19 +118,17 @@ class _UserMainPageState extends State<UserMainPage>
     });
 
     // ✅ FIX: Only load conversation if passed, don't create new one
-    if (widget.conversationId != null &&
-        widget.conversationId!.isNotEmpty &&
-        widget.conversationId != 'null') {
-      print(
-        '✅ Initializing with passed conversation: ${widget.conversationId}',
-      );
-      _conversationId = widget.conversationId;
-      _initFuture = _loadExistingConversation(widget.conversationId!);
-      _showFAQs = false; // Never show FAQs when loading from notification
-    } else {
-      print('ℹ️ No conversation passed, looking for active conversation');
-      _initFuture = _initializeConversationId();
-    }
+ if (widget.conversationId != null &&
+      widget.conversationId!.isNotEmpty &&
+      widget.conversationId != 'null') {
+    print('✅ Initializing with passed conversation: ${widget.conversationId}');
+    _conversationId = widget.conversationId;
+    _initFuture = _loadExistingConversation(widget.conversationId!);
+    _showFAQs = false;
+  } else {
+    print('ℹ️ No conversation passed, checking for active conversation');
+    _initFuture = _initializeConversationOrShowFAQs(); // ✅ NEW method
+  }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       UserConstant.initializeChatSession(context, setState);
@@ -142,6 +140,55 @@ class _UserMainPageState extends State<UserMainPage>
       }
     });
   }
+
+  Future<void> _initializeConversationOrShowFAQs() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  try {
+    print('🔍 Looking for active conversations...');
+    final activeConversations = await _firestore
+        .collection('conversations')
+        .where('userId', isEqualTo: user.uid)
+        .where('status', isEqualTo: 'active')
+        .orderBy('lastActivity', descending: true)
+        .limit(1)
+        .get();
+
+    if (activeConversations.docs.isNotEmpty) {
+      final conversationId = activeConversations.docs.first.id;
+      print('✅ Found active conversation: $conversationId');
+      
+      if (mounted) {
+        setState(() {
+          _conversationId = conversationId;
+          _pendingConversationId = conversationId;
+          _showFAQs = false;
+        });
+      }
+
+      // Load the conversation
+      await _loadExistingConversation(conversationId);
+    } else {
+      print('ℹ️ No active conversations found - showing FAQs');
+      
+      if (mounted) {
+        setState(() {
+          _conversationId = null;
+          _pendingConversationId = null;
+          _showFAQs = true;
+        });
+      }
+    }
+  } catch (e) {
+    print('❌ Error in initialization: $e');
+    if (mounted) {
+      setState(() {
+        _showFAQs = true;
+      });
+    }
+  }
+}
 
   String _loadingText = "Loading...";
 

@@ -1,3 +1,4 @@
+import 'package:capstone_project/modal_pages/add_edit_placement.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -375,14 +376,12 @@ Widget _buildActionButtons(
   bool isMobile,
   bool isTablet,
 ) {
-  // Professional button sizing
   double buttonHeight = isMobile ? 44 : 48;
   double fontSize = isMobile ? 14 : 15;
   double borderRadius = 10;
 
   return Row(
     children: [
-      // Delete Button
       Expanded(
         child: SizedBox(
           height: buttonHeight,
@@ -390,9 +389,8 @@ Widget _buildActionButtons(
             onPressed: () => showDeleteConfirmation(
               context,
               doc,
-              DeleteConfigs.placements,
+              DeleteConfigs.placements, // Adjust this based on your DeleteConfigs
               'placements',
-              
             ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
@@ -411,7 +409,6 @@ Widget _buildActionButtons(
         ),
       ),
       const SizedBox(width: 12),
-      // Edit Button
       Expanded(
         child: SizedBox(
           height: buttonHeight,
@@ -420,7 +417,91 @@ Widget _buildActionButtons(
               Navigator.of(context).pop();
               Future.delayed(
                 const Duration(milliseconds: 200),
-                () => showEditPLModal(context, doc, previousModal: 'info'),
+                () => showDialog(
+                  context: context,
+                  builder: (context) => PlacementFormDialog(
+                    doc: doc,
+                    isEdit: true,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: Text(
+              'Edit',
+              style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E7D32),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(borderRadius),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+// If there's a full content modal for placement, use the same pattern:
+Widget _buildFullContentActionButtons(
+  BuildContext context,
+  DocumentSnapshot doc,
+  bool isMobile,
+  bool isTablet,
+) {
+  double buttonHeight = isMobile ? 44 : 48;
+  double fontSize = isMobile ? 14 : 15;
+  double borderRadius = 10;
+
+  return Row(
+    children: [
+      Expanded(
+        child: SizedBox(
+          height: buttonHeight,
+          child: OutlinedButton.icon(
+            onPressed: () => showDeleteConfirmation(
+              context,
+              doc,
+              DeleteConfigs.placements,
+              'placements',
+            ),
+            icon: const Icon(Icons.delete_outline, size: 18),
+            label: Text(
+              'Delete',
+              style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFEF4444),
+              side: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(borderRadius),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: SizedBox(
+          height: buttonHeight,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Future.delayed(
+                const Duration(milliseconds: 200),
+                () => showDialog(
+                  context: context,
+                  builder: (context) => PlacementFormDialog(
+                    doc: doc,
+                    isEdit: true,
+                  ),
+                ),
               );
             },
             icon: const Icon(Icons.edit_outlined, size: 18),

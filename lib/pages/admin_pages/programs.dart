@@ -382,52 +382,42 @@ Widget _buildMobileHeader(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       // Title
-      const Text(
-        'Programs Management',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
-      const SizedBox(height: 4),
-      // Subtitle
-      const Text(
-        'Manage academic programs',
-        style: TextStyle(fontSize: 12, color: Colors.grey),
-      ),
-      const SizedBox(height: 12),
-      // Add button aligned to the right
-      Align(
-        alignment: Alignment.centerRight,
-        child: AddProgramButton(
-          onPressed: () {
-            showDialog(
-              context: context,
-              builder: (context) => AddEditProgramDialog(onSaved: () {}),
-            );
-          },
-        ),
-      ),
-      const SizedBox(height: 16),
-      // Stat Cards Section
-      Column(
-        children: [
-          buildStatCard(
-            'Total Programs',
-            '${program?.totalProgram}',
-            Colors.blue,
-            Icons.message,
+      Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Programs Management',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Manage academic programs',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+              // Updated button using the new component
+              AddProgramButton(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AddEditProgramDialog(onSaved: () {}),
+                  );
+                },
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          buildStatCard(
-            'Programs with Most Students Registered',
-            '${program?.dominantProgram}',
-            Colors.green,
-            Icons.check_circle,
-          ),
-        ],
-      ),
+    
       const SizedBox(height: 16),
       // Search Field
       buildSearchField('Search programs by name', searchController),

@@ -272,7 +272,7 @@ class MobileUserManagement extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Container(
-                height: MediaQuery.of(context).size.height * 0.7,
+                height: MediaQuery.of(context).size.height * 0.8,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -441,93 +441,35 @@ Widget _buildMobileHeader(
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // Title
-      const Text(
-        'Users Management',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
-      const SizedBox(height: 4),
-      // Subtitle
-      const Text(
-        'Manage accounts and user roles',
-        style: TextStyle(
-          fontSize: 12,
-          color: Colors.grey,
-        ),
-      ),
-      const SizedBox(height: 12),
-      // Add User button aligned to the right
-      Align(
-        alignment: Alignment.centerRight,
-        child: AddUserButton(onNavigateToPage: onNavigateToPage),
-      ),
-      const SizedBox(height: 16),
-      // Stat Cards Section
-      Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: buildStatCard(
-                  'Total Users',
-                  '${user?.totalUsers}',
-                  Colors.blue,
-                  Icons.message,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: buildStatCard(
-                  'Active Users',
-                  '${user?.activeUsers}',
-                  Colors.green,
-                  Icons.check_circle,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: buildStatCard(
-                  'New Users (This Month)',
-                  '${user?.newUsersThisMonth}',
-                  Colors.red,
-                  Icons.group,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: buildStatCard(
-                  'Users Logged in Today',
-                  '${user?.usersLoggedInToday}',
-                  Colors.orange,
-                  Icons.help_outline,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      const SizedBox(height: 16),
-      // Search and Filter
-      buildSearchField('name, email or role', searchController),
-      const SizedBox(height: 12),
       Row(
-        children: [
-          Expanded(
-            child: RoleDropdownButton(
-              initialValue: selectedRole,
-              onChanged: onRoleChanged,
-            ),
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Users Management',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Manage accounts and user roles',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [AddUserButton(onNavigateToPage: onNavigateToPage)],
+              ),
+            ],
           ),
-        ],
-      ),
     ],
   );
 }
@@ -938,7 +880,7 @@ Widget _buildHeader(
             ),
           ),
 
-          const SizedBox(height: 24),
+
 
           // Search and Filter Row
           Row(

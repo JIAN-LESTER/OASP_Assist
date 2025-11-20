@@ -27,16 +27,24 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       icon: Icons.school_rounded,
       title: "Welcome to OASP Assist",
       description:
-          "Your intelligent companion for navigating university services. Get instant answers about admissions, scholarships, and placements—all powered by AI.",
+          "Your intelligent companion for navigating OASP services. Get instant answers about admissions, scholarships, and placements—all powered by AI.",
       color: primaryColor,
     ),
     OnboardingPage(
       icon: Icons.chat_bubble_outline_rounded,
       title: "Your Personal Assistant",
       description:
-          "Ask questions naturally and get accurate, instant responses. Available 24/7 to help you with admissions, scholarships, placements, and campus services.",
+          "Ask questions naturally and get accurate, instant responses. Available 24/7 to help you with admissions, scholarships, and placements services.",
       color: primaryColor,
       isFeaturePage: true,
+    ),
+    OnboardingPage(
+      icon: Icons.security_rounded,
+      title: "Your Privacy Matters",
+      description:
+          "We're committed to protecting your data. Here's what we collect and why:",
+      color: primaryColor,
+      isPrivacyPage: true,
     ),
     OnboardingPage(
       icon: Icons.login_rounded,
@@ -331,6 +339,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         titleFontSize,
         descriptionFontSize,
       );
+    } else if (page.isPrivacyPage) {
+      return _buildPrivacyPage(
+        page,
+        iconSize,
+        titleFontSize,
+        descriptionFontSize,
+      );
     } else {
       return _buildWelcomePage(
         page,
@@ -478,6 +493,117 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
+  Widget _buildPrivacyPage(
+    OnboardingPage page,
+    double iconSize,
+    double titleFontSize,
+    double descriptionFontSize,
+  ) {
+    final dataItems = [
+      DataCollectionItem(
+        icon: Icons.account_circle_outlined,
+        title: "Profile Information",
+        description: "Name, email, year level, program, affiliation, and scholarship for authentication and user profile.",
+        color:  Colors.green,
+      ),
+      DataCollectionItem(
+        icon: Icons.message_outlined,
+        title: "Chat History",
+        description: "Conversations to improve AI responses and your experience.",
+        color: Colors.green,
+      ),
+      DataCollectionItem(
+        icon: Icons.analytics_outlined,
+        title: "Usage Data",
+        description: "App interactions to enhance features and performance.",
+        color: Colors.green,
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: iconSize * 0.9,
+            height: iconSize * 0.9,
+            decoration: BoxDecoration(
+              color: primaryColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(page.icon, size: iconSize * 0.4, color: primaryColor),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            page.title,
+            style: TextStyle(
+              fontSize: titleFontSize * 0.85,
+              fontWeight: FontWeight.w800,
+              color: textPrimaryColor,
+              letterSpacing: -0.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            page.description,
+            style: TextStyle(
+              fontSize: descriptionFontSize * 0.9,
+              color: textSecondaryColor,
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: dataItems.length,
+              itemBuilder:
+                  (context, index) =>
+                      _buildDataCollectionCard(dataItems[index], descriptionFontSize),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: primaryColor.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: primaryColor.withOpacity(0.2),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.shield_outlined,
+                  color: primaryColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "Your data will remain confidential and never shared with third parties.",
+                    style: TextStyle(
+                      fontSize: descriptionFontSize * 0.75,
+                      color: textSecondaryColor,
+                      fontWeight: FontWeight.w500,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFeatureCard(FeatureItem feature, double fontSize) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -530,6 +656,65 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
+  Widget _buildDataCollectionCard(DataCollectionItem item, double fontSize) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: item.color.withOpacity(0.3), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: item.color.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: item.color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(item.icon, color: item.color, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: TextStyle(
+                    fontSize: fontSize * 0.9,
+                    fontWeight: FontWeight.w700,
+                    color: item.color,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.description,
+                  style: TextStyle(
+                    fontSize: fontSize * 0.75,
+                    color: textSecondaryColor,
+                    height: 1.3,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStepsPage(
     OnboardingPage page,
     double iconSize,
@@ -540,19 +725,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       StepItem(
         number: "1",
         title: "Sign In",
-        description: "Log in with your OASP credentials.",
+        description: "Log in with your OASP Assist credentials.",
         icon: Icons.login_rounded,
       ),
       StepItem(
         number: "2",
         title: "Start Chatting",
-        description: "Ask questions about admissions or scholarships.",
+        description: "Ask questions about admissions, scholarships, or placements.",
         icon: Icons.chat_rounded,
       ),
       StepItem(
         number: "3",
         title: "Explore Services",
-        description: "Browse resources and access OASP features.",
+        description: "Browse resources and access OASP Assist features.",
         icon: Icons.explore_rounded,
       ),
     ];
@@ -774,6 +959,7 @@ class OnboardingPage {
   final Color color;
   final bool isFeaturePage;
   final bool isStepsPage;
+  final bool isPrivacyPage;
 
   OnboardingPage({
     required this.icon,
@@ -782,6 +968,7 @@ class OnboardingPage {
     required this.color,
     this.isFeaturePage = false,
     this.isStepsPage = false,
+    this.isPrivacyPage = false,
   });
 }
 
@@ -794,6 +981,20 @@ class FeatureItem {
     required this.icon,
     required this.title,
     required this.description,
+  });
+}
+
+class DataCollectionItem {
+  final IconData icon;
+  final String title;
+  final String description;
+  final Color color;
+
+  DataCollectionItem({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.color,
   });
 }
 

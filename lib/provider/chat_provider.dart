@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:capstone_project/responsive/user_constant.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -462,20 +463,55 @@ class ChatProvider extends ChangeNotifier {
 
   // In ChatProvider class, replace askQuestionWithStreaming method:
 
-  Future<void> askQuestionWithStreaming(
-    BuildContext context,
-    String question,
-  ) async {
-    if (_isLoading || conversationId == null || conversationId!.isEmpty) return;
+ Future<void> askQuestionWithStreaming(
+  BuildContext context,
+  String question,
+) async {
+  if (_isLoading) return;
 
-    _isLoading = true;
-    notifyListeners();
+  // ✅ FIX: Create conversation if none exists
+  if (conversationId == null || conversationId!.isEmpty) {
+    print('⚠️ No conversation ID - creating new conversation');
+    
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
 
-    final startTime = DateTime.now();
+      return;
+    }
 
     try {
-      _cohere ??= CohereService();
-      final userId = FirebaseAuth.instance.currentUser?.uid;
+      // Create new conversation
+      final newConversationId = await UserConstant.createNewConversation(userId);
+      
+      // Set it in the provider
+      await setConversationId(newConversationId);
+      
+      print('✅ Created new conversation: $newConversationId');
+      
+      // Small delay to ensure setup completes
+      await Future.delayed(Duration(milliseconds: 300));
+    } catch (e) {
+      print('❌ Error creating conversation: $e');
+ 
+      return;
+    }
+  }
+
+  // ✅ Double-check conversation exists
+  if (conversationId == null || conversationId!.isEmpty) {
+    print('❌ Still no conversation ID after creation attempt');
+
+    return;
+  }
+
+  _isLoading = true;
+  notifyListeners();
+
+  final startTime = DateTime.now();
+
+  try {
+    _cohere ??= CohereService();
+    final userId = FirebaseAuth.instance.currentUser?.uid;
 
       // ───────────────────────────────────────────────
       //  ✅ 1. Create user message immediately (UI fast)
@@ -706,187 +742,145 @@ class ChatProvider extends ChangeNotifier {
     return 'General';
   }
 
-  Map<String, dynamic>? _findMatchingFAQWithContext(
-    String question,
-    List<double> questionEmbedding,
-    List<Message> conversationHistory,
-  ) {
-    try {
-      // Check if this is a follow-up question
-      final isFollowUp = _isFollowUpQuestion(question);
-
-      if (isFollowUp && conversationHistory.isNotEmpty) {
-        final lastBotMessage =
-            conversationHistory.where((m) => m.sender == 'bot').lastOrNull;
-
-        if (lastBotMessage != null) {
-          final contextualQuestion = "${lastBotMessage.content} $question";
-          print('Treating as follow-up: "$contextualQuestion"');
-          return _findBestFAQMatch(contextualQuestion, questionEmbedding);
-        }
-      }
-
-      return _findBestFAQMatch(question, questionEmbedding);
-    } catch (e) {
-      print('Error in contextual FAQ matching: $e');
-      return null;
-    }
-  }
-
-  bool _isFollowUpQuestion(String question) {
-    final followUpPatterns = [
-      RegExp(
-        r'\b(what are those|what are these|those|these|that|this)\b',
-        caseSensitive: false,
-      ),
-      RegExp(r'\b(how many|how much|which ones)\b', caseSensitive: false),
-      RegExp(
-        r'\b(tell me more|more info|details|elaborate)\b',
-        caseSensitive: false,
-      ),
-      RegExp(r'^\w{1,5}(\?|\.)*$'),
-    ];
-
-    return followUpPatterns.any((pattern) => pattern.hasMatch(question.trim()));
-  }
-
   Map<String, dynamic>? _findBestFAQMatch(
-    String question,
-    List<double> questionEmbedding,
-  ) {
-    try {
-      double highestSimilarity = 0.0;
-      Map<String, dynamic>? bestMatch;
+  String question,
+  List<double> questionEmbedding,
+) {
+  try {
+    double highestSimilarity = 0.0;
+    Map<String, dynamic>? bestMatch;
 
-      for (var entry in FAQCache.cache.entries) {
-        final data = entry.value;
+    print('🔍 Checking ${FAQCache.cache.length} FAQs for match');
+    print('🔍 Question: "$question"');
 
-        if (!data.containsKey('embedding')) continue;
+    for (var entry in FAQCache.cache.entries) {
+      final data = entry.value;
 
-        final faqEmbedding = List<double>.from(data['embedding']);
-        final similarity = cosineSimilarity(questionEmbedding, faqEmbedding);
-
-        if (similarity > 0.90 && similarity > highestSimilarity) {
-          highestSimilarity = similarity;
-          bestMatch = data;
-        }
+      // ✅ CRITICAL: Validate embedding exists
+      if (!data.containsKey('embedding') || data['embedding'] == null) {
+        print('⚠️ FAQ missing embedding: ${data['question']}');
+        continue;
       }
 
-      if (bestMatch != null) {
-        print('✅ Found FAQ match with similarity: $highestSimilarity');
+      // ✅ CRITICAL: Validate answer exists and is not empty
+      final answer = data['answer'] as String?;
+      if (answer == null || answer.trim().isEmpty) {
+        print('⚠️ FAQ has empty answer: ${data['question']}');
+        continue;
       }
 
-      return bestMatch;
-    } catch (e) {
-      print('Error finding FAQ match: $e');
-      return null;
-    }
-  }
-
-  Future<void> _handleError(dynamic error) async {
-    String errorMessage;
-
-    if (error.toString().contains('network') ||
-        error.toString().contains('connection')) {
-      errorMessage =
-          'Network error. Please check your internet connection and try again.';
-    } else if (error.toString().contains('embedding') ||
-        error.toString().contains('cohere')) {
-      errorMessage =
-          'I\'m having trouble processing your question. Please try rephrasing it or contact OASP staff.';
-    } else if (error.toString().contains('pinecone') ||
-        error.toString().contains('retrieval')) {
-      errorMessage =
-          'I\'m having trouble accessing the knowledge base. Please contact OASP staff for assistance.';
-    } else {
-      errorMessage =
-          'Sorry, I encountered an unexpected error. Please try again or contact OASP staff if the problem persists.';
-    }
-
-    if (conversationId != null) {
-      final errorMsgRef =
-          _firestore
-              .collection('conversations')
-              .doc(conversationId!)
-              .collection('messages')
-              .doc();
-
-      final errorMsg = Message(
-        id: errorMsgRef.id,
-        conversationId: conversationId!,
-        content: errorMessage,
-        sender: 'system',
-        status: 'error',
-        type: 'text',
-        sentAt: DateTime.now(),
-        count: count,
-      );
-
+      List<double> faqEmbedding;
       try {
-        await errorMsgRef.set(_messageToMap(errorMsg));
-        _messages.add(errorMsg);
-        notifyListeners();
-      } catch (saveError) {
-        print('Failed to save error message: $saveError');
+        faqEmbedding = List<double>.from(data['embedding']);
+      } catch (e) {
+        print('⚠️ Invalid embedding format for: ${data['question']}');
+        continue;
+      }
+
+      // ✅ Validate embedding dimensions match
+      if (faqEmbedding.length != questionEmbedding.length) {
+        print('⚠️ Embedding dimension mismatch: FAQ=${faqEmbedding.length}, Query=${questionEmbedding.length}');
+        continue;
+      }
+
+      final similarity = cosineSimilarity(questionEmbedding, faqEmbedding);
+
+      print('📊 FAQ: "${(data['question'] as String).substring(0, min(50, (data['question'] as String).length))}..."');
+      print('   Answer length: ${answer.length} chars');
+      print('   Similarity: ${similarity.toStringAsFixed(4)}');
+
+      // ✅ LOWERED THRESHOLD: Changed from 0.85 to 0.75 for better matching
+      if (similarity > 0.75 && similarity > highestSimilarity) {
+        highestSimilarity = similarity;
+        bestMatch = {
+          'question': data['question'],
+          'answer': answer,
+          'similarity': similarity,
+        };
+        print('   🎯 NEW BEST MATCH!');
       }
     }
-  }
 
-  Future<String> _classifyQuestionCategory(String question) async {
-    final lowercaseQuestion = question.toLowerCase();
-
-    if (lowercaseQuestion.contains(
-      RegExp(
-        r'\b(admission|admit|enroll|application|apply|entrance|entry|requirements?|eligibility|qualify)\b',
-      ),
-    )) {
-      return 'Admission';
-    } else if (lowercaseQuestion.contains(
-      RegExp(
-        r'\b(scholarship|grant|financial|aid|funding|stipend|allowance|discount|free)\b',
-      ),
-    )) {
-      return 'Scholarship';
-    } else if (lowercaseQuestion.contains(
-      RegExp(
-        r'\b(placement|job|career|internship|work|employment|company|companies|hiring)\b',
-      ),
-    )) {
-      return 'Placement';
+    if (bestMatch != null) {
+      print('✅ Found FAQ match:');
+      print('   Question: ${bestMatch['question']}');
+      print('   Similarity: ${highestSimilarity.toStringAsFixed(4)}');
+      print('   Answer length: ${(bestMatch['answer'] as String).length} chars');
+    } else {
+      print('❌ No FAQ match found (best similarity: ${highestSimilarity.toStringAsFixed(4)})');
     }
 
+    return bestMatch;
+  } catch (e) {
+    print('❌ Error finding FAQ match: $e');
+    return null;
+  }
+}
+
+// ✅ ALSO UPDATE: _ensureFAQCacheLoaded to validate data
+Future<void> _ensureFAQCacheLoaded() async {
+  if (FAQCache.isExpired || FAQCache.cache.isEmpty) {
     try {
-      final categoryPrompt = '''
-Classify this educational query into exactly one category: Admission, Scholarship, Placement, or General.
+      print('🔄 Refreshing FAQ cache...');
+      
+      // ✅ CRITICAL: Only fetch FAQs with non-empty answers AND embeddings
+      final faqSnapshot = await _firestore
+          .collection('faqs')
+          .where('answer', isNotEqualTo: "")
+          .get();
 
-Message: "$question"
+      print('📚 Found ${faqSnapshot.docs.length} FAQs in Firestore');
 
-Category:''';
+      // ✅ Filter and validate before caching
+      Map<String, Map<String, dynamic>> validFAQs = {};
+      int skippedCount = 0;
 
-      final result = await _cohere!.generateResponse(categoryPrompt);
+      for (var doc in faqSnapshot.docs) {
+        final data = doc.data();
+        final question = data['question'] as String?;
+        final answer = data['answer'] as String?;
+        final embedding = data['embedding'];
 
-      // Normalize the output
-      var category = result?.trim() ?? 'General';
-      category = category.replaceAll(
-        RegExp(r'[^\w\s]'),
-        '',
-      ); // remove punctuation
-      category =
-          category[0].toUpperCase() +
-          category.substring(1).toLowerCase(); // capitalize
+        // Validate all required fields
+        if (question == null || question.isEmpty) {
+          print('⚠️ Skipping FAQ ${doc.id}: No question');
+          skippedCount++;
+          continue;
+        }
 
-      const validCategories = [
-        'Admission',
-        'Scholarship',
-        'Placement',
-        'General',
-      ];
-      return validCategories.contains(category) ? category : 'General';
+        if (answer == null || answer.trim().isEmpty) {
+          print('⚠️ Skipping FAQ ${doc.id}: Empty answer');
+          skippedCount++;
+          continue;
+        }
+
+        if (embedding == null || !(embedding is List) || (embedding as List).isEmpty) {
+          print('⚠️ Skipping FAQ ${doc.id}: No embedding - "${question.substring(0, min(50, question.length))}"');
+          skippedCount++;
+          continue;
+        }
+
+        // ✅ Only add valid FAQs to cache
+        validFAQs[doc.id] = data;
+        print('✅ Cached FAQ: "${question.substring(0, min(50, question.length))}" (${answer.length} chars)');
+      }
+
+      FAQCache.cache.clear();
+      FAQCache.cache.addAll(validFAQs);
+      FAQCache.lastCacheUpdate = DateTime.now();
+      
+      print('✅ FAQ Cache updated:');
+      print('   Valid FAQs: ${validFAQs.length}');
+      print('   Skipped: $skippedCount');
+      print('   Total in cache: ${FAQCache.cache.length}');
     } catch (e) {
-      print('Classification error: $e');
-      return 'General';
+      print('❌ Error loading FAQ cache: $e');
     }
+  } else {
+    print('ℹ️ Using cached FAQs (${FAQCache.cache.length} entries)');
   }
+}
+
 
   Future<List<double>> _generateEmbeddingCached(String text) async {
     final cached = EmbeddingCache.get(text);
@@ -899,22 +893,6 @@ Category:''';
     return embedding;
   }
 
-  Future<void> _ensureFAQCacheLoaded() async {
-    if (FAQCache.isExpired || FAQCache.cache.isEmpty) {
-      try {
-        final faqSnapshot =
-            await _firestore
-                .collection('faqs')
-                .where('answer', isNotEqualTo: "")
-                .limit(100) // ⚡ Add limit
-                .get();
-
-        FAQCache.updateCache(faqSnapshot.docs);
-      } catch (e) {
-        print('Error loading FAQ cache: $e');
-      }
-    }
-  }
 
   Future<void> _handlePostResponseTasks(
     BuildContext context,
@@ -1673,4 +1651,11 @@ double _calculateQuestionQuality(String question) {
   score += (domainMatches * 0.3);
 
   return score.clamp(0.0, 5.0);
+}
+
+
+extension DoubleExtension on double {
+  String toFixed(int decimals) {
+    return toStringAsFixed(decimals);
+  }
 }
