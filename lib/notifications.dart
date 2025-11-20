@@ -246,8 +246,6 @@ class _NotificationModalState extends State<NotificationModal>
   }
 
   void _navigateToAnnouncements(String? announcementId) {
- 
-
     Future.delayed(const Duration(milliseconds: 200), () {
       if (!mounted) return;
 
@@ -441,6 +439,12 @@ class _NotificationModalState extends State<NotificationModal>
                     ),
                   ),
                 ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               ],
             ),
           ),
@@ -537,53 +541,55 @@ class _NotificationModalState extends State<NotificationModal>
               child: SafeArea(
                 child: SizedBox(
                   width: double.infinity,
-                  child:ElevatedButton(
-  onPressed: () async {
-    print('🔄 Continue in Chat pressed');
-    print('   - conversationId: $conversationId');
-    
-    if (conversationId == null || conversationId.isEmpty || conversationId == 'null') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No conversation available'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
- 
-    // ✅ Wait for modal to close
-    await Future.delayed(const Duration(milliseconds: 200));
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      print('🔄 Continue in Chat pressed');
+                      print('   - conversationId: $conversationId');
 
-    if (!mounted) return;
+                      if (conversationId == null ||
+                          conversationId.isEmpty ||
+                          conversationId == 'null') {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('No conversation available'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
 
-    // ✅ Navigate to home with chat tab
-    Navigator.of(context).pushReplacementNamed(
-      '/home',
-      arguments: {
-        'initialTab': 1,
-        'conversationId': conversationId,
-        'loadExisting': true,
-      },
-    );
-  },
-  style: ElevatedButton.styleFrom(
-    backgroundColor: const Color(0xFF2E7D32),
-    foregroundColor: Colors.white,
-    padding: const EdgeInsets.symmetric(vertical: 14),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(8),
-    ),
-    elevation: 0,
-  ),
-  child: const Text(
-    'Continue in Chat',
-    style: TextStyle(
-      fontWeight: FontWeight.w600,
-      fontSize: 15,
-    ),
-  ),
-)
+                      // ✅ Wait for modal to close
+                      await Future.delayed(const Duration(milliseconds: 200));
+
+                      if (!mounted) return;
+
+                      // ✅ Navigate to home with chat tab
+                      Navigator.of(context).pushReplacementNamed(
+                        '/home',
+                        arguments: {
+                          'initialTab': 1,
+                          'conversationId': conversationId,
+                          'loadExisting': true,
+                        },
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E7D32),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Continue in Chat',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -657,6 +663,12 @@ class _NotificationModalState extends State<NotificationModal>
                     ),
                   ),
                 ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               ],
             ),
           ),
@@ -720,64 +732,64 @@ class _NotificationModalState extends State<NotificationModal>
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-  onPressed: () async {
-    final escalationId = _viewingEscalationId;
+                  onPressed: () async {
+                    final escalationId = _viewingEscalationId;
 
-    print('🔧 Respond to Escalation pressed');
-    print('   - escalationId: $escalationId');
-    print('   - conversationId: $conversationId');
+                    print('🔧 Respond to Escalation pressed');
+                    print('   - escalationId: $escalationId');
+                    print('   - conversationId: $conversationId');
 
-    if (escalationId == null || escalationId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error: No escalation ID'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+                    if (escalationId == null || escalationId.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Error: No escalation ID'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
 
+                    // ✅ Wait for modal to close
+                    await Future.delayed(const Duration(milliseconds: 200));
 
-    // ✅ Wait for modal to close
-    await Future.delayed(const Duration(milliseconds: 200));
+                    if (!mounted) return;
 
-    if (!mounted) return;
+                    final route =
+                        widget.role == 'admin' ? '/admin/home' : '/staff/home';
+                    final tabIndex = widget.role == 'admin' ? 5 : 2;
 
-    final route = widget.role == 'admin' ? '/admin/home' : '/staff/home';
-    final tabIndex = widget.role == 'admin' ? 5 : 2;
+                    print('📍 Navigating to: $route (tab $tabIndex)');
 
-    print('📍 Navigating to: $route (tab $tabIndex)');
-
-    // ✅ Navigate with escalation details
-    Navigator.of(context).pushReplacementNamed(
-      route,
-      arguments: {
-        'initialTab': tabIndex,
-        'escalationId': escalationId,
-        'conversationId': conversationId,
-        'autoOpen': true,
-      },
-    );
-  },
-  style: ElevatedButton.styleFrom(
-    backgroundColor: const Color(0xFF2E7D32),
-    foregroundColor: Colors.white,
-    padding: const EdgeInsets.symmetric(vertical: 14),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(8),
-    ),
-    elevation: 0,
-  ),
-  child: Text(
-    status == 'resolved'
-        ? 'View Full Details'
-        : 'Respond to Escalation',
-    style: const TextStyle(
-      fontWeight: FontWeight.w600,
-      fontSize: 15,
-    ),
-  ),
-)
+                    // ✅ Navigate with escalation details
+                    Navigator.of(context).pushReplacementNamed(
+                      route,
+                      arguments: {
+                        'initialTab': tabIndex,
+                        'escalationId': escalationId,
+                        'conversationId': conversationId,
+                        'autoOpen': true,
+                      },
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E7D32),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    status == 'resolved'
+                        ? 'View Full Details'
+                        : 'Respond to Escalation',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -884,51 +896,17 @@ class _NotificationModalState extends State<NotificationModal>
                   ),
                 ),
                 const Spacer(),
-                StreamBuilder<QuerySnapshot>(
-                  stream: baseQuery.snapshots(),
-                  builder: (context, snapshot) {
-                    final hasUnread =
-                        snapshot.hasData &&
-                        snapshot.data!.docs.any((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          return !_isRead(data);
-                        });
-
-                    return TextButton.icon(
-                      onPressed: hasUnread ? _markAllAsRead : null,
-                      icon: Icon(
-                        Icons.done_all,
-                        size: 18,
-                        color:
-                            hasUnread
-                                ? const Color(0xFF1976D2)
-                                : Colors.grey[400],
-                      ),
-                      label: Text(
-                        'Mark all as read',
-                        style: TextStyle(
-                          color:
-                              hasUnread
-                                  ? const Color(0xFF1976D2)
-                                  : Colors.grey[400],
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
-                        ),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                    );
-                  },
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
           ),
 
-          // Tab Bar
+          // Tab Bar with Mark all as read button
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -955,85 +933,155 @@ class _NotificationModalState extends State<NotificationModal>
                       }).length;
                 }
 
-                return TabBar(
-                  controller: _tabController,
-                  labelColor: const Color(0xFF2E7D32),
-                  unselectedLabelColor: Colors.grey[600],
-                  indicatorColor: const Color(0xFF2E7D32),
-                  indicatorWeight: 3,
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
-                  tabs: [
-                    Tab(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('All'),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
+                final hasUnread =
+                    snapshot.hasData &&
+                    snapshot.data!.docs.any((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      return !_isRead(data);
+                    });
+
+                return Row(
+                  children: [
+                    // Tabs on the left
+                    Expanded(
+                      child: TabBar(
+                        controller: _tabController,
+                        labelColor: const Color(0xFF2E7D32),
+                        unselectedLabelColor: Colors.grey[600],
+                        indicatorColor: const Color(0xFF2E7D32),
+                        indicatorWeight: 3,
+                        dividerColor: Colors.transparent,
+                        labelPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        unselectedLabelStyle: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
+                        tabs: [
+                          Tab(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Text('All'),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            _selectedTabIndex == 0
+                                                ? const Color(
+                                                  0xFF2E7D32,
+                                                ).withOpacity(0.1)
+                                                : Colors.grey[200],
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        allCount.toString(),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color:
+                                              _selectedTabIndex == 0
+                                                  ? const Color(0xFF2E7D32)
+                                                  : Colors.grey[600],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                            decoration: BoxDecoration(
-                              color:
-                                  _selectedTabIndex == 0
-                                      ? const Color(0xFF2E7D32).withOpacity(0.1)
-                                      : Colors.grey[200],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              allCount.toString(),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color:
-                                    _selectedTabIndex == 0
-                                        ? const Color(0xFF2E7D32)
-                                        : Colors.grey[600],
-                              ),
+                          ),
+                          Tab(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Text('Today'),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            _selectedTabIndex == 1
+                                                ? const Color(
+                                                  0xFF2E7D32,
+                                                ).withOpacity(0.1)
+                                                : Colors.grey[200],
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        todayCount.toString(),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color:
+                                              _selectedTabIndex == 1
+                                                  ? const Color(0xFF2E7D32)
+                                                  : Colors.grey[600],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    Tab(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('Today'),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  _selectedTabIndex == 1
-                                      ? const Color(0xFF2E7D32).withOpacity(0.1)
-                                      : Colors.grey[200],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              todayCount.toString(),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color:
-                                    _selectedTabIndex == 1
-                                        ? const Color(0xFF2E7D32)
-                                        : Colors.grey[600],
-                              ),
-                            ),
+                    // Mark all as read button on the right
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: TextButton.icon(
+                        onPressed: hasUnread ? _markAllAsRead : null,
+                        icon: Icon(
+                          Icons.done_all,
+                          size: 18,
+                          color:
+                              hasUnread
+                                  ? const Color(0xFF1976D2)
+                                  : Colors.grey[400],
+                        ),
+                        label: Text(
+                          'Mark all as read',
+                          style: TextStyle(
+                            color:
+                                hasUnread
+                                    ? const Color(0xFF1976D2)
+                                    : Colors.grey[400],
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
                           ),
-                        ],
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
                       ),
                     ),
                   ],
