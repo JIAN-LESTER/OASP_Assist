@@ -5,6 +5,8 @@ import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 void showAddFaqModal(BuildContext context) {
   showGeneralDialog(
@@ -44,6 +46,8 @@ class AddFaqModal extends StatelessWidget {
       desktopBody: _buildModal(context, false, false, true),
     );
   }
+
+
 
   Widget _buildModal(
     BuildContext context,
@@ -135,6 +139,43 @@ class _AddFaqContentState extends State<AddFaqContent> {
   String _selectedCategory = 'General';
   bool _isSubmitting = false;
 
+    final String _cohereApiKey = "IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
+
+  Future<List<double>> _generateEmbedding(String text) async {
+  try {
+    print('🔧 Generating v3 embedding for FAQ: "${text.substring(0, text.length > 50 ? 50 : text.length)}..."');
+    
+    final response = await http.post(
+      Uri.parse("https://api.cohere.ai/v1/embed"),
+      headers: {
+        'Authorization': 'Bearer $_cohereApiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "texts": [text],
+        "model": "embed-multilingual-v3.0",  // ✅ Using v3
+        "input_type": "search_document",      // ✅ Required for v3 - FAQs are documents
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      print('❌ Cohere API error: ${response.statusCode} - ${response.body}');
+      throw Exception('Failed to generate embedding: ${response.statusCode}');
+    }
+
+    final data = jsonDecode(response.body);
+    final embedding = (data['embeddings'][0] as List)
+        .map((e) => (e as num).toDouble())
+        .toList();
+    
+    print('✅ Generated v3 embedding: ${embedding.length} dimensions');
+    return embedding;
+  } catch (e) {
+    print('❌ Error generating embedding: $e');
+    rethrow;
+  }
+}
+
   final List<String> _categories = [
     'Admission',
     'Scholarship',
@@ -152,50 +193,74 @@ class _AddFaqContentState extends State<AddFaqContent> {
   
 
   Future<void> _saveFaq() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    if (_questionController.text.trim().isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please enter a question');
-      return;
-    }
-
-    if (_answerController.text.trim().isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please enter an answer');
-      return;
-    }
-
-    setState(() {
-      _isSubmitting = true;
-    });
-
-   try {
-  final faqData = {
-    'question': _questionController.text.trim(),
-    'answer': _answerController.text.trim(),
-    'category': _selectedCategory,
-    'isPredefined': true,
-    'createdAt': Timestamp.now(),
-  };
-
-  await FirebaseFirestore.instance.collection('faqs').add(faqData);
-
-  // Log the action
-  await _logCreateAction();
-
-  // Pop the modal immediately
-  Navigator.of(context).pop(true);
-
-  // Show success snackbar after modal is closed
-  SnackbarUtil.showSuccess(context, 'FAQ created successfully!');
-} catch (e) {
-  SnackbarUtil.showError(context, 'Failed to create FAQ: $e');
-} finally {
-  if (mounted) setState(() => _isSubmitting = false);
-}
-
+  if (!_formKey.currentState!.validate()) {
+    return;
   }
+
+  if (_questionController.text.trim().isEmpty) {
+    SnackbarUtil.showWarning(context, 'Please enter a question');
+    return;
+  }
+
+  if (_answerController.text.trim().isEmpty) {
+    SnackbarUtil.showWarning(context, 'Please enter an answer');
+    return;
+  }
+
+  setState(() {
+    _isSubmitting = true;
+  });
+
+  try {
+    final question = _questionController.text.trim();
+    final answer = _answerController.text.trim();
+
+    // ✅ Generate embedding for the FAQ question
+    List<double>? embedding;
+    try {
+      embedding = await _generateEmbedding(question);
+    } catch (e) {
+      print('⚠️ Failed to generate embedding: $e');
+      // Show warning but continue - embedding can be generated later by Cloud Function
+    }
+
+    // ✅ Include embedding in FAQ data
+    final Map<String, dynamic> faqData = {
+      'question': question,
+      'answer': answer,
+      'category': _selectedCategory,
+      'isPredefined': true,
+      'createdAt': Timestamp.now(),
+      'similarityCount': 0,
+    };
+
+    // ✅ Add embedding fields if generated successfully
+    if (embedding != null) {
+      faqData['embedding'] = embedding;
+      faqData['embeddingModel'] = 'embed-multilingual-v3.0';
+      faqData['embeddingDimensions'] = embedding.length;
+    }
+
+    await FirebaseFirestore.instance.collection('faqs').add(faqData);
+
+    // Log the action
+    await _logCreateAction();
+
+    // Pop the modal
+    Navigator.of(context).pop(true);
+
+    // Show success message
+    if (embedding != null) {
+      SnackbarUtil.showSuccess(context, 'FAQ created with embedding (${embedding.length} dims)!');
+    } else {
+      SnackbarUtil.showWarning(context, 'FAQ created without embedding - will be generated on first use');
+    }
+  } catch (e) {
+    SnackbarUtil.showError(context, 'Failed to create FAQ: $e');
+  } finally {
+    if (mounted) setState(() => _isSubmitting = false);
+  }
+}
 
 //   Future<void> _saveFaq() async {
 //    setState(() => _isSubmitting = true);

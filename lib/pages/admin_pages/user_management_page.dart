@@ -609,7 +609,7 @@ Widget _buildUserRow({
               color: Colors.grey[700],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 2),
           Expanded(
             flex: 3,
             child: Column(
@@ -621,6 +621,7 @@ Widget _buildUserRow({
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (!isMobile && email.isNotEmpty)
@@ -669,7 +670,7 @@ Widget _buildUserRow({
             ),
           if (isMobile)
             Expanded(
-              flex: 2,
+              flex: 3,
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
@@ -704,12 +705,12 @@ Widget _buildUserRow({
             ),
           if (!isMobile)
             Expanded(
-              flex: 2,
+              flex: 3,
               child: Text(year, style: const TextStyle(fontSize: 13)),
             ),
           if (!isMobile)
             Expanded(
-              flex: 3,
+              flex: 4,
               child: Text(
                 program,
                 style: const TextStyle(fontSize: 13),
@@ -741,7 +742,7 @@ Widget _buildUserRow({
               ),
             ),
           ),
-          SizedBox(width: isTablet ? 60 : 80),
+          SizedBox(width: isTablet ? 60 : 5),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {
@@ -974,7 +975,7 @@ Widget _buildTableHeader() {
           children: [
             const SizedBox(width: 8),
             Expanded(
-              flex: 3,
+              flex: 4,
               child: Text(
                 'User',
                 style: TextStyle(
@@ -997,7 +998,7 @@ Widget _buildTableHeader() {
             ),
             if (!isMobile)
               Expanded(
-                flex: 2,
+                flex: 3,
                 child: Text(
                   'Year',
                   style: TextStyle(
@@ -1020,7 +1021,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             Expanded(
-              flex: 2,
+              flex: 3,
               child: Text(
                 'Status',
                 style: TextStyle(
@@ -1030,7 +1031,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            SizedBox(width: isTablet ? 60 : 80),
+      
           ],
         ),
       );

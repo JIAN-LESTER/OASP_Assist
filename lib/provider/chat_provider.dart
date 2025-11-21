@@ -459,11 +459,8 @@ class ChatProvider extends ChangeNotifier {
   final Set<String> _processedMessages = {}; // NEW: Track processed messages
 
   String? getStreamingContent(String messageId) => _streamingContent[messageId];
-  // In ChatProvider class, replace askQuestionWithStreaming method:
 
-  // In ChatProvider class, replace askQuestionWithStreaming method:
-
- Future<void> askQuestionWithStreaming(
+Future<void> askQuestionWithStreaming(
   BuildContext context,
   String question,
 ) async {
@@ -475,7 +472,6 @@ class ChatProvider extends ChangeNotifier {
     
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) {
-
       return;
     }
 
@@ -492,7 +488,6 @@ class ChatProvider extends ChangeNotifier {
       await Future.delayed(Duration(milliseconds: 300));
     } catch (e) {
       print('❌ Error creating conversation: $e');
- 
       return;
     }
   }
@@ -500,7 +495,6 @@ class ChatProvider extends ChangeNotifier {
   // ✅ Double-check conversation exists
   if (conversationId == null || conversationId!.isEmpty) {
     print('❌ Still no conversation ID after creation attempt');
-
     return;
   }
 
@@ -513,236 +507,223 @@ class ChatProvider extends ChangeNotifier {
     _cohere ??= CohereService();
     final userId = FirebaseAuth.instance.currentUser?.uid;
 
-      // ───────────────────────────────────────────────
-      //  ✅ 1. Create user message immediately (UI fast)
-      // ───────────────────────────────────────────────
-      final userMessageRef =
-          _firestore
-              .collection('conversations')
-              .doc(conversationId!)
-              .collection('messages')
-              .doc();
+    // ───────────────────────────────────────────────
+    //  ⚡ 1. Run embedding + FAQ load in parallel (NO classification yet)
+    // ───────────────────────────────────────────────
+    final results = await Future.wait([
+      _generateEmbeddingCached(question),
+      _ensureFAQCacheLoaded(),
+    ]);
 
-      final userMsg = Message(
-        id: userMessageRef.id,
-        conversationId: conversationId!,
-        content: question,
-        userID: userId,
-        category: 'General',
-        sender: 'user',
-        status: 'sent',
-        isAnswered: false,
-        type: 'text',
-        sentAt: DateTime.now(),
-        count: count,
-      );
+    final currentEmbedding = results[0] as List<double>;
+    final existingFAQ = _findBestFAQMatch(question, currentEmbedding);
 
-      _messages.add(userMsg);
-      _processedMessages.add(userMsg.id);
-      notifyListeners();
-      _onMessageAdded?.call();
+    // ───────────────────────────────────────────────
+    //  ✅ 2. Determine category: Use FAQ category FIRST, then classify
+    // ───────────────────────────────────────────────
+    String questionCategory;
+    
+    if (existingFAQ != null && existingFAQ['category'] != null) {
+      // ✅ PRIORITY 1: Use FAQ category if match found
+      questionCategory = existingFAQ['category'] as String;
+      print('✅ Using FAQ category: $questionCategory');
+    } else {
+      // ✅ PRIORITY 2: Classify only if no FAQ match
+      questionCategory = await _classifyQuestionCategoryFast(question);
+      print('✅ Classified category: $questionCategory');
+    }
 
-      // Save user message in background (no await)
-      unawaited(userMessageRef.set(_messageToMap(userMsg)));
-
-      // ───────────────────────────────────────────────
-      //  ⚡ 2. Limit history to last 5 messages only
-      // ───────────────────────────────────────────────
-      final history =
-          _messages.where((m) => m.conversationId == conversationId).toList();
-
-      history.sort((a, b) => a.sentAt.compareTo(b.sentAt));
-
-      final recentHistory =
-          history.length > 5 ? history.sublist(history.length - 5) : history;
-
-      // ───────────────────────────────────────────────
-      //  ⚡ 3. Run embedding + category + FAQ load fully in parallel
-      // ───────────────────────────────────────────────
-      final results = await Future.wait([
-        _generateEmbeddingCached(question),
-        _classifyQuestionCategoryFast(question),
-        _ensureFAQCacheLoaded(),
-      ]);
-
-      final currentEmbedding = results[0] as List<double>;
-      final classifiedCategory = results[1] as String;
-      final existingFAQ = _findBestFAQMatch(question, currentEmbedding);
-
-      // ───────────────────────────────────────────────
-      //  ⚡ 4. Prepare bot message placeholder immediately
-      // ───────────────────────────────────────────────
-      final botMessageId = "bot_${userMsg.id}";
-      final botMessage = Message(
-        id: botMessageId,
-        conversationId: conversationId!,
-        content: "",
-        sender: "bot",
-        status: "sent",
-        type: "text",
-        sentAt: DateTime.now(),
-        count: count,
-      );
-
-      _messages.add(botMessage);
-      _streamingContent[botMessageId] = "";
-      notifyListeners();
-      _onMessageAdded?.call();
-
-      String finalAnswer = "";
-
-      // ───────────────────────────────────────────────
-      //  ⚡ 5. FAST PATH: FAQ answer (no RAG, no LLM)
-      // ───────────────────────────────────────────────
-      if (existingFAQ != null) {
-        final String answer = existingFAQ["answer"];
-        final int chunkSize = 20; // faster streaming
-
-        for (int i = 0; i < answer.length; i += chunkSize) {
-          final chunk = answer.substring(
-            i,
-            (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
-          );
-
-          _streamingContent[botMessageId] =
-              _streamingContent[botMessageId]! + chunk;
-
-          // Update UI only every 3 chunks (fast!)
-          if (i % (chunkSize * 3) == 0) {
-            notifyListeners();
-            _onMessageAdded?.call();
-          }
-        }
-
-        finalAnswer = answer;
-        unawaited(_incrementFAQSimilarityCountAsync(existingFAQ["question"]));
-      } else {
-        // ───────────────────────────────────────────────
-        //  ⚡ 6. RAG STREAMING (optimized UI updates)
-        // ───────────────────────────────────────────────
-        int chunkCounter = 0;
-
-        await for (final streamedText in _retriever.generateAnswerStream(
-          question,
-          conversationHistory: recentHistory,
-          conversationId: conversationId!,
-        )) {
-          chunkCounter++;
-
-          _streamingContent[botMessageId] = streamedText;
-
-          // Update UI only every 3–5 chunks instead of every chunk
-          if (chunkCounter % 4 == 0) {
-            notifyListeners();
-            _onMessageAdded?.call();
-          }
-
-          finalAnswer = streamedText;
-        }
-      }
-
-      // Remove temporary streaming content
-      _streamingContent.remove(botMessageId);
-
-      // ───────────────────────────────────────────────
-      //  ⚡ 7. Remove duplication only if VERY long
-      // ───────────────────────────────────────────────
-      String verified = finalAnswer;
-      if (verified.length > 300) {
-        final half = verified.length ~/ 2;
-        if (verified.substring(0, half) == verified.substring(half)) {
-          verified = verified.substring(0, half);
-        }
-      }
-
-      // Update bot message locally
-      final idx = _messages.indexWhere((m) => m.id == botMessageId);
-      if (idx >= 0) {
-        _messages[idx] = botMessage.copyWith(content: verified);
-      }
-
-      notifyListeners();
-      _onMessageAdded?.call();
-
-      // ───────────────────────────────────────────────
-      //  ⚡ 8. Compute response time (ms)
-      // ───────────────────────────────────────────────
-      final totalMs = DateTime.now().difference(startTime).inMilliseconds;
-      print("⚡ Optimized total response time: ${totalMs}ms");
-
-      // ───────────────────────────────────────────────
-      //  ⚡ 9. Save bot message + update user message (async)
-      //      This removes 400–900ms from critical path!
-      // ───────────────────────────────────────────────
-      unawaited(() async {
-        final batch = _firestore.batch();
-
-        final botRef = _firestore
+    // ───────────────────────────────────────────────
+    //  ✅ 3. Create user message with CORRECT category
+    // ───────────────────────────────────────────────
+    final userMessageRef =
+        _firestore
             .collection('conversations')
             .doc(conversationId!)
             .collection('messages')
-            .doc(botMessageId);
+            .doc();
 
-        batch.set(botRef, _messageToMap(_messages[idx]));
+    final userMsg = Message(
+      id: userMessageRef.id,
+      conversationId: conversationId!,
+      content: question,
+      userID: userId,
+      category: questionCategory,  // ✅ USE DETERMINED CATEGORY (not hardcoded!)
+      sender: 'user',
+      status: 'sent',
+      isAnswered: false,
+      type: 'text',
+      sentAt: DateTime.now(),
+      count: count,
+    );
 
-        batch.update(userMessageRef, {
-          "isAnswered": true,
-          "answeredAt": Timestamp.now(),
-          "responseTimeMs": totalMs,
-        });
+    _messages.add(userMsg);
+    _processedMessages.add(userMsg.id);
+    notifyListeners();
+    _onMessageAdded?.call();
 
-        await batch.commit();
-      }());
+    // Save user message in background (no await)
+    unawaited(userMessageRef.set(_messageToMap(userMsg)));
 
+    // ───────────────────────────────────────────────
+    //  ⚡ 4. Limit history to last 5 messages only
+    // ───────────────────────────────────────────────
+    final history =
+        _messages.where((m) => m.conversationId == conversationId).toList();
+
+    history.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+
+    final recentHistory =
+        history.length > 5 ? history.sublist(history.length - 5) : history;
+
+    // ───────────────────────────────────────────────
+    //  ⚡ 5. Prepare bot message placeholder immediately
+    // ───────────────────────────────────────────────
+    final botMessageId = "bot_${userMsg.id}";
+    final botMessage = Message(
+      id: botMessageId,
+      conversationId: conversationId!,
+      content: "",
+      sender: "bot",
+      status: "sent",
+      type: "text",
+      sentAt: DateTime.now(),
+      count: count,
+    );
+
+    _messages.add(botMessage);
+    _streamingContent[botMessageId] = "";
+    notifyListeners();
+    _onMessageAdded?.call();
+
+    String finalAnswer = "";
+
+    // ───────────────────────────────────────────────
+    //  ⚡ 6. FAST PATH: FAQ answer (no RAG, no LLM)
+    // ───────────────────────────────────────────────
+    if (existingFAQ != null) {
+      final String answer = existingFAQ["answer"];
+      final int chunkSize = 20; // faster streaming
+
+      for (int i = 0; i < answer.length; i += chunkSize) {
+        final chunk = answer.substring(
+          i,
+          (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
+        );
+
+        _streamingContent[botMessageId] =
+            _streamingContent[botMessageId]! + chunk;
+
+        // Update UI only every 3 chunks (fast!)
+        if (i % (chunkSize * 3) == 0) {
+          notifyListeners();
+          _onMessageAdded?.call();
+        }
+      }
+
+      finalAnswer = answer;
+      unawaited(_incrementFAQSimilarityCountAsync(existingFAQ["question"]));
+    } else {
       // ───────────────────────────────────────────────
-      //  ⚡ 10. Background tasks (not blocking)
+      //  ⚡ 7. RAG STREAMING (optimized UI updates)
       // ───────────────────────────────────────────────
-      unawaited(
-        _handlePostResponseTasks(
-          context,
-          question,
-          verified,
-          currentEmbedding,
-          classifiedCategory,
-          userId,
-        ),
-      );
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-      _onMessageAdded?.call();
-    }
-  }
+      int chunkCounter = 0;
 
-  Future<String> _classifyQuestionCategoryFast(String question) async {
-    final lowercaseQuestion = question.toLowerCase();
+      await for (final streamedText in _retriever.generateAnswerStream(
+        question,
+        conversationHistory: recentHistory,
+        conversationId: conversationId!,
+      )) {
+        chunkCounter++;
 
-    // Use keyword matching first (instant)
-    if (lowercaseQuestion.contains(
-      RegExp(
-        r'\b(admission|admit|enroll|application|apply|entrance|entry|requirements?|eligibility|qualify)\b',
-      ),
-    )) {
-      return 'Admission';
-    } else if (lowercaseQuestion.contains(
-      RegExp(
-        r'\b(scholarship|grant|financial|aid|funding|stipend|allowance|discount|free)\b',
-      ),
-    )) {
-      return 'Scholarship';
-    } else if (lowercaseQuestion.contains(
-      RegExp(
-        r'\b(placement|job|career|internship|work|employment|company|companies|hiring)\b',
-      ),
-    )) {
-      return 'Placement';
+        _streamingContent[botMessageId] = streamedText;
+
+        // Update UI only every 3–5 chunks instead of every chunk
+        if (chunkCounter % 4 == 0) {
+          notifyListeners();
+          _onMessageAdded?.call();
+        }
+
+        finalAnswer = streamedText;
+      }
     }
 
-    // If no keyword match, return General (skip LLM classification for speed)
-    return 'General';
-  }
+    // Remove temporary streaming content
+    _streamingContent.remove(botMessageId);
 
-  Map<String, dynamic>? _findBestFAQMatch(
+    // ───────────────────────────────────────────────
+    //  ⚡ 8. Remove duplication only if VERY long
+    // ───────────────────────────────────────────────
+    String verified = finalAnswer;
+    if (verified.length > 300) {
+      final half = verified.length ~/ 2;
+      if (verified.substring(0, half) == verified.substring(half)) {
+        verified = verified.substring(0, half);
+      }
+    }
+
+    // Update bot message locally
+    final idx = _messages.indexWhere((m) => m.id == botMessageId);
+    if (idx >= 0) {
+      _messages[idx] = botMessage.copyWith(content: verified);
+    }
+
+    notifyListeners();
+    _onMessageAdded?.call();
+
+    // ───────────────────────────────────────────────
+    //  ⚡ 9. Compute response time (ms)
+    // ───────────────────────────────────────────────
+    final totalMs = DateTime.now().difference(startTime).inMilliseconds;
+    print("⚡ Optimized total response time: ${totalMs}ms");
+
+    // ───────────────────────────────────────────────
+    //  ⚡ 10. Save bot message + update user message (async)
+    //      This removes 400–900ms from critical path!
+    // ───────────────────────────────────────────────
+    unawaited(() async {
+      final batch = _firestore.batch();
+
+      final botRef = _firestore
+          .collection('conversations')
+          .doc(conversationId!)
+          .collection('messages')
+          .doc(botMessageId);
+
+      batch.set(botRef, _messageToMap(_messages[idx]));
+
+      batch.update(userMessageRef, {
+        "isAnswered": true,
+        "answeredAt": Timestamp.now(),
+        "responseTimeMs": totalMs,
+      });
+
+      await batch.commit();
+    }());
+
+    // ───────────────────────────────────────────────
+    //  ⚡ 11. Background tasks (not blocking) - USE CORRECT CATEGORY
+    // ───────────────────────────────────────────────
+    unawaited(
+      _handlePostResponseTasks(
+        context,
+        question,
+        verified,
+        currentEmbedding,
+        questionCategory,  // ✅ PASS CORRECT CATEGORY (not classifiedCategory!)
+        userId,
+      ),
+    );
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+    _onMessageAdded?.call();
+  }
+}
+
+
+
+ Map<String, dynamic>? _findBestFAQMatch(
   String question,
   List<double> questionEmbedding,
 ) {
@@ -787,6 +768,7 @@ class ChatProvider extends ChangeNotifier {
 
       print('📊 FAQ: "${(data['question'] as String).substring(0, min(50, (data['question'] as String).length))}..."');
       print('   Answer length: ${answer.length} chars');
+      print('   Category: ${data['category'] ?? 'N/A'}');  // ✅ ADDED
       print('   Similarity: ${similarity.toStringAsFixed(4)}');
 
       // ✅ LOWERED THRESHOLD: Changed from 0.85 to 0.75 for better matching
@@ -795,6 +777,7 @@ class ChatProvider extends ChangeNotifier {
         bestMatch = {
           'question': data['question'],
           'answer': answer,
+          'category': data['category'] ?? 'General',  // ✅ INCLUDE CATEGORY
           'similarity': similarity,
         };
         print('   🎯 NEW BEST MATCH!');
@@ -804,6 +787,7 @@ class ChatProvider extends ChangeNotifier {
     if (bestMatch != null) {
       print('✅ Found FAQ match:');
       print('   Question: ${bestMatch['question']}');
+      print('   Category: ${bestMatch['category']}');  // ✅ ADDED
       print('   Similarity: ${highestSimilarity.toStringAsFixed(4)}');
       print('   Answer length: ${(bestMatch['answer'] as String).length} chars');
     } else {
@@ -817,6 +801,58 @@ class ChatProvider extends ChangeNotifier {
   }
 }
 
+// ✅ SIMPLIFIED: Only Admission, Scholarship, Placement, or General
+Future<String> _classifyQuestionCategoryFast(String question) async {
+  final q = question.toLowerCase();
+
+  // ✅ Admission keywords
+  if (RegExp(r'\b(admission|admit|admitted|enroll|enrollment|application|apply|applying|entrance|entry|requirement|requirements|eligibility|qualify|acceptance|accepted|applicant)\b').hasMatch(q)) {
+    return 'Admission';
+  }
+  
+  // ✅ Scholarship keywords
+  if (RegExp(r'\b(scholarship|scholarships|scholar|grant|grants|financial\s*aid|funding|stipend|allowance|tuition\s*fee\s*discount|free\s*tuition|financial\s*support)\b').hasMatch(q)) {
+    return 'Scholarship';
+  }
+  
+  // ✅ Placement keywords
+  if (RegExp(r'\b(placement|job|jobs|career|careers|internship|intern|employment|work|hiring|vacancy|vacancies|position|positions|ojt|practicum|on[- ]the[- ]job|training)\b').hasMatch(q)) {
+    return 'Placement';
+  }
+
+  // ✅ SIMPLIFIED: Fall back to LLM classification (only 3 categories + General)
+  try {
+    final prompt = '''Classify this question into ONE category: Admission, Scholarship, Placement, or General.
+
+Categories:
+- Admission: enrollment, application process, requirements, eligibility
+- Scholarship: financial aid, grants, scholarships, tuition assistance
+- Placement: jobs, internships, career services, OJT, employment
+- General: anything else
+
+Question: "$question"
+
+Return ONLY the category name (Admission, Scholarship, Placement, or General):''';
+    
+    final category = await _cohere?.generateResponse(prompt);
+    
+    if (category != null && category.trim().isNotEmpty) {
+      final normalized = category.trim().replaceAll(RegExp(r'[^a-zA-Z]'), '');
+      
+      // ✅ Check if response contains any of the 3 main categories
+      if (normalized.toLowerCase().contains('admission')) return 'Admission';
+      if (normalized.toLowerCase().contains('scholarship')) return 'Scholarship';
+      if (normalized.toLowerCase().contains('placement')) return 'Placement';
+      
+      print('⚠️ LLM returned: "$category", using General');
+    }
+  } catch (e) {
+    print('❌ Classification error: $e');
+  }
+  
+  print('ℹ️ No specific category matched, using General');
+  return 'General';
+}
 // ✅ ALSO UPDATE: _ensureFAQCacheLoaded to validate data
 Future<void> _ensureFAQCacheLoaded() async {
   if (FAQCache.isExpired || FAQCache.cache.isEmpty) {
@@ -1439,34 +1475,37 @@ $question
     }
   }
 
-  Future<List<double>> generateEmbedding(String question) async {
-    try {
-      final response = await http.post(
-        Uri.parse("https://api.cohere.ai/v1/embed"),
-        headers: {
-          'Authorization': 'Bearer $_apiKey',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          "texts": [question],
-          "model": "embed-english-v2.0",
-        }),
-      );
+ Future<List<double>> generateEmbedding(String question) async {
+  try {
+    final response = await http.post(
+      Uri.parse("https://api.cohere.ai/v1/embed"),
+      headers: {
+        'Authorization': 'Bearer $_apiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "texts": [question],
+        "model": "embed-multilingual-v3.0",  // ✅ Changed to v3
+        "input_type": "search_query",         // ✅ Required for v3 - queries
+      }),
+    );
 
-      if (response.statusCode != 200) {
-        throw Exception('Failed to generate embedding: ${response.statusCode}');
-      }
-
-      final data = jsonDecode(response.body);
-      return (data['embeddings'][0] as List)
-          .map((e) => (e as num).toDouble())
-          .toList();
-    } catch (e) {
-      print('Error generating embedding: $e');
-      rethrow;
+    if (response.statusCode != 200) {
+      throw Exception('Failed to generate embedding: ${response.statusCode}');
     }
-  }
 
+    final data = jsonDecode(response.body);
+    final embedding = (data['embeddings'][0] as List)
+        .map((e) => (e as num).toDouble())
+        .toList();
+    
+    print('✅ Generated v3 embedding: ${embedding.length} dimensions');
+    return embedding;
+  } catch (e) {
+    print('Error generating embedding: $e');
+    rethrow;
+  }
+}
   Future<void> rateMessage(
     String messageId,
     bool isLiked,

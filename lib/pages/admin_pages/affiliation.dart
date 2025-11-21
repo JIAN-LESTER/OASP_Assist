@@ -711,7 +711,7 @@ Widget _buildAddButton(BuildContext context, bool isMobile, bool isTablet) {
               Icon(Icons.add, color: Colors.white, size: iconSize),
               const SizedBox(width: 8),
               Text(
-                isMobile ? 'Add' : 'Add Affiliation',
+                isMobile ? 'Add' : 'Add',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: fontSize,

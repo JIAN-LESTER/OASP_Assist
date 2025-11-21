@@ -123,6 +123,7 @@ Widget _buildExpandedGroupItem({
           borderRadius: BorderRadius.circular(8),
           child: ExpansionTile(
             minTileHeight: 44,
+            key: ValueKey('${groupIndex}_${PersistentDrawerState.getExpansionState(groupIndex)}'),
             tilePadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
             leading: Container(
               width: 20,

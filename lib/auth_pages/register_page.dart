@@ -391,41 +391,66 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  void _showVerificationDialog(User user) {
-    final userEmail = user.email ?? '';
+  // ✅ FIXED: Email verification dialog with proper keyboard handling
+void _showVerificationDialog(User user) {
+  final userEmail = user.email ?? '';
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder:
-          (context) => WillPopScope(
-            onWillPop: () async => false,
-            child: Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isSmallScreen = MediaQuery.of(context).size.width < 400;
-                  final horizontalPadding = isSmallScreen ? 20.0 : 32.0;
-                  final verticalPadding = isSmallScreen ? 24.0 : 32.0;
-                  final iconSize = isSmallScreen ? 64.0 : 80.0;
-                  final titleSize = isSmallScreen ? 20.0 : 24.0;
-                  final bodySize = isSmallScreen ? 14.0 : 15.0;
-                  final buttonHeight = isSmallScreen ? 50.0 : 56.0;
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => WillPopScope(
+      onWillPop: () async => false,
+      child: Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        // ✅ CRITICAL FIX: Wrap in MediaQuery to handle keyboard properly
+        child: MediaQuery.removeViewInsets(
+          removeBottom: false,
+          context: context,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // ✅ Get screen size and keyboard height
+              final screenHeight = MediaQuery.of(context).size.height;
+              final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+              final isKeyboardVisible = keyboardHeight > 0;
+              
+              // ✅ Calculate available height considering keyboard
+              final availableHeight = screenHeight - keyboardHeight;
+              
+              final isSmallScreen = MediaQuery.of(context).size.width < 400;
+              
+              // ✅ ADAPTIVE sizing based on available height
+              final horizontalPadding = isSmallScreen ? 16.0 : 32.0;
+              final verticalPadding = isKeyboardVisible 
+                  ? (isSmallScreen ? 16.0 : 20.0)
+                  : (isSmallScreen ? 24.0 : 32.0);
+              
+              final iconSize = isKeyboardVisible 
+                  ? (isSmallScreen ? 48.0 : 56.0)
+                  : (isSmallScreen ? 64.0 : 80.0);
+              
+              final titleSize = isSmallScreen ? 18.0 : 22.0;
+              final bodySize = isSmallScreen ? 13.0 : 14.0;
+              final buttonHeight = isSmallScreen ? 46.0 : 52.0;
 
-                  return Container(
-                    constraints: BoxConstraints(
-                      maxWidth: isSmallScreen ? 340 : 440,
-                    ),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding,
-                      vertical: verticalPadding,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Success Icon
+              return SingleChildScrollView(
+                // ✅ CRITICAL: Allow scrolling when keyboard appears
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: isSmallScreen ? 340 : 440,
+                    // ✅ CRITICAL: Limit max height to prevent overflow
+                    maxHeight: availableHeight * 0.9,
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: verticalPadding,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Success Icon - hide when keyboard is visible on small screens
+                      if (!isKeyboardVisible || !isSmallScreen)
                         Container(
                           width: iconSize,
                           height: iconSize,
@@ -440,245 +465,144 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ),
 
-                        SizedBox(height: isSmallScreen ? 20 : 24),
+                      SizedBox(height: isKeyboardVisible ? 12 : (isSmallScreen ? 20 : 24)),
 
-                        // Title
-                        Text(
-                          'Verify Your Email',
-                          style: TextStyle(
-                            fontFamily: primaryFontFamily,
-                            fontSize: titleSize,
-                            fontWeight: FontWeight.w600,
-                            color: textPrimaryColor,
-                            height: 1.2,
-                          ),
-                          textAlign: TextAlign.center,
+                      // Title
+                      Text(
+                        'Verify Your Email',
+                        style: TextStyle(
+                          fontFamily: primaryFontFamily,
+                          fontSize: titleSize,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimaryColor,
+                          height: 1.2,
                         ),
+                        textAlign: TextAlign.center,
+                      ),
 
-                        SizedBox(height: isSmallScreen ? 8 : 12),
+                      SizedBox(height: isSmallScreen ? 6 : 10),
 
-                        // Subtitle
-                        Text(
-                          'A verification email has been sent to:',
-                          style: TextStyle(
-                            fontFamily: primaryFontFamily,
-                            fontSize: bodySize,
-                            color: textSecondaryColor,
-                            height: 1.4,
-                          ),
-                          textAlign: TextAlign.center,
+                      // Subtitle
+                      Text(
+                        'A verification email has been sent to:',
+                        style: TextStyle(
+                          fontFamily: primaryFontFamily,
+                          fontSize: bodySize,
+                          color: textSecondaryColor,
+                          height: 1.4,
                         ),
+                        textAlign: TextAlign.center,
+                      ),
 
-                        SizedBox(height: isSmallScreen ? 16 : 20),
+                      SizedBox(height: isSmallScreen ? 12 : 16),
 
-                        // Email display
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 14 : 16,
-                            vertical: isSmallScreen ? 12 : 14,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.email_outlined,
-                                color: primaryColor,
-                                size: isSmallScreen ? 18 : 20,
-                              ),
-                              SizedBox(width: isSmallScreen ? 10 : 12),
-                              Expanded(
-                                child: Text(
-                                  userEmail,
-                                  style: TextStyle(
-                                    fontFamily: primaryFontFamily,
-                                    fontSize: bodySize,
-                                    color: textPrimaryColor,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+                      // Email display
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 12 : 14,
+                          vertical: isSmallScreen ? 10 : 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.email_outlined,
+                              color: primaryColor,
+                              size: isSmallScreen ? 16 : 18,
+                            ),
+                            SizedBox(width: isSmallScreen ? 8 : 10),
+                            Expanded(
+                              child: Text(
+                                userEmail,
+                                style: TextStyle(
+                                  fontFamily: primaryFontFamily,
+                                  fontSize: bodySize,
+                                  color: textPrimaryColor,
+                                  fontWeight: FontWeight.w500,
                                 ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      SizedBox(height: isSmallScreen ? 12 : 16),
+
+                      // Info message - make more compact when keyboard visible
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: primaryColor.withOpacity(0.1),
                           ),
                         ),
-
-                        SizedBox(height: isSmallScreen ? 16 : 20),
-
-                        // Info message
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.all(isSmallScreen ? 12 : 14),
-                          decoration: BoxDecoration(
-                            color: primaryColor.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: primaryColor.withOpacity(0.1),
-                            ),
+                        child: Text(
+                          'Please check your inbox or spam folder and click the verification link before signing in.',
+                          style: TextStyle(
+                            fontFamily: primaryFontFamily,
+                            fontSize: bodySize - 1,
+                            color: textSecondaryColor,
+                            height: 1.3,
                           ),
-                          child: Text(
-                            'Please check your inbox or spam folder and click the verification link before signing in.',
-                            style: TextStyle(
-                              fontFamily: primaryFontFamily,
-                              fontSize: bodySize - 1,
-                              color: textSecondaryColor,
-                              height: 1.4,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
+                          textAlign: TextAlign.center,
                         ),
+                      ),
 
-                        SizedBox(height: isSmallScreen ? 24 : 32),
+                      SizedBox(height: isKeyboardVisible ? 16 : (isSmallScreen ? 20 : 28)),
 
-                        // Primary button - Continue to Sign In
-                        SizedBox(
-                          width: double.infinity,
-                          height: buttonHeight,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 0,
+                      // Primary button - Continue to Sign In
+                      SizedBox(
+                        width: double.infinity,
+                        height: buttonHeight,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            onPressed: () async {
-                              print('🔵 Continue to Sign In pressed');
+                            elevation: 0,
+                          ),
+                          onPressed: () async {
+                            print('🔵 Continue to Sign In pressed');
 
-                              try {
-                                // Sign out user
-                                await FirebaseAuth.instance.signOut();
-                                print('✅ User signed out');
+                            try {
+                              // Sign out user
+                              await FirebaseAuth.instance.signOut();
+                              print('✅ User signed out');
 
-                                // Clear form fields
-                                emailController.clear();
-                                passwordController.clear();
-                                confirmPasswordController.clear();
+                              // Clear form fields
+                              emailController.clear();
+                              passwordController.clear();
+                              confirmPasswordController.clear();
 
-                                // Close dialog
+                              // Close dialog
+                              if (mounted) {
+                                Navigator.of(context, rootNavigator: true).pop();
+
+                                // Navigate back to login
+                                await Future.delayed(
+                                  const Duration(milliseconds: 150),
+                                );
+
                                 if (mounted) {
-                                  Navigator.of(
-                                    context,
-                                    rootNavigator: true,
-                                  ).pop();
+                                  Navigator.of(context).pop();
 
-                                  // Navigate back to login
+                                  // Show success message
                                   await Future.delayed(
-                                    const Duration(milliseconds: 150),
+                                    const Duration(milliseconds: 200),
                                   );
 
                                   if (mounted) {
-                                    Navigator.of(context).pop();
-
-                                    // Show success message
-                                    await Future.delayed(
-                                      const Duration(milliseconds: 200),
-                                    );
-
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Row(
-                                            children: const [
-                                              Icon(
-                                                Icons.check_circle,
-                                                color: Colors.white,
-                                              ),
-                                              SizedBox(width: 12),
-                                              Expanded(
-                                                child: Text(
-                                                  'Account created! Please verify your email.',
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          backgroundColor: Colors.green,
-                                          duration: const Duration(seconds: 5),
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                }
-                              } catch (e) {
-                                print('❌ Navigation error: $e');
-                                if (mounted) {
-                                  try {
-                                    Navigator.of(
-                                      context,
-                                      rootNavigator: true,
-                                    ).pop();
-                                  } catch (_) {}
-                                  try {
-                                    Navigator.of(context).pop();
-                                  } catch (_) {}
-                                }
-                              }
-                            },
-                            child: Text(
-                              'Continue to Sign In',
-                              style: TextStyle(
-                                fontFamily: primaryFontFamily,
-                                fontSize: bodySize + 1,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        SizedBox(height: isSmallScreen ? 10 : 12),
-
-                        // Secondary button - Resend Email
-                        SizedBox(
-                          width: double.infinity,
-                          height: buttonHeight,
-                          child: OutlinedButton.icon(
-                            icon: Icon(
-                              Icons.refresh,
-                              size: isSmallScreen ? 18 : 20,
-                            ),
-                            label: Text(
-                              'Resend Email',
-                              style: TextStyle(
-                                fontFamily: primaryFontFamily,
-                                fontSize: bodySize + 1,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: primaryColor,
-                              side: BorderSide(
-                                color: primaryColor.withOpacity(0.3),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            onPressed: () async {
-                              print('🔵 Resend Email pressed');
-                              try {
-                                final currentUser =
-                                    FirebaseAuth.instance.currentUser;
-
-                                if (currentUser != null) {
-                                  await currentUser
-                                      .sendEmailVerification()
-                                      .timeout(const Duration(seconds: 5));
-                                  print('✅ Email resent');
-
-                                  if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Row(
@@ -690,73 +614,130 @@ class _RegisterPageState extends State<RegisterPage> {
                                             SizedBox(width: 12),
                                             Expanded(
                                               child: Text(
-                                                'Verification email sent!',
+                                                'Account created! Please verify your email.',
                                               ),
                                             ),
                                           ],
                                         ),
                                         backgroundColor: Colors.green,
-                                        duration: const Duration(seconds: 4),
+                                        duration: const Duration(seconds: 5),
                                         behavior: SnackBarBehavior.floating,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                } else {
-                                  print('⚠️ No user signed in');
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Row(
-                                          children: const [
-                                            Icon(
-                                              Icons.info_outline,
-                                              color: Colors.white,
-                                            ),
-                                            SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                'Please sign in to resend email.',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        backgroundColor: Colors.orange,
-                                        duration: const Duration(seconds: 4),
-                                        behavior: SnackBarBehavior.floating,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
                                       ),
                                     );
                                   }
                                 }
-                              } catch (e) {
-                                print('❌ Resend error: $e');
+                              }
+                            } catch (e) {
+                              print('❌ Navigation error: $e');
+                              if (mounted) {
+                                try {
+                                  Navigator.of(context, rootNavigator: true).pop();
+                                } catch (_) {}
+                                try {
+                                  Navigator.of(context).pop();
+                                } catch (_) {}
+                              }
+                            }
+                          },
+                          child: Text(
+                            'Continue to Sign In',
+                            style: TextStyle(
+                              fontFamily: primaryFontFamily,
+                              fontSize: bodySize + 1,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      SizedBox(height: isSmallScreen ? 8 : 10),
+
+                      // Secondary button - Resend Email
+                      SizedBox(
+                        width: double.infinity,
+                        height: buttonHeight,
+                        child: OutlinedButton.icon(
+                          icon: Icon(
+                            Icons.refresh,
+                            size: isSmallScreen ? 16 : 18,
+                          ),
+                          label: Text(
+                            'Resend Email',
+                            style: TextStyle(
+                              fontFamily: primaryFontFamily,
+                              fontSize: bodySize + 1,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: primaryColor,
+                            side: BorderSide(
+                              color: primaryColor.withOpacity(0.3),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () async {
+                            print('🔵 Resend Email pressed');
+                            try {
+                              final currentUser = FirebaseAuth.instance.currentUser;
+
+                              if (currentUser != null) {
+                                await currentUser
+                                    .sendEmailVerification()
+                                    .timeout(const Duration(seconds: 5));
+                                print('✅ Email resent');
+
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Row(
                                         children: const [
                                           Icon(
-                                            Icons.error_outline,
+                                            Icons.check_circle,
                                             color: Colors.white,
                                           ),
                                           SizedBox(width: 12),
                                           Expanded(
                                             child: Text(
-                                              'Failed to resend email.',
+                                              'Verification email sent!',
                                             ),
                                           ),
                                         ],
                                       ),
-                                      backgroundColor: Colors.red,
+                                      backgroundColor: Colors.green,
+                                      duration: const Duration(seconds: 4),
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } else {
+                                print('⚠️ No user signed in');
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Row(
+                                        children: const [
+                                          Icon(
+                                            Icons.info_outline,
+                                            color: Colors.white,
+                                          ),
+                                          SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              'Please sign in to resend email.',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      backgroundColor: Colors.orange,
                                       duration: const Duration(seconds: 4),
                                       behavior: SnackBarBehavior.floating,
                                       shape: RoundedRectangleBorder(
@@ -766,18 +747,49 @@ class _RegisterPageState extends State<RegisterPage> {
                                   );
                                 }
                               }
-                            },
-                          ),
+                            } catch (e) {
+                              print('❌ Resend error: $e');
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Row(
+                                      children: const [
+                                        Icon(
+                                          Icons.error_outline,
+                                          color: Colors.white,
+                                        ),
+                                        SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            'Failed to resend email.',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    backgroundColor: Colors.red,
+                                    duration: const Duration(seconds: 4),
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          },
                         ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
-    );
-  }
+        ),
+      ),
+    ),
+  );
+}
 
   // Email validation helper
   bool _isValidEmail(String email) {
@@ -841,7 +853,7 @@ class _RegisterPageState extends State<RegisterPage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null && !user.emailVerified) {
       await user.sendEmailVerification();
-      print('Verification email sent to ${user.email}');
+      print('Verification email sent to ${user.email}. Please check your inbox or spam folder.');
     }
   }
 

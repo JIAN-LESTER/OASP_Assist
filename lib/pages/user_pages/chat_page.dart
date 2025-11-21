@@ -1371,369 +1371,404 @@
     }
   }
 
-  Future<void> _processManualEscalation(Message message) async {
-    final reasonController = TextEditingController();
-    String selectedReason = 'Bot response not accurate';
+Future<void> _processManualEscalation(Message message) async {
+  final reasonController = TextEditingController();
+  String selectedReason = 'Bot response not accurate';
 
-    try {
-      final bool? shouldEscalate = await showDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder: (BuildContext context) {
-          return StatefulBuilder(
-            builder: (context, setState) => Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+  try {
+    final bool? shouldEscalate = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) { // ✅ Use separate context variable
+        final screenHeight = MediaQuery.of(dialogContext).size.height;
+        final keyboardHeight = MediaQuery.of(dialogContext).viewInsets.bottom;
+        final availableHeight = screenHeight - keyboardHeight;
+        
+        return StatefulBuilder(
+          builder: (context, setState) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            elevation: 8,
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: keyboardHeight > 0 ? 16 : 24,
+            ),
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: 500,
+                maxHeight: availableHeight * 0.9,
               ),
-              elevation: 8,
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 500),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Header with gradient
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF2E7D32),
-                            const Color(0xFF43A047),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(20),
-                          topRight: Radius.circular(20),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.support_agent,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Request Staff Assistance',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Get personalized help from our team',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header - Fixed
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF2E7D32),
+                          const Color(0xFF43A047),
                         ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
                       ),
                     ),
-                    
-                    // Content
-                    SingleChildScrollView(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [      
-                            
-                            // Reason selection
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.flag_outlined,
-                                  size: 20,
-                                  color: Colors.grey.shade700,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'What went wrong?',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            
-                            Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey.shade300),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                children: [
-                                  _buildReasonTile(
-                                    context: context,
-                                    title: 'Bot response not accurate',
-                                    icon: Icons.error_outline,
-                                    value: 'Bot response not accurate',
-                                    groupValue: selectedReason,
-                                    onChanged: (val) =>
-                                        setState(() => selectedReason = val!),
-                                    isFirst: true,
-                                  ),
-                                  Divider(height: 1, color: Colors.grey.shade300),
-                                  _buildReasonTile(
-                                    context: context,
-                                    title: 'Bot did not understand my question',
-                                    icon: Icons.help_outline,
-                                    value: 'Bot did not understand my question',
-                                    groupValue: selectedReason,
-                                    onChanged: (val) =>
-                                        setState(() => selectedReason = val!),
-                                  ),
-                                  Divider(height: 1, color: Colors.grey.shade300),
-                                  _buildReasonTile(
-                                    context: context,
-                                    title: 'Need clarification from staff',
-                                    icon: Icons.contact_support_outlined,
-                                    value: 'Need clarification from staff',
-                                    groupValue: selectedReason,
-                                    onChanged: (val) =>
-                                        setState(() => selectedReason = val!),
-                                    isLast: true,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // Additional details
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.edit_note,
-                                  size: 20,
-                                  color: Colors.grey.shade700,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Additional details (optional)',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            
-                            TextField(
-                              controller: reasonController,
-                              maxLines: 3,
-                              maxLength: 200,
-                              decoration: InputDecoration(
-                                hintText:
-                                    'Tell us more about what you need help with...',
-                                hintStyle: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade400,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey.shade300,
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey.shade300,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF2E7D32),
-                                    width: 2,
-                                  ),
-                                ),
-                                filled: true,
-                                fillColor: Colors.grey.shade50,
-                                contentPadding: const EdgeInsets.all(16),
-                                counterStyle: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    
-                    // Actions
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(20),
-                          bottomRight: Radius.circular(20),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(false),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 12,
-                              ),
-                            ),
-                            child: Text(
-                              'Cancel',
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                              ),
-                            ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
                           ),
-              
-                          ElevatedButton(
-                            onPressed: () => Navigator.of(context).pop(true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2E7D32),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          child: const Icon(
+                            Icons.support_agent,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Request Staff Assistance',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 15,
-                                vertical: 14,
+                              SizedBox(height: 2),
+                              Text(
+                                'Get personalized help from our team',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white70,
+                                ),
                               ),
+                            ],
+                          ),
+                        ),
+                        // Close button for easier dismissal
+                        IconButton(
+                          onPressed: () {
+                            // ✅ Unfocus before closing to prevent errors
+                            FocusScope.of(context).unfocus();
+                            Navigator.of(context).pop(false);
+                          },
+                          icon: const Icon(Icons.close, color: Colors.white70),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Scrollable Content
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Reason selection
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.flag_outlined,
+                                size: 18,
+                                color: Colors.grey.shade700,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'What went wrong?',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Row(
+                            child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.send, size: 18),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Submit Request',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 15,
-                                  ),
+                                _buildReasonTile(
+                                  context: context,
+                                  title: 'Bot response not accurate',
+                                  icon: Icons.error_outline,
+                                  value: 'Bot response not accurate',
+                                  groupValue: selectedReason,
+                                  onChanged: (val) =>
+                                      setState(() => selectedReason = val!),
+                                  isFirst: true,
+                                ),
+                                Divider(height: 1, color: Colors.grey.shade300),
+                                _buildReasonTile(
+                                  context: context,
+                                  title: 'Bot did not understand my question',
+                                  icon: Icons.help_outline,
+                                  value: 'Bot did not understand my question',
+                                  groupValue: selectedReason,
+                                  onChanged: (val) =>
+                                      setState(() => selectedReason = val!),
+                                ),
+                                Divider(height: 1, color: Colors.grey.shade300),
+                                _buildReasonTile(
+                                  context: context,
+                                  title: 'Need clarification from staff',
+                                  icon: Icons.contact_support_outlined,
+                                  value: 'Need clarification from staff',
+                                  groupValue: selectedReason,
+                                  onChanged: (val) =>
+                                      setState(() => selectedReason = val!),
+                                  isLast: true,
                                 ),
                               ],
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 20),
+                          
+                          // Additional details
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.edit_note,
+                                size: 18,
+                                color: Colors.grey.shade700,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Additional details (optional)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          
+                          TextField(
+                            controller: reasonController,
+                            maxLines: 3,
+                            maxLength: 200,
+                            textInputAction: TextInputAction.done,
+                            onEditingComplete: () {
+                              FocusScope.of(context).unfocus();
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Tell us more about what you need help with...',
+                              hintStyle: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade400,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF2E7D32),
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              contentPadding: const EdgeInsets.all(14),
+                              counterStyle: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey.shade500,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  
+                  // Actions - Fixed at bottom
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
+                      ),
+                      border: Border(
+                        top: BorderSide(color: Colors.grey.shade200),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            // ✅ CRITICAL FIX: Unfocus before closing
+                            FocusScope.of(context).unfocus();
+                            Navigator.of(context).pop(false);
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                          ),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () {
+                            // ✅ Unfocus before closing
+                            FocusScope.of(context).unfocus();
+                            Navigator.of(context).pop(true);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E7D32),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.send, size: 16),
+                              SizedBox(width: 6),
+                              Text(
+                                'Submit',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ),
-          );
-        },
-      );
-
-      if (shouldEscalate != true || !mounted) return;
-
-      final userReason = reasonController.text.trim();
-      final fullReason =
-          userReason.isNotEmpty ? '$selectedReason — $userReason' : selectedReason;
-
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      final messages = chatProvider.messages;
-
-      String userQuestion = 'No question found';
-
-      final botMessageIndex = messages.indexWhere((m) => m.id == message.id);
-
-      if (botMessageIndex > 0) {
-        for (int i = botMessageIndex - 1; i >= 0; i--) {
-          if (messages[i].sender == 'user') {
-            userQuestion = messages[i].content;
-            break;
-          }
-        }
-      }
-
-      final escalationRef = _firestore.collection('escalations').doc();
-      final escalationId = escalationRef.id;
-
-      final escalatedData = {
-        'escalationId': escalationId,
-        'userId': FirebaseAuth.instance.currentUser?.uid,
-        'conversationId': message.conversationId,
-        'question': userQuestion,
-        'botAnswer':
-            message.sender == 'bot'
-                ? message.content
-                : 'No bot response available',
-        'status': 'pending',
-        'reason': fullReason,
-        'createdAt': Timestamp.now(),
-        'messageId': message.id,
-      };
-
-      await escalationRef.set(escalatedData);
-
-      print('✅ Manual escalation created with ID: $escalationId');
-      print('📝 User question: $userQuestion');
-
-      // Show success confirmation dialog
-      if (mounted) {
-        await _showEscalationSuccessDialog();
-      }
-    } catch (e) {
-      print('❌ Error creating manual escalation: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('Failed to escalate: $e'),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red.shade600,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
             ),
           ),
         );
-      }
-    } finally {
-      reasonController.dispose();
+      },
+    );
+
+    // ✅ CRITICAL FIX: Check if dialog was cancelled before proceeding
+    if (shouldEscalate != true) {
+      print('ℹ️ Escalation cancelled by user');
+      return; // Exit early, don't process escalation
     }
+
+    if (!mounted) return;
+
+    final userReason = reasonController.text.trim();
+    final fullReason =
+        userReason.isNotEmpty ? '$selectedReason — $userReason' : selectedReason;
+
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final messages = chatProvider.messages;
+
+    String userQuestion = 'No question found';
+
+    final botMessageIndex = messages.indexWhere((m) => m.id == message.id);
+
+    if (botMessageIndex > 0) {
+      for (int i = botMessageIndex - 1; i >= 0; i--) {
+        if (messages[i].sender == 'user') {
+          userQuestion = messages[i].content;
+          break;
+        }
+      }
+    }
+
+    final escalationRef = _firestore.collection('escalations').doc();
+    final escalationId = escalationRef.id;
+
+    final escalatedData = {
+      'escalationId': escalationId,
+      'userId': FirebaseAuth.instance.currentUser?.uid,
+      'conversationId': message.conversationId,
+      'question': userQuestion,
+      'botAnswer':
+          message.sender == 'bot'
+              ? message.content
+              : 'No bot response available',
+      'status': 'pending',
+      'reason': fullReason,
+      'createdAt': Timestamp.now(),
+      'messageId': message.id,
+    };
+
+    await escalationRef.set(escalatedData);
+
+    print('✅ Manual escalation created with ID: $escalationId');
+    print('📝 User question: $userQuestion');
+
+    if (mounted) {
+      await _showEscalationSuccessDialog();
+    }
+  } catch (e) {
+    print('❌ Error creating manual escalation: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 12),
+              Expanded(child: Text('Failed to escalate: $e')),
+            ],
+          ),
+          backgroundColor: Colors.red.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  } finally {
+    // ✅ CRITICAL FIX: Always dispose controller, but safely
+    reasonController.dispose();
   }
+}
 
   Widget _buildReasonTile({
     required BuildContext context,

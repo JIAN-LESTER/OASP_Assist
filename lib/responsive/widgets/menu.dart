@@ -541,38 +541,40 @@ class UniversalUIComponents {
           );
 
           // Add New Chat and Chat History section
-        menuItems.add(
-  _buildNewChatAndHistorySection(
-    context,
-    selectedConversationId,
-    onConversationSelected,
-    setDrawerState,
-  ),
-);
+          menuItems.add(
+            _buildNewChatAndHistorySection(
+              context,
+              selectedConversationId,
+              onConversationSelected,
+              setDrawerState,
+            ),
+          );
         }
-      } else {
-        menuItems.add(
-          _buildRegularMenuItem(
-            context,
-            item,
-            selectedIndex,
-            onItemTap,
-            userRole,
-          ),
-        );
-      }
+    } else {
+  menuItems.add(
+    _buildRegularMenuItem(
+      context,
+      item,
+      selectedIndex,
+      onItemTap,
+      userRole,
+      setDrawerState: setDrawerState, // ✅ ADD THIS
+    ),
+  );
+}
     }
 
     return Column(children: menuItems);
   }
 
-  static Widget _buildRegularMenuItem(
-    BuildContext context,
-    MenuItem item,
-    int selectedIndex,
-    Function(int) onItemTap,
-    UserRole userRole,
-  ) {
+ static Widget _buildRegularMenuItem(
+  BuildContext context,
+  MenuItem item,
+  int selectedIndex,
+  Function(int) onItemTap,
+  UserRole userRole, {
+  StateSetter? setDrawerState, // ✅ ADD THIS
+}) {
     final isSelected = selectedIndex == item.index;
 
     return Container(
@@ -582,17 +584,18 @@ class UniversalUIComponents {
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: () {
-            if (context.mounted && Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            }
-            onItemTap(item.index);
-          },
+         onTap: () {
+  _handleItemTap(
+    context: context,
+    index: item.index,
+    onItemTap: onItemTap,
+    setDrawerState: setDrawerState,
+  );
+},
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             child: Row(
               children: [
-                // Green vertical line indicator
                 Container(
                   width: 3,
                   height: 20,
@@ -602,8 +605,6 @@ class UniversalUIComponents {
                     borderRadius: BorderRadius.circular(1.5),
                   ),
                 ),
-
-                // Icon
                 Container(
                   width: 20,
                   height: 20,
@@ -614,8 +615,6 @@ class UniversalUIComponents {
                     size: 20,
                   ),
                 ),
-
-                // Title
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(left: 8),
@@ -742,13 +741,15 @@ class UniversalUIComponents {
                         borderRadius: BorderRadius.circular(8),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(8),
-                          onTap: () {
-                            if (context.mounted &&
-                                Navigator.of(context).canPop()) {
-                              Navigator.of(context).pop();
-                            }
-                            onItemTap(subItem.index);
-                          },
+                         onTap: () {
+  _handleItemTap(
+    context: context,
+    index: subItem.index,
+    onItemTap: onItemTap,
+    groupIndex: item.index, // ✅ Pass parent group index
+    setDrawerState: setDrawerState,
+  );
+},
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -823,336 +824,434 @@ class UniversalUIComponents {
     );
   }
 
-static Widget _buildNewChatAndHistorySection(
-  BuildContext context,
-  String? selectedConversationId,
-  Function(BuildContext, String?)? onConversationSelected,
-  StateSetter? setDrawerState,
-) {
-  bool isExpanded = UserConstant.isOASPAssistExpanded;
+  static int? _getGroupIndexForItem(int itemIndex) {
+  // Admin role
+  if (itemIndex == 6 || itemIndex == 12 || itemIndex == 13) {
+    return -1; // User Management group
+  }
+  if (itemIndex == 9 || itemIndex == 10 || itemIndex == 11) {
+    return -2; // Services group
+  }
+  if (itemIndex == 7 || itemIndex == 8) {
+    return -3; // Logs group
+  }
+  
+  // User role
+  if (itemIndex == 3 || itemIndex == 4 || itemIndex == 5) {
+    return -1; // Services group for user
+  }
+  
+  return null; // Not in any group
+}
 
-  return StatefulBuilder(
-    builder: (context, setLocalState) {
-      return Column(
-        children: [
-          // New Chat Button
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            height: 44,
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  HapticFeedback.mediumImpact();
-                  Navigator.of(context).pop();
-                  await Future.delayed(Duration(milliseconds: 300));
+  static Widget _buildNewChatAndHistorySection(
+    BuildContext context,
+    String? selectedConversationId,
+    Function(BuildContext, String?)? onConversationSelected,
+    StateSetter? setDrawerState,
+  ) {
+    bool isExpanded = UserConstant.isOASPAssistExpanded;
 
-                  if (context.mounted) {
-                    final parentState = context.findAncestorStateOfType<State>();
-                    if (parentState != null && parentState is dynamic) {
-                      if (parentState.widget.runtimeType.toString() == '_UserMainPageState') {
-                        await (parentState as dynamic)._onNewChatPressed();
+    return StatefulBuilder(
+      builder: (context, setLocalState) {
+        return Column(
+          children: [
+            // New Chat Button
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              height: 44,
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    HapticFeedback.mediumImpact();
+                    Navigator.of(context).pop();
+                    await Future.delayed(Duration(milliseconds: 300));
+
+                    if (context.mounted) {
+                      final parentState =
+                          context.findAncestorStateOfType<State>();
+                      if (parentState != null && parentState is dynamic) {
+                        if (parentState.widget.runtimeType.toString() ==
+                            '_UserMainPageState') {
+                          await (parentState as dynamic)._onNewChatPressed();
+                        }
                       }
                     }
-                  }
-                },
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text(
-                  'New Chat',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: UniversalUIComponents.primaryGreen,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                  },
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text(
+                    'New Chat',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
-                  elevation: 0,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: UniversalUIComponents.primaryGreen,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 0,
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // Chat History with StreamBuilder
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            child: Theme(
-              data: Theme.of(context).copyWith(
-                dividerColor: Colors.transparent,
-                expansionTileTheme: ExpansionTileThemeData(
-                  backgroundColor: Colors.transparent,
-                  collapsedBackgroundColor: Colors.transparent,
-                  tilePadding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 0,
-                  ),
-                  childrenPadding: const EdgeInsets.only(left: 0, top: 4),
-                  iconColor: Colors.grey[600],
-                  collapsedIconColor: Colors.grey[600],
-                  textColor: Colors.grey[700],
-                  collapsedTextColor: Colors.grey[700],
-                  expansionAnimationStyle: AnimationStyle(
-                    duration: Duration.zero,
-                  ),
-                ),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: ExpansionTile(
-                    minTileHeight: 44,
+            // Chat History with StreamBuilder
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  dividerColor: Colors.transparent,
+                  expansionTileTheme: ExpansionTileThemeData(
+                    backgroundColor: Colors.transparent,
+                    collapsedBackgroundColor: Colors.transparent,
                     tilePadding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 0,
                     ),
-                    leading: Container(
-                      width: 20,
-                      height: 20,
-                      margin: const EdgeInsets.only(left: 12),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.history,
-                        color: Colors.grey[600],
-                        size: 20,
-                      ),
+                    childrenPadding: const EdgeInsets.only(left: 0, top: 4),
+                    iconColor: Colors.grey[600],
+                    collapsedIconColor: Colors.grey[600],
+                    textColor: Colors.grey[700],
+                    collapsedTextColor: Colors.grey[700],
+                    expansionAnimationStyle: AnimationStyle(
+                      duration: Duration.zero,
                     ),
-                    title: Container(
-                      margin: const EdgeInsets.only(left: 4),
-                      child: Text(
-                        'Chat History',
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.w400,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    initiallyExpanded: isExpanded,
-                    onExpansionChanged: (expanded) {
-                      setDrawerState?.call(() {
-                        UserConstant.isOASPAssistExpanded = expanded;
-                      });
-                      setLocalState(() {
-                        isExpanded = expanded;
-                      });
-                    }, // <-- **Missing closing parenthesis and semicolon added here**
-                    children: [
-                      _buildChatHistoryList(
-                        context,
-                        [], // Empty list since StreamBuilder handles data
-                        selectedConversationId,
-                        onConversationSelected,
-                      ),
-                    ],
                   ),
                 ),
-              ),
-            ),
-          ),
-        ],
-      );
-    },
-  );
-}
-
- static Widget _buildChatHistoryList(
-  BuildContext context,
-  List<Map<String, dynamic>> conversations,
-  String? selectedConversationId,
-  Function(BuildContext, String?)? onConversationSelected,
-) {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
-  
-  if (userId == null) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      child: Center(
-        child: Text(
-          'Please log in',
-          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-        ),
-      ),
-    );
-  }
-
-  return StreamBuilder<QuerySnapshot>(
-    stream: FirebaseFirestore.instance
-        .collection('conversations')
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          child: Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
-              ),
-            ),
-          ),
-        );
-      }
-
-      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.chat_outlined, color: Colors.grey[400], size: 30),
-                const SizedBox(height: 8),
-                Text(
-                  'No conversations yet',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-
-      final conversations = snapshot.data!.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return {
-          'id': doc.id,
-          'title': data['title'] ?? 'Untitled',
-          'status': data['status'] ?? 'unknown',
-          'createdAt': data['createdAt'],
-        };
-      }).toList();
-
-      return Container(
-        constraints: const BoxConstraints(maxHeight: 200),
-        child: ListView.builder(
-          shrinkWrap: true,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          itemCount: conversations.length,
-          itemBuilder: (context, index) {
-            final conv = conversations[index];
-            final isSelected = conv['id'] == UserConstant.selectedConversationId;
-
-            return Container(
-              margin: const EdgeInsets.symmetric(vertical: 2),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: isSelected
-                    ? primaryGreen.withOpacity(0.1)
-                    : Colors.transparent,
-                border: isSelected
-                    ? Border.all(
-                        color: primaryGreen.withOpacity(0.3),
-                        width: 1,
-                      )
-                    : null,
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
+                child: Material(
+                  color: Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
-                  onTap: () async {
-                    HapticFeedback.lightImpact();
-                    Navigator.of(context).pop(); // Close drawer
-
-                    await UserConstant.setSelectedConversation(conv['id']);
-
-                    if (onConversationSelected != null && context.mounted) {
-                      await Future.delayed(Duration(milliseconds: 100));
-                      onConversationSelected(context, conv['id']);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    child: Row(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: ExpansionTile(
+                      minTileHeight: 44,
+                      tilePadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 0,
+                      ),
+                      leading: Container(
+                        width: 20,
+                        height: 20,
+                        margin: const EdgeInsets.only(left: 12),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.history,
+                          color: Colors.grey[600],
+                          size: 20,
+                        ),
+                      ),
+                      title: Container(
+                        margin: const EdgeInsets.only(left: 4),
+                        child: Text(
+                          'Chat History',
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      initiallyExpanded: isExpanded,
+                      onExpansionChanged: (expanded) {
+                        setDrawerState?.call(() {
+                          UserConstant.isOASPAssistExpanded = expanded;
+                        });
+                        setLocalState(() {
+                          isExpanded = expanded;
+                        });
+                      }, // <-- **Missing closing parenthesis and semicolon added here**
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? primaryGreen.withOpacity(0.2)
-                                : Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Icon(
-                            Icons.chat_bubble_outline,
-                            color: isSelected
-                                ? Colors.green[700]
-                                : Colors.grey[500],
-                            size: 14,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            conv['title'] ?? 'Untitled',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                              color: isSelected
-                                  ? Colors.green[800]
-                                  : Colors.grey[700],
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        PopupMenuButton<String>(
-                          icon: Icon(
-                            Icons.more_vert,
-                            size: 18,
-                            color: Colors.grey[600],
-                          ),
-                          padding: EdgeInsets.zero,
-                          onSelected: (value) {
-                            if (value == 'delete') {
-                              _deleteConversation(context, conv['id']);
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.red,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Delete',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        _buildChatHistoryList(
+                          context,
+                          [], // Empty list since StreamBuilder handles data
+                          selectedConversationId,
+                          onConversationSelected,
                         ),
                       ],
                     ),
                   ),
                 ),
               ),
-            );
-          },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+ static void _handleItemTap({
+  required BuildContext context,
+  required int index,
+  required Function(int) onItemTap,
+  int? groupIndex,
+  StateSetter? setDrawerState,
+}) {
+  // Determine which group the clicked item belongs to
+  int? itemGroupIndex = _getGroupIndexForItem(index);
+  
+  // Close all expansion groups EXCEPT the one containing the clicked item
+  if (index >= 0) {
+    // Reset persistent drawer states (desktop sidebar)
+    if (itemGroupIndex != -1) {
+      PersistentDrawerState.setUserManagementExpanded(false);
+    }
+    if (itemGroupIndex != -2) {
+      PersistentDrawerState.setServicesExpanded(false);
+    }
+    if (itemGroupIndex != -3) {
+      PersistentDrawerState.setLogsExpanded(false);
+    }
+    
+    // Keep the current item's group open
+    if (itemGroupIndex == -1) {
+      PersistentDrawerState.setUserManagementExpanded(true);
+    } else if (itemGroupIndex == -2) {
+      PersistentDrawerState.setServicesExpanded(true);
+    } else if (itemGroupIndex == -3) {
+      PersistentDrawerState.setLogsExpanded(true);
+    }
+    
+    // Clear mobile drawer expansion states except current group
+    if (itemGroupIndex != -1) {
+      _expandedState['User Management'] = false;
+    }
+    if (itemGroupIndex != -2) {
+      _expandedState['Services'] = false;
+    }
+    if (itemGroupIndex != -3) {
+      _expandedState['Logs'] = false;
+    }
+    
+    // Keep current group open in mobile drawer
+    if (itemGroupIndex == -1) {
+      _expandedState['User Management'] = true;
+    } else if (itemGroupIndex == -2) {
+      _expandedState['Services'] = true;
+    } else if (itemGroupIndex == -3) {
+      _expandedState['Logs'] = true;
+    }
+    
+    // Update mobile drawer UI
+    if (setDrawerState != null) {
+      setDrawerState(() {});
+    }
+  }
+  
+  // Close the drawer if it's mobile
+  if (context.mounted && Navigator.of(context).canPop()) {
+    Navigator.of(context).pop();
+  }
+  
+  onItemTap(index);
+}
+
+  static Widget _buildChatHistoryList(
+    BuildContext context,
+    List<Map<String, dynamic>> conversations,
+    String? selectedConversationId,
+    Function(BuildContext, String?)? onConversationSelected,
+  ) {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
+    if (userId == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        child: Center(
+          child: Text(
+            'Please log in',
+            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+          ),
         ),
       );
-    },
-  );
-}
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream:
+          FirebaseFirestore.instance
+              .collection('conversations')
+              .where('userId', isEqualTo: userId)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.chat_outlined, color: Colors.grey[400], size: 30),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No conversations yet',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final conversations =
+            snapshot.data!.docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return {
+                'id': doc.id,
+                'title': data['title'] ?? 'Untitled',
+                'status': data['status'] ?? 'unknown',
+                'createdAt': data['createdAt'],
+              };
+            }).toList();
+
+        return Container(
+          constraints: const BoxConstraints(maxHeight: 200),
+          child: ListView.builder(
+            shrinkWrap: true,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            itemCount: conversations.length,
+            itemBuilder: (context, index) {
+              final conv = conversations[index];
+              final isSelected =
+                  conv['id'] == UserConstant.selectedConversationId;
+
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color:
+                      isSelected
+                          ? primaryGreen.withOpacity(0.1)
+                          : Colors.transparent,
+                  border:
+                      isSelected
+                          ? Border.all(
+                            color: primaryGreen.withOpacity(0.3),
+                            width: 1,
+                          )
+                          : null,
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () async {
+                      HapticFeedback.lightImpact();
+                      Navigator.of(context).pop(); // Close drawer
+
+                      await UserConstant.setSelectedConversation(conv['id']);
+
+                      if (onConversationSelected != null && context.mounted) {
+                        await Future.delayed(Duration(milliseconds: 100));
+                        onConversationSelected(context, conv['id']);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color:
+                                  isSelected
+                                      ? primaryGreen.withOpacity(0.2)
+                                      : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Icon(
+                              Icons.chat_bubble_outline,
+                              color:
+                                  isSelected
+                                      ? Colors.green[700]
+                                      : Colors.grey[500],
+                              size: 14,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              conv['title'] ?? 'Untitled',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight:
+                                    isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                color:
+                                    isSelected
+                                        ? Colors.green[800]
+                                        : Colors.grey[700],
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          PopupMenuButton<String>(
+                            icon: Icon(
+                              Icons.more_vert,
+                              size: 18,
+                              color: Colors.grey[600],
+                            ),
+                            padding: EdgeInsets.zero,
+                            onSelected: (value) {
+                              if (value == 'delete') {
+                                _deleteConversation(context, conv['id']);
+                              }
+                            },
+                            itemBuilder:
+                                (context) => [
+                                  PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.red,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Delete',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
 
   static Future<void> _deleteConversation(
     BuildContext context,
@@ -1851,7 +1950,11 @@ static Widget _buildNewChatAndHistorySection(
         return Align(
           alignment: Alignment.topRight,
           child: Padding(
-            padding: const EdgeInsets.only(top: 95, right: 10, left: 10), //  position
+            padding: const EdgeInsets.only(
+              top: 95,
+              right: 10,
+              left: 10,
+            ), //  position
             child: Material(
               elevation: 8,
               borderRadius: BorderRadius.circular(12),

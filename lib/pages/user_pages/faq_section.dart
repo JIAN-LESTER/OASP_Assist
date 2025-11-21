@@ -924,8 +924,8 @@ class FAQInputSection extends StatelessWidget {
     if (width < 600) {
       return {
         'buttonSize': 40.0,
-        'horizontalPadding': 16.0,
-        'verticalPadding': 12.0,
+        'horizontalPadding': 12.0,  // Reduced from 16
+        'verticalPadding': 8.0,     // Reduced from 12
         'borderRadius': 12.0,
         'iconSize': 22.0,
         'fontSize': 15.0,
@@ -933,8 +933,8 @@ class FAQInputSection extends StatelessWidget {
     } else if (width < 1100) {
       return {
         'buttonSize': 42.0,
-        'horizontalPadding': 24.0,
-        'verticalPadding': 14.0,
+        'horizontalPadding': 16.0,  // Reduced from 24
+        'verticalPadding': 10.0,    // Reduced from 14
         'borderRadius': 14.0,
         'iconSize': 23.0,
         'fontSize': 16.0,
@@ -942,8 +942,8 @@ class FAQInputSection extends StatelessWidget {
     } else {
       return {
         'buttonSize': 44.0,
-        'horizontalPadding': 32.0,
-        'verticalPadding': 16.0,
+        'horizontalPadding': 24.0,  // Reduced from 32
+        'verticalPadding': 12.0,    // Reduced from 16
         'borderRadius': 16.0,
         'iconSize': 24.0,
         'fontSize': 16.0,
@@ -968,12 +968,11 @@ class FAQInputSection extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(color: surfaceColor),
       child: SafeArea(
+        top: false,  // Don't add top safe area padding
         child: Padding(
-          padding: EdgeInsets.only(
-            left: horizontalPadding,
-            right: horizontalPadding,
-            top: verticalPadding,
-            bottom: verticalPadding + 12,
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: verticalPadding,  // Removed the extra +12
           ),
           child: Container(
             constraints: BoxConstraints(maxWidth: 900),
@@ -1035,13 +1034,13 @@ class FAQInputSection extends StatelessWidget {
                     ),
                   ),
                 ),
-                SizedBox(width: 12),
+                SizedBox(width: 10),  // Reduced from 12
                 // Text Input Field
                 Expanded(
                   child: Container(
                     constraints: BoxConstraints(
                       minHeight: buttonSize,
-                      maxHeight: 120,
+                      maxHeight: 100,  // Reduced from 120
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -1057,8 +1056,7 @@ class FAQInputSection extends StatelessWidget {
                     ),
                     child: TextField(
                       controller: controller,
-                      enabled:
-                          !isLoading, // Add && !_isTyping if you want to disable during typewriter
+                      enabled: !isLoading,
                       maxLines: null,
                       minLines: 1,
                       textAlignVertical: TextAlignVertical.center,
@@ -1077,8 +1075,8 @@ class FAQInputSection extends StatelessWidget {
                         ),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 14,
+                          horizontal: 16,  // Reduced from 18
+                          vertical: 10,    // Reduced from 14
                         ),
                         isDense: true,
                       ),
@@ -1086,7 +1084,7 @@ class FAQInputSection extends StatelessWidget {
                     ),
                   ),
                 ),
-                SizedBox(width: 12),
+                SizedBox(width: 10),  // Reduced from 12
                 // Microphone Button
                 if (onMicrophoneTap != null)
                   Tooltip(
@@ -1114,10 +1112,9 @@ class FAQInputSection extends StatelessWidget {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                isListening
-                                    ? primaryColor.withOpacity(0.3)
-                                    : Colors.black.withOpacity(0.06),
+                            color: isListening
+                                ? primaryColor.withOpacity(0.3)
+                                : Colors.black.withOpacity(0.06),
                             blurRadius: isListening ? 12 : 8,
                             offset: Offset(0, 2),
                           ),
@@ -1131,24 +1128,21 @@ class FAQInputSection extends StatelessWidget {
                             onMicrophoneTap!();
                           },
                           borderRadius: BorderRadius.circular(8),
-                          splashColor:
-                              isListening
-                                  ? Colors.white.withOpacity(0.2)
-                                  : Colors.grey.withOpacity(0.1),
-                          highlightColor:
-                              isListening
-                                  ? Colors.white.withOpacity(0.1)
-                                  : Colors.grey.withOpacity(0.05),
+                          splashColor: isListening
+                              ? Colors.white.withOpacity(0.2)
+                              : Colors.grey.withOpacity(0.1),
+                          highlightColor: isListening
+                              ? Colors.white.withOpacity(0.1)
+                              : Colors.grey.withOpacity(0.05),
                           child: Center(
                             child: AnimatedSwitcher(
                               duration: const Duration(milliseconds: 200),
                               child: Icon(
                                 isListening ? Icons.mic : Icons.mic_none,
                                 key: ValueKey(isListening),
-                                color:
-                                    isListening
-                                        ? Colors.white
-                                        : Color(0xFF666666),
+                                color: isListening
+                                    ? Colors.white
+                                    : Color(0xFF666666),
                                 size: iconSize,
                               ),
                             ),
@@ -1157,7 +1151,7 @@ class FAQInputSection extends StatelessWidget {
                       ),
                     ),
                   ),
-                SizedBox(width: 12),
+                SizedBox(width: 10),  // Reduced from 12
                 // Send Button
                 Container(
                   width: buttonSize,
@@ -1165,16 +1159,15 @@ class FAQInputSection extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isLoading ? Colors.grey.shade400 : primaryColor,
                     borderRadius: BorderRadius.circular(10),
-                    boxShadow:
-                        isLoading
-                            ? []
-                            : [
-                              BoxShadow(
-                                color: primaryColor.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
+                    boxShadow: isLoading
+                        ? []
+                        : [
+                            BoxShadow(
+                              color: primaryColor.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
                   ),
                   child: Material(
                     color: Colors.transparent,

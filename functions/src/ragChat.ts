@@ -1229,3 +1229,88 @@ export const debugFAQs = onRequest(
     }
   }
 );
+
+export const reembedAllFAQsV3 = onRequest(
+  {
+    secrets: [COHERE_API_KEY],
+    cors: true,
+    timeoutSeconds: 300,
+    memory: "1GiB",
+  },
+  async (req, res) => {
+    try {
+      const cohereKey = COHERE_API_KEY.value();
+      
+      console.log('🔄 Re-embedding all FAQs with embed-multilingual-v3.0');
+      
+      const faqSnapshot = await db.collection("faqs").get();
+      console.log(`📚 Found ${faqSnapshot.docs.length} FAQs`);
+      
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const doc of faqSnapshot.docs) {
+        const data = doc.data();
+        const question = data.question as string;
+        
+        if (!question) {
+          errorCount++;
+          continue;
+        }
+        
+        try {
+          console.log(`🔧 [${doc.id}] Embedding: "${question.substring(0, 50)}..."`);
+          
+          const response = await axios.post(
+            "https://api.cohere.ai/v1/embed",
+            {
+              texts: [question],
+              model: "embed-multilingual-v3.0",
+              input_type: "search_document",  // FAQs are documents
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${cohereKey}`,
+                "Content-Type": "application/json",
+              },
+              timeout: 30000,
+            }
+          );
+          
+          const embedding = (response.data as { embeddings: number[][] }).embeddings[0];
+          
+          await doc.ref.update({
+            embedding: embedding,
+            embeddingModel: "embed-multilingual-v3.0",
+            embeddingDimensions: embedding.length,
+            embeddingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          
+          successCount++;
+          console.log(`✅ [${doc.id}] Done - ${embedding.length} dims`);
+          
+          // Rate limit protection
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+        } catch (error) {
+          errorCount++;
+          console.error(`❌ [${doc.id}] Failed:`, error);
+        }
+      }
+      
+      console.log(`✅ Complete: ${successCount} success, ${errorCount} errors`);
+      
+      res.json({
+        success: true,
+        model: "embed-multilingual-v3.0",
+        total: faqSnapshot.docs.length,
+        successCount,
+        errorCount,
+      });
+      
+    } catch (error) {
+      console.error("❌ Error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  }
+);

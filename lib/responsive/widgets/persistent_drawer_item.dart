@@ -1,3 +1,4 @@
+import 'package:capstone_project/responsive/widgets/persistent_drawer_group.dart';
 import 'package:flutter/material.dart';
 
 Widget buildPersistentDrawerItem({
@@ -18,7 +19,6 @@ Widget buildPersistentDrawerItem({
 
   return Container(
     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-    // Remove fixed height to allow dynamic sizing
     constraints: const BoxConstraints(minHeight: 44),
     child: Material(
       color:
@@ -29,14 +29,19 @@ Widget buildPersistentDrawerItem({
                   : Colors.transparent),
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => onTap(index),
+  borderRadius: BorderRadius.circular(8),
+  onTap: () {
+    // ✅ Close all groups when clicking any item
+    if (index >= 0) {
+      PersistentDrawerState.resetExpansionStates();
+    }
+    onTap(index);
+  },
         child: Container(
           width: double.infinity,
-          // Remove fixed height constraint
           constraints: const BoxConstraints(minHeight: 44),
           padding: EdgeInsets.symmetric(
-           horizontal: isSubItem ? 8 : 8,
+            horizontal: isSubItem ? 8 : 8,
             vertical: 0,
           ),
           child: Row(
@@ -93,10 +98,9 @@ Widget buildPersistentDrawerItem({
                                 : FontWeight.w400,
                         fontSize: isSubItem ? 13 : 14,
                       ),
-                      // Allow text to wrap and display fully
                       softWrap: true,
                       overflow: TextOverflow.visible,
-                      maxLines: null, // Allow unlimited lines
+                      maxLines: null,
                     ),
                   ),
                 ),
