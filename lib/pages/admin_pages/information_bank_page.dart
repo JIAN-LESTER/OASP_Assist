@@ -770,7 +770,7 @@ Widget _buildIBRow({
       child: Row(
         children: [
           Expanded(
-            flex: 4,
+            flex: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -790,7 +790,7 @@ Widget _buildIBRow({
 
           if (!isMobile)
             Expanded(
-              flex: 3,
+              flex: 4,
               child: Text(
                 content,
                 style: const TextStyle(fontSize: 13),
@@ -798,7 +798,7 @@ Widget _buildIBRow({
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 100),
 
           Expanded(
             flex: 3,
