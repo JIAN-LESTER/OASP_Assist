@@ -803,6 +803,7 @@ class DesktopDashboard extends StatelessWidget {
   }
 }
 
+
 class TabletDashboard extends StatelessWidget {
   final String selectedTimeFrame;
   final ValueChanged<String> onTimeFrameChanged;
@@ -982,10 +983,9 @@ Widget dashboardContents(
                   height: 400,
                   child: LazyLoadWidget(
                     delay: const Duration(milliseconds: 100),
-                    builder:
-                        (context) => buildCategoryDistributionCard(
-                          inq?.categoryDistribution ?? {},
-                        ),
+                    builder: (context) => buildCategoryDistributionCard(
+                      inq?.categoryDistribution ?? {},
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -993,11 +993,10 @@ Widget dashboardContents(
                   height: 400,
                   child: LazyLoadWidget(
                     delay: const Duration(milliseconds: 200),
-                    builder:
-                        (context) => buildInquiryTrendCard(
-                          inq?.inquiryTrend ?? [],
-                          selectedTimeFrame,
-                        ),
+                    builder: (context) => buildInquiryTrendCard(
+                      inq?.inquiryTrend ?? [],
+                      selectedTimeFrame,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -1005,8 +1004,7 @@ Widget dashboardContents(
                   height: 350,
                   child: LazyLoadWidget(
                     delay: const Duration(milliseconds: 300),
-                    builder:
-                        (context) => buildSystemLogsCard(inq?.recentLogs ?? []),
+                    builder: (context) => buildSystemLogsCard(inq?.recentLogs ?? []),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -1014,52 +1012,51 @@ Widget dashboardContents(
                   height: 350,
                   child: LazyLoadWidget(
                     delay: const Duration(milliseconds: 400),
-                    builder:
-                        (context) => buildMessageLogsCard(inq?.msgLogs ?? []),
+                    builder: (context) => buildMessageLogsCard(inq?.msgLogs ?? []),
                   ),
                 ),
               ],
             );
           } else {
-            // Web/Desktop: fixed layout with Expanded
+            // Desktop/Tablet: Fixed heights for scrolling
             return Column(
               children: [
-                 SizedBox(
-      height: 400, // set your desired fixed height
-      child: Row(
-        children: [
-          Expanded(
-            child: LazyLoadWidget(
-              delay: const Duration(milliseconds: 100),
-              builder: (context) => buildCategoryDistributionCard(
-                inq?.categoryDistribution ?? {},
-              ),
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: LazyLoadWidget(
-              delay: const Duration(milliseconds: 200),
-              builder: (context) => buildInquiryTrendCard(
-                inq?.inquiryTrend ?? [],
-                selectedTimeFrame,
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
+                SizedBox(
+                  height: 400,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: LazyLoadWidget(
+                          delay: const Duration(milliseconds: 100),
+                          builder: (context) => buildCategoryDistributionCard(
+                            inq?.categoryDistribution ?? {},
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: LazyLoadWidget(
+                          delay: const Duration(milliseconds: 200),
+                          builder: (context) => buildInquiryTrendCard(
+                            inq?.inquiryTrend ?? [],
+                            selectedTimeFrame,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 20),
-                Expanded(
+                SizedBox(
+                  height: 350,
                   child: Row(
                     children: [
                       Expanded(
                         flex: 1,
                         child: LazyLoadWidget(
                           delay: const Duration(milliseconds: 300),
-                          builder:
-                              (context) =>
-                                  buildSystemLogsCard(inq?.recentLogs ?? []),
+                          builder: (context) =>
+                              buildSystemLogsCard(inq?.recentLogs ?? []),
                         ),
                       ),
                       const SizedBox(width: 20),
@@ -1067,9 +1064,8 @@ Widget dashboardContents(
                         flex: 2,
                         child: LazyLoadWidget(
                           delay: const Duration(milliseconds: 400),
-                          builder:
-                              (context) =>
-                                  buildMessageLogsCard(inq?.msgLogs ?? []),
+                          builder: (context) =>
+                              buildMessageLogsCard(inq?.msgLogs ?? []),
                         ),
                       ),
                     ],
@@ -1080,45 +1076,25 @@ Widget dashboardContents(
           }
         }
 
-        // --- Return widget ---
-        return Padding(
+        // --- ALWAYS SCROLLABLE: SingleChildScrollView wrapper ---
+        return SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
-          child:
-              isMobile
-                  ? SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildHeader(
-                          selectedTimeFrame,
-                          onTimeFrameChanged,
-                          onRefresh,
-                          isRefreshing,
-                          userName,
-                        ),
-                        const SizedBox(height: 32),
-                        statCards(),
-                        const SizedBox(height: 32),
-                        cardsSection(),
-                      ],
-                    ),
-                  )
-                  : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(
-                        selectedTimeFrame,
-                        onTimeFrameChanged,
-                        onRefresh,
-                        isRefreshing,
-                        userName,
-                      ),
-                      const SizedBox(height: 32),
-                      statCards(),
-                      const SizedBox(height: 32),
-                      Expanded(child: cardsSection()),
-                    ],
-                  ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(
+                selectedTimeFrame,
+                onTimeFrameChanged,
+                onRefresh,
+                isRefreshing,
+                userName,
+              ),
+              const SizedBox(height: 32),
+              statCards(),
+              const SizedBox(height: 32),
+              cardsSection(),
+            ],
+          ),
         );
       },
     ),

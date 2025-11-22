@@ -93,7 +93,6 @@ class _AdminMainPageState extends State<AdminMainPage> {
     const AdmissionManagementPage(),
     const ScholarshipManagementPage(),
     const PlacementManagementPage(),
-    const AffiliationManagementPage(),
     const ProgramManagementPage()
   ];
 
@@ -110,7 +109,6 @@ class _AdminMainPageState extends State<AdminMainPage> {
     'Admission',
     'Scholarship',
     'Placement',
-    'Affiliations',
     'Programs'
   ];
 

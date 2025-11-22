@@ -295,8 +295,8 @@ class UniversalUIComponents {
               isExpandable: true,
               subItems: [
                 MenuItem(icon: Icons.person, title: "Users", index: 6),
-                MenuItem(icon: Icons.book, title: "Affiliations", index: 12),
-                MenuItem(icon: Icons.book, title: "Programs", index: 13),
+       
+                MenuItem(icon: Icons.book, title: "Programs", index: 12),
               ],
             ),
             MenuItem(
@@ -550,31 +550,31 @@ class UniversalUIComponents {
             ),
           );
         }
-    } else {
-  menuItems.add(
-    _buildRegularMenuItem(
-      context,
-      item,
-      selectedIndex,
-      onItemTap,
-      userRole,
-      setDrawerState: setDrawerState, // ✅ ADD THIS
-    ),
-  );
-}
+      } else {
+        menuItems.add(
+          _buildRegularMenuItem(
+            context,
+            item,
+            selectedIndex,
+            onItemTap,
+            userRole,
+            setDrawerState: setDrawerState, // ✅ ADD THIS
+          ),
+        );
+      }
     }
 
     return Column(children: menuItems);
   }
 
- static Widget _buildRegularMenuItem(
-  BuildContext context,
-  MenuItem item,
-  int selectedIndex,
-  Function(int) onItemTap,
-  UserRole userRole, {
-  StateSetter? setDrawerState, // ✅ ADD THIS
-}) {
+  static Widget _buildRegularMenuItem(
+    BuildContext context,
+    MenuItem item,
+    int selectedIndex,
+    Function(int) onItemTap,
+    UserRole userRole, {
+    StateSetter? setDrawerState, // ✅ ADD THIS
+  }) {
     final isSelected = selectedIndex == item.index;
 
     return Container(
@@ -584,14 +584,14 @@ class UniversalUIComponents {
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
-         onTap: () {
-  _handleItemTap(
-    context: context,
-    index: item.index,
-    onItemTap: onItemTap,
-    setDrawerState: setDrawerState,
-  );
-},
+          onTap: () {
+            _handleItemTap(
+              context: context,
+              index: item.index,
+              onItemTap: onItemTap,
+              setDrawerState: setDrawerState,
+            );
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             child: Row(
@@ -741,15 +741,16 @@ class UniversalUIComponents {
                         borderRadius: BorderRadius.circular(8),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(8),
-                         onTap: () {
-  _handleItemTap(
-    context: context,
-    index: subItem.index,
-    onItemTap: onItemTap,
-    groupIndex: item.index, // ✅ Pass parent group index
-    setDrawerState: setDrawerState,
-  );
-},
+                          onTap: () {
+                            _handleItemTap(
+                              context: context,
+                              index: subItem.index,
+                              onItemTap: onItemTap,
+                              groupIndex:
+                                  item.index, // ✅ Pass parent group index
+                              setDrawerState: setDrawerState,
+                            );
+                          },
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -825,24 +826,24 @@ class UniversalUIComponents {
   }
 
   static int? _getGroupIndexForItem(int itemIndex) {
-  // Admin role
-  if (itemIndex == 6 || itemIndex == 12 || itemIndex == 13) {
-    return -1; // User Management group
+    // Admin role
+    if (itemIndex == 6 || itemIndex == 12 || itemIndex == 13) {
+      return -1; // User Management group
+    }
+    if (itemIndex == 9 || itemIndex == 10 || itemIndex == 11) {
+      return -2; // Services group
+    }
+    if (itemIndex == 7 || itemIndex == 8) {
+      return -3; // Logs group
+    }
+
+    // User role
+    if (itemIndex == 3 || itemIndex == 4 || itemIndex == 5) {
+      return -1; // Services group for user
+    }
+
+    return null; // Not in any group
   }
-  if (itemIndex == 9 || itemIndex == 10 || itemIndex == 11) {
-    return -2; // Services group
-  }
-  if (itemIndex == 7 || itemIndex == 8) {
-    return -3; // Logs group
-  }
-  
-  // User role
-  if (itemIndex == 3 || itemIndex == 4 || itemIndex == 5) {
-    return -1; // Services group for user
-  }
-  
-  return null; // Not in any group
-}
 
   static Widget _buildNewChatAndHistorySection(
     BuildContext context,
@@ -981,71 +982,71 @@ class UniversalUIComponents {
     );
   }
 
- static void _handleItemTap({
-  required BuildContext context,
-  required int index,
-  required Function(int) onItemTap,
-  int? groupIndex,
-  StateSetter? setDrawerState,
-}) {
-  // Determine which group the clicked item belongs to
-  int? itemGroupIndex = _getGroupIndexForItem(index);
-  
-  // Close all expansion groups EXCEPT the one containing the clicked item
-  if (index >= 0) {
-    // Reset persistent drawer states (desktop sidebar)
-    if (itemGroupIndex != -1) {
-      PersistentDrawerState.setUserManagementExpanded(false);
+  static void _handleItemTap({
+    required BuildContext context,
+    required int index,
+    required Function(int) onItemTap,
+    int? groupIndex,
+    StateSetter? setDrawerState,
+  }) {
+    // Determine which group the clicked item belongs to
+    int? itemGroupIndex = _getGroupIndexForItem(index);
+
+    // Close all expansion groups EXCEPT the one containing the clicked item
+    if (index >= 0) {
+      // Reset persistent drawer states (desktop sidebar)
+      if (itemGroupIndex != -1) {
+        PersistentDrawerState.setUserManagementExpanded(false);
+      }
+      if (itemGroupIndex != -2) {
+        PersistentDrawerState.setServicesExpanded(false);
+      }
+      if (itemGroupIndex != -3) {
+        PersistentDrawerState.setLogsExpanded(false);
+      }
+
+      // Keep the current item's group open
+      if (itemGroupIndex == -1) {
+        PersistentDrawerState.setUserManagementExpanded(true);
+      } else if (itemGroupIndex == -2) {
+        PersistentDrawerState.setServicesExpanded(true);
+      } else if (itemGroupIndex == -3) {
+        PersistentDrawerState.setLogsExpanded(true);
+      }
+
+      // Clear mobile drawer expansion states except current group
+      if (itemGroupIndex != -1) {
+        _expandedState['User Management'] = false;
+      }
+      if (itemGroupIndex != -2) {
+        _expandedState['Services'] = false;
+      }
+      if (itemGroupIndex != -3) {
+        _expandedState['Logs'] = false;
+      }
+
+      // Keep current group open in mobile drawer
+      if (itemGroupIndex == -1) {
+        _expandedState['User Management'] = true;
+      } else if (itemGroupIndex == -2) {
+        _expandedState['Services'] = true;
+      } else if (itemGroupIndex == -3) {
+        _expandedState['Logs'] = true;
+      }
+
+      // Update mobile drawer UI
+      if (setDrawerState != null) {
+        setDrawerState(() {});
+      }
     }
-    if (itemGroupIndex != -2) {
-      PersistentDrawerState.setServicesExpanded(false);
+
+    // Close the drawer if it's mobile
+    if (context.mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
     }
-    if (itemGroupIndex != -3) {
-      PersistentDrawerState.setLogsExpanded(false);
-    }
-    
-    // Keep the current item's group open
-    if (itemGroupIndex == -1) {
-      PersistentDrawerState.setUserManagementExpanded(true);
-    } else if (itemGroupIndex == -2) {
-      PersistentDrawerState.setServicesExpanded(true);
-    } else if (itemGroupIndex == -3) {
-      PersistentDrawerState.setLogsExpanded(true);
-    }
-    
-    // Clear mobile drawer expansion states except current group
-    if (itemGroupIndex != -1) {
-      _expandedState['User Management'] = false;
-    }
-    if (itemGroupIndex != -2) {
-      _expandedState['Services'] = false;
-    }
-    if (itemGroupIndex != -3) {
-      _expandedState['Logs'] = false;
-    }
-    
-    // Keep current group open in mobile drawer
-    if (itemGroupIndex == -1) {
-      _expandedState['User Management'] = true;
-    } else if (itemGroupIndex == -2) {
-      _expandedState['Services'] = true;
-    } else if (itemGroupIndex == -3) {
-      _expandedState['Logs'] = true;
-    }
-    
-    // Update mobile drawer UI
-    if (setDrawerState != null) {
-      setDrawerState(() {});
-    }
+
+    onItemTap(index);
   }
-  
-  // Close the drawer if it's mobile
-  if (context.mounted && Navigator.of(context).canPop()) {
-    Navigator.of(context).pop();
-  }
-  
-  onItemTap(index);
-}
 
   static Widget _buildChatHistoryList(
     BuildContext context,
@@ -1994,6 +1995,7 @@ class UniversalUIComponents {
       stream:
           FirebaseFirestore.instance
               .collection('notifications')
+              .where('userId', isEqualTo: currentUserId) // ✅ Filter by userId
               .where('targetRole', isEqualTo: roleToString(userRole))
               .orderBy('createdAt', descending: true)
               .limit(50)

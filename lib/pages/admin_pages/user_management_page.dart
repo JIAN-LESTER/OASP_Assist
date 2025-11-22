@@ -292,9 +292,10 @@ class MobileUserManagement extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('users')
-                            .snapshots(),
+                        stream:
+                            FirebaseFirestore.instance
+                                .collection('users')
+                                .snapshots(),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -309,7 +310,8 @@ class MobileUserManagement extends StatelessWidget {
                             );
                           }
 
-                          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          if (!snapshot.hasData ||
+                              snapshot.data!.docs.isEmpty) {
                             return const Center(child: Text('No users found.'));
                           }
 
@@ -442,34 +444,29 @@ Widget _buildMobileHeader(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Users Management',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Manage accounts and user roles',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
+              Text(
+                'Users Management',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
-              Row(
-                children: [AddUserButton(onNavigateToPage: onNavigateToPage)],
+              const SizedBox(height: 4),
+              Text(
+                'Manage accounts and user roles',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
           ),
+          Row(children: [AddUserButton(onNavigateToPage: onNavigateToPage)]),
+        ],
+      ),
     ],
   );
 }
@@ -541,11 +538,24 @@ Widget _buildUserList({
                         email: data['email'] ?? 'N/A',
                         role:
                             data['role'] == 'user'
-                                ? 'User'
+                                ? data['affiliation'] ==
+                                        "Incoming Freshman Applicant"
+                                    ? 'Incoming Freshman Applicant'
+                                    : data['affiliation'] == 'Parent'
+                                    ? 'Parent'
+                                    : data['affiliation'] == 'Employer'
+                                    ? 'Employer'
+                                    : data['affiliation'] == 'Alumni'
+                                    ? 'Alumni'
+                                    : data['affiliation'] == 'Faculty'
+                                    ? 'Faculty'
+                                    : data['affiliation'] == 'CMU Staff'
+                                    ? 'CMU Staff'
+                                    : 'CMU Student'
                                 : data['role'] == 'admin'
-                                ? 'Admin'
+                                ? 'OASP Admin'
                                 : data['role'] == 'staff'
-                                ? 'Staff'
+                                ? 'OASP Staff'
                                 : (data['role'] ?? 'N/A'),
                         year: data['year']?.toString() ?? '-',
                         program: data['program'] ?? '-',
@@ -580,6 +590,7 @@ Widget _buildUserRow({
   required String year,
   required String program,
   required String status,
+
   required Function(int)? onNavigateToPage,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
@@ -824,10 +835,7 @@ Widget _buildHeader(
                   const SizedBox(height: 4),
                   Text(
                     'Manage accounts and user roles',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -880,8 +888,6 @@ Widget _buildHeader(
               ],
             ),
           ),
-
-
 
           // Search and Filter Row
           Row(
@@ -1031,7 +1037,6 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-      
           ],
         ),
       );

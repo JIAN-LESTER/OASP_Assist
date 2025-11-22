@@ -57,9 +57,9 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
   List<String> _programs = [];
   final List<String> _affiliations = [
     'Incoming Freshman Applicant',
-    'Parents',
+    'Parent',
     'Faculty',
-    'Staff',
+    'CMU Staff'
     'Employer',
     'Alumni',
 
