@@ -1,3 +1,4 @@
+import 'package:capstone_project/responsive/user_constant.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/pages/user_pages/user_main_page.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
@@ -220,51 +221,63 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     }
   }
 
-  void _finishOnboarding() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception('User session expired');
-      }
+ void _finishOnboarding() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User session expired');
+    }
 
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder:
-            (context) => WillPopScope(
-              onWillPop: () async => false,
-              child: const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                ),
-              ),
-            ),
-      );
-
-      await _saveUserProfile();
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get(const GetOptions(source: Source.server));
-
-      if (!doc.exists || doc.data()?['onboardingCompleted'] != true) {
-        throw Exception('Failed to verify onboarding completion');
-      }
-
-      if (mounted) Navigator.of(context).pop();
-      await Future.delayed(const Duration(milliseconds: 200));
-
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (context) => const UserMainPage(initialTabIndex: 1),
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false,
+        child: const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
           ),
-          (route) => false,
-        );
-      }
+        ),
+      ),
+    );
+
+    await _saveUserProfile();
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get(const GetOptions(source: Source.server));
+
+    if (!doc.exists || doc.data()?['onboardingCompleted'] != true) {
+      throw Exception('Failed to verify onboarding completion');
+    }
+
+    // ✅ FIX: Create a conversation BEFORE navigating to chat
+    String? newConversationId;
+    try {
+      newConversationId = await UserConstant.createNewConversation(user.uid);
+      print('✅ Created initial conversation after onboarding: $newConversationId');
     } catch (e) {
+      print('⚠️ Could not create conversation: $e');
+      // Continue anyway - chat page will handle it
+    }
+
+    if (mounted) Navigator.of(context).pop();
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => UserMainPage(
+            initialTabIndex: 1,
+            conversationId: newConversationId, // ✅ Pass the conversation ID
+          ),
+        ),
+        (route) => false,
+      );
+    }
+  } catch (e) {
       if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }

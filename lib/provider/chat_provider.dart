@@ -466,37 +466,41 @@ Future<void> askQuestionWithStreaming(
 ) async {
   if (_isLoading) return;
 
+  final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
   // ✅ FIX: Create conversation if none exists
-  if (conversationId == null || conversationId!.isEmpty) {
-    print('⚠️ No conversation ID - creating new conversation');
-    
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) {
-      return;
-    }
-
-    try {
-      // Create new conversation
-      final newConversationId = await UserConstant.createNewConversation(userId);
-      
-      // Set it in the provider
-      await setConversationId(newConversationId);
-      
-      print('✅ Created new conversation: $newConversationId');
-      
-      // Small delay to ensure setup completes
-      await Future.delayed(Duration(milliseconds: 300));
-    } catch (e) {
-      print('❌ Error creating conversation: $e');
-      return;
-    }
-  }
-
-  // ✅ Double-check conversation exists
-  if (conversationId == null || conversationId!.isEmpty) {
-    print('❌ Still no conversation ID after creation attempt');
+ if (conversationId == null || conversationId!.isEmpty) {
+  print('⚠️ No conversation ID - creating new conversation');
+  
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  if (userId == null) {
     return;
   }
+
+
+
+  try {
+    // ✅ End any existing active conversations first to prevent duplicates
+    await UserConstant.endAllActiveConversations(userId);
+    
+    final newConversationId = await UserConstant.createNewConversation(userId);
+    
+    // ✅ Set it in the provider (this also sets up listeners)
+    await setConversationId(newConversationId);
+    
+    print('✅ Created new conversation: $newConversationId');
+    
+    await Future.delayed(Duration(milliseconds: 300));
+  } catch (e) {
+    print('❌ Error creating conversation: $e');
+    return;
+  }
+}
+
+// ✅ Double-check we have a valid conversationId now
+if (conversationId == null || conversationId!.isEmpty) {
+  print('❌ Still no conversation ID after creation attempt');
+  return;
+}
 
   _isLoading = true;
   notifyListeners();

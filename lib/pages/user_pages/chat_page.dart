@@ -1137,39 +1137,50 @@
     }
 
   Future<void> _handleLikeDislike(
-    String messageId,
-    bool isLike, [
-    Message? message,
-  ]) async {
-    if (!mounted) return;
+  String messageId,
+  bool isLike, [
+  Message? message,
+]) async {
+  if (!mounted) return;
 
-    if (widget.conversationId.isEmpty) {
-      print('Error: No conversation ID available');
-      if (mounted) {
-        _showSnackBar('Unable to rate message', Icons.error);
-      }
-      return;
+  // ✅ FIX: Get the actual conversation ID from the message or provider
+  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  final actualConversationId = chatProvider.conversationId ?? widget.conversationId;
+
+  if (actualConversationId == null || actualConversationId.isEmpty) {
+    print('Error: No conversation ID available');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to rate message - no active conversation'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
+    return;
+  }
 
-    setState(() {
-      _localRatings[messageId] = isLike ? 'like' : 'dislike';
-    });
+  setState(() {
+    _localRatings[messageId] = isLike ? 'like' : 'dislike';
+  });
 
-    try {
-      await Provider.of<ChatProvider>(
-        context,
-        listen: false,
-      ).rateMessage(messageId, isLike, widget.conversationId);
-    } catch (e) {
-      print('Error rating message: $e');
-      if (mounted) {
-        setState(() {
-          _localRatings.remove(messageId);
-        });
-        _showSnackBar('Failed to save rating', Icons.error);
-      }
-      return;
+  try {
+    await chatProvider.rateMessage(messageId, isLike, actualConversationId);
+  } catch (e) {
+    print('Error rating message: $e');
+    if (mounted) {
+      setState(() {
+        _localRatings.remove(messageId);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save rating'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
+    return;
+  }
 
     if (!isLike && message != null && mounted) {
       final bool? escalate = await showDialog<bool>(

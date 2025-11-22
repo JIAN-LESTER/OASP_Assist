@@ -142,53 +142,53 @@
     }
 
     Future<void> _initializeConversationOrShowFAQs() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
 
-    try {
-      print('🔍 Looking for active conversations...');
-      final activeConversations = await _firestore
-          .collection('conversations')
-          .where('userId', isEqualTo: user.uid)
-          .where('status', isEqualTo: 'active')
-          .orderBy('lastActivity', descending: true)
-          .limit(1)
-          .get();
+  try {
+    print('🔍 Looking for active conversations...');
+    final activeConversations = await _firestore
+        .collection('conversations')
+        .where('userId', isEqualTo: user.uid)
+        .where('status', isEqualTo: 'active')
+        .orderBy('lastActivity', descending: true)
+        .limit(1)
+        .get();
 
-      if (activeConversations.docs.isNotEmpty) {
-        final conversationId = activeConversations.docs.first.id;
-        print('✅ Found active conversation: $conversationId');
-        
-        if (mounted) {
-          setState(() {
-            _conversationId = conversationId;
-            _pendingConversationId = conversationId;
-            _showFAQs = false;
-          });
-        }
-
-        // Load the conversation
-        await _loadExistingConversation(conversationId);
-      } else {
-        print('ℹ️ No active conversations found - showing FAQs');
-        
-        if (mounted) {
-          setState(() {
-            _conversationId = null;
-            _pendingConversationId = null;
-            _showFAQs = true;
-          });
-        }
-      }
-    } catch (e) {
-      print('❌ Error in initialization: $e');
+    if (activeConversations.docs.isNotEmpty) {
+      final conversationId = activeConversations.docs.first.id;
+      print('✅ Found active conversation: $conversationId');
+      
       if (mounted) {
         setState(() {
+          _conversationId = conversationId;
+          _pendingConversationId = conversationId;
+          _showFAQs = false;
+        });
+      }
+
+      await _loadExistingConversation(conversationId);
+    } else {
+      print('ℹ️ No active conversations found - showing FAQs');
+      
+      // ✅ DON'T create conversation here - let it be created when user sends first message
+      if (mounted) {
+        setState(() {
+          _conversationId = null;
+          _pendingConversationId = null;
           _showFAQs = true;
         });
       }
     }
+  } catch (e) {
+    print('❌ Error in initialization: $e');
+    if (mounted) {
+      setState(() {
+        _showFAQs = true;
+      });
+    }
   }
+}
 
     String _loadingText = "Loading...";
 
