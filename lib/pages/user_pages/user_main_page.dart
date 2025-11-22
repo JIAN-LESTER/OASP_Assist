@@ -141,6 +141,27 @@
       });
     }
 
+    void _onConversationDeleted(String conversationId) {
+  print('🗑️ Conversation deleted: $conversationId');
+  
+  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  
+  // Clear if this was the active conversation
+  if (_conversationId == conversationId || 
+      chatProvider.conversationId == conversationId) {
+    
+    chatProvider.clearMessages();
+    
+    if (mounted) {
+      setState(() {
+        _conversationId = null;
+        _pendingConversationId = null;
+        _showFAQs = true;
+      });
+    }
+  }
+}
+
     Future<void> _initializeConversationOrShowFAQs() async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
@@ -1457,3 +1478,7 @@
       super.dispose();
     }
   }
+
+  
+
+  
