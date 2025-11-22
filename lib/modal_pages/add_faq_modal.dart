@@ -3,8 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
+import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
-import 'package:capstone_project/utils/snackbar_util.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -46,8 +46,6 @@ class AddFaqModal extends StatelessWidget {
       desktopBody: _buildModal(context, false, false, true),
     );
   }
-
-
 
   Widget _buildModal(
     BuildContext context,
@@ -139,42 +137,45 @@ class _AddFaqContentState extends State<AddFaqContent> {
   String _selectedCategory = 'General';
   bool _isSubmitting = false;
 
-    final String _cohereApiKey = "IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
+  final String _cohereApiKey = "IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
 
   Future<List<double>> _generateEmbedding(String text) async {
-  try {
-    print('🔧 Generating v3 embedding for FAQ: "${text.substring(0, text.length > 50 ? 50 : text.length)}..."');
-    
-    final response = await http.post(
-      Uri.parse("https://api.cohere.ai/v1/embed"),
-      headers: {
-        'Authorization': 'Bearer $_cohereApiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        "texts": [text],
-        "model": "embed-multilingual-v3.0",  // ✅ Using v3
-        "input_type": "search_document",      // ✅ Required for v3 - FAQs are documents
-      }),
-    );
+    try {
+      print(
+        '🔧 Generating v3 embedding for FAQ: "${text.substring(0, text.length > 50 ? 50 : text.length)}..."',
+      );
 
-    if (response.statusCode != 200) {
-      print('❌ Cohere API error: ${response.statusCode} - ${response.body}');
-      throw Exception('Failed to generate embedding: ${response.statusCode}');
+      final response = await http.post(
+        Uri.parse("https://api.cohere.ai/v1/embed"),
+        headers: {
+          'Authorization': 'Bearer $_cohereApiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          "texts": [text],
+          "model": "embed-multilingual-v3.0",
+          "input_type": "search_document",
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        print('❌ Cohere API error: ${response.statusCode} - ${response.body}');
+        throw Exception('Failed to generate embedding: ${response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body);
+      final embedding =
+          (data['embeddings'][0] as List)
+              .map((e) => (e as num).toDouble())
+              .toList();
+
+      print('✅ Generated v3 embedding: ${embedding.length} dimensions');
+      return embedding;
+    } catch (e) {
+      print('❌ Error generating embedding: $e');
+      rethrow;
     }
-
-    final data = jsonDecode(response.body);
-    final embedding = (data['embeddings'][0] as List)
-        .map((e) => (e as num).toDouble())
-        .toList();
-    
-    print('✅ Generated v3 embedding: ${embedding.length} dimensions');
-    return embedding;
-  } catch (e) {
-    print('❌ Error generating embedding: $e');
-    rethrow;
   }
-}
 
   final List<String> _categories = [
     'Admission',
@@ -190,132 +191,107 @@ class _AddFaqContentState extends State<AddFaqContent> {
     super.dispose();
   }
 
-  
+  void _showTopRightAlert(String message, AlertType type) {
+    if (!context.mounted) return;
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+
+    overlayEntry = OverlayEntry(
+      builder:
+          (context) => TopRightAlert(
+            message: message,
+            type: type,
+            onDismiss: () => overlayEntry.remove(),
+            isMobile: isMobile,
+            isTablet: isTablet,
+          ),
+    );
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 4), () {
+      if (overlayEntry.mounted) overlayEntry.remove();
+    });
+  }
 
   Future<void> _saveFaq() async {
-  if (!_formKey.currentState!.validate()) {
-    return;
-  }
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-  if (_questionController.text.trim().isEmpty) {
-    SnackbarUtil.showWarning(context, 'Please enter a question');
-    return;
-  }
+    if (_questionController.text.trim().isEmpty) {
+      _showTopRightAlert('Please enter a question', AlertType.warning);
+      return;
+    }
 
-  if (_answerController.text.trim().isEmpty) {
-    SnackbarUtil.showWarning(context, 'Please enter an answer');
-    return;
-  }
+    if (_answerController.text.trim().isEmpty) {
+      _showTopRightAlert('Please enter an answer', AlertType.warning);
+      return;
+    }
 
-  setState(() {
-    _isSubmitting = true;
-  });
+    setState(() {
+      _isSubmitting = true;
+    });
 
-  try {
-    final question = _questionController.text.trim();
-    final answer = _answerController.text.trim();
-
-    // ✅ Generate embedding for the FAQ question
-    List<double>? embedding;
     try {
-      embedding = await _generateEmbedding(question);
+      final question = _questionController.text.trim();
+      final answer = _answerController.text.trim();
+
+      // ✅ Generate embedding for the FAQ question
+      List<double>? embedding;
+      try {
+        embedding = await _generateEmbedding(question);
+      } catch (e) {
+        print('⚠️ Failed to generate embedding: $e');
+        // Show warning but continue - embedding can be generated later by Cloud Function
+      }
+
+      // ✅ Include embedding in FAQ data
+      final Map<String, dynamic> faqData = {
+        'question': question,
+        'answer': answer,
+        'category': _selectedCategory,
+        'isPredefined': true,
+        'createdAt': Timestamp.now(),
+        'similarityCount': 0,
+      };
+
+      // ✅ Add embedding fields if generated successfully
+      if (embedding != null) {
+        faqData['embedding'] = embedding;
+        faqData['embeddingModel'] = 'embed-multilingual-v3.0';
+        faqData['embeddingDimensions'] = embedding.length;
+      }
+
+      await FirebaseFirestore.instance.collection('faqs').add(faqData);
+
+      // Log the action
+      await _logCreateAction();
+
+      // Pop the modal
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+
+      // Show success message
+      if (embedding != null) {
+        _showTopRightAlert(
+          'FAQ created with embedding (${embedding.length} dims)!',
+          AlertType.success,
+        );
+      } else {
+        _showTopRightAlert(
+          'FAQ created without embedding - will be generated on first use',
+          AlertType.warning,
+        );
+      }
     } catch (e) {
-      print('⚠️ Failed to generate embedding: $e');
-      // Show warning but continue - embedding can be generated later by Cloud Function
+      _showTopRightAlert('Failed to create FAQ: $e', AlertType.error);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
-
-    // ✅ Include embedding in FAQ data
-    final Map<String, dynamic> faqData = {
-      'question': question,
-      'answer': answer,
-      'category': _selectedCategory,
-      'isPredefined': true,
-      'createdAt': Timestamp.now(),
-      'similarityCount': 0,
-    };
-
-    // ✅ Add embedding fields if generated successfully
-    if (embedding != null) {
-      faqData['embedding'] = embedding;
-      faqData['embeddingModel'] = 'embed-multilingual-v3.0';
-      faqData['embeddingDimensions'] = embedding.length;
-    }
-
-    await FirebaseFirestore.instance.collection('faqs').add(faqData);
-
-    // Log the action
-    await _logCreateAction();
-
-    // Pop the modal
-    Navigator.of(context).pop(true);
-
-    // Show success message
-    if (embedding != null) {
-      SnackbarUtil.showSuccess(context, 'FAQ created with embedding (${embedding.length} dims)!');
-    } else {
-      SnackbarUtil.showWarning(context, 'FAQ created without embedding - will be generated on first use');
-    }
-  } catch (e) {
-    SnackbarUtil.showError(context, 'Failed to create FAQ: $e');
-  } finally {
-    if (mounted) setState(() => _isSubmitting = false);
   }
-}
-
-//   Future<void> _saveFaq() async {
-//    setState(() => _isSubmitting = true);
-
-//   try {
-//     final db = FirebaseFirestore.instance;
-//     final conversationsSnapshot = await db.collection('conversations').get();
-
-//     if (conversationsSnapshot.docs.isEmpty) {
-//       if (context.mounted) SnackbarUtil.showInfo(context, 'No conversations found.');
-//       return;
-//     }
-
-//     for (final conversationDoc in conversationsSnapshot.docs) {
-//       final conversationId = conversationDoc.id;
-//       final messagesRef = db.collection('conversations').doc(conversationId).collection('messages');
-
-//       bool hasMore = true;
-//       while (hasMore) {
-//         final messagesSnapshot = await messagesRef.limit(100).get();
-
-//         if (messagesSnapshot.docs.isEmpty) {
-//           hasMore = false;
-//           break;
-//         }
-
-//         // Process in smaller batches of 50
-//         for (int i = 0; i < messagesSnapshot.docs.length; i += 50) {
-//           final batch = db.batch();
-//           final end = (i + 50 < messagesSnapshot.docs.length) 
-//               ? i + 50 
-//               : messagesSnapshot.docs.length;
-
-//           for (int j = i; j < end; j++) {
-//             batch.delete(messagesSnapshot.docs[j].reference);
-//           }
-
-//           await batch.commit();
-          
-//           // Small delay to prevent rate limits
-//           await Future.delayed(const Duration(milliseconds: 50));
-//         }
-//       }
-
-//       print('Deleted all messages for conversation $conversationId');
-//     }
-
-//     if (context.mounted) SnackbarUtil.showSuccess(context, 'All messages deleted!');
-//   } catch (e) {
-//     print('Error deleting messages: $e');
-//     if (context.mounted) SnackbarUtil.showError(context, 'Failed to delete messages: $e');
-//   } finally {
-//     if (mounted) setState(() => _isSubmitting = false);
-//   }
-// }
 
   Future<void> _logCreateAction() async {
     try {

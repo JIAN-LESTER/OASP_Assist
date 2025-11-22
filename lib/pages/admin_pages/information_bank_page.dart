@@ -14,6 +14,7 @@ import 'package:capstone_project/pages/admin_pages/widgets/category_dropdown_but
 import 'package:capstone_project/pages/admin_pages/widgets/pagination.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/search_field.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
+import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 import 'package:flutter/material.dart';
 
 class InformationBankPage extends StatefulWidget {
@@ -174,6 +175,7 @@ class DesktopInformationBank extends StatelessWidget {
       onItemsPerPageChanged,
       24.0,
       ib,
+      context,
     );
   }
 }
@@ -212,6 +214,7 @@ class TabletInformationBank extends StatelessWidget {
       onItemsPerPageChanged,
       20.0,
       ib,
+      context,
     );
   }
 }
@@ -305,6 +308,7 @@ class MobileInformationBank extends StatelessWidget {
                           }
 
                           return _buildIBList(
+                            context: context,
                             getAllDocuments: snapshot.data!.docs,
                             selectedCategory: selectedCategory,
                             searchQuery: searchController.text,
@@ -337,6 +341,7 @@ Widget mainContent(
   final ValueChanged<int> onItemsPerPageChanged,
   final double padding,
   final InformationBankData? ib,
+  final BuildContext context,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -398,6 +403,7 @@ Widget mainContent(
                         }
 
                         return _buildIBList(
+                          context: context,
                           getAllDocuments: snapshot.data!.docs,
                           selectedCategory: selectedCategory,
                           searchQuery: searchController.text,
@@ -654,7 +660,32 @@ Widget _buildTableHeader() {
   );
 }
 
+void _showTopRightAlert(BuildContext context, String message, AlertType type) {
+  if (!context.mounted) return;
+  final overlay = Overlay.of(context);
+  late OverlayEntry overlayEntry;
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isMobile = screenWidth < 600;
+  final isTablet = screenWidth >= 600 && screenWidth < 1024;
+
+  overlayEntry = OverlayEntry(
+    builder:
+        (context) => TopRightAlert(
+          message: message,
+          type: type,
+          onDismiss: () => overlayEntry.remove(),
+          isMobile: isMobile,
+          isTablet: isTablet,
+        ),
+  );
+  overlay.insert(overlayEntry);
+  Future.delayed(const Duration(seconds: 4), () {
+    if (overlayEntry.mounted) overlayEntry.remove();
+  });
+}
+
 Widget _buildIBList({
+  required BuildContext context,
   required List<DocumentSnapshot> getAllDocuments,
   required String selectedCategory,
   required String searchQuery,
@@ -798,7 +829,7 @@ Widget _buildIBRow({
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 100),
+          const SizedBox(width: 100),
 
           Expanded(
             flex: 3,
@@ -821,7 +852,7 @@ Widget _buildIBRow({
               ),
             ),
           ),
-          SizedBox(width: isTablet ? 40: 5),
+          SizedBox(width: isTablet ? 40 : 5),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {
@@ -837,7 +868,7 @@ Widget _buildIBRow({
                     await handleComplexDocumentDelete(
                       context,
                       doc,
-                      'information_bank', // ✅ Pass the collection name
+                      'information_bank',
                     );
                   },
                 );

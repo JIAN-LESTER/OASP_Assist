@@ -13,6 +13,7 @@ import 'package:capstone_project/pages/admin_pages/widgets/faq_category_dropdown
 import 'package:capstone_project/pages/admin_pages/widgets/pagination.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/search_field.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
+import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 import 'package:flutter/material.dart';
 
 class FaqManagementPage extends StatefulWidget {
@@ -279,9 +280,10 @@ class MobileFaqManagement extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('faqs')
-                            .snapshots(),
+                        stream:
+                            FirebaseFirestore.instance
+                                .collection('faqs')
+                                .snapshots(),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -296,11 +298,13 @@ class MobileFaqManagement extends StatelessWidget {
                             );
                           }
 
-                          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          if (!snapshot.hasData ||
+                              snapshot.data!.docs.isEmpty) {
                             return const Center(child: Text('No FAQs found.'));
                           }
 
                           return _buildFAQList(
+                            context: context,
                             getAllFAQs: snapshot.data!.docs,
                             selectedCategory: selectedCategory,
                             searchQuery: searchController.text,
@@ -370,9 +374,10 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('faqs')
-                          .snapshots(),
+                      stream:
+                          FirebaseFirestore.instance
+                              .collection('faqs')
+                              .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -392,6 +397,7 @@ Widget mainContent(
                         }
 
                         return _buildFAQList(
+                          context: context,
                           getAllFAQs: snapshot.data!.docs,
                           selectedCategory: selectedCategory,
                           searchQuery: searchController.text,
@@ -422,33 +428,30 @@ Widget _buildMobileHeader(
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'FAQ Management',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Manage questions, answers, and categories',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
+              Text(
+                'FAQ Management',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
-              AddFaqButton(),
+              const SizedBox(height: 4),
+              Text(
+                'Manage questions, answers, and categories',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
             ],
           ),
+          AddFaqButton(),
+        ],
+      ),
     ],
   );
 }
@@ -485,10 +488,7 @@ Widget _buildHeader(
                   const SizedBox(height: 4),
                   Text(
                     'Manage questions, answers, and categories',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -659,7 +659,32 @@ Widget _buildTableHeader() {
   );
 }
 
+void _showTopRightAlert(BuildContext context, String message, AlertType type) {
+  if (!context.mounted) return;
+  final overlay = Overlay.of(context);
+  late OverlayEntry overlayEntry;
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isMobile = screenWidth < 600;
+  final isTablet = screenWidth >= 600 && screenWidth < 1024;
+
+  overlayEntry = OverlayEntry(
+    builder:
+        (context) => TopRightAlert(
+          message: message,
+          type: type,
+          onDismiss: () => overlayEntry.remove(),
+          isMobile: isMobile,
+          isTablet: isTablet,
+        ),
+  );
+  overlay.insert(overlayEntry);
+  Future.delayed(const Duration(seconds: 4), () {
+    if (overlayEntry.mounted) overlayEntry.remove();
+  });
+}
+
 Widget _buildFAQList({
+  required BuildContext context,
   required List<DocumentSnapshot> getAllFAQs,
   required String selectedCategory,
   required String searchQuery,
@@ -668,22 +693,23 @@ Widget _buildFAQList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  final filtered = getAllFAQs.where((doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final question = (data['question'] ?? '').toString().toLowerCase();
-    final category = (data['category'] ?? '').toString().toLowerCase();
+  final filtered =
+      getAllFAQs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final question = (data['question'] ?? '').toString().toLowerCase();
+        final category = (data['category'] ?? '').toString().toLowerCase();
 
-    bool matchesCategory =
-        selectedCategory == 'All Categories' ||
+        bool matchesCategory =
+            selectedCategory == 'All Categories' ||
             category == selectedCategory.toLowerCase();
 
-    bool matchesSearch =
-        searchQuery.isEmpty ||
+        bool matchesSearch =
+            searchQuery.isEmpty ||
             question.contains(searchQuery.toLowerCase()) ||
             category.contains(searchQuery.toLowerCase());
 
-    return matchesCategory && matchesSearch;
-  }).toList();
+        return matchesCategory && matchesSearch;
+      }).toList();
 
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
@@ -699,30 +725,31 @@ Widget _buildFAQList({
   return Column(
     children: [
       Expanded(
-        child: currentPageFAQs.isEmpty
-            ? const Center(
-                child: Text('No FAQs match your search criteria.'),
-              )
-            : ListView.builder(
-                shrinkWrap: false,
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: currentPageFAQs.length,
-                itemBuilder: (context, index) {
-                  final doc = currentPageFAQs[index];
-                  final data = doc.data() as Map<String, dynamic>;
+        child:
+            currentPageFAQs.isEmpty
+                ? const Center(
+                  child: Text('No FAQs match your search criteria.'),
+                )
+                : ListView.builder(
+                  shrinkWrap: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: currentPageFAQs.length,
+                  itemBuilder: (context, index) {
+                    final doc = currentPageFAQs[index];
+                    final data = doc.data() as Map<String, dynamic>;
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _buildIBRow(
-                      context: context,
-                      doc: doc,
-                      question: data['question'] ?? 'N/A',
-                      answer: data['answer'] ?? 'N/A',
-                      category: data['category'] ?? 'General',
-                    ),
-                  );
-                },
-              ),
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildFAQRow(
+                        context: context,
+                        doc: doc,
+                        question: data['question'] ?? 'N/A',
+                        answer: data['answer'] ?? 'N/A',
+                        category: data['category'] ?? 'General',
+                      ),
+                    );
+                  },
+                ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -738,7 +765,7 @@ Widget _buildFAQList({
   );
 }
 
-Widget _buildIBRow({
+Widget _buildFAQRow({
   required BuildContext context,
   required DocumentSnapshot doc,
   required String question,
@@ -826,28 +853,29 @@ Widget _buildIBRow({
                 );
               }
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, size: 18),
-                    SizedBox(width: 8),
-                    Text('Edit'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete, size: 18, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Delete', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
           ),
         ],
       ),
