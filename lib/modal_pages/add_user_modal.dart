@@ -294,17 +294,16 @@ class _AddUserContentState extends State<AddUserContent> {
       return;
     }
 
-   final emailRegex = RegExp(
-  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$'
-);
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
 
-if (!emailRegex.hasMatch(_emailController.text.trim())) {
-  _showTopRightAlert(
-    'Please enter a valid email address',
-    AlertType.warning,
-  );
-  return;
-}
+    if (!emailRegex.hasMatch(_emailController.text.trim())) {
+      _showTopRightAlert(
+        'Please enter a valid email address',
+        AlertType.warning,
+      );
+      return;
+    }
+
     if (_passwordController.text.trim().isEmpty) {
       _showTopRightAlert('Please enter password', AlertType.warning);
       return;
@@ -355,7 +354,6 @@ if (!emailRegex.hasMatch(_emailController.text.trim())) {
         return;
       }
 
-      // Step 2: Create user document in Firestore using the same UID
       try {
         await FirebaseFirestore.instance.collection('users').doc(uid).set({
           'name': fullName,
@@ -371,7 +369,6 @@ if (!emailRegex.hasMatch(_emailController.text.trim())) {
         print('✅ User document created in Firestore');
       } catch (e) {
         print('❌ Failed to create Firestore document: $e');
-        // Try to clean up the auth user if Firestore creation fails
         try {
           await functionsService.deleteUserAuth(uid);
           print('✅ Cleaned up auth user after Firestore failure');
@@ -389,7 +386,6 @@ if (!emailRegex.hasMatch(_emailController.text.trim())) {
         return;
       }
 
-      // Step 3: Log the action
       await _logCreateAction(fullName);
 
       _showTopRightAlert('User created successfully!', AlertType.success);
@@ -532,7 +528,7 @@ if (!emailRegex.hasMatch(_emailController.text.trim())) {
             ),
           ),
 
-          // Content
+          // Scrollable Content
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(
@@ -713,10 +709,8 @@ if (!emailRegex.hasMatch(_emailController.text.trim())) {
                           height: 46,
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              Navigator.of(context).pop(); // Close modal
-                              widget.onNavigateToPage?.call(
-                                12,
-                              ); // Navigate to Programs page
+                              Navigator.of(context).pop();
+                              widget.onNavigateToPage?.call(12);
                             },
                             icon: const Icon(Icons.edit, size: 16),
                             label: const Text('Manage'),
@@ -754,8 +748,7 @@ if (!emailRegex.hasMatch(_emailController.text.trim())) {
                           child: _buildDropdownField(
                             label: 'Affiliation',
                             value: _selectedAffiliation,
-                            items:
-                                _affiliations, // list fetched via _fetchAffiliations()
+                            items: _affiliations,
                             icon: Icons.business_outlined,
                             isEnabled: true,
                             onChanged:
@@ -769,10 +762,8 @@ if (!emailRegex.hasMatch(_emailController.text.trim())) {
                           height: 46,
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              Navigator.of(context).pop(); // Close modal
-                              widget.onNavigateToPage?.call(
-                                11,
-                              ); // Navigate to Affiliations page
+                              Navigator.of(context).pop();
+                              widget.onNavigateToPage?.call(11);
                             },
                             icon: const Icon(Icons.edit, size: 16),
                             label: const Text('Manage'),
@@ -803,12 +794,9 @@ if (!emailRegex.hasMatch(_emailController.text.trim())) {
                           child: _buildDropdownField(
                             label: 'Scholarship',
                             value: _selectedScholarship,
-
-                            items:
-                                _scholarships, // list fetched via _fetchScholarships()
+                            items: _scholarships,
                             icon: Icons.school_outlined,
                             isEnabled: true,
-
                             onChanged:
                                 (value) => setState(
                                   () => _selectedScholarship = value!,
@@ -820,10 +808,8 @@ if (!emailRegex.hasMatch(_emailController.text.trim())) {
                           height: 46,
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              Navigator.of(context).pop(); // Close modal
-                              widget.onNavigateToPage?.call(
-                                9,
-                              ); // Navigate to Scholarship page
+                              Navigator.of(context).pop();
+                              widget.onNavigateToPage?.call(9);
                             },
                             icon: const Icon(Icons.edit, size: 16),
                             label: const Text('Manage'),
@@ -888,17 +874,26 @@ if (!emailRegex.hasMatch(_emailController.text.trim())) {
                         return null;
                       },
                     ),
-
-                    const SizedBox(height: 32),
-
-                    // Action Buttons
-                    _buildActionButtons(),
-
-                    const SizedBox(height: 16),
                   ],
                 ),
               ),
             ),
+          ),
+
+          // Fixed Action Buttons at Bottom
+          Container(
+            padding: EdgeInsets.all(widget.isMobile ? 20 : 28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: _buildActionButtons(),
           ),
         ],
       ),
@@ -928,9 +923,7 @@ if (!emailRegex.hasMatch(_emailController.text.trim())) {
         ),
         const SizedBox(height: 8),
         Container(
-          constraints: const BoxConstraints(
-            maxWidth: double.infinity, // ✅ ensures it doesn’t expand outwards
-          ),
+          constraints: const BoxConstraints(maxWidth: double.infinity),
           decoration: BoxDecoration(
             color: isEnabled ? Colors.white : const Color(0xFFF9FAFB),
             borderRadius: BorderRadius.circular(10),
@@ -950,17 +943,16 @@ if (!emailRegex.hasMatch(_emailController.text.trim())) {
             child: DropdownButtonFormField<String>(
               value: value,
               onChanged: isEnabled ? onChanged : null,
-              isExpanded: true, // ✅ prevents horizontal text overflow
-              alignment: Alignment.centerLeft, // ✅ keeps dropdown aligned
-              menuMaxHeight: 250, // ✅ avoids vertical overflow
+              isExpanded: true,
+              alignment: Alignment.centerLeft,
+              menuMaxHeight: 250,
               items:
                   items.map((String item) {
                     return DropdownMenuItem<String>(
                       value: item,
                       child: Text(
                         item,
-                        overflow:
-                            TextOverflow.ellipsis, // ✅ truncate long names
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 14,
                           color:

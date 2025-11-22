@@ -2,20 +2,17 @@ import 'package:capstone_project/modal_pages/add_edit_scholarship.dart';
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:capstone_project/modal_pages/scholarship_edit.dart';
 import 'package:capstone_project/modal_pages/scholarship_info.dart';
-
 import 'package:capstone_project/pages/admin_pages/buttons/upload_document_button.dart';
-
 import 'package:capstone_project/pages/admin_pages/widgets/pagination.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/provider_dropdown.dart';
-
 import 'package:capstone_project/pages/admin_pages/widgets/search_field.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
+import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 import 'package:flutter/material.dart';
-
-import '../../crud/delete/delete.dart';
 
 class ScholarshipManagementPage extends StatefulWidget {
   const ScholarshipManagementPage({super.key});
@@ -271,7 +268,6 @@ class MobileScholarshipManagement extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header section
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: _buildMobileHeader(
@@ -282,7 +278,6 @@ class MobileScholarshipManagement extends StatelessWidget {
                 sc,
               ),
             ),
-            // Table section with fixed height
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Container(
@@ -404,33 +399,31 @@ Widget _buildMobileHeader(
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // Title
-       Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Scholarship List',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ), 
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Manage scholarship list and its contents',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
+              const Text(
+                'Scholarship List',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
-              Row(children: [UploadDocumentButton(formType: 'scholarship')]),
+              const SizedBox(height: 4),
+              Text(
+                'Manage scholarship list and its contents',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
             ],
           ),
-       const SizedBox(height: 16),
-      // Search and Filter
+          Row(children: [UploadDocumentButton(formType: 'scholarship')]),
+        ],
+      ),
+      const SizedBox(height: 16),
       buildSearchField('scholarship name', searchController),
       const SizedBox(height: 12),
       Row(
@@ -588,6 +581,7 @@ Widget _buildScholarshipRow({
     privileges: privileges,
   );
 }
+
 Widget _buildHeader(
   String selectedProvider,
   List<DocumentSnapshot> allScholarships,
@@ -627,8 +621,6 @@ Widget _buildHeader(
               Row(children: [UploadDocumentButton(formType: 'scholarship')]),
             ],
           ),
-
-          // Stat Cards Section
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Row(
@@ -662,10 +654,7 @@ Widget _buildHeader(
               ],
             ),
           ),
-
           const SizedBox(height: 24),
-
-          // Search and Filter Row
           Row(
             children: [
               Expanded(
@@ -711,10 +700,9 @@ Widget _buildTableHeader() {
                     fontSize: 12,
                     color: Colors.black87,
                   ),
-                  
                 ),
               ),
-               Expanded(
+              Expanded(
                 flex: 3,
                 child: Text(
                   'Eligibility/Requirements',
@@ -815,7 +803,6 @@ Widget _buildExpandableList({
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // First item (always visible)
       Container(
         margin: const EdgeInsets.only(bottom: 4),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -835,30 +822,33 @@ Widget _buildExpandableList({
           overflow: TextOverflow.ellipsis,
         ),
       ),
-      
-      // Expanded items
       if (isExpanded && items.length > 1)
-        ...items.skip(1).map((item) => Container(
-          margin: const EdgeInsets.only(bottom: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.purple[50],
-            border: Border.all(color: Colors.purple[200]!),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            item,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Colors.purple[900],
+        ...items
+            .skip(1)
+            .map(
+              (item) => Container(
+                margin: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.purple[50],
+                  border: Border.all(color: Colors.purple[200]!),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  item,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.purple[900],
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        )),
-      
-      // Toggle button
       if (items.length > 1)
         InkWell(
           onTap: () => onToggle(!isExpanded),
@@ -887,6 +877,313 @@ Widget _buildExpandableList({
         ),
     ],
   );
+}
+
+// ==================== DELETE SCHOLARSHIP MODAL ====================
+void showDeleteScholarshipModal(
+  BuildContext context,
+  DocumentSnapshot scholarshipDoc,
+) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Delete Scholarship',
+    barrierColor: Colors.black.withOpacity(0.6),
+    transitionDuration: const Duration(milliseconds: 250),
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return DeleteScholarshipModal(scholarshipDoc: scholarshipDoc);
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      return ScaleTransition(
+        scale: Tween<double>(begin: 0.9, end: 1.0).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+        ),
+        child: FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+class DeleteScholarshipModal extends StatefulWidget {
+  final DocumentSnapshot scholarshipDoc;
+  const DeleteScholarshipModal({super.key, required this.scholarshipDoc});
+
+  @override
+  State<DeleteScholarshipModal> createState() => _DeleteScholarshipModalState();
+}
+
+class _DeleteScholarshipModalState extends State<DeleteScholarshipModal> {
+  bool _isDeleting = false;
+
+  void _showTopRightAlert(String message, AlertType type) {
+    if (!mounted) return;
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+
+    overlayEntry = OverlayEntry(
+      builder:
+          (context) => TopRightAlert(
+            message: message,
+            type: type,
+            onDismiss: () => overlayEntry.remove(),
+            isMobile: isMobile,
+            isTablet: isTablet,
+          ),
+    );
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 4), () {
+      if (overlayEntry.mounted) overlayEntry.remove();
+    });
+  }
+
+  Future<void> _deleteScholarship() async {
+    setState(() => _isDeleting = true);
+    final data = widget.scholarshipDoc.data() as Map<String, dynamic>;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('scholarships')
+          .doc(widget.scholarshipDoc.id)
+          .delete();
+
+      final currentUser = FirebaseAuth.instance.currentUser;
+      String actorName = 'Unknown';
+      if (currentUser != null) {
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+        }
+      }
+
+      final logRef = FirebaseFirestore.instance.collection('logs').doc();
+      await logRef.set({
+        'logId': logRef.id,
+        'user': actorName,
+        'action': 'Deleted scholarship: ${data['name']}',
+        'time': Timestamp.now(),
+      });
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        _showTopRightAlert(
+          'Scholarship deleted successfully!',
+          AlertType.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+        _showTopRightAlert('Failed to delete scholarship: $e', AlertType.error);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.scholarshipDoc.data() as Map<String, dynamic>;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 420),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with pink background
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(32),
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFEF4444),
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Delete Scholarship',
+                    style: TextStyle(
+                      fontSize: isMobile ? 20 : 24,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1F2937),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Text(
+                    'Are you sure you want to delete this scholarship?',
+                    style: TextStyle(
+                      fontSize: isMobile ? 14 : 16,
+                      color: const Color(0xFF6B7280),
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  // Scholarship Info Box
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9FAFB),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Scholarship:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B7280),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          data['name'] ?? 'Unknown Scholarship',
+                          style: TextStyle(
+                            fontSize: isMobile ? 14 : 16,
+                            color: const Color(0xFF1F2937),
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Action Buttons
+                  _buildDeleteActionButtons(isMobile),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeleteActionButtons(bool isMobile) {
+    double buttonHeight = isMobile ? 40 : 46;
+    double fontSize = isMobile ? 14 : 15;
+    double borderRadius = 10;
+
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: buttonHeight,
+            child: OutlinedButton(
+              onPressed: _isDeleting ? null : () => Navigator.of(context).pop(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF6B7280),
+                side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(borderRadius),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
+              ),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: SizedBox(
+            height: buttonHeight,
+            child: ElevatedButton(
+              onPressed: _isDeleting ? null : _deleteScholarship,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                disabledBackgroundColor: const Color(0xFFFCA5A5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(borderRadius),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
+              ),
+              child:
+                  _isDeleting
+                      ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                      : Text(
+                        'Delete',
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _ScholarshipRowWidget extends StatefulWidget {
@@ -976,7 +1273,8 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                   items: widget.eligibilityRequirements ?? [],
                   emptyText: 'No eligibility',
                   isExpanded: eligibilityExpanded,
-                  onToggle: (value) => setState(() => eligibilityExpanded = value),
+                  onToggle:
+                      (value) => setState(() => eligibilityExpanded = value),
                 ),
               ),
               const SizedBox(width: 8),
@@ -988,42 +1286,39 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                   if (value == 'edit') {
                     showDialog(
                       context: context,
-                      builder: (context) => ScholarshipFormDialog(
-                        doc: widget.doc,
-                        isEdit: true,
-                      ),
+                      builder:
+                          (context) => ScholarshipFormDialog(
+                            doc: widget.doc,
+                            isEdit: true,
+                          ),
                     );
                   } else if (value == 'delete') {
-                    showDeleteConfirmation(
-                      context,
-                      widget.doc,
-                      DeleteConfigs.scholarships,
-                      'scholarships',
-                    );
+                    showDeleteScholarshipModal(context, widget.doc);
                   }
                 },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18),
-                        SizedBox(width: 8),
-                        Text('Delete'),
-                      ],
-                    ),
-                  ),
-                ],
+                itemBuilder:
+                    (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
               ),
             ],
           ),
@@ -1067,10 +1362,7 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         widget.scholarshipProvider,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1086,7 +1378,8 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                 items: widget.eligibilityRequirements ?? [],
                 emptyText: 'No eligibility/requirements',
                 isExpanded: eligibilityExpanded,
-                onToggle: (value) => setState(() => eligibilityExpanded = value),
+                onToggle:
+                    (value) => setState(() => eligibilityExpanded = value),
               ),
             ),
             const SizedBox(width: 16),
@@ -1119,42 +1412,39 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                 if (value == 'edit') {
                   showDialog(
                     context: context,
-                    builder: (context) => ScholarshipFormDialog(
-                      doc: widget.doc,
-                      isEdit: true,
-                    ),
+                    builder:
+                        (context) => ScholarshipFormDialog(
+                          doc: widget.doc,
+                          isEdit: true,
+                        ),
                   );
                 } else if (value == 'delete') {
-                  showDeleteConfirmation(
-                    context,
-                    widget.doc,
-                    DeleteConfigs.scholarships,
-                    'scholarships',
-                  );
+                  showDeleteScholarshipModal(context, widget.doc);
                 }
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18),
-                      SizedBox(width: 8),
-                      Text('Delete'),
-                    ],
-                  ),
-                ),
-              ],
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
             ),
           ],
         ),
@@ -1162,4 +1452,3 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
     );
   }
 }
-

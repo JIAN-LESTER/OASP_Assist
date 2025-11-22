@@ -2,11 +2,13 @@ import 'package:capstone_project/pages/data/charts.dart';
 import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/pagination.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/search_field.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/empty_state.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
+import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
+import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
+import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 import 'package:flutter/material.dart';
 
 class ProgramManagementPage extends StatefulWidget {
@@ -18,11 +20,8 @@ class ProgramManagementPage extends StatefulWidget {
 
 class _ProgramManagementPageState extends State<ProgramManagementPage> {
   final TextEditingController _searchController = TextEditingController();
-
-  // Pagination variables
   int currentPage = 1;
   int itemsPerPage = 10;
-
   bool isLoading = true;
   final StatDataManagement statData = StatDataManagement();
   ProgramData? program;
@@ -36,26 +35,18 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
 
   Future<void> loadStatData() async {
     if (!mounted) return;
-
-    setState(() {
-      isLoading = true;
-    });
-
+    setState(() => isLoading = true);
     try {
       final data = await statData.getProgramData();
-
       if (!mounted) return;
-
       setState(() {
         program = data;
         isLoading = false;
       });
     } catch (e) {
-      print("Error loading information bank data: $e");
+      print("Error loading program data: $e");
       if (!mounted) return;
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
   }
 
@@ -66,18 +57,8 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
     super.dispose();
   }
 
-  void _onSearchChanged() {
-    setState(() {
-      currentPage = 1;
-    });
-  }
-
-  void _goToPage(int page) {
-    setState(() {
-      currentPage = page;
-    });
-  }
-
+  void _onSearchChanged() => setState(() => currentPage = 1);
+  void _goToPage(int page) => setState(() => currentPage = page);
   void _changeItemsPerPage(int newItemsPerPage) {
     setState(() {
       itemsPerPage = newItemsPerPage;
@@ -119,7 +100,6 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
   }
 }
 
-// Desktop Program Management
 class DesktopProgramManagement extends StatelessWidget {
   final TextEditingController searchController;
   final int currentPage;
@@ -153,7 +133,6 @@ class DesktopProgramManagement extends StatelessWidget {
   }
 }
 
-// Tablet Program Management
 class TabletProgramManagement extends StatelessWidget {
   final TextEditingController searchController;
   final int currentPage;
@@ -187,7 +166,6 @@ class TabletProgramManagement extends StatelessWidget {
   }
 }
 
-// Mobile Program Management
 class MobileProgramManagement extends StatelessWidget {
   final TextEditingController searchController;
   final int currentPage;
@@ -213,12 +191,10 @@ class MobileProgramManagement extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header section
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: _buildMobileHeader(searchController, context, program),
             ),
-            // Table section with fixed height
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Container(
@@ -254,18 +230,15 @@ class MobileProgramManagement extends StatelessWidget {
                               child: CircularProgressIndicator(),
                             );
                           }
-
                           if (snapshot.hasError) {
                             return Center(
                               child: Text('Error: ${snapshot.error}'),
                             );
                           }
-
                           if (!snapshot.hasData ||
                               snapshot.data!.docs.isEmpty) {
                             return buildEmptyState(false, false, "programs");
                           }
-
                           return _buildProgramList(
                             allPrograms: snapshot.data!.docs,
                             searchQuery: searchController.text,
@@ -290,13 +263,13 @@ class MobileProgramManagement extends StatelessWidget {
 
 Widget mainContent(
   BuildContext context,
-  final TextEditingController searchController,
-  final int currentPage,
-  final int itemsPerPage,
-  final ValueChanged<int> onPageChanged,
-  final ValueChanged<int> onItemsPerPageChanged,
-  final double padding,
-  final ProgramData? program,
+  TextEditingController searchController,
+  int currentPage,
+  int itemsPerPage,
+  ValueChanged<int> onPageChanged,
+  ValueChanged<int> onItemsPerPageChanged,
+  double padding,
+  ProgramData? program,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -309,7 +282,6 @@ Widget mainContent(
           const SizedBox(height: 16),
           Expanded(
             child: Container(
-              height: MediaQuery.of(context).size.height - 200,
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -341,17 +313,14 @@ Widget mainContent(
                             child: CircularProgressIndicator(),
                           );
                         }
-
                         if (snapshot.hasError) {
                           return Center(
                             child: Text('Error: ${snapshot.error}'),
                           );
                         }
-
                         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                           return buildEmptyState(false, false, "programs");
                         }
-
                         return _buildProgramList(
                           allPrograms: snapshot.data!.docs,
                           searchQuery: searchController.text,
@@ -381,45 +350,33 @@ Widget _buildMobileHeader(
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // Title
       Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Programs Management',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Manage academic programs',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
+              const Text(
+                'Programs Management',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
-              // Updated button using the new component
-              AddProgramButton(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AddEditProgramDialog(onSaved: () {}),
-                  );
-                },
+              const SizedBox(height: 4),
+              Text(
+                'Manage academic programs',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
           ),
-    
+          AddProgramButton(
+            onPressed: () => showAddEditProgramModal(context, null),
+          ),
+        ],
+      ),
       const SizedBox(height: 16),
-      // Search Field
       buildSearchField('Search programs by name', searchController),
     ],
   );
@@ -433,25 +390,16 @@ Widget _buildProgramList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  // Filtering
   final filtered =
       allPrograms.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
         final name = (data['name'] ?? '').toString().toLowerCase();
-
-        // Search filter
-        bool matchesSearch =
-            searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
-
-        return matchesSearch;
+        return searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
       }).toList();
 
-  // Calculate pagination
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
   final safeCurrentPage = currentPage.clamp(1, totalPages);
-
-  // Pagination
   final startIndex = (safeCurrentPage - 1) * itemsPerPage;
   final endIndex = (startIndex + itemsPerPage).clamp(0, filtered.length);
   final currentPagePrograms = filtered.sublist(
@@ -461,7 +409,6 @@ Widget _buildProgramList({
 
   return Column(
     children: [
-      // Program List
       Expanded(
         child:
             currentPagePrograms.isEmpty
@@ -469,15 +416,11 @@ Widget _buildProgramList({
                   child: Text('No programs match your search criteria.'),
                 )
                 : ListView.separated(
-                  shrinkWrap: false,
-                  physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: currentPagePrograms.length,
-                  separatorBuilder:
-                      (context, index) => const SizedBox(height: 8),
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final doc = currentPagePrograms[index];
                     final data = doc.data() as Map<String, dynamic>;
-
                     return _buildProgramRow(
                       context: context,
                       doc: doc,
@@ -487,7 +430,6 @@ Widget _buildProgramList({
                   },
                 ),
       ),
-      // Pagination
       if (totalItems > 0)
         buildPagination(
           currentPage: safeCurrentPage,
@@ -519,188 +461,82 @@ Widget _buildProgramRow({
       border: Border.all(color: Colors.grey[200]!),
       borderRadius: BorderRadius.circular(6),
     ),
-    child: Row(
-      children: [
-        // Icon
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF10B981).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
+    child: InkWell(
+      onTap: () => showProgramInfoModal(context, doc),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.school,
+              color: const Color(0xFF2E7D32),
+              size: isMobile ? 20 : 24,
+            ),
           ),
-          child: Icon(
-            Icons.school,
-            color: const Color(0xFF2E7D32),
-            size: isMobile ? 20 : 24,
-          ),
-        ),
-        const SizedBox(width: 12),
-        // Program Info
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (!isMobile && description.isNotEmpty && description != '-')
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  description,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                   overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
                 ),
-            ],
-          ),
-        ),
-        // Actions
-        SizedBox(width: isTablet ? 60 : 80),
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.more_horiz),
-          onSelected: (value) {
-            if (value == 'edit') {
-              showDialog(
-                context: context,
-                builder:
-                    (context) =>
-                        AddEditProgramDialog(program: doc, onSaved: () {}),
-              );
-            } else if (value == 'delete') {
-              _showDeleteConfirmation(context, doc);
-            }
-          },
-          itemBuilder:
-              (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
+                if (!isMobile && description.isNotEmpty && description != '-')
+                  Text(
+                    description,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
               ],
-        ),
-      ],
+            ),
+          ),
+          SizedBox(width: isTablet ? 60 : 80),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_horiz),
+            onSelected: (value) {
+              if (value == 'edit') {
+                showAddEditProgramModal(context, doc);
+              } else if (value == 'delete') {
+                showDeleteProgramModal(context, doc);
+              }
+            },
+            itemBuilder:
+                (_) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+          ),
+        ],
+      ),
     ),
-  );
-}
-
-void _showDeleteConfirmation(BuildContext context, DocumentSnapshot program) {
-  final data = program.data() as Map<String, dynamic>;
-
-  showDialog(
-    context: context,
-    builder:
-        (context) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.warning, color: const Color(0xFFDC2626), size: 24),
-              const SizedBox(width: 12),
-              const Text(
-                'Delete Program',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          content: Text(
-            'Are you sure you want to delete "${data['name']}"?\n\nThis action cannot be undone.',
-            style: const TextStyle(fontSize: 14, height: 1.5),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF6B7280),
-              ),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  Navigator.of(context).pop(); // Close confirmation dialog
-
-                  await FirebaseFirestore.instance
-                      .collection('programs')
-                      .doc(program.id)
-                      .delete();
-
-                  // Log the action
-                  final currentUser = FirebaseAuth.instance.currentUser;
-                  String actorName = 'Unknown';
-
-                  if (currentUser != null) {
-                    final userDoc =
-                        await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(currentUser.uid)
-                            .get();
-
-                    if (userDoc.exists) {
-                      final userData = userDoc.data() as Map<String, dynamic>;
-                      actorName =
-                          userData['name'] ?? currentUser.email ?? 'Unknown';
-                    }
-                  }
-
-                  final logRef =
-                      FirebaseFirestore.instance.collection('logs').doc();
-                  await logRef.set({
-                    'logId': logRef.id,
-                    'user': actorName,
-                    'action': 'Deleted program: ${data['name']}',
-                    'time': Timestamp.now(),
-                  });
-
-                  // Show success message
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Program deleted successfully'),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  // Show error message
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to delete program: $e')),
-                    );
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFDC2626),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('Delete'),
-            ),
-          ],
-        ),
   );
 }
 
@@ -718,7 +554,6 @@ Widget _buildHeader(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title and Add Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -743,14 +578,8 @@ Widget _buildHeader(
                   ),
                 ],
               ),
-              // Updated button using the new component
               AddProgramButton(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AddEditProgramDialog(onSaved: () {}),
-                  );
-                },
+                onPressed: () => showAddEditProgramModal(context, null),
               ),
             ],
           ),
@@ -798,8 +627,6 @@ Widget _buildHeader(
                       ],
                     ),
           ),
-
-          // Search Row
           buildSearchField('Search programs by name', searchController),
         ],
       );
@@ -868,7 +695,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            SizedBox(width: isTablet ? 60 : 80), // Actions space
+            SizedBox(width: isTablet ? 60 : 80),
           ],
         ),
       );
@@ -876,10 +703,9 @@ Widget _buildTableHeader() {
   );
 }
 
-// AddProgramButton Widget
+// ==================== ADD PROGRAM BUTTON ====================
 class AddProgramButton extends StatelessWidget {
   final VoidCallback? onPressed;
-
   const AddProgramButton({Key? key, this.onPressed}) : super(key: key);
 
   @override
@@ -887,23 +713,19 @@ class AddProgramButton extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         double screenWidth = MediaQuery.of(context).size.width;
-
-        // Using the same breakpoints as ResponsiveLayout
         bool isMobile = screenWidth < 600;
         bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
-        // Responsive dimensions
         double height = isMobile ? 44 : (isTablet ? 46 : 48);
         double fontSize = isMobile ? 13 : (isTablet ? 14 : 15);
         double horizontalPadding = isMobile ? 16 : (isTablet ? 18 : 20);
         double iconSize = isMobile ? 18 : (isTablet ? 20 : 22);
-        double borderRadius = 8;
 
         return Container(
           height: height,
           decoration: BoxDecoration(
-            color: Color(0xFF2E7D32),
-            borderRadius: BorderRadius.circular(borderRadius),
+            color: const Color(0xFF2E7D32),
+            borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
                 color: Colors.grey.withOpacity(0.1),
@@ -916,7 +738,7 @@ class AddProgramButton extends StatelessWidget {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: BorderRadius.circular(borderRadius),
+              borderRadius: BorderRadius.circular(8),
               onTap: onPressed,
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -944,124 +766,662 @@ class AddProgramButton extends StatelessWidget {
   }
 }
 
-// AddEditProgramDialog class
-class AddEditProgramDialog extends StatelessWidget {
-  final DocumentSnapshot? program;
-  final VoidCallback onSaved;
+// ==================== PROGRAM INFO MODAL ====================
+void showProgramInfoModal(BuildContext context, DocumentSnapshot programDoc) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Program Info',
+    barrierColor: Colors.black.withOpacity(0.5),
+    transitionDuration: const Duration(milliseconds: 300),
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return ProgramInfoModal(programDoc: programDoc);
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      return SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.1),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+        ),
+        child: FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        ),
+      );
+    },
+  );
+}
 
-  const AddEditProgramDialog({Key? key, this.program, required this.onSaved})
-    : super(key: key);
+class ProgramInfoModal extends StatelessWidget {
+  final DocumentSnapshot programDoc;
+  const ProgramInfoModal({super.key, required this.programDoc});
+
+  String _formatTimestamp(Timestamp timestamp) {
+    final date = timestamp.toDate();
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final hour =
+        date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+    final amPm = date.hour >= 12 ? 'PM' : 'AM';
+    return '${months[date.month - 1]} ${date.day}, ${date.year} • ${hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')} $amPm';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ResponsiveLayout(
-      mobileBody: _buildModal(context, true, false, false),
-      tabletBody: _buildModal(context, false, true, false),
-      desktopBody: _buildModal(context, false, false, true),
-    );
-  }
-
-  Widget _buildModal(
-    BuildContext context,
-    bool isMobile,
-    bool isTablet,
-    bool isDesktop,
-  ) {
-    final screenSize = MediaQuery.of(context).size;
-    final screenWidth = screenSize.width;
-    final screenHeight = screenSize.height;
-
-    double modalWidth;
-    double modalHeight;
-    EdgeInsets modalPadding;
-
-    if (isMobile) {
-      modalWidth = screenWidth * 0.95;
-      modalHeight = screenHeight * 0.65;
-      modalPadding = const EdgeInsets.all(16);
-    } else if (isTablet) {
-      modalWidth = screenWidth * 0.70;
-      modalHeight = screenHeight * 0.60;
-      modalPadding = const EdgeInsets.all(24);
-    } else {
-      modalWidth = 500;
-      modalHeight = screenHeight * 0.55;
-      modalPadding = const EdgeInsets.all(32);
-    }
+    final data = programDoc.data() as Map<String, dynamic>;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: modalPadding,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          width: modalWidth,
-          height: modalHeight,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 32,
-                offset: const Offset(0, 16),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-            child: AddEditProgramContent(
-              program: program,
-              onSaved: onSaved,
-              isMobile: isMobile,
-              isTablet: isTablet,
-              isDesktop: isDesktop,
+      insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 520),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 32,
+              offset: const Offset(0, 16),
             ),
-          ),
+          ],
         ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(isMobile ? 20 : 24),
+              decoration: const BoxDecoration(
+                color: Color(0xFF2E7D32),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.school,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Program Details',
+                          style: TextStyle(
+                            fontSize: isMobile ? 18 : 20,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Program information',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withOpacity(0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(24),
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.close,
+                          color: Colors.white.withOpacity(0.9),
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(isMobile ? 20 : 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Program Information Section
+                    buildSectionHeader(
+                      'Program Information',
+                      Icons.info_outline,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInfoItem(
+                      Icons.school_outlined,
+                      'Program Name',
+                      data['name'] ?? 'N/A',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInfoItem(
+                      Icons.description_outlined,
+                      'Description',
+                      data['description']?.isNotEmpty == true
+                          ? data['description']
+                          : 'No description provided',
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Metadata Section
+                    buildSectionHeader('Metadata', Icons.access_time),
+                    const SizedBox(height: 12),
+                    if (data['createdAt'] != null)
+                      _buildInfoItem(
+                        Icons.calendar_today_outlined,
+                        'Created',
+                        _formatTimestamp(data['createdAt']),
+                      ),
+                    if (data['updatedAt'] != null) ...[
+                      const SizedBox(height: 8),
+                      _buildInfoItem(
+                        Icons.update_outlined,
+                        'Last Updated',
+                        _formatTimestamp(data['updatedAt']),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            // Actions - Delete (outlined red) left, Edit (filled green) right
+            Container(
+              padding: EdgeInsets.all(isMobile ? 20 : 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          showDeleteProgramModal(context, programDoc);
+                        },
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('Delete'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFDC2626),
+                          side: const BorderSide(
+                            color: Color(0xFFDC2626),
+                            width: 1.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          showAddEditProgramModal(
+                            context,
+                            programDoc,
+                            previousModal: 'info',
+                          );
+                        },
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E7D32),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoItem(IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: const Color(0xFF6B7280)),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+          ),
+          const Spacer(),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1F2937),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
 }
 
-class AddEditProgramContent extends StatefulWidget {
-  final DocumentSnapshot? program;
-  final VoidCallback onSaved;
-  final bool isMobile;
-  final bool isTablet;
-  final bool isDesktop;
-
-  const AddEditProgramContent({
-    Key? key,
-    this.program,
-    required this.onSaved,
-    required this.isMobile,
-    required this.isTablet,
-    required this.isDesktop,
-  }) : super(key: key);
-
-  @override
-  State<AddEditProgramContent> createState() => _AddEditProgramContentState();
+// ==================== DELETE PROGRAM MODAL ====================
+void showDeleteProgramModal(BuildContext context, DocumentSnapshot programDoc) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Delete Program',
+    barrierColor: Colors.black.withOpacity(0.6),
+    transitionDuration: const Duration(milliseconds: 250),
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return DeleteProgramModal(programDoc: programDoc);
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      return ScaleTransition(
+        scale: Tween<double>(begin: 0.9, end: 1.0).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+        ),
+        child: FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        ),
+      );
+    },
+  );
 }
 
-class _AddEditProgramContentState extends State<AddEditProgramContent> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
+class DeleteProgramModal extends StatefulWidget {
+  final DocumentSnapshot programDoc;
+  const DeleteProgramModal({super.key, required this.programDoc});
+
+  @override
+  State<DeleteProgramModal> createState() => _DeleteProgramModalState();
+}
+
+class _DeleteProgramModalState extends State<DeleteProgramModal> {
+  bool _isDeleting = false;
+
+  void _showTopRightAlert(String message, AlertType type) {
+    if (!mounted) return;
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+
+    overlayEntry = OverlayEntry(
+      builder:
+          (context) => TopRightAlert(
+            message: message,
+            type: type,
+            onDismiss: () => overlayEntry.remove(),
+            isMobile: isMobile,
+            isTablet: isTablet,
+          ),
+    );
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 4), () {
+      if (overlayEntry.mounted) overlayEntry.remove();
+    });
+  }
+
+  Future<void> _deleteProgram() async {
+    setState(() => _isDeleting = true);
+    final data = widget.programDoc.data() as Map<String, dynamic>;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('programs')
+          .doc(widget.programDoc.id)
+          .delete();
+
+      final currentUser = FirebaseAuth.instance.currentUser;
+      String actorName = 'Unknown';
+      if (currentUser != null) {
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+        }
+      }
+
+      final logRef = FirebaseFirestore.instance.collection('logs').doc();
+      await logRef.set({
+        'logId': logRef.id,
+        'user': actorName,
+        'action': 'Deleted program: ${data['name']}',
+        'time': Timestamp.now(),
+      });
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        _showTopRightAlert('Program deleted successfully!', AlertType.success);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+        _showTopRightAlert('Failed to delete program: $e', AlertType.error);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.programDoc.data() as Map<String, dynamic>;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 420),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with pink background
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(32),
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFEF4444),
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Delete Program',
+                    style: TextStyle(
+                      fontSize: isMobile ? 20 : 24,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1F2937),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Text(
+                    'Are you sure you want to delete this program?',
+                    style: TextStyle(
+                      fontSize: isMobile ? 14 : 16,
+                      color: const Color(0xFF6B7280),
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  // Program Info Box
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9FAFB),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Program:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B7280),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          data['name'] ?? 'Unknown Program',
+                          style: TextStyle(
+                            fontSize: isMobile ? 14 : 16,
+                            color: const Color(0xFF1F2937),
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Action Buttons
+                  _buildDeleteActionButtons(isMobile),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeleteActionButtons(bool isMobile) {
+    double buttonHeight = isMobile ? 40 : 46;
+    double fontSize = isMobile ? 14 : 15;
+    double borderRadius = 10;
+
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: buttonHeight,
+            child: OutlinedButton(
+              onPressed: _isDeleting ? null : () => Navigator.of(context).pop(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF6B7280),
+                side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(borderRadius),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
+              ),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: SizedBox(
+            height: buttonHeight,
+            child: ElevatedButton(
+              onPressed: _isDeleting ? null : _deleteProgram,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                disabledBackgroundColor: const Color(0xFFFCA5A5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(borderRadius),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
+              ),
+              child:
+                  _isDeleting
+                      ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                      : Text(
+                        'Delete',
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==================== ADD/EDIT PROGRAM MODAL ====================
+void showAddEditProgramModal(
+  BuildContext context,
+  DocumentSnapshot? programDoc, {
+  String? previousModal,
+}) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: programDoc == null ? 'Add Program' : 'Edit Program',
+    barrierColor: Colors.black.withOpacity(0.5),
+    transitionDuration: const Duration(milliseconds: 300),
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return AddEditProgramModal(
+        programDoc: programDoc,
+        previousModal: previousModal,
+      );
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      return SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.1),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+        ),
+        child: FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+class AddEditProgramModal extends StatefulWidget {
+  final DocumentSnapshot? programDoc;
+  final String? previousModal;
+  const AddEditProgramModal({super.key, this.programDoc, this.previousModal});
+
+  @override
+  State<AddEditProgramModal> createState() => _AddEditProgramModalState();
+}
+
+class _AddEditProgramModalState extends State<AddEditProgramModal> {
+  late TextEditingController _nameController;
+  late TextEditingController _descriptionController;
   bool _isSubmitting = false;
+
+  bool get isEditing => widget.programDoc != null;
 
   @override
   void initState() {
     super.initState();
-    if (widget.program != null) {
-      final data = widget.program!.data() as Map<String, dynamic>;
-      _nameController.text = data['name'] ?? '';
-      _descriptionController.text = data['description'] ?? '';
+    if (widget.programDoc != null) {
+      final data = widget.programDoc!.data() as Map<String, dynamic>;
+      _nameController = TextEditingController(text: data['name'] ?? '');
+      _descriptionController = TextEditingController(
+        text: data['description'] ?? '',
+      );
+    } else {
+      _nameController = TextEditingController();
+      _descriptionController = TextEditingController();
     }
   }
 
@@ -1072,15 +1432,33 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
     super.dispose();
   }
 
-  bool get isEditing => widget.program != null;
+  void _showTopRightAlert(String message, AlertType type) {
+    if (!mounted) return;
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+
+    overlayEntry = OverlayEntry(
+      builder:
+          (context) => TopRightAlert(
+            message: message,
+            type: type,
+            onDismiss: () => overlayEntry.remove(),
+            isMobile: isMobile,
+            isTablet: isTablet,
+          ),
+    );
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 4), () {
+      if (overlayEntry.mounted) overlayEntry.remove();
+    });
+  }
 
   Future<void> _saveProgram() async {
-    if (!_formKey.currentState!.validate()) return;
-
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a program name')),
-      );
+      _showTopRightAlert('Please enter a program name', AlertType.warning);
       return;
     }
 
@@ -1096,7 +1474,7 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
       if (isEditing) {
         await FirebaseFirestore.instance
             .collection('programs')
-            .doc(widget.program!.id)
+            .doc(widget.programDoc!.id)
             .update(programData);
       } else {
         programData['createdAt'] = Timestamp.now();
@@ -1105,17 +1483,14 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
             .add(programData);
       }
 
-      // Log the action
       final currentUser = FirebaseAuth.instance.currentUser;
       String actorName = 'Unknown';
-
       if (currentUser != null) {
         final userDoc =
             await FirebaseFirestore.instance
                 .collection('users')
                 .doc(currentUser.uid)
                 .get();
-
         if (userDoc.exists) {
           final userData = userDoc.data() as Map<String, dynamic>;
           actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
@@ -1131,237 +1506,339 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
         'time': Timestamp.now(),
       });
 
-      widget.onSaved();
-
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Program ${isEditing ? 'updated' : 'created'} successfully!',
-            ),
-          ),
+        _showTopRightAlert(
+          'Program ${isEditing ? 'updated' : 'created'} successfully!',
+          AlertType.success,
         );
-        Navigator.of(context).pop();
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) Navigator.of(context).pop();
+        });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to ${isEditing ? 'update' : 'create'} program: $e',
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
         setState(() => _isSubmitting = false);
+        _showTopRightAlert(
+          'Failed to ${isEditing ? 'update' : 'create'} program: $e',
+          AlertType.error,
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    return Dialog(
       backgroundColor: Colors.transparent,
-      body: Column(
-        children: [
-          // Header
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(widget.isMobile ? 20 : 24),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2E7D32),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
+      insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 550),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 32,
+              offset: const Offset(0, 16),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isEditing ? 'Edit Program' : 'Add New Program',
-                        style: TextStyle(
-                          fontSize: widget.isMobile ? 18 : 20,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        isEditing
-                            ? 'Update program information'
-                            : 'Create a new academic program',
-                        style: TextStyle(
-                          fontSize: widget.isMobile ? 13 : 14,
-                          color: Colors.white.withOpacity(0.9),
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      child: Icon(Icons.close, color: Colors.white, size: 22),
-                    ),
-                  ),
-                ),
-              ],
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
-          ),
-
-          // Content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: widget.isMobile ? 20 : 28,
-                vertical: widget.isMobile ? 20 : 28,
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(isMobile ? 20 : 28),
+                decoration: const BoxDecoration(color: Color(0xFF2E7D32)),
+                child: Row(
                   children: [
-                    // Program Name Field
-                    TextFormField(
-                      controller: _nameController,
-                      decoration: InputDecoration(
-                        labelText: 'Program Name',
-                        hintText:
-                            'e.g., Bachelor of Science in Information Technology',
-                        prefixIcon: const Icon(Icons.school_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter a program name';
-                        }
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Program Description Field
-                    TextFormField(
-                      controller: _descriptionController,
-                      decoration: InputDecoration(
-                        labelText: 'Description (Optional)',
-                        hintText: 'Enter a brief description of the program...',
-                        prefixIcon: const Icon(Icons.description_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      maxLines: 3,
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Action Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed:
-                                _isSubmitting
-                                    ? null
-                                    : () => Navigator.of(context).pop(),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF6B7280),
-                              side: const BorderSide(
-                                color: Color(0xFFD1D5DB),
-                                width: 1.5,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                            child: const Text(
-                              'Cancel',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
+                    if (widget.previousModal == 'info') ...[
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(24),
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            Future.delayed(
+                              const Duration(milliseconds: 200),
+                              () {
+                                showProgramInfoModal(
+                                  context,
+                                  widget.programDoc!,
+                                );
+                              },
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Icon(
+                              Icons.arrow_back,
+                              color: Colors.white.withOpacity(0.9),
+                              size: 24,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _isSubmitting ? null : _saveProgram,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2E7D32),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              disabledBackgroundColor: const Color(0xFFE5E7EB),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        isEditing
+                            ? Icons.edit_document
+                            : Icons.add_circle_outline,
+                        color: Colors.white,
+                        size: isMobile ? 24 : 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isEditing ? 'Edit Program' : 'Add New Program',
+                            style: TextStyle(
+                              fontSize: isMobile ? 20 : 24,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
                             ),
-                            child:
-                                _isSubmitting
-                                    ? const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                                  Colors.white,
-                                                ),
-                                          ),
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'Saving...',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    )
-                                    : Text(
-                                      isEditing
-                                          ? 'Update Program'
-                                          : 'Create Program',
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isEditing
+                                ? 'Update program information'
+                                : 'Create a new academic program',
+                            style: TextStyle(
+                              fontSize: isMobile ? 14 : 16,
+                              color: Colors.white.withOpacity(0.85),
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(24),
+                        onTap: () => Navigator.of(context).pop(),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          child: Icon(
+                            Icons.close,
+                            color: Colors.white.withOpacity(0.9),
+                            size: 24,
                           ),
                         ),
-                      ],
+                      ),
                     ),
-
-                    const SizedBox(height: 16),
                   ],
                 ),
               ),
-            ),
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(isMobile ? 20 : 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      buildSectionHeader(
+                        'Program Information',
+                        Icons.school_outlined,
+                      ),
+                      const SizedBox(height: 16),
+                      buildTextField(
+                        controller: _nameController,
+                        label: 'Program Name',
+                        hint:
+                            'e.g., Bachelor of Science in Information Technology',
+                        icon: Icons.school_outlined,
+                        isMobile: isMobile,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildDescriptionField(),
+                    ],
+                  ),
+                ),
+              ),
+              // Actions
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    top: BorderSide(color: const Color(0xFFE5E7EB), width: 1),
+                  ),
+                ),
+                padding: EdgeInsets.all(isMobile ? 20 : 28),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: isMobile ? 44 : 48,
+                        child: OutlinedButton(
+                          onPressed:
+                              _isSubmitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF6B7280),
+                            side: const BorderSide(
+                              color: Color(0xFFD1D5DB),
+                              width: 1.5,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: isMobile ? 44 : 48,
+                        child: ElevatedButton(
+                          onPressed: _isSubmitting ? null : _saveProgram,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E7D32),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            disabledBackgroundColor: const Color(0xFFE5E7EB),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child:
+                              _isSubmitting
+                                  ? Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _isSubmitting ? 'Saving...' : '',
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                  : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.save_outlined, size: 18),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        isEditing
+                                            ? 'Save Changes'
+                                            : 'Create Program',
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildDescriptionField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Description (Optional)',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF374151),
+            letterSpacing: -0.1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: TextField(
+            controller: _descriptionController,
+            maxLines: 4,
+            decoration: InputDecoration(
+              hintText: 'Enter a brief description of the program...',
+              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.only(left: 12, right: 8, bottom: 60),
+                child: Icon(
+                  Icons.description_outlined,
+                  color: const Color(0xFF9CA3AF),
+                  size: 20,
+                ),
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+            style: const TextStyle(fontSize: 14, color: Color(0xFF1F2937)),
+          ),
+        ),
+      ],
     );
   }
 }
