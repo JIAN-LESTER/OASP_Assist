@@ -1,21 +1,91 @@
 // Add this to your main.dart or root widget where you initialize NotificationService
 
 import 'package:capstone_project/icon_and_color.dart';
+import 'package:capstone_project/main.dart';
 import 'package:capstone_project/services/notification_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationNavigationHandler {
   final GlobalKey<NavigatorState> navigatorKey;
+  String? _cachedUserRole; // ✅ Cache the role
 
   NotificationNavigationHandler(this.navigatorKey);
 
-  // Call this during app initialization
   void setup() {
     NotificationService().setNavigationHandler(_handleNavigation);
+    _initializeUserRole(); // ✅ Initialize role on setup
+    _listenToRoleChanges(); // ✅ Start listening to role changes
+    print('✅ Navigation handler registered');
   }
 
-  void _handleNavigation(String type, Map<String, dynamic> data) {
+  Future<void> initializeServices() async {
+  try {
+    print('🚀 Initializing services...');
+    
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    print('✅ Background handler registered');
+    
+    await NotificationService().initialize(); // ✅ Make this await
+    print('✅ Notifications ready');
+    
+    NotificationNavigationHandler(navigatorKey).setup();
+    
+    print('✅ Core services initialized');
+  } catch (e, stackTrace) {
+    print('⚠️ Service init warning: $e');
+    print('Stack: $stackTrace');
+  }
+}
+// Add to your initialization
+  Future<void> _initializeUserRole() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        
+        if (userDoc.exists) {
+          _cachedUserRole = userDoc.data()?['role'] ?? 'user';
+          print('✅ Cached user role: $_cachedUserRole');
+        }
+      }
+    } catch (e) {
+      print('⚠️ Error caching user role: $e');
+      _cachedUserRole = 'user'; // Safe fallback
+    }
+  }
+
+   Future<String> _getUserRole() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        return _cachedUserRole ?? 'user';
+      }
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      if (userDoc.exists) {
+        final role = userDoc.data()?['role'] ?? 'user';
+        _cachedUserRole = role; // Update cache
+        return role;
+      }
+      
+      return _cachedUserRole ?? 'user';
+    } catch (e) {
+      print('⚠️ Error fetching role, using cache: $e');
+      return _cachedUserRole ?? 'user'; // Fallback to cache
+    }
+  }
+    void _handleNavigation(String type, Map<String, dynamic> data) {
     final context = navigatorKey.currentContext;
     if (context == null) {
       print('⚠️ No navigator context available');
@@ -39,27 +109,93 @@ class NotificationNavigationHandler {
         break;
     }
   }
+ void _listenToRoleChanges() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots()
+          .listen((doc) async {
+        if (doc.exists) {
+          final newRole = doc.data()?['role'] ?? 'user';
+          _cachedUserRole = newRole;
+          
+          // ✅ Also update SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_role', newRole);
+          
+          print('🔄 Role updated in real-time: $_cachedUserRole');
+        }
+      });
+    }
+  }
+
 
   // Staff: Navigate to escalation detail
-  void _navigateToEscalationDetail(
-    BuildContext context,
-    Map<String, dynamic> data,
-  ) {
+  void _navigateToEscalationDetail(BuildContext context, Map<String, dynamic> data) async {
     final escalationId = data['escalationId'];
     if (escalationId == null || escalationId.isEmpty) {
       print('⚠️ No escalation ID provided');
       return;
     }
 
-    // Navigate to Human Escalation screen with the specific escalation
-    Navigator.of(context).pushNamed(
-      '/staff/escalations', // Your staff escalation route
-      arguments: {
-        'escalationId': escalationId,
-        'autoOpen': true, // Flag to auto-open the dialog
-      },
-    );
+    LoadingOverlay.show(context, message: 'Loading escalation...');
+
+    try {
+      // ✅ Use improved role getter with cache fallback
+      final role = await _getUserRole();
+      
+      print('📍 User role determined: $role');
+      
+      // ✅ Navigate based on actual role
+      String route;
+      int tabIndex;
+      
+      if (role == 'admin') {
+        route = '/admin/home';
+        tabIndex = 5;
+      } else if (role == 'staff') {
+        route = '/staff/home';
+        tabIndex = 2;
+      } else {
+        // ✅ Users shouldn't access escalations
+        LoadingOverlay.hide(context);
+        _showErrorDialog(context, 'You do not have permission to view escalations');
+        return;
+      }
+      
+      print('📍 Navigating $role to escalations (route: $route, tab: $tabIndex)');
+      
+      LoadingOverlay.hide(context);
+      
+      // ✅ Use small delay to ensure overlay is hidden
+      await Future.delayed(Duration(milliseconds: 100));
+      
+      if (context.mounted) {
+        Navigator.of(context).pushReplacementNamed(
+          route,
+          arguments: {
+            'initialTab': tabIndex,
+            'escalationId': escalationId,
+            'autoOpen': true,
+          },
+        );
+      }
+    } catch (e) {
+      print('❌ Error in escalation navigation: $e');
+      LoadingOverlay.hide(context);
+      
+      // ✅ Better error handling - don't navigate on error
+      if (context.mounted) {
+        _showErrorDialog(
+          context, 
+          'Failed to load escalation. Please check your connection and try again.'
+        );
+      }
+    }
   }
+
 
   // User: Show escalation response dialog
   Future<void> _showEscalationResponse(

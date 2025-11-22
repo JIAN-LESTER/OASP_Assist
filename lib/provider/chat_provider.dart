@@ -1131,110 +1131,127 @@ Future<void> _ensureFAQCacheLoaded() async {
   }
 
   Future<void> _checkAndPromoteToFAQOptimized(
-    String question,
-    List<double> currentEmbedding,
-    String botAnswer,
-    String category,
-  ) async {
-    try {
-      // Only process if answer and question are worthy
-      if (!_isAnswerWorthyOfFAQ(botAnswer) ||
-          !_isQuestionWorthyOfFAQ(question)) {
-        return;
-      }
-
-      final querySnapshot =
-          await _firestore
-              .collectionGroup('messages')
-              .where('sender', isEqualTo: 'user')
-              .where('isAnswered', isEqualTo: true)
-              .where('category', isEqualTo: category)
-              .orderBy('sent_at', descending: true)
-              .limit(50)
-              .get();
-
-      Map<String, QuestionGroup> questionGroups = {};
-
-      for (var doc in querySnapshot.docs) {
-        final data = doc.data();
-        final pastQuestion = data['content'] as String?;
-        final pastEmbeddingData = data['embedding'];
-
-        if (pastQuestion == null || pastEmbeddingData == null) continue;
-        if (!_isQuestionWorthyOfFAQ(pastQuestion)) continue;
-
-        try {
-          final pastEmbedding =
-              (pastEmbeddingData as List)
-                  .map((e) => (e as num).toDouble())
-                  .toList();
-
-          if (pastEmbedding.length != currentEmbedding.length) continue;
-
-          final similarity = cosineSimilarity(currentEmbedding, pastEmbedding);
-
-          if (similarity > 0.90) {
-            final contextKey = _extractContextualKey(pastQuestion);
-            final groupKey = '${category}_$contextKey';
-
-            questionGroups.putIfAbsent(groupKey, () => QuestionGroup());
-            questionGroups[groupKey]!.addQuestion(
-              pastQuestion,
-              data,
-              similarity,
-            );
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      // Promote groups that meet the threshold
-      final batch = _firestore.batch();
-      bool hasBatchOperations = false;
-
-      for (var group in questionGroups.values) {
-        if (group.questionCount >= 5 && group.averageSimilarity > 0.92) {
-          final representativeQuestion = group.getMostRepresentativeQuestion();
-
-          final existing =
-              await _firestore
-                  .collection('faqs')
-                  .where('question', isEqualTo: representativeQuestion)
-                  .limit(1)
-                  .get();
-
-          if (existing.docs.isEmpty) {
-            final faqRef = _firestore.collection('faqs').doc();
-            final faqData = {
-              'question': representativeQuestion,
-              'answer': botAnswer,
-              'category': category,
-              'isPredefined': false,
-              'createdAt': Timestamp.now(),
-              'embedding': currentEmbedding,
-              'promotionReason':
-                  'Auto-promoted after ${group.questionCount} similar questions',
-              'similarityCount': group.questionCount,
-              'averageSimilarity': group.averageSimilarity,
-            };
-
-            batch.set(faqRef, faqData);
-            hasBatchOperations = true;
-
-            print('Auto-adding FAQ: $representativeQuestion');
-          }
-        }
-      }
-
-      if (hasBatchOperations) {
-        await batch.commit();
-        FAQCache.lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(0);
-      }
-    } catch (e) {
-      print('Error in FAQ promotion: $e');
+  String question,
+  List<double> currentEmbedding,
+  String botAnswer,
+  String category,
+) async {
+  try {
+    // Only process if answer and question are worthy
+    if (!_isAnswerWorthyOfFAQ(botAnswer) ||
+        !_isQuestionWorthyOfFAQ(question)) {
+      return;
     }
+
+    // ✅ NEW: Calculate date 30 days ago
+    final oneMonthAgo = DateTime.now().subtract(Duration(days: 30));
+    final oneMonthAgoTimestamp = Timestamp.fromDate(oneMonthAgo);
+
+    // ✅ UPDATED: Query messages from the last 30 days only
+    final querySnapshot = await _firestore
+        .collectionGroup('messages')
+        .where('sender', isEqualTo: 'user')
+        .where('isAnswered', isEqualTo: true)
+        .where('category', isEqualTo: category)
+        .where('sent_at', isGreaterThanOrEqualTo: oneMonthAgoTimestamp)
+        .orderBy('sent_at', descending: true)
+        .limit(100) // Increased limit to capture more data
+        .get();
+
+    Map<String, QuestionGroup> questionGroups = {};
+
+    for (var doc in querySnapshot.docs) {
+      final data = doc.data();
+      final pastQuestion = data['content'] as String?;
+      final pastEmbeddingData = data['embedding'];
+
+      if (pastQuestion == null || pastEmbeddingData == null) continue;
+      if (!_isQuestionWorthyOfFAQ(pastQuestion)) continue;
+
+      try {
+        final pastEmbedding = (pastEmbeddingData as List)
+            .map((e) => (e as num).toDouble())
+            .toList();
+
+        if (pastEmbedding.length != currentEmbedding.length) continue;
+
+        final similarity = cosineSimilarity(currentEmbedding, pastEmbedding);
+
+        // ✅ Slightly lower similarity threshold to capture more variations
+        if (similarity > 0.88) {
+          final contextKey = _extractContextualKey(pastQuestion);
+          final groupKey = '${category}_$contextKey';
+
+          questionGroups.putIfAbsent(groupKey, () => QuestionGroup());
+          questionGroups[groupKey]!.addQuestion(
+            pastQuestion,
+            data,
+            similarity,
+          );
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    // ✅ UPDATED: Promote groups with more than 10 questions in the last month
+    final batch = _firestore.batch();
+    bool hasBatchOperations = false;
+
+    for (var group in questionGroups.values) {
+      // ✅ NEW THRESHOLD: More than 10 questions with avg similarity > 0.90
+      if (group.questionCount > 10 && group.averageSimilarity > 0.90) {
+        final representativeQuestion = group.getMostRepresentativeQuestion();
+
+        final existing = await _firestore
+            .collection('faqs')
+            .where('question', isEqualTo: representativeQuestion)
+            .limit(1)
+            .get();
+
+        if (existing.docs.isEmpty) {
+          final faqRef = _firestore.collection('faqs').doc();
+          final faqData = {
+            'question': representativeQuestion,
+            'answer': botAnswer,
+            'category': category,
+            'isPredefined': false,
+            'createdAt': Timestamp.now(),
+            'embedding': currentEmbedding,
+            'promotionReason':
+                'Auto-promoted: ${group.questionCount} similar questions in last 30 days',
+            'similarityCount': group.questionCount,
+            'averageSimilarity': group.averageSimilarity,
+            'promotionPeriod': '30_days',
+            'promotionDate': Timestamp.now(),
+          };
+
+          batch.set(faqRef, faqData);
+          hasBatchOperations = true;
+
+          print('🎯 Auto-adding FAQ: $representativeQuestion');
+          print('   Questions in group: ${group.questionCount}');
+          print('   Average similarity: ${group.averageSimilarity.toStringAsFixed(3)}');
+          print('   Category: $category');
+        }
+      } else if (group.questionCount > 5) {
+        // ✅ Log near-threshold groups for monitoring
+        print('📊 Question group approaching threshold:');
+        print('   Context: ${_extractContextualKey(group.questions.first)}');
+        print('   Count: ${group.questionCount}/11 (need >10)');
+        print('   Avg similarity: ${group.averageSimilarity.toStringAsFixed(3)}');
+      }
+    }
+
+    if (hasBatchOperations) {
+      await batch.commit();
+      FAQCache.lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(0);
+      print('✅ FAQ promotion batch committed successfully');
+    }
+  } catch (e) {
+    print('❌ Error in FAQ promotion: $e');
   }
+}
 
   String _extractContextualKey(String question) {
     final lowercaseQuestion = question.toLowerCase();

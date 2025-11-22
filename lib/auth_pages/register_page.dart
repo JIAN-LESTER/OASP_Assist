@@ -132,31 +132,83 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
-  Future<bool> _isEmailTaken(String email) async {
+ Future<bool> _isEmailTaken(String email) async {
+  try {
+    // Check Firebase Auth first (most authoritative source)
     try {
-      // OPTIMIZED: Reduced timeout and use cache first
-      final querySnapshot = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: email.trim())
-          .limit(1)
-          .get(const GetOptions(source: Source.cache))
-          .timeout(const Duration(seconds: 2))
-          .catchError((_) async {
-            // If cache fails, try server
-            return await _firestore
-                .collection('users')
-                .where('email', isEqualTo: email.trim())
-                .limit(1)
-                .get()
-                .timeout(const Duration(seconds: 3));
-          });
+      // Use dynamic invocation to remain compatible with different firebase_auth SDK versions
+      List<String> signInMethods = [];
+      try {
+        final result = await (FirebaseAuth.instance as dynamic)
+            .fetchSignInMethodsForEmail(email.trim())
+            .timeout(const Duration(seconds: 5));
+        signInMethods = List<String>.from(result as List);
+      } on NoSuchMethodError {
+        // Method not available in this firebase_auth SDK version
+        print('⚠️ fetchSignInMethodsForEmail not available in firebase_auth SDK');
+      }
 
-      return querySnapshot.docs.isNotEmpty;
+      // If Auth returns sign-in methods, email is actively used
+      if (signInMethods.isNotEmpty) {
+        print('✅ Email found in Firebase Auth: $email');
+        return true;
+      }
+
+      print('⚠️ Email NOT in Firebase Auth: $email');
+    } on FirebaseAuthException catch (e) {
+      // If we get 'invalid-email', the email format is wrong
+      if (e.code == 'invalid-email') {
+        print('❌ Invalid email format: $email');
+        return false;
+      }
+      // Other Auth errors - continue to Firestore check
+      print('⚠️ Auth check error: ${e.code}');
     } catch (e) {
-      print('Error checking email in Firestore: $e');
-      return false; // Assume not taken if check fails
+      print('⚠️ Auth check timeout/error: $e');
     }
+
+    // If not in Auth, check Firestore (might be orphaned data)
+    print('🔍 Checking Firestore for: $email');
+    final querySnapshot = await _firestore
+        .collection('users')
+        .where('email', isEqualTo: email.trim())
+        .limit(1)
+        .get(const GetOptions(source: Source.cache))
+        .timeout(const Duration(seconds: 2))
+        .catchError((_) async {
+          return await _firestore
+              .collection('users')
+              .where('email', isEqualTo: email.trim())
+              .limit(1)
+              .get()
+              .timeout(const Duration(seconds: 3));
+        });
+
+    if (querySnapshot.docs.isNotEmpty) {
+      print('⚠️ Email found in Firestore but not in Auth (orphaned): $email');
+      
+      // OPTIONAL: Clean up orphaned document
+      try {
+        final docId = querySnapshot.docs.first.id;
+        await _firestore.collection('users').doc(docId).delete();
+        print('🗑️ Cleaned up orphaned Firestore document for: $email');
+        return false; // Email is now available
+      } catch (e) {
+        print('❌ Failed to cleanup orphaned doc: $e');
+        // If we can't clean it up, consider it taken to be safe
+        return true;
+      }
+    }
+
+    print('✅ Email is available: $email');
+    return false;
+
+  } catch (e) {
+    print('❌ Error checking email: $e');
+    // On error, assume email is available to allow registration attempt
+    return false;
   }
+}
 
   // Validate email
   Future<bool> _validateEmail(String email) async {
@@ -362,7 +414,8 @@ class _RegisterPageState extends State<RegisterPage> {
           _setPasswordError('The password provided is too weak');
           break;
         case 'email-already-in-use':
-          _setEmailError('An account already exists for this email');
+          // More helpful message
+          _setEmailError('This email is already registered. Try signing in instead.');
           break;
         case 'invalid-email':
           _setEmailError('Invalid email address');
@@ -374,9 +427,9 @@ class _RegisterPageState extends State<RegisterPage> {
           _setGeneralError('Network error. Please check your connection');
           break;
         default:
-          _setGeneralError(e.message ?? 'Registration failed');
+          _setGeneralError(e.message ?? 'Registration failed. Please try again.');
       }
-    } on TimeoutException catch (e) {
+    }on TimeoutException catch (e) {
       print('❌ Timeout: $e');
 
       if (mounted) setState(() => _isLoading = false);
@@ -655,130 +708,7 @@ void _showVerificationDialog(User user) {
 
                       SizedBox(height: isSmallScreen ? 8 : 10),
 
-                      // Secondary button - Resend Email
-                      SizedBox(
-                        width: double.infinity,
-                        height: buttonHeight,
-                        child: OutlinedButton.icon(
-                          icon: Icon(
-                            Icons.refresh,
-                            size: isSmallScreen ? 16 : 18,
-                          ),
-                          label: Text(
-                            'Resend Email',
-                            style: TextStyle(
-                              fontFamily: primaryFontFamily,
-                              fontSize: bodySize + 1,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: primaryColor,
-                            side: BorderSide(
-                              color: primaryColor.withOpacity(0.3),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: () async {
-                            print('🔵 Resend Email pressed');
-                            try {
-                              final currentUser = FirebaseAuth.instance.currentUser;
-
-                              if (currentUser != null) {
-                                await currentUser
-                                    .sendEmailVerification()
-                                    .timeout(const Duration(seconds: 5));
-                                print('✅ Email resent');
-
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Row(
-                                        children: const [
-                                          Icon(
-                                            Icons.check_circle,
-                                            color: Colors.white,
-                                          ),
-                                          SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              'Verification email sent!',
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      backgroundColor: Colors.green,
-                                      duration: const Duration(seconds: 4),
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                  );
-                                }
-                              } else {
-                                print('⚠️ No user signed in');
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Row(
-                                        children: const [
-                                          Icon(
-                                            Icons.info_outline,
-                                            color: Colors.white,
-                                          ),
-                                          SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              'Please sign in to resend email.',
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      backgroundColor: Colors.orange,
-                                      duration: const Duration(seconds: 4),
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                  );
-                                }
-                              }
-                            } catch (e) {
-                              print('❌ Resend error: $e');
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Row(
-                                      children: const [
-                                        Icon(
-                                          Icons.error_outline,
-                                          color: Colors.white,
-                                        ),
-                                        SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            'Failed to resend email.',
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    backgroundColor: Colors.red,
-                                    duration: const Duration(seconds: 4),
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                        ),
-                      ),
+                     
                     ],
                   ),
                 ),

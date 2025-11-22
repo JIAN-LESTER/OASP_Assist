@@ -384,73 +384,75 @@ void dispose() {
   }
 
   void _showUploadOptionsBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                offset: Offset(0, -2),
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(height: 12),
+              Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(3),
+                ),
               ),
-            ],
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(height: 12),
-                Container(
-                  width: 48,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-                SizedBox(height: 24),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Choose Input Method',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1F2937),
-                          letterSpacing: -0.5,
-                        ),
+              SizedBox(height: 24),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Choose Input Method',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1F2937),
+                        letterSpacing: -0.5,
                       ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Select how you want to add admission information',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF6B7280),
-                        ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Select how you want to add admission information',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF6B7280),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                SizedBox(height: 24),
-                _buildUploadOption(
-                  icon: Icons.insert_drive_file_outlined,
-                  title: 'Upload Document',
-                  subtitle: 'PDF, TXT, DOC, DOCX',
-                  color: Color(0xFF2E7D32),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickFile();
-                  },
-                ),
+              ),
+              SizedBox(height: 24),
+              _buildUploadOption(
+                icon: Icons.insert_drive_file_outlined,
+                title: 'Upload Document',
+                subtitle: 'PDF, TXT, DOC, DOCX',
+                color: Color(0xFF2E7D32),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickFile();
+                },
+              ),
+              // Only show gallery option if NOT Web or Desktop
+              if (!kIsWeb && !(Platform.isWindows || Platform.isLinux || Platform.isMacOS))
                 _buildUploadOption(
                   icon: Icons.photo_library_outlined,
                   title: 'Choose from Gallery',
@@ -461,32 +463,33 @@ void dispose() {
                     _pickImageFromGallery();
                   },
                 ),
-                if (!kIsWeb && !Platform.isWindows)
-                  _buildUploadOption(
-                    icon: Icons.camera_alt_outlined,
-                    title: 'Take Photo',
-                    subtitle: 'Capture and extract text',
-                    color: Color(0xFFED6C02),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _takePhoto();
-                    },
-                  ),
+              if (!kIsWeb && !(Platform.isWindows || Platform.isLinux || Platform.isMacOS))
                 _buildUploadOption(
-                  icon: Icons.edit_outlined,
-                  title: 'Manual Entry',
-                  subtitle: 'Fill in details manually',
-                  color: Color(0xFF9C27B0),
-                  onTap: () => Navigator.pop(context),
+                  icon: Icons.camera_alt_outlined,
+                  title: 'Take Photo',
+                  subtitle: 'Capture and extract text',
+                  color: Color(0xFFED6C02),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _takePhoto();
+                  },
                 ),
-                SizedBox(height: 24),
-              ],
-            ),
+              _buildUploadOption(
+                icon: Icons.edit_outlined,
+                title: 'Manual Entry',
+                subtitle: 'Fill in details manually',
+                color: Color(0xFF9C27B0),
+                onTap: () => Navigator.pop(context),
+              ),
+              SizedBox(height: 24),
+            ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
+
 
   Widget _buildUploadOption({
     required IconData icon,
@@ -1009,20 +1012,13 @@ void dispose() {
                       'e.g., Form 137, Birth Certificate',
                       isMobile,
                     ),
-                    SizedBox(height: 10),
-                      _buildDynamicListSection(
-        'Relevant Links',
-        _linkControllers,
-        Icons.link_outlined,
-        'https://example.com',
-        isMobile,
-      ),
+
       
       SizedBox(height: 24), // ✅ Add spacing
       
       // ✅ NEW: Schedule Section
       _buildScheduleSection(isMobile),
-
+           SizedBox(height: 10),
                     _buildDynamicListSection(
                       'Relevant Links',
                       _linkControllers,

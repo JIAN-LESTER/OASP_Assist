@@ -7,6 +7,7 @@ import axios from "axios";
 
 // Define secrets
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
+const GOOGLE_VISION_API_KEY = defineSecret("GOOGLE_VISION_API_KEY"); // ✅ NEW: For OCR
 
 const db = admin.firestore();
 const storage = admin.storage();
@@ -29,6 +30,7 @@ interface CohereResult {
 }
 
 interface AnnouncementData {
+  announcementId: string; // ✅ Unique ID field
   message: string;
   created_time: string;
   full_picture: string;
@@ -36,12 +38,100 @@ interface AnnouncementData {
   permalink_url: string;
   category: string;
   deadline: admin.firestore.Timestamp | null;
-  deleted: boolean;
+  deleted: boolean; // ✅ Soft delete flag
   fetched_at: admin.firestore.FieldValue;
   processed_by_cohere: boolean;
   stored_in_storage: boolean;
   notification_sent: boolean;
+  ocr_text?: string;
+  has_image_text: boolean;
 }
+
+// ============================================================================
+// ✅ NEW: OCR FUNCTIONS FOR IMAGE TEXT EXTRACTION
+// ============================================================================
+
+/**
+ * Extract text from image using Google Cloud Vision API
+ */
+async function extractTextFromImage(imageUrl: string): Promise<string> {
+  try {
+    console.log(`🔍 Extracting text from image: ${imageUrl.substring(0, 100)}...`);
+    
+    const visionApiKey = GOOGLE_VISION_API_KEY.value();
+    
+    // Download image
+    const imageResponse = await axios.get(imageUrl, {
+      responseType: "arraybuffer",
+      timeout: 30000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; OASP-Bot/1.0)',
+      },
+    });
+    
+    const imageBuffer = Buffer.from(new Uint8Array(imageResponse.data as ArrayBuffer));
+    const base64Image = imageBuffer.toString('base64');
+    
+    // Call Google Cloud Vision API
+    const visionResponse = await axios.post(
+      `https://vision.googleapis.com/v1/images:annotate?key=${visionApiKey}`,
+      {
+        requests: [
+          {
+            image: {
+              content: base64Image,
+            },
+            features: [
+              {
+                type: "TEXT_DETECTION",
+                maxResults: 1,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        timeout: 30000,
+      }
+    );
+    
+    const visionData = (visionResponse.data as any);
+    const annotations = visionData?.responses?.[0]?.textAnnotations;
+    
+    if (annotations && annotations.length > 0) {
+      const extractedText = annotations[0].description;
+      console.log(`✅ Extracted ${extractedText.length} characters from image`);
+      console.log(`📝 Preview: ${extractedText.substring(0, 200)}...`);
+      return extractedText;
+    }
+    
+    console.log(`⚠️ No text found in image`);
+    return "";
+    
+  } catch (error: any) {
+    console.error(`❌ Error extracting text from image:`, error.message);
+    
+    if (error.response) {
+      console.error(`❌ Vision API Status: ${error.response.status}`);
+      console.error(`❌ Vision API Response:`, JSON.stringify(error.response.data));
+    }
+    
+    return ""; // Return empty string on error, don't fail the entire process
+  }
+}
+
+/**
+ * Alternative: Extract text using Tesseract.js (if running in Node environment)
+ * This is a fallback option if Google Vision API is not available
+ */
+
+
+// ============================================================================
+// EXISTING HELPER FUNCTIONS (unchanged)
+// ============================================================================
 
 async function verifyAuthToken(authHeader: string | undefined): Promise<string | null> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -168,7 +258,6 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
   }
 }
 
-// ✅ SIGNIFICANTLY IMPROVED: Multi-strategy deadline parsing with better accuracy
 function parseDeadlineToTimestamp(deadline: string | null): admin.firestore.Timestamp | null {
   if (!deadline || deadline.trim() === '') return null;
 
@@ -176,7 +265,6 @@ function parseDeadlineToTimestamp(deadline: string | null): admin.firestore.Time
     console.log(`🔍 Attempting to parse deadline: "${deadline}"`);
     const cleanedDeadline = deadline.trim();
     
-    // Strategy 1: Full date formats (Month DD, YYYY or Mon DD, YYYY)
     const fullDatePatterns = [
       /(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/i,
       /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/i,
@@ -194,17 +282,14 @@ function parseDeadlineToTimestamp(deadline: string | null): admin.firestore.Time
       }
     }
     
-    // Strategy 2: MM/DD/YYYY or DD/MM/YYYY or MM-DD-YYYY formats
     const slashDateMatch = cleanedDeadline.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
     if (slashDateMatch) {
-      // Try MM/DD/YYYY first (common US format)
       const month = parseInt(slashDateMatch[1]) - 1;
       const day = parseInt(slashDateMatch[2]);
       const year = parseInt(slashDateMatch[3]);
       
       let parsedDate = new Date(year, month, day);
       
-      // Validate: if month > 12, it's probably DD/MM/YYYY
       if (month > 11 || day > 31) {
         parsedDate = new Date(year, parseInt(slashDateMatch[2]) - 1, parseInt(slashDateMatch[1]));
       }
@@ -216,43 +301,39 @@ function parseDeadlineToTimestamp(deadline: string | null): admin.firestore.Time
       }
     }
     
-    // Strategy 3: Relative dates (e.g., "in 3 days", "next week", "tomorrow")
-  const relativeDatePatterns = [
-  { pattern: /tomorrow/i, days: 1 },
-  { pattern: /in\s+(\d+)\s+days?/i, daysFromMatch: true },
-  { pattern: /next\s+week/i, days: 7 },
-  { pattern: /(\d+)\s+days?\s+from\s+now/i, daysFromMatch: true },
-];
+    const relativeDatePatterns = [
+      { pattern: /tomorrow/i, days: 1 },
+      { pattern: /in\s+(\d+)\s+days?/i, daysFromMatch: true },
+      { pattern: /next\s+week/i, days: 7 },
+      { pattern: /(\d+)\s+days?\s+from\s+now/i, daysFromMatch: true },
+    ];
 
-for (const entry of relativeDatePatterns) {
-  const match = cleanedDeadline.match(entry.pattern);
-  if (match) {
-    // ✅ Safely determine how many days to add
-    let daysToAdd = 0;
-    if (entry.daysFromMatch && match[1]) {
-      daysToAdd = parseInt(match[1]);
-    } else if (typeof entry.days === 'number') {
-      daysToAdd = entry.days;
-    }
+    for (const entry of relativeDatePatterns) {
+      const match = cleanedDeadline.match(entry.pattern);
+      if (match) {
+        let daysToAdd = 0;
+        if (entry.daysFromMatch && match[1]) {
+          daysToAdd = parseInt(match[1]);
+        } else if (typeof entry.days === 'number') {
+          daysToAdd = entry.days;
+        }
 
-    if (!isNaN(daysToAdd) && daysToAdd > 0) {
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + daysToAdd);
-      futureDate.setHours(23, 59, 59, 999);
-      console.log(`✅ Parsed (relative date): ${futureDate.toISOString()}`);
-      return admin.firestore.Timestamp.fromDate(futureDate);
+        if (!isNaN(daysToAdd) && daysToAdd > 0) {
+          const futureDate = new Date();
+          futureDate.setDate(futureDate.getDate() + daysToAdd);
+          futureDate.setHours(23, 59, 59, 999);
+          console.log(`✅ Parsed (relative date): ${futureDate.toISOString()}`);
+          return admin.firestore.Timestamp.fromDate(futureDate);
+        }
+      }
     }
-  }
-}
     
-    // Strategy 4: Month and day without year (assume current or next year)
     const monthDayPattern = /(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?/i;
     const monthDayMatch = cleanedDeadline.match(monthDayPattern);
     if (monthDayMatch) {
       const currentYear = new Date().getFullYear();
       let parsedDate = new Date(`${monthDayMatch[0]} ${currentYear}`);
       
-      // If date is in the past, use next year
       if (parsedDate < new Date()) {
         parsedDate = new Date(`${monthDayMatch[0]} ${currentYear + 1}`);
       }
@@ -264,7 +345,6 @@ for (const entry of relativeDatePatterns) {
       }
     }
     
-    // Strategy 5: Try native Date parsing as last resort
     let parsedDate = new Date(cleanedDeadline);
     if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() > 2020) {
       parsedDate.setHours(23, 59, 59, 999);
@@ -354,7 +434,6 @@ async function downloadAndUploadImage(
   }
 }
 
-// ✅ IMPROVED: More aggressive deadline extraction with better patterns
 async function analyzeAnnouncement(message: string, cohereKey: string): Promise<CohereResult> {
   try {
     const prompt = `Analyze this announcement and categorize it. Also extract any deadlines mentioned.
@@ -421,7 +500,6 @@ Respond ONLY in JSON format:
           deadline = null;
         }
         
-        // ✅ NEW: If Cohere didn't find deadline, try fallback extraction
         if (!deadline) {
           deadline = extractDeadlines(message);
           if (deadline) {
@@ -530,25 +608,13 @@ function fallbackAnalysis(message: string): CohereResult {
   return {category, deadline};
 }
 
-// ✅ SIGNIFICANTLY IMPROVED: More comprehensive deadline extraction
 function extractDeadlines(message: string): string | null {
   const deadlinePatterns = [
-    // Pattern 1: Full dates with year (highest priority)
     /(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}/gi,
-    
-    // Pattern 2: Slash/dash dates with year
     /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}/g,
-    
-    // Pattern 3: Date ranges with year (extract end date)
     /(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{1,2}(?:st|nd|rd|th)?\s*[-–]\s*\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}/gi,
-    
-    // Pattern 4: Contextual deadline phrases with dates
     /(?:deadline|due|submit|until|before|on or before)[:\s]+(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?/gi,
-    
-    // Pattern 5: Month and day without year
     /(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{1,2}(?:st|nd|rd|th)?/gi,
-    
-    // Pattern 6: Relative dates
     /(?:tomorrow|in\s+\d+\s+days?|next\s+week|\d+\s+days?\s+from\s+now)/gi,
   ];
   
@@ -559,10 +625,8 @@ function extractDeadlines(message: string): string | null {
     for (const match of matches) {
       let found = match[0].trim();
       
-      // Clean up contextual phrases
       found = found.replace(/^(?:deadline|due|submit|until|before|on or before)[:\s]+/i, '');
       
-      // For date ranges, extract the end date
       const rangeMatch = found.match(/(\d{1,2})(?:st|nd|rd|th)?\s*[-–]\s*(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/i);
       if (rangeMatch) {
         const month = found.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i)?.[0];
@@ -582,7 +646,6 @@ function extractDeadlines(message: string): string | null {
   
   console.log(`📅 Extracted ${extractedDates.length} potential deadline(s): ${extractedDates.join(', ')}`);
   
-  // Prioritize dates with years
   const datesWithYear = extractedDates.filter(d => /\d{4}/.test(d));
   if (datesWithYear.length > 0) {
     return datesWithYear[0];
@@ -591,73 +654,572 @@ function extractDeadlines(message: string): string | null {
   return extractedDates[0];
 }
 
+// ============================================================================
+// ✅ ENHANCED: Category-specific extraction with image OCR support
+// ============================================================================
+
+interface ExtractedAdmissionData {
+  title: string;
+  content: string;
+  steps: string[];
+  requirements: string[];
+  contacts: string[];
+  academicYear: { start: number; end?: number } | null;
+  schedules: Array<{ date: string; dayOfWeek: string; locations: string[] }>;
+}
+
+interface ExtractedScholarshipData {
+  name: string;
+  description: string;
+  scholarshipProvider: string;
+  eligibilityRequirements: string[];
+  privileges: string[];
+  applicationLink: string;
+}
+
+interface ExtractedPlacementData {
+  partnerCompany: string;
+  positions: string[];
+  contacts: string[];
+  isRecruiting: boolean;
+}
+
+async function extractAdmissionData(message: string, cohereKey: string): Promise<ExtractedAdmissionData> {
+  try {
+    const prompt = `Extract admission information from this announcement. Return ONLY valid JSON.
+
+Announcement: "${message}"
+
+Extract these fields:
+- title: A short descriptive title for the admission (max 100 chars)
+- content: The full announcement content
+- steps: Array of enrollment/application steps mentioned
+- requirements: Array of required documents or requirements
+- contacts: Array of contact information (email, phone, office)
+- academicYear: Object with "start" year and optionally "end" year (e.g., {"start": 2024, "end": 2025})
+- schedules: Array of schedule objects with "date", "dayOfWeek", and "locations" array
+
+Respond ONLY in this JSON format:
+{
+  "title": "string",
+  "content": "string",
+  "steps": ["step1", "step2"],
+  "requirements": ["req1", "req2"],
+  "contacts": ["contact1"],
+  "academicYear": {"start": 2024, "end": 2025},
+  "schedules": [{"date": "OCT 4, 2025", "dayOfWeek": "SATURDAY", "locations": ["Location 1"]}]
+}`;
+
+    const response = await axios.post<{ text?: string }>(
+      "https://api.cohere.ai/v1/chat",
+      {
+        model: "command-r-08-2024",
+        message: prompt,
+        max_tokens: 1000,
+        temperature: 0.1,
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${cohereKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const text = String(response.data?.text ?? "").trim();
+    const jsonStr = extractJsonFromResponse(text);
+    const result = JSON.parse(jsonStr);
+
+    return {
+      title: result.title || message.substring(0, 100),
+      content: message,
+      steps: Array.isArray(result.steps) ? result.steps : [],
+      requirements: Array.isArray(result.requirements) ? result.requirements : [],
+      contacts: Array.isArray(result.contacts) ? result.contacts : [],
+      academicYear: result.academicYear || null,
+      schedules: Array.isArray(result.schedules) ? result.schedules : [],
+    };
+  } catch (error) {
+    console.error("Error extracting admission data:", error);
+    return {
+      title: message.substring(0, 100),
+      content: message,
+      steps: [],
+      requirements: [],
+      contacts: [],
+      academicYear: null,
+      schedules: [],
+    };
+  }
+}
+
+async function extractScholarshipData(message: string, cohereKey: string): Promise<ExtractedScholarshipData> {
+  try {
+    const prompt = `Extract scholarship information from this announcement. Return ONLY valid JSON.
+
+Announcement: "${message}"
+
+Extract these fields:
+- name: The scholarship name/title
+- description: Brief description of the scholarship
+- scholarshipProvider: Organization or entity offering the scholarship
+- eligibilityRequirements: Array of eligibility criteria
+- privileges: Array of benefits (tuition, stipend, allowance, etc.)
+- applicationLink: URL for application if mentioned
+
+Respond ONLY in this JSON format:
+{
+  "name": "string",
+  "description": "string",
+  "scholarshipProvider": "string",
+  "eligibilityRequirements": ["req1", "req2"],
+  "privileges": ["benefit1", "benefit2"],
+  "applicationLink": "string or empty"
+}`;
+
+    const response = await axios.post<{ text?: string }>(
+      "https://api.cohere.ai/v1/chat",
+      {
+        model: "command-r-08-2024",
+        message: prompt,
+        max_tokens: 1000,
+        temperature: 0.1,
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${cohereKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const text = String(response.data?.text ?? "").trim();
+    const jsonStr = extractJsonFromResponse(text);
+    const result = JSON.parse(jsonStr);
+
+    return {
+      name: result.name || "Scholarship Announcement",
+      description: result.description || message,
+      scholarshipProvider: result.scholarshipProvider || "",
+      eligibilityRequirements: Array.isArray(result.eligibilityRequirements) ? result.eligibilityRequirements : [],
+      privileges: Array.isArray(result.privileges) ? result.privileges : [],
+      applicationLink: result.applicationLink || "",
+    };
+  } catch (error) {
+    console.error("Error extracting scholarship data:", error);
+    return {
+      name: "Scholarship Announcement",
+      description: message,
+      scholarshipProvider: "",
+      eligibilityRequirements: [],
+      privileges: [],
+      applicationLink: "",
+    };
+  }
+}
+
+async function extractPlacementData(message: string, cohereKey: string): Promise<ExtractedPlacementData> {
+  try {
+    const prompt = `Extract job placement/hiring information from this announcement. Return ONLY valid JSON.
+
+Announcement: "${message}"
+
+Extract these fields:
+- partnerCompany: Company name that is hiring
+- positions: Array of job positions/titles available
+- contacts: Array of contact information for application
+- isRecruiting: Boolean indicating if currently accepting applications (default true)
+
+Respond ONLY in this JSON format:
+{
+  "partnerCompany": "string",
+  "positions": ["position1", "position2"],
+  "contacts": ["contact1"],
+  "isRecruiting": true
+}`;
+
+    const response = await axios.post<{ text?: string }>(
+      "https://api.cohere.ai/v1/chat",
+      {
+        model: "command-r-08-2024",
+        message: prompt,
+        max_tokens: 1000,
+        temperature: 0.1,
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${cohereKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const text = String(response.data?.text ?? "").trim();
+    const jsonStr = extractJsonFromResponse(text);
+    const result = JSON.parse(jsonStr);
+
+    return {
+      partnerCompany: result.partnerCompany || "Company",
+      positions: Array.isArray(result.positions) ? result.positions : [],
+      contacts: Array.isArray(result.contacts) ? result.contacts : [],
+      isRecruiting: result.isRecruiting !== false,
+    };
+  } catch (error) {
+    console.error("Error extracting placement data:", error);
+    return {
+      partnerCompany: "Company",
+      positions: [],
+      contacts: [],
+      isRecruiting: true,
+    };
+  }
+}
+
+async function createAdmissionFromAnnouncement(
+  postId: string,
+  message: string,
+  deadline: admin.firestore.Timestamp | null,
+  cohereKey: string
+): Promise<void> {
+  try {
+    const admissionRef = db.collection("admissions").doc(postId);
+    const existingDoc = await admissionRef.get();
+    
+    if (existingDoc.exists) {
+      const existingData = existingDoc.data();
+      
+      // ✅ If deleted, don't recreate or restore
+      if (existingData?.deleted === true) {
+        console.log(`⏭️ Skipping admission for post ${postId} - it was deleted by user`);
+        return;
+      }
+      
+      console.log(`Admission already exists for post ${postId}`);
+      return;
+    }
+
+    const extractedData = await extractAdmissionData(message, cohereKey);
+
+    await admissionRef.set({
+      id: postId,
+      announcementId: postId, // ✅ Link to announcement
+      title: extractedData.title,
+      content: extractedData.content,
+      source: "Facebook Announcement",
+      academicYear: extractedData.academicYear,
+      contact: extractedData.contacts,
+      steps: extractedData.steps,
+      requirements: extractedData.requirements,
+      links: [],
+      schedules: extractedData.schedules,
+      deadline: deadline,
+      deleted: false, // ✅ Soft delete flag
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      autoGenerated: true,
+    });
+
+    console.log(`✅ Created admission from announcement ${postId}`);
+  } catch (error) {
+    console.error(`❌ Error creating admission from announcement ${postId}:`, error);
+  }
+}
+
+async function createScholarshipFromAnnouncement(
+  postId: string,
+  message: string,
+  deadline: admin.firestore.Timestamp | null,
+  cohereKey: string
+): Promise<void> {
+  try {
+    const scholarshipRef = db.collection("scholarships").doc(postId);
+    const existingDoc = await scholarshipRef.get();
+    
+    if (existingDoc.exists) {
+      const existingData = existingDoc.data();
+      
+      // ✅ If deleted, don't recreate or restore
+      if (existingData?.deleted === true) {
+        console.log(`⏭️ Skipping scholarship for post ${postId} - it was deleted by user`);
+        return;
+      }
+      
+      console.log(`Scholarship already exists for post ${postId}`);
+      return;
+    }
+
+    const extractedData = await extractScholarshipData(message, cohereKey);
+
+    await scholarshipRef.set({
+      scholarshipID: postId,
+      sourceId: postId,
+      announcementId: postId, // ✅ Link to announcement
+      name: extractedData.name,
+      description: extractedData.description,
+      scholarshipProvider: extractedData.scholarshipProvider,
+      eligibilityRequirements: extractedData.eligibilityRequirements,
+      privileges: extractedData.privileges,
+      deadline: deadline ? deadline.toDate() : null,
+      applicationLink: extractedData.applicationLink,
+      deleted: false, // ✅ Soft delete flag
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      autoGenerated: true,
+    });
+
+    console.log(`✅ Created scholarship from announcement ${postId}`);
+  } catch (error) {
+    console.error(`❌ Error creating scholarship from announcement ${postId}:`, error);
+  }
+}
+
+async function createPlacementFromAnnouncement(
+  postId: string,
+  message: string,
+  deadline: admin.firestore.Timestamp | null,
+  cohereKey: string
+): Promise<void> {
+  try {
+    const placementRef = db.collection("placements").doc(postId);
+    const existingDoc = await placementRef.get();
+    
+    if (existingDoc.exists) {
+      const existingData = existingDoc.data();
+      
+      // ✅ If deleted, don't recreate or restore
+      if (existingData?.deleted === true) {
+        console.log(`⏭️ Skipping placement for post ${postId} - it was deleted by user`);
+        return;
+      }
+      
+      console.log(`Placement already exists for post ${postId}`);
+      return;
+    }
+
+    const extractedData = await extractPlacementData(message, cohereKey);
+
+    await placementRef.set({
+      placementID: postId,
+      announcementId: postId, // ✅ Link to announcement
+      partnerCompany: extractedData.partnerCompany,
+      positions: extractedData.positions,
+      contacts: extractedData.contacts,
+      isRecruiting: extractedData.isRecruiting,
+      deadline: deadline ? deadline.toDate() : null,
+      deleted: false, // ✅ Soft delete flag
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      autoGenerated: true,
+    });
+
+    console.log(`✅ Created placement from announcement ${postId}`);
+  } catch (error) {
+    console.error(`❌ Error creating placement from announcement ${postId}:`, error);
+  }
+}
+
+export const cleanupDeletedAnnouncement = onDocumentUpdated(
+  {
+    document: "announcements/{postId}",
+    secrets: [],
+  },
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    const postId = event.params.postId;
+    
+    if (!before || !after) return;
+    
+    // ✅ CASCADE DELETE: When announcement is soft-deleted, also soft-delete category document
+    if (!before.deleted && after.deleted) {
+      console.log(`🗑️ Announcement ${postId} was soft-deleted, cascading to category document...`);
+      
+      const category = after.category?.toLowerCase() || "";
+      
+      // ✅ Soft delete the linked category document
+      await softDeleteCategoryDocument(postId, category);
+      
+      // ✅ Optionally clean up images if stored in storage
+      if (after.stored_in_storage) {
+        try {
+          console.log(`🖼️ Cleaning up images for deleted post: ${postId}`);
+          
+          const bucket = storage.bucket();
+          const [files] = await bucket.getFiles({
+            prefix: `announcements/${postId}`,
+          });
+          
+          for (const file of files) {
+            await file.delete();
+            console.log(`✅ Deleted file: ${file.name}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error cleaning up images for ${postId}:`, error);
+        }
+      }
+      
+      console.log(`✅ Cascade delete complete for ${postId}`);
+    }
+    
+    // ✅ REMOVED: No restoration logic - once deleted, stays deleted
+  }
+);
+// ============================================================================
+// ✅ ENHANCED: processPost with IMAGE OCR SUPPORT
+// ============================================================================
+
 async function processPost(post: FacebookPost, cohereKey: string): Promise<void> {
   const postId = post.id;
-  const message = post.message || "";
-  
-  if (!message) {
-    console.log(`Skipping post ${postId} - no message`);
-    return;
-  }
+  const originalMessage = post.message || "";
   
   const postRef = db.collection("announcements").doc(postId);
   const doc = await postRef.get();
   
+  // ✅ Extract text from image if present
+  let ocrText = "";
+  let hasImageText = false;
+  
+  if (post.full_picture) {
+    console.log(`🖼️ Post ${postId} has an image, attempting OCR...`);
+    
+    try {
+      ocrText = await extractTextFromImage(post.full_picture);
+      
+      if (ocrText && ocrText.trim().length > 0) {
+        hasImageText = true;
+        console.log(`✅ Extracted ${ocrText.length} characters from image`);
+      } else {
+        console.log(`⚠️ No text found in image for post ${postId}`);
+      }
+    } catch (ocrError: any) {
+      console.error(`⚠️ OCR failed for post ${postId}:`, ocrError.message);
+    }
+  }
+  
+  // ✅ Combine original message + OCR text for AI analysis ONLY
+  let messageForAnalysis = originalMessage;
+  
+  if (hasImageText && ocrText) {
+    if (originalMessage.trim().length === 0) {
+      messageForAnalysis = ocrText;
+      console.log(`📝 Using OCR text for analysis (no caption)`);
+    } else {
+      messageForAnalysis = `${originalMessage}\n\n[Image Text]:\n${ocrText}`;
+      console.log(`📝 Combined caption with OCR text for analysis`);
+    }
+  }
+  
+  // Skip if no content after OCR attempt
+  if (!messageForAnalysis || messageForAnalysis.trim().length === 0) {
+    console.log(`Skipping post ${postId} - no message or image text`);
+    return;
+  }
+  
+  // Download and upload image
   let imageUrl = "";
   if (post.full_picture) {
     imageUrl = await downloadAndUploadImage(post.full_picture, postId);
   }
   
   if (!doc.exists) {
+    // ✅ NEW ANNOUNCEMENT
     console.log(`Creating new post: ${postId}`);
     
-    const cohereResult = await analyzeAnnouncement(message, cohereKey);
+    const cohereResult = await analyzeAnnouncement(messageForAnalysis, cohereKey);
     const deadlineTimestamp = parseDeadlineToTimestamp(cohereResult.deadline);
     
     const newData: AnnouncementData = {
-      message: message,
+      announcementId: postId, // ✅ Unique announcement ID
+      message: originalMessage,
       created_time: post.created_time,
       full_picture: imageUrl || post.full_picture || "",
       original_image_url: post.full_picture || "",
       permalink_url: post.permalink_url || "",
       category: cohereResult.category || "General",
       deadline: deadlineTimestamp || null,
-      deleted: false,
+      deleted: false, // ✅ Soft delete flag
       fetched_at: admin.firestore.FieldValue.serverTimestamp(),
       processed_by_cohere: true,
       stored_in_storage: !!imageUrl,
       notification_sent: false,
+      ocr_text: ocrText || "",
+      has_image_text: hasImageText,
     };
     
     await postRef.set(newData);
-  } else {
-    const docData = doc.data();
-    if (docData?.deleted) {
-      console.log(`Skipping deleted post: ${postId}`);
-      return;
+
+    // ✅ Create category-specific document with announcementId reference
+    const category = cohereResult.category?.toLowerCase() || "general";
+    
+    if (category === "admission") {
+      await createAdmissionFromAnnouncement(postId, messageForAnalysis, deadlineTimestamp, cohereKey);
+    } else if (category === "scholarship") {
+      await createScholarshipFromAnnouncement(postId, messageForAnalysis, deadlineTimestamp, cohereKey);
+    } else if (category === "placement") {
+      await createPlacementFromAnnouncement(postId, messageForAnalysis, deadlineTimestamp, cohereKey);
     }
     
+    console.log(`✅ Post ${postId} processed with category: ${category}${hasImageText ? ' (with image OCR)' : ''}`);
+    
+  } else {
+    // ✅ EXISTING ANNOUNCEMENT
+    const docData = doc.data();
+    
+    // ✅ CRITICAL: If deleted, SKIP and don't restore
+    if (docData?.deleted === true) {
+      console.log(`⏭️ Skipping post ${postId} - user has deleted it (deleted: true)`);
+      return; // ✅ Don't restore deleted posts
+    }
+    
+    // ✅ REGULAR UPDATE (not deleted)
     console.log(`Updating existing post: ${postId}`);
     
-    // ✅ NEW: Re-analyze if deadline is missing but message contains potential deadline
     let updatedDeadline = docData?.deadline;
-    if (!updatedDeadline && message) {
+    if (!updatedDeadline && messageForAnalysis) {
       console.log(`🔍 Re-analyzing post ${postId} for missing deadline`);
-      const cohereResult = await analyzeAnnouncement(message, cohereKey);
+      const cohereResult = await analyzeAnnouncement(messageForAnalysis, cohereKey);
       updatedDeadline = parseDeadlineToTimestamp(cohereResult.deadline);
-      if (updatedDeadline) {
-        console.log(`✅ Found missing deadline: ${updatedDeadline.toDate().toISOString()}`);
-      }
     }
     
     await postRef.update({
-      message: message,
+      message: originalMessage,
       full_picture: imageUrl || docData?.full_picture || post.full_picture || "",
       permalink_url: post.permalink_url || "",
       deadline: updatedDeadline || docData?.deadline || null,
       last_synced_at: admin.firestore.FieldValue.serverTimestamp(),
       stored_in_storage: !!imageUrl || docData?.stored_in_storage || false,
+      ocr_text: ocrText || docData?.ocr_text || "",
+      has_image_text: hasImageText || docData?.has_image_text || false,
     });
+  }
+}
+
+async function softDeleteCategoryDocument(
+  announcementId: string,
+  category: string
+): Promise<void> {
+  try {
+    let collectionName = "";
+    
+    if (category === "admission") {
+      collectionName = "admissions";
+    } else if (category === "scholarship") {
+      collectionName = "scholarships";
+    } else if (category === "placement") {
+      collectionName = "placements";
+    } else {
+      return; // No category-specific document for "general"
+    }
+    
+    const docRef = db.collection(collectionName).doc(announcementId);
+    const doc = await docRef.get();
+    
+    if (doc.exists) {
+      await docRef.update({
+        deleted: true,
+        deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      console.log(`✅ Soft-deleted ${collectionName} document for ${announcementId}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error soft-deleting category document for ${announcementId}:`, error);
   }
 }
 
@@ -671,7 +1233,7 @@ export const syncFacebookPosts = onSchedule(
     timeZone: "Asia/Manila",
     timeoutSeconds: 540,
     memory: "1GiB",
-    secrets: [COHERE_API_KEY],
+    secrets: [COHERE_API_KEY, GOOGLE_VISION_API_KEY], // ✅ NEW: Add Vision API key
   },
   async (event) => {
     try {
@@ -702,11 +1264,22 @@ async function syncFacebookPostsLogic(): Promise<any> {
     
     let processed = 0;
     let failed = 0;
+    let withOCR = 0;
     
     for (const post of posts) {
       try {
         console.log(`📝 Processing post: ${post.id}`);
+        
+        const hasImage = !!post.full_picture;
         await processPost(post, COHERE_API_KEY.value());
+        
+        if (hasImage) {
+          const postDoc = await db.collection("announcements").doc(post.id).get();
+          if (postDoc.exists && postDoc.data()?.has_image_text) {
+            withOCR++;
+          }
+        }
+        
         processed++;
       } catch (postError: any) {
         console.error(`❌ Error processing post ${post.id}:`, postError.message);
@@ -714,13 +1287,14 @@ async function syncFacebookPostsLogic(): Promise<any> {
       }
     }
     
-    console.log(`✅ Sync complete: ${processed} processed, ${failed} failed`);
+    console.log(`✅ Sync complete: ${processed} processed, ${failed} failed, ${withOCR} with OCR`);
     
     return {
       success: true,
-      message: `Successfully synced ${processed} posts` + (failed > 0 ? ` (${failed} failed)` : ''),
+      message: `Successfully synced ${processed} posts (${withOCR} with image text extraction)` + (failed > 0 ? ` (${failed} failed)` : ''),
       count: processed,
       failed: failed,
+      withOCR: withOCR,
       total: posts.length,
     };
   } catch (error: any) {
@@ -739,7 +1313,7 @@ export const manualSyncFacebookPosts = onCall(
     cors: true,
     timeoutSeconds: 540,
     memory: "1GiB",
-    secrets: [COHERE_API_KEY],
+    secrets: [COHERE_API_KEY, GOOGLE_VISION_API_KEY], // ✅ NEW
   },
   async (request) => {
     console.log("========================================");
@@ -774,7 +1348,7 @@ export const manualSyncFacebookPostsHttp = onRequest(
     cors: true,
     timeoutSeconds: 540,
     memory: "1GiB",
-    secrets: [COHERE_API_KEY],
+    secrets: [COHERE_API_KEY, GOOGLE_VISION_API_KEY], // ✅ NEW
   },
   async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
@@ -823,7 +1397,7 @@ export const reprocessExistingAnnouncements = onCall(
   {
     cors: true,
     timeoutSeconds: 540,
-    secrets: [COHERE_API_KEY],
+    secrets: [COHERE_API_KEY, GOOGLE_VISION_API_KEY], // ✅ NEW
   },
   async (request) => {
     try {
@@ -879,35 +1453,3 @@ export const reprocessExistingAnnouncements = onCall(
   }
 );
 
-export const cleanupDeletedAnnouncement = onDocumentUpdated(
-  {
-    document: "announcements/{postId}",
-    secrets: [],
-  },
-  async (event) => {
-    const before = event.data?.before.data();
-    const after = event.data?.after.data();
-    const postId = event.params.postId;
-    
-    if (!before || !after) return;
-    
-    if (!before.deleted && after.deleted && after.stored_in_storage) {
-      try {
-        console.log(`Cleaning up image for deleted post: ${postId}`);
-        
-        const bucket = storage.bucket();
-        const [files] = await bucket.getFiles({
-          prefix: `announcements/${postId}`,
-        });
-        
-        for (const file of files) {
-          await file.delete();
-          console.log(`Deleted file: ${file.name}`);
-        }
-        
-      } catch (error) {
-        console.error(`Error cleaning up images for ${postId}:`, error);
-      }
-    }
-  }
-);

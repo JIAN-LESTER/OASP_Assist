@@ -426,18 +426,15 @@ class NotificationNavigationHandler {
   }
 }
 
-Future<void> initializeServices() async {
+  Future<void> initializeServices() async {
   try {
     print('🚀 Initializing services...');
     
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     print('✅ Background handler registered');
     
-    NotificationService().initialize().then((_) {
-      print('✅ Notifications ready');
-    }).catchError((e) {
-      print('⚠️ Notification init failed (non-critical): $e');
-    });
+    await NotificationService().initialize(); // ✅ Make this await
+    print('✅ Notifications ready');
     
     NotificationNavigationHandler(navigatorKey).setup();
     
@@ -447,7 +444,6 @@ Future<void> initializeServices() async {
     print('Stack: $stackTrace');
   }
 }
-
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
@@ -610,6 +606,8 @@ class OnboardingManager {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('${_userOnboardingPrefix}_$userId', true);
   }
+
+  
 
   static Future<void> handleFirstTimeLogin(BuildContext context, String userId, String userName) async {
     try {
