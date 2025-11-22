@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -171,20 +172,24 @@ void dispose() {
 }
 
   Future<void> _pickFile() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'txt', 'docx', 'doc'],
-        withData: true,
-      );
+  try {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'txt', 'docx', 'doc'],
+      withData: true, // ✅ CRITICAL for web
+    );
 
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
-        final fileName = result.files.single.name;
-        final fileBytes = result.files.single.bytes;
+    if (result != null) {
+      final fileName = result.files.single.name;
+      final fileBytes = result.files.single.bytes;
+
+      // ✅ Web platform - use bytes directly
+      if (kIsWeb || fileBytes != null) {
+        if (fileBytes == null) {
+          throw Exception('No file data available');
+        }
 
         setState(() {
-          _selectedFile = file;
           _selectedFileName = fileName;
           _isProcessing = true;
         });
@@ -192,22 +197,46 @@ void dispose() {
         String extractedText;
         final extension = fileName.split('.').last.toLowerCase();
 
-        if (extension == 'pdf' && fileBytes != null) {
+        if (extension == 'pdf') {
           extractedText = await _fileService.extractTextFromPdfBytes(fileBytes);
+        } else if (extension == 'docx' || extension == 'doc') {
+          extractedText = await _fileService.extractTextFromFileBytes(
+            fileBytes,
+            fileName,
+          );
+        } else if (extension == 'txt') {
+          extractedText = utf8.decode(fileBytes);
         } else {
-          extractedText = await _fileService.extractTextFromFile(file);
+          throw UnsupportedError('Unsupported file type: $extension');
         }
 
         await _processExtractedText(extractedText, fileName);
 
         setState(() => _isProcessing = false);
         _showAlert('File processed successfully!', AlertType.success);
+      } 
+      // ✅ Mobile/Desktop platform - use file path
+      else if (result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+
+        setState(() {
+          _selectedFile = file;
+          _selectedFileName = fileName;
+          _isProcessing = true;
+        });
+
+        String extractedText = await _fileService.extractTextFromFile(file);
+        await _processExtractedText(extractedText, fileName);
+
+        setState(() => _isProcessing = false);
+        _showAlert('File processed successfully!', AlertType.success);
       }
-    } catch (e) {
-      setState(() => _isProcessing = false);
-      _showAlert('Error processing file: $e', AlertType.error);
     }
+  } catch (e) {
+    setState(() => _isProcessing = false);
+    _showAlert('Error processing file: $e', AlertType.error);
   }
+}
 
   Future<void> _pickImageFromGallery() async {
     try {
@@ -959,14 +988,86 @@ void dispose() {
                     ),
                     SizedBox(height: 16),
 
-                    buildTextField(
-                      controller: _contentController,
-                      isMobile: isMobile,
-                      label: 'Content',
-                      hint: 'Enter admission content',
-                      icon: Icons.description_outlined,
-                      maxLines: 5,
-                    ),
+           Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Row(
+      children: [
+        Icon(
+          Icons.description_outlined,
+          size: 20,
+          color: Color(0xFF2E7D32),
+        ),
+        SizedBox(width: 8),
+        Text(
+          'Content',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF374151),
+            letterSpacing: -0.1,
+          ),
+        ),
+        Spacer(),
+        // ✅ Character count indicator
+        if (_contentController.text.isNotEmpty)
+          Text(
+            '${_contentController.text.length} characters',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF9CA3AF),
+            ),
+          ),
+      ],
+    ),
+    SizedBox(height: 8),
+    Container(
+      height: 200, // ✅ Fixed height with scrolling
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: Color(0xFFE5E7EB),
+          width: 1.5,
+        ),
+      ),
+      child: TextField(
+        controller: _contentController,
+        maxLines: null, // ✅ Unlimited lines
+        expands: true, // ✅ Expands to fill container
+        textAlignVertical: TextAlignVertical.top,
+        style: TextStyle(
+          fontSize: isMobile ? 14 : 15,
+          fontWeight: FontWeight.w500,
+          color: Color(0xFF1F2937),
+          height: 1.5, // ✅ Better line spacing
+        ),
+        decoration: InputDecoration(
+          hintText: 'Enter admission content (extracted text will appear here)',
+          hintStyle: TextStyle(
+            color: Color(0xFF9CA3AF),
+            fontWeight: FontWeight.w400,
+          ),
+          filled: false,
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.all(16),
+        ),
+        onChanged: (value) {
+          setState(() {}); // ✅ Update character count
+        },
+      ),
+    ),
+    SizedBox(height: 4),
+    Text(
+      'Extracted text from uploaded documents will automatically appear here',
+      style: TextStyle(
+        fontSize: 12,
+        color: Color(0xFF9CA3AF),
+        fontStyle: FontStyle.italic,
+      ),
+    ),
+  ],
+),
                     SizedBox(height: 16),
 
                     buildTextField(

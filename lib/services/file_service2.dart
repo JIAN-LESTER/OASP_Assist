@@ -442,16 +442,16 @@ Future<void> saveToAdmission(Admissions ad) async {
 
   /// Extract text from DOCX bytes
   Future<String> _extractTextFromDocxBytes(Uint8List bytes) async {
-    try {
-      final text = docxToText(bytes);
-      if (text.isEmpty) {
-        throw Exception('No text content found in DOCX file');
-      }
-      return text;
-    } catch (e) {
-      throw Exception('Failed to parse DOCX content: $e');
+  try {
+    final text = docxToText(bytes);
+    if (text.isEmpty) {
+      throw Exception('No text content found in DOCX file');
     }
+    return text;
+  } catch (e) {
+    throw Exception('Failed to parse DOCX content: $e');
   }
+}
 
   /// Extract text from DOC file (legacy Word format)
   /// Note: This is a basic implementation and may not work for all DOC files
@@ -470,80 +470,65 @@ Future<void> saveToAdmission(Admissions ad) async {
   /// Extract text from DOC bytes
   /// This is a simplified implementation that may not work for all DOC files
   Future<String> _extractTextFromDocBytes(Uint8List bytes) async {
-    try {
-      // DOC files are complex binary format, this is a very basic extraction
-      // For production use, consider using a server-side conversion service
-
-      // Try to extract readable text from the binary data
-      String content = '';
-      final text = String.fromCharCodes(bytes);
-
-      // Simple regex to extract text-like content
-      final textPattern = RegExp(r'[\x20-\x7E\x0A\x0D]+');
-      final matches = textPattern.allMatches(text);
-
-      for (final match in matches) {
-        final extractedText = match.group(0)?.trim() ?? '';
-        if (extractedText.length > 10) {
-          // Only include substantial text blocks
-          content += extractedText + '\n';
-        }
+  try {
+    // Basic text extraction from DOC format
+    String content = '';
+    final text = String.fromCharCodes(bytes);
+    
+    final textPattern = RegExp(r'[\x20-\x7E\x0A\x0D]+');
+    final matches = textPattern.allMatches(text);
+    
+    for (final match in matches) {
+      final extractedText = match.group(0)?.trim() ?? '';
+      if (extractedText.length > 10) {
+        content += extractedText + '\n';
       }
-
-      if (content.trim().isEmpty) {
-        throw Exception('No readable text found in DOC file');
-      }
-
-      // Clean up the extracted text
-      content =
-          content
-              .replaceAll(RegExp(r'\s+'), ' ') // Normalize whitespace
-              .replaceAll(
-                RegExp(r'[^\x20-\x7E\x0A\x0D]'),
-                '',
-              ) // Remove non-printable chars
-              .trim();
-
-      print(
-        '⚠️ DOC file processed with basic extraction. For better results, consider converting to DOCX format.',
-      );
-      return content;
-    } catch (e) {
-      throw Exception(
-        'Failed to parse DOC content: $e. Please convert the file to DOCX format for better compatibility.',
-      );
     }
+    
+    if (content.trim().isEmpty) {
+      throw Exception('No readable text found in DOC file');
+    }
+    
+    content = content
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .replaceAll(RegExp(r'[^\x20-\x7E\x0A\x0D]'), '')
+        .trim();
+    
+    return content;
+  } catch (e) {
+    throw Exception('Failed to parse DOC content: $e');
   }
+}
 
   /// Helper method to extract text from uploaded file bytes based on filename
   Future<String> extractTextFromFileBytes(
-    Uint8List bytes,
-    String filename,
-  ) async {
-    final extension = filename.split('.').last.toLowerCase();
+  Uint8List bytes,
+  String filename,
+) async {
+  final extension = filename.split('.').last.toLowerCase();
 
-    if (!supportedExtensions.contains(extension)) {
-      throw UnsupportedError('Unsupported file type: $extension');
-    }
-
-    try {
-      switch (extension) {
-        case 'pdf':
-          return await extractTextFromPdfBytes(bytes);
-        case 'txt':
-          return utf8.decode(bytes);
-        case 'docx':
-          return await _extractTextFromDocxBytes(bytes);
-        case 'doc':
-          return await _extractTextFromDocBytes(bytes);
-        default:
-          throw UnsupportedError('Unsupported file type: $extension');
-      }
-    } catch (e) {
-      print('❌ Error extracting text from $extension file: $e');
-      rethrow;
-    }
+  if (!supportedExtensions.contains(extension)) {
+    throw UnsupportedError('Unsupported file type: $extension');
   }
+
+  try {
+    switch (extension) {
+      case 'pdf':
+        return await extractTextFromPdfBytes(bytes);
+      case 'txt':
+        return utf8.decode(bytes);
+      case 'docx':
+        return await _extractTextFromDocxBytes(bytes);
+      case 'doc':
+        return await _extractTextFromDocBytes(bytes);
+      default:
+        throw UnsupportedError('Unsupported file type: $extension');
+    }
+  } catch (e) {
+    print('❌ Error extracting text from $extension file: $e');
+    rethrow;
+  }
+}
 
   /// Split document content into chunks for better retrieval
   List<DocumentChunk> _splitIntoChunks(

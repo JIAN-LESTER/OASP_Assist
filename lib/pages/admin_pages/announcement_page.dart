@@ -2090,276 +2090,326 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final data = widget.announcement.data() as Map<String, dynamic>;
-    final message = data['message'] ?? "";
-    final category = data['category'] ?? 'General';
-    final deadline = data['deadline'];
-    
-    // ✅ Get images array (backward compatible with old single image field)
-    List<String> images = [];
-    if (data['images'] is List) {
-      images = List<String>.from(data['images']);
-    } else if (data['full_picture'] != null && data['full_picture'].isNotEmpty) {
-      images = [data['full_picture']];
-    }
-    
-    final hasImages = images.isNotEmpty;
-    final imageCount = data['image_count'] ?? images.length;
-    final createdTime = _formatDate(data['created_time']);
-    final hasOCR = data['has_image_text'] == true;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: -4,
-          ),
-        ],
-        border: Border.all(color: Colors.grey[300]!, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header (existing code)
-          _buildHeader(category, createdTime, imageCount, hasOCR),
-
-          // Deadline notice (existing code)
-          if (deadline != null) _buildDeadline(deadline),
-
-          // Message content
-          if (message.isNotEmpty) _buildMessage(message),
-
-          // ✅ ENHANCED: Multiple Images Display
-          if (hasImages) _buildImageGallery(images),
-
-          // Action buttons (existing code)
-          _buildActionButtons(data),
-        ],
-      ),
-    );
+ @override
+Widget build(BuildContext context) {
+  final data = widget.announcement.data() as Map<String, dynamic>;
+  final message = data['message'] ?? "";
+  final category = data['category'] ?? 'General';
+  final deadline = data['deadline'];
+  
+  // ✅ FIX: Properly get images array with type safety
+  List<String> images = [];
+  
+  // Check for new 'images' array field first
+  if (data['images'] != null && data['images'] is List) {
+    images = (data['images'] as List)
+        .whereType<String>()
+        .where((url) => url.isNotEmpty)
+        .toList();
   }
+  
+  // Fallback to single 'full_picture' for backward compatibility
+  if (images.isEmpty && 
+      data['full_picture'] != null && 
+      (data['full_picture'] as String).isNotEmpty) {
+    images = [data['full_picture'] as String];
+  }
+  
+  final hasImages = images.isNotEmpty;
+  final imageCount = data['image_count'] ?? images.length;
+  final createdTime = _formatDate(data['created_time']);
+  final hasOCR = data['has_image_text'] == true;
 
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 24,
+          offset: const Offset(0, 8),
+          spreadRadius: -4,
+        ),
+      ],
+      border: Border.all(color: Colors.grey[300]!, width: 1),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildHeader(category, createdTime, imageCount, hasOCR),
+        if (deadline != null) _buildDeadline(deadline),
+        if (message.isNotEmpty) _buildMessage(message),
+        // ✅ Pass the properly extracted images list
+        if (hasImages) _buildImageGallery(images),
+        _buildActionButtons(data),
+      ],
+    ),
+  );
+}
   // ============================================================================
   // ✅ NEW: Image Gallery Widget with Carousel
   // ============================================================================
   
   Widget _buildImageGallery(List<String> images) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        widget.isDesktop ? 24 : 20,
-        0,
-        widget.isDesktop ? 24 : 20,
-        widget.isDesktop ? 20 : 16,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Image carousel
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              height: widget.isDesktop ? 400 : 300,
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Stack(
-                children: [
-                  // Image PageView
-                  PageView.builder(
-                    controller: _pageController,
-                    itemCount: images.length,
-                    onPageChanged: (index) {
-                      setState(() {
-                        _currentImageIndex = index;
-                      });
-                    },
-                    itemBuilder: (context, index) {
-                      return GestureDetector(
-                        onTap: () => _showFullScreenImage(context, images, index),
-                        child: Image.network(
-                          images[index],
-                          width: double.infinity,
-                          height: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return _buildImageError();
-                          },
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return _buildImageLoading(loadingProgress);
-                          },
-                        ),
-                      );
-                    },
-                  ),
-
-                  // Navigation arrows (for multiple images)
-                  if (images.length > 1) ...[
-                    _buildNavigationArrow(
-                      alignment: Alignment.centerLeft,
-                      icon: Icons.chevron_left,
-                      onTap: () {
-                        if (_currentImageIndex > 0) {
-                          _pageController.previousPage(
-                            duration: Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                          );
-                        }
-                      },
-                      enabled: _currentImageIndex > 0,
-                    ),
-                    _buildNavigationArrow(
-                      alignment: Alignment.centerRight,
-                      icon: Icons.chevron_right,
-                      onTap: () {
-                        if (_currentImageIndex < images.length - 1) {
-                          _pageController.nextPage(
-                            duration: Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                          );
-                        }
-                      },
-                      enabled: _currentImageIndex < images.length - 1,
-                    ),
-                  ],
-
-                  // Image counter badge
-                  if (images.length > 1)
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.photo_library,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                            SizedBox(width: 6),
-                            Text(
-                              '${_currentImageIndex + 1}/${images.length}',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  // Fullscreen button
-                  Positioned(
-                    top: 12,
-                    left: 12,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => _showFullScreenImage(context, images, _currentImageIndex),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Icon(
-                            Icons.fullscreen,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Thumbnail strip (for multiple images)
-          if (images.length > 1) ...[
-            SizedBox(height: 12),
-            SizedBox(
-              height: 70,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: images.length,
-                itemBuilder: (context, index) {
-                  return _buildThumbnail(images[index], index);
-                },
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
+  // Reset page controller if image count changed
+  if (_pageController.hasClients && images.length == 1) {
+    _currentImageIndex = 0;
   }
-
-  // ============================================================================
-  // ✅ NEW: Thumbnail Widget
-  // ============================================================================
-
-  Widget _buildThumbnail(String imageUrl, int index) {
-    final isActive = index == _currentImageIndex;
-    
-    return GestureDetector(
-      onTap: () {
-        _pageController.animateToPage(
-          index,
-          duration: Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      },
-      child: Container(
-        width: 70,
-        margin: EdgeInsets.only(right: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isActive ? Colors.green[600]! : Colors.grey[300]!,
-            width: isActive ? 3 : 1,
+  
+  return Padding(
+    padding: EdgeInsets.fromLTRB(
+      widget.isDesktop ? 24 : 20,
+      0,
+      widget.isDesktop ? 24 : 20,
+      widget.isDesktop ? 20 : 16,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Main image display
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: widget.isDesktop ? 400 : 300,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: images.length == 1
+                // Single image - simple display
+                ? _buildSingleImage(images[0])
+                // Multiple images - carousel
+                : _buildImageCarousel(images),
           ),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(6),
+
+        // Thumbnail strip (only for multiple images)
+        if (images.length > 1) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 70,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: images.length,
+              itemBuilder: (context, index) {
+                return _buildThumbnail(images[index], index, images);
+              },
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+Widget _buildSingleImage(String imageUrl) {
+  return GestureDetector(
+    onTap: () => _showFullScreenImage(context, [imageUrl], 0),
+    child: Stack(
+      children: [
+        Positioned.fill(
           child: Image.network(
             imageUrl,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: Colors.grey[200],
-                child: Icon(Icons.image, color: Colors.grey[400]),
-              );
+            errorBuilder: (context, error, stackTrace) => _buildImageError(),
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return _buildImageLoading(loadingProgress);
             },
           ),
         ),
-      ),
-    );
-  }
+        // Fullscreen button
+        Positioned(
+          top: 12,
+          left: 12,
+          child: _buildFullscreenButton([imageUrl], 0),
+        ),
+      ],
+    ),
+  );
+}
 
-  // ============================================================================
-  // ✅ NEW: Navigation Arrow Widget
-  // ============================================================================
+// Multiple images carousel
+Widget _buildImageCarousel(List<String> images) {
+  return Stack(
+    children: [
+      // PageView for swiping
+      PageView.builder(
+        controller: _pageController,
+        itemCount: images.length,
+        onPageChanged: (index) {
+          setState(() {
+            _currentImageIndex = index;
+          });
+        },
+        itemBuilder: (context, index) {
+          return GestureDetector(
+            onTap: () => _showFullScreenImage(context, images, index),
+            child: Image.network(
+              images[index],
+              width: double.infinity,
+              height: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => _buildImageError(),
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return _buildImageLoading(loadingProgress);
+              },
+            ),
+          );
+        },
+      ),
+
+      // Navigation arrows
+      if (images.length > 1) ...[
+        _buildNavigationArrow(
+          alignment: Alignment.centerLeft,
+          icon: Icons.chevron_left,
+          onTap: () {
+            if (_currentImageIndex > 0) {
+              _pageController.previousPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
+          },
+          enabled: _currentImageIndex > 0,
+        ),
+        _buildNavigationArrow(
+          alignment: Alignment.centerRight,
+          icon: Icons.chevron_right,
+          onTap: () {
+            if (_currentImageIndex < images.length - 1) {
+              _pageController.nextPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
+          },
+          enabled: _currentImageIndex < images.length - 1,
+        ),
+      ],
+
+      // Image counter badge
+      if (images.length > 1)
+        Positioned(
+          top: 12,
+          right: 12,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.photo_library, color: Colors.white, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  '${_currentImageIndex + 1}/${images.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+      // Fullscreen button
+      Positioned(
+        top: 12,
+        left: 12,
+        child: _buildFullscreenButton(images, _currentImageIndex),
+      ),
+    ],
+  );
+}
+
+Widget _buildFullscreenButton(List<String> images, int index) {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: () => _showFullScreenImage(context, images, index),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Icon(Icons.fullscreen, color: Colors.white, size: 20),
+      ),
+    ),
+  );
+}
+
+// Updated thumbnail with proper images list reference
+Widget _buildThumbnail(String imageUrl, int index, List<String> allImages) {
+  final isActive = index == _currentImageIndex;
+  
+  return GestureDetector(
+    onTap: () {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    },
+    child: Container(
+      width: 70,
+      margin: const EdgeInsets.only(right: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isActive ? Colors.green[600]! : Colors.grey[300]!,
+          width: isActive ? 3 : 1,
+        ),
+        boxShadow: isActive
+            ? [
+                BoxShadow(
+                  color: Colors.green.withOpacity(0.3),
+                  blurRadius: 8,
+                  spreadRadius: 0,
+                )
+              ]
+            : null,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: Colors.grey[200],
+              child: Icon(Icons.image, color: Colors.grey[400], size: 24),
+            );
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              color: Colors.grey[100],
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    ),
+  );
+}
 
   Widget _buildNavigationArrow({
     required AlignmentGeometry alignment,

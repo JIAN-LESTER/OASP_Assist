@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -99,20 +100,24 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
   }
 
   Future<void> _pickFile() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'txt', 'docx', 'doc'],
-        withData: true,
-      );
+  try {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'txt', 'docx', 'doc'],
+      withData: true, // ✅ CRITICAL for web
+    );
 
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
-        final fileName = result.files.single.name;
-        final fileBytes = result.files.single.bytes;
+    if (result != null) {
+      final fileName = result.files.single.name;
+      final fileBytes = result.files.single.bytes;
+
+      // ✅ Web platform - use bytes directly
+      if (kIsWeb || fileBytes != null) {
+        if (fileBytes == null) {
+          throw Exception('No file data available');
+        }
 
         setState(() {
-          _selectedFile = file;
           _selectedFileName = fileName;
           _isProcessing = true;
         });
@@ -120,22 +125,46 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
         String extractedText;
         final extension = fileName.split('.').last.toLowerCase();
 
-        if (extension == 'pdf' && fileBytes != null) {
+        if (extension == 'pdf') {
           extractedText = await _fileService.extractTextFromPdfBytes(fileBytes);
+        } else if (extension == 'docx' || extension == 'doc') {
+          extractedText = await _fileService.extractTextFromFileBytes(
+            fileBytes,
+            fileName,
+          );
+        } else if (extension == 'txt') {
+          extractedText = utf8.decode(fileBytes);
         } else {
-          extractedText = await _fileService.extractTextFromFile(file);
+          throw UnsupportedError('Unsupported file type: $extension');
         }
 
         await _processExtractedText(extractedText, fileName);
 
         setState(() => _isProcessing = false);
         _showAlert('File processed successfully!', AlertType.success);
+      } 
+      // ✅ Mobile/Desktop platform - use file path
+      else if (result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+
+        setState(() {
+          _selectedFile = file;
+          _selectedFileName = fileName;
+          _isProcessing = true;
+        });
+
+        String extractedText = await _fileService.extractTextFromFile(file);
+        await _processExtractedText(extractedText, fileName);
+
+        setState(() => _isProcessing = false);
+        _showAlert('File processed successfully!', AlertType.success);
       }
-    } catch (e) {
-      setState(() => _isProcessing = false);
-      _showAlert('Error processing file: $e', AlertType.error);
     }
+  } catch (e) {
+    setState(() => _isProcessing = false);
+    _showAlert('Error processing file: $e', AlertType.error);
   }
+}
 
   Future<void> _pickImageFromGallery() async {
     try {
