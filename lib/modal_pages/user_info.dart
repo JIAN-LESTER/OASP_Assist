@@ -542,19 +542,21 @@ Future<void> _handleDeleteUser(
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-      ),
+      builder:
+          (context) => const Center(
+            child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+          ),
     );
 
     final currentUser = FirebaseAuth.instance.currentUser;
     String actorName = 'Unknown';
 
     if (currentUser != null) {
-      final currentUserDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      final currentUserDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
       if (currentUserDoc.exists) {
         final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
         actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';

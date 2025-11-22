@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
+import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 import 'package:capstone_project/modal_pages/programs.modal.dart';
 import 'package:capstone_project/pages/admin_pages/affiliation.dart';
 import 'package:capstone_project/pages/admin_pages/scholarship_management.dart';
@@ -87,6 +88,9 @@ class _EditUserModalState extends State<EditUserModal> {
   late TextEditingController firstNameController;
   late TextEditingController lastNameController;
   late TextEditingController emailController;
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
 
   late String selectedRole;
   late String selectedYear;
@@ -94,6 +98,10 @@ class _EditUserModalState extends State<EditUserModal> {
   String _selectedAffiliation = 'N/A';
   String _selectedScholarship = 'N/A';
   late bool isActive;
+
+  bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
+  bool _isSubmitting = false;
 
   bool get isYearEnabled => selectedRole == 'user';
   bool get isProgramEnabled =>
@@ -130,10 +138,11 @@ class _EditUserModalState extends State<EditUserModal> {
 
   Future<void> _fetchPrograms() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('programs')
-          .orderBy('name')
-          .get();
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('programs')
+              .orderBy('name')
+              .get();
 
       final fetchedPrograms = ['N/A'];
       fetchedPrograms.addAll(snapshot.docs.map((doc) => doc['name'] as String));
@@ -157,10 +166,11 @@ class _EditUserModalState extends State<EditUserModal> {
 
   Future<void> _fetchAffiliations() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('affiliations')
-          .orderBy('name')
-          .get();
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('affiliations')
+              .orderBy('name')
+              .get();
 
       setState(() {
         _affiliations.clear();
@@ -182,10 +192,11 @@ class _EditUserModalState extends State<EditUserModal> {
 
   Future<void> _fetchScholarships() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('scholarships')
-          .orderBy('name')
-          .get();
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('scholarships')
+              .orderBy('name')
+              .get();
 
       setState(() {
         _scholarships.clear();
@@ -210,6 +221,8 @@ class _EditUserModalState extends State<EditUserModal> {
     firstNameController.dispose();
     lastNameController.dispose();
     emailController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -217,6 +230,36 @@ class _EditUserModalState extends State<EditUserModal> {
       role[0].toUpperCase() + role.substring(1);
 
   String getOriginalRole(String displayRole) => displayRole.toLowerCase();
+
+  void _showTopRightAlert(String message, AlertType type) {
+    if (!mounted) return;
+
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+
+    overlayEntry = OverlayEntry(
+      builder:
+          (context) => TopRightAlert(
+            message: message,
+            type: type,
+            onDismiss: () => overlayEntry.remove(),
+            isMobile: isMobile,
+            isTablet: isTablet,
+          ),
+    );
+
+    overlay.insert(overlayEntry);
+
+    Future.delayed(const Duration(seconds: 4), () {
+      if (overlayEntry.mounted) {
+        overlayEntry.remove();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -345,8 +388,8 @@ class _EditUserModalState extends State<EditUserModal> {
                 ),
               ),
 
-              // Content
-              Flexible(
+              // Scrollable Content
+              Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.all(isMobile ? 20 : 28),
                   child: Column(
@@ -361,47 +404,47 @@ class _EditUserModalState extends State<EditUserModal> {
 
                       isMobile
                           ? Column(
-                              children: [
-                                buildTextField(
+                            children: [
+                              buildTextField(
+                                isMobile: false,
+                                controller: firstNameController,
+                                label: "First Name",
+                                hint: "Enter first name",
+                                icon: Icons.person_outline,
+                              ),
+                              const SizedBox(height: 16),
+                              buildTextField(
+                                isMobile: false,
+                                controller: lastNameController,
+                                label: "Last Name",
+                                hint: "Enter last name",
+                                icon: Icons.person_outline,
+                              ),
+                            ],
+                          )
+                          : Row(
+                            children: [
+                              Expanded(
+                                child: buildTextField(
                                   isMobile: false,
                                   controller: firstNameController,
                                   label: "First Name",
                                   hint: "Enter first name",
                                   icon: Icons.person_outline,
                                 ),
-                                const SizedBox(height: 16),
-                                buildTextField(
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: buildTextField(
                                   isMobile: false,
                                   controller: lastNameController,
                                   label: "Last Name",
                                   hint: "Enter last name",
                                   icon: Icons.person_outline,
                                 ),
-                              ],
-                            )
-                          : Row(
-                              children: [
-                                Expanded(
-                                  child: buildTextField(
-                                    isMobile: false,
-                                    controller: firstNameController,
-                                    label: "First Name",
-                                    hint: "Enter first name",
-                                    icon: Icons.person_outline,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: buildTextField(
-                                    isMobile: false,
-                                    controller: lastNameController,
-                                    label: "Last Name",
-                                    hint: "Enter last name",
-                                    icon: Icons.person_outline,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
+                          ),
 
                       const SizedBox(height: 16),
                       buildTextField(
@@ -444,18 +487,19 @@ class _EditUserModalState extends State<EditUserModal> {
                         label: "Year Level",
                         value: selectedYear,
                         items: years,
-                        onChanged: isYearEnabled
-                            ? (val) {
-                                setState(() {
-                                  selectedYear = val!;
-                                  if (selectedYear == 'N/A' ||
-                                      selectedYear == 'Incoming' ||
-                                      selectedYear == 'Graduate') {
-                                    selectedProgram = 'N/A';
-                                  }
-                                });
-                              }
-                            : null,
+                        onChanged:
+                            isYearEnabled
+                                ? (val) {
+                                  setState(() {
+                                    selectedYear = val!;
+                                    if (selectedYear == 'N/A' ||
+                                        selectedYear == 'Incoming' ||
+                                        selectedYear == 'Graduate') {
+                                      selectedProgram = 'N/A';
+                                    }
+                                  });
+                                }
+                                : null,
                         icon: Icons.school_outlined,
                         isEnabled: isYearEnabled,
                       ),
@@ -465,24 +509,27 @@ class _EditUserModalState extends State<EditUserModal> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Expanded(
-                            child: isLoadingPrograms
-                                ? const Center(
-                                    child: CircularProgressIndicator(),
-                                  )
-                                : _buildDropdownField(
-                                    label: 'Program',
-                                    value: programs.contains(selectedProgram)
-                                        ? selectedProgram
-                                        : 'N/A',
-                                    items: programs,
-                                    onChanged: isProgramEnabled
-                                        ? (value) => setState(
-                                              () => selectedProgram = value!,
-                                            )
-                                        : null,
-                                    icon: Icons.class_outlined,
-                                    isEnabled: isProgramEnabled,
-                                  ),
+                            child:
+                                isLoadingPrograms
+                                    ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                    : _buildDropdownField(
+                                      label: 'Program',
+                                      value:
+                                          programs.contains(selectedProgram)
+                                              ? selectedProgram
+                                              : 'N/A',
+                                      items: programs,
+                                      onChanged:
+                                          isProgramEnabled
+                                              ? (value) => setState(
+                                                () => selectedProgram = value!,
+                                              )
+                                              : null,
+                                      icon: Icons.class_outlined,
+                                      isEnabled: isProgramEnabled,
+                                    ),
                           ),
                           const SizedBox(width: 12),
                           Container(
@@ -525,22 +572,27 @@ class _EditUserModalState extends State<EditUserModal> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Expanded(
-                            child: isLoadingAffiliations
-                                ? const Center(
-                                    child: CircularProgressIndicator(),
-                                  )
-                                : _buildDropdownField(
-                                    label: 'Affiliation',
-                                    value: _affiliations.contains(_selectedAffiliation)
-                                        ? _selectedAffiliation
-                                        : 'N/A',
-                                    items: _affiliations,
-                                    icon: Icons.business_outlined,
-                                    isEnabled: true,
-                                    onChanged: (value) => setState(
-                                      () => _selectedAffiliation = value!,
+                            child:
+                                isLoadingAffiliations
+                                    ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                    : _buildDropdownField(
+                                      label: 'Affiliation',
+                                      value:
+                                          _affiliations.contains(
+                                                _selectedAffiliation,
+                                              )
+                                              ? _selectedAffiliation
+                                              : 'N/A',
+                                      items: _affiliations,
+                                      icon: Icons.business_outlined,
+                                      isEnabled: true,
+                                      onChanged:
+                                          (value) => setState(
+                                            () => _selectedAffiliation = value!,
+                                          ),
                                     ),
-                                  ),
                           ),
                           const SizedBox(width: 12),
                           Container(
@@ -576,22 +628,27 @@ class _EditUserModalState extends State<EditUserModal> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Expanded(
-                            child: isLoadingScholarships
-                                ? const Center(
-                                    child: CircularProgressIndicator(),
-                                  )
-                                : _buildDropdownField(
-                                    label: 'Scholarship',
-                                    value: _scholarships.contains(_selectedScholarship)
-                                        ? _selectedScholarship
-                                        : 'N/A',
-                                    items: _scholarships,
-                                    icon: Icons.school_outlined,
-                                    isEnabled: true,
-                                    onChanged: (value) => setState(
-                                      () => _selectedScholarship = value!,
+                            child:
+                                isLoadingScholarships
+                                    ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                    : _buildDropdownField(
+                                      label: 'Scholarship',
+                                      value:
+                                          _scholarships.contains(
+                                                _selectedScholarship,
+                                              )
+                                              ? _selectedScholarship
+                                              : 'N/A',
+                                      items: _scholarships,
+                                      icon: Icons.school_outlined,
+                                      isEnabled: true,
+                                      onChanged:
+                                          (value) => setState(
+                                            () => _selectedScholarship = value!,
+                                          ),
                                     ),
-                                  ),
                           ),
                           const SizedBox(width: 12),
                           Container(
@@ -622,6 +679,57 @@ class _EditUserModalState extends State<EditUserModal> {
 
                       const SizedBox(height: 24),
 
+                      // Password Section
+                      buildSectionHeader(
+                        'Change Password',
+                        Icons.lock_outlined,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Leave blank to keep current password',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: const Color(0xFF6B7280),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Password Fields
+                      buildTextField(
+                        controller: passwordController,
+                        label: 'New Password',
+                        hint: 'Enter new password...',
+                        icon: Icons.lock_outlined,
+                        isPassword: true,
+                        isPasswordVisible: _isPasswordVisible,
+                        isMobile: false,
+                        onTogglePassword:
+                            () => setState(
+                              () => _isPasswordVisible = !_isPasswordVisible,
+                            ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      buildTextField(
+                        controller: confirmPasswordController,
+                        isMobile: false,
+                        label: 'Confirm New Password',
+                        hint: 'Confirm new password...',
+                        icon: Icons.lock_outlined,
+                        isPassword: true,
+                        isPasswordVisible: _isConfirmPasswordVisible,
+                        onTogglePassword:
+                            () => setState(
+                              () =>
+                                  _isConfirmPasswordVisible =
+                                      !_isConfirmPasswordVisible,
+                            ),
+                      ),
+
+                      const SizedBox(height: 24),
+
                       // Status Section
                       buildSectionHeader('Status', Icons.toggle_on_outlined),
                       const SizedBox(height: 16),
@@ -641,9 +749,10 @@ class _EditUserModalState extends State<EditUserModal> {
                             Icon(
                               Icons.circle_outlined,
                               size: 18,
-                              color: isActive
-                                  ? const Color(0xFF2E7D32)
-                                  : const Color(0xFFEF4444),
+                              color:
+                                  isActive
+                                      ? const Color(0xFF2E7D32)
+                                      : const Color(0xFFEF4444),
                             ),
                             const SizedBox(width: 12),
                             const Expanded(
@@ -661,23 +770,31 @@ class _EditUserModalState extends State<EditUserModal> {
                               activeColor: const Color(0xFF2E7D32),
                               inactiveThumbColor: Colors.white,
                               inactiveTrackColor: const Color(0xFFE2E8F0),
-                              onChanged: (val) => setState(() => isActive = val),
+                              onChanged:
+                                  (val) => setState(() => isActive = val),
                             ),
                           ],
                         ),
                       ),
-
-                      const SizedBox(height: 32),
-
-                      // Action Buttons
-                      _buildActionButtons(
-                        context,
-                        isMobile,
-                        isTablet,
-                        isDesktop,
-                      ),
                     ],
                   ),
+                ),
+              ),
+
+              // Fixed Action Buttons at Bottom
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    top: BorderSide(color: const Color(0xFFE5E7EB), width: 1),
+                  ),
+                ),
+                padding: EdgeInsets.all(isMobile ? 20 : 28),
+                child: _buildActionButtons(
+                  context,
+                  isMobile,
+                  isTablet,
+                  isDesktop,
                 ),
               ),
             ],
@@ -693,9 +810,10 @@ class _EditUserModalState extends State<EditUserModal> {
     bool isTablet,
     bool isDesktop,
   ) {
-    double buttonHeight = isMobile
-        ? 40
-        : isTablet
+    double buttonHeight =
+        isMobile
+            ? 40
+            : isTablet
             ? 44
             : 46;
     double fontSize = isMobile ? 14 : 15;
@@ -707,7 +825,8 @@ class _EditUserModalState extends State<EditUserModal> {
           child: SizedBox(
             height: buttonHeight,
             child: OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed:
+                  _isSubmitting ? null : () => Navigator.of(context).pop(),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF6B7280),
                 side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
@@ -730,25 +849,57 @@ class _EditUserModalState extends State<EditUserModal> {
         Expanded(
           child: SizedBox(
             height: buttonHeight,
-            child: ElevatedButton.icon(
-              onPressed: _saveChanges,
-              icon: const Icon(Icons.save_outlined, size: 18),
-              label: Text(
-                'Save Changes',
-                style: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _saveChanges,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2E7D32),
                 foregroundColor: Colors.white,
                 elevation: 0,
+                disabledBackgroundColor: const Color(0xFFE5E7EB),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(borderRadius),
                 ),
                 padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
               ),
+              child:
+                  _isSubmitting
+                      ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Updating...',
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      )
+                      : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.save_outlined, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Save Changes',
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
             ),
           ),
         ),
@@ -758,107 +909,91 @@ class _EditUserModalState extends State<EditUserModal> {
 
   Future<void> _saveChanges() async {
     if (firstNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              const Text('Please enter a first name'),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      _showTopRightAlert('Please enter a first name', AlertType.warning);
       return;
     }
 
-    try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-        ),
-      );
+    // Validate password if entered
+    if (passwordController.text.isNotEmpty) {
+      if (passwordController.text.length < 6) {
+        _showTopRightAlert(
+          'Password must be at least 6 characters',
+          AlertType.warning,
+        );
+        return;
+      }
 
+      if (passwordController.text != confirmPasswordController.text) {
+        _showTopRightAlert('Passwords do not match', AlertType.warning);
+        return;
+      }
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
       final userData = widget.userDoc.data() as Map<String, dynamic>;
       final originalEmail = userData['email'] ?? '';
       final newEmail = emailController.text.trim();
       final newDisplayName =
           '${firstNameController.text.trim()} ${lastNameController.text.trim()}';
 
-      if (newEmail != originalEmail && newEmail.isNotEmpty) {
+      // Update email and/or password in Firebase Authentication if changed
+      if (newEmail != originalEmail || passwordController.text.isNotEmpty) {
         try {
           final functionsService = FirebaseFunctionsService();
           await functionsService.updateUserAuth(
             uid: widget.userDoc.id,
-            email: newEmail,
+            email: newEmail != originalEmail ? newEmail : null,
             displayName: newDisplayName,
+            password:
+                passwordController.text.isNotEmpty
+                    ? passwordController.text.trim()
+                    : null,
           );
-          print('✅ User email updated in Firebase Authentication');
+          print('✅ User updated in Firebase Authentication');
         } catch (e) {
-          print('⚠️ Failed to update email in Authentication: $e');
-          if (context.mounted) {
-            Navigator.of(context).pop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.warning, color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                    const Flexible(
-                      child: Text(
-                        'Email update in Authentication failed. Firestore will still be updated.',
-                      ),
-                    ),
-                  ],
-                ),
-                backgroundColor: Colors.orange,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                duration: const Duration(seconds: 3),
-              ),
-            );
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => const Center(
-                child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-              ),
-            );
-          }
+          print('⚠️ Failed to update in Authentication: $e');
+          setState(() {
+            _isSubmitting = false;
+          });
+          _showTopRightAlert(
+            'Failed to update authentication: ${e.toString()}',
+            AlertType.error,
+          );
+          return;
         }
       }
 
+      // Update Firestore document
       await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.userDoc.id)
           .update({
-        'name': newDisplayName,
-        'email': newEmail,
-        'role': selectedRole.toLowerCase(),
-        'year': selectedYear,
-        'program': selectedProgram,
-        'affiliation': _selectedAffiliation,
-        'scholarship': _selectedScholarship,
-        'isActive': isActive,
-        'updatedAt': Timestamp.now(),
-      });
+            'name': newDisplayName,
+            'email': newEmail,
+            'role': selectedRole.toLowerCase(),
+            'year': selectedYear,
+            'program': selectedProgram,
+            'affiliation': _selectedAffiliation,
+            'scholarship': _selectedScholarship,
+            'isActive': isActive,
+            'updatedAt': Timestamp.now(),
+          });
       print('✅ User document updated in Firestore');
 
+      // Log the action
       final currentUser = FirebaseAuth.instance.currentUser;
       String actorName = 'Unknown';
 
       if (currentUser != null) {
-        final doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
+        final doc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
         if (doc.exists) {
           final data = doc.data() as Map<String, dynamic>;
           actorName = data['name'] ?? currentUser.email ?? 'Unknown';
@@ -876,46 +1011,29 @@ class _EditUserModalState extends State<EditUserModal> {
       await logRef.set(logData);
       print('✅ Update logged successfully');
 
-      if (context.mounted) {
-        Navigator.of(context).pop();
-        Navigator.of(context).pop();
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                const Text('User updated successfully'),
-              ],
-            ),
-            backgroundColor: const Color(0xFF2E7D32),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        );
+        _showTopRightAlert('User updated successfully!', AlertType.success);
+
+        // Close modal after short delay to show success message
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+        });
       }
     } catch (e) {
       print('❌ Error updating user: $e');
-      if (context.mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Flexible(child: Text('Failed to update: ${e.toString()}')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+        _showTopRightAlert(
+          'Failed to update: ${e.toString()}',
+          AlertType.error,
         );
       }
     }
@@ -937,33 +1055,28 @@ class _EditUserModalState extends State<EditUserModal> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: isEnabled
-                ? const Color(0xFF374151)
-                : const Color(0xFF9CA3AF),
+            color:
+                isEnabled ? const Color(0xFF374151) : const Color(0xFF9CA3AF),
             letterSpacing: -0.1,
           ),
         ),
         const SizedBox(height: 8),
         Container(
-          constraints: const BoxConstraints(
-            maxWidth: double.infinity,
-          ),
+          constraints: const BoxConstraints(maxWidth: double.infinity),
           decoration: BoxDecoration(
             color: isEnabled ? Colors.white : const Color(0xFFF9FAFB),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: const Color(0xFFE5E7EB),
-              width: 1.5,
-            ),
-            boxShadow: isEnabled
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+            boxShadow:
+                isEnabled
+                    ? [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ]
+                    : null,
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButtonFormField<String>(
@@ -972,27 +1085,30 @@ class _EditUserModalState extends State<EditUserModal> {
               isExpanded: true,
               alignment: Alignment.centerLeft,
               menuMaxHeight: 250,
-              items: items.map((String item) {
-                return DropdownMenuItem<String>(
-                  value: item,
-                  child: Text(
-                    item,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isEnabled
-                          ? const Color(0xFF1F2937)
-                          : const Color(0xFF9CA3AF),
-                    ),
-                  ),
-                );
-              }).toList(),
+              items:
+                  items.map((String item) {
+                    return DropdownMenuItem<String>(
+                      value: item,
+                      child: Text(
+                        item,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color:
+                              isEnabled
+                                  ? const Color(0xFF1F2937)
+                                  : const Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    );
+                  }).toList(),
               decoration: InputDecoration(
                 prefixIcon: Icon(
                   icon,
-                  color: isEnabled
-                      ? const Color(0xFF9CA3AF)
-                      : const Color(0xFFD1D5DB),
+                  color:
+                      isEnabled
+                          ? const Color(0xFF9CA3AF)
+                          : const Color(0xFFD1D5DB),
                   size: 20,
                 ),
                 border: InputBorder.none,
@@ -1002,10 +1118,7 @@ class _EditUserModalState extends State<EditUserModal> {
                 ),
               ),
               dropdownColor: Colors.white,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF1F2937),
-              ),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF1F2937)),
             ),
           ),
         ),
