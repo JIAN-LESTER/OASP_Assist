@@ -7,26 +7,57 @@ import * as admin from "firebase-admin";
 
 const db = admin.firestore();
 
+async function getUsersByRole(role: string): Promise<string[]> {
+  try {
+    console.log(`👥 Fetching users with role: ${role}`);
+    
+    const usersSnapshot = await db
+      .collection("users")
+      .where("role", "==", role)
+      .where("isActive", "==", true)
+      .get();
+
+    const userIds = usersSnapshot.docs.map((doc) => doc.id);
+    console.log(`✅ Found ${userIds.length} active ${role} users`);
+    
+    return userIds;
+  } catch (error) {
+    console.error(`❌ Error fetching ${role} users:`, error);
+    return [];
+  }
+}
+
 // ✅ Get FCM tokens grouped by userId
 async function getUserFCMTokens(
   userIds: string[]
 ): Promise<Map<string, string[]>> {
   try {
+    console.log(`🔍 Fetching FCM tokens for users: ${userIds.join(', ')}`);
+    
     const userTokensMap = new Map<string, string[]>();
-    const allSeenTokens = new Set<string>(); // ✅ Track globally to avoid cross-user duplicates
+    const allSeenTokens = new Set<string>();
 
     for (let i = 0; i < userIds.length; i += 10) {
       const batch = userIds.slice(i, i + 10);
+      console.log(`🔍 Fetching token batch: ${batch.join(', ')}`);
 
       const tokensSnapshot = await db
         .collection("fcm_tokens")
         .where("userId", "in", batch)
         .get();
 
+      console.log(`📦 Found ${tokensSnapshot.size} token documents for this batch`);
+
       tokensSnapshot.forEach((doc) => {
         const data = doc.data();
         const userId = data.userId;
-        // Ensure tokens is an array of strings
+        
+        // ✅ CRITICAL: Verify this userId is in our requested list
+        if (!userIds.includes(userId)) {
+          console.warn(`⚠️ WARNING: Token for user ${userId} found but NOT in requested list [${userIds.join(', ')}]!`);
+          return; // Skip this token
+        }
+        
         const rawTokens = Array.isArray(data.tokens) ? data.tokens : [];
         const tokens: string[] = rawTokens
           .map((t) => (typeof t === "string" ? t : String(t)))
@@ -36,7 +67,6 @@ async function getUserFCMTokens(
           (token: string) => !token.startsWith("web_") && token.length > 10
         );
 
-        // ✅ Deduplicate tokens per user
         const uniqueTokens = [...new Set(mobileTokens)].filter(
           (token: string) => !allSeenTokens.has(token)
         );
@@ -44,12 +74,14 @@ async function getUserFCMTokens(
         uniqueTokens.forEach(token => allSeenTokens.add(token));
 
         if (uniqueTokens.length > 0) {
+          console.log(`✅ User ${userId}: ${uniqueTokens.length} mobile tokens`);
           userTokensMap.set(userId, uniqueTokens);
         }
       });
     }
 
-    console.log(`📊 Total unique tokens across ${userTokensMap.size} users: ${allSeenTokens.size}`);
+    console.log(`📊 Total: ${userTokensMap.size} users with ${allSeenTokens.size} unique tokens`);
+    console.log(`📊 Users with tokens: ${Array.from(userTokensMap.keys()).join(', ')}`);
     return userTokensMap;
   } catch (error) {
     console.error("❌ Error getting user FCM tokens:", error);
@@ -62,9 +94,16 @@ async function sendFCMNotifications(
   title: string,
   body: string,
   data: { [key: string]: string },
-  targetRole?: string // ✅ Role info for CLIENT-SIDE filtering
+  targetRole?: string,
+  targetUserId?: string // ✅ NEW: For escalation replies
 ): Promise<void> {
   try {
+    console.log(`📤 sendFCMNotifications called with:`);
+    console.log(`   Users: ${userIds.join(', ')}`);
+    console.log(`   Target Role: ${targetRole || 'any'}`);
+    console.log(`   Target User: ${targetUserId || 'none'}`);
+    console.log(`   Type: ${data.type}`);
+    
     const userTokensMap = await getUserFCMTokens(userIds);
 
     if (userTokensMap.size === 0) {
@@ -72,7 +111,6 @@ async function sendFCMNotifications(
       return;
     }
 
-    // ✅ Deduplicate tokens using Set
     const allTokens: string[] = [];
     const seenTokens = new Set<string>();
     
@@ -91,19 +129,28 @@ async function sendFCMNotifications(
     }
 
     console.log(
-      `📱 Sending FCM to ${allTokens.length} unique mobile devices (targetRole: ${targetRole || 'any'})`
+      `📱 Sending FCM to ${allTokens.length} unique mobile devices`
     );
+    
+    // ✅ CRITICAL: Include targetUserId in notification data
+        const notificationData: { [key: string]: string } = {
+          ...data,
+          click_action: "FLUTTER_NOTIFICATION_CLICK",
+          targetRole: targetRole || "any",
+        };
+        
+        // ✅ Add targetUserId for escalation replies
+        if (targetUserId) {
+          notificationData.targetUserId = targetUserId;
+          console.log(`✅ Added targetUserId to notification data: ${targetUserId}`);
+        }
     
     const message = {
       notification: {
         title: title,
         body: body,
       },
-      data: {
-        ...data,
-        click_action: "FLUTTER_NOTIFICATION_CLICK",
-        targetRole: targetRole || "any", // ✅ Include target role for CLIENT-SIDE filtering
-      },
+      data: notificationData,
       tokens: allTokens,
       android: {
         priority: "high" as const,
@@ -137,7 +184,7 @@ async function sendFCMNotifications(
 
     const response = await admin.messaging().sendEachForMulticast(message);
     console.log(
-      `✅ FCM sent: ${response.successCount} successful, ${response.failureCount} failed (targetRole: ${targetRole || 'any'})`
+      `✅ FCM sent: ${response.successCount} successful, ${response.failureCount} failed`
     );
 
     if (response.failureCount > 0) {
@@ -204,7 +251,6 @@ async function createNotificationsForUsers(
       `📝 Creating notifications for ${userIds.length} ${targetRole} users`
     );
 
-    // ✅ Build unique notification key with CONSISTENT reminderDate for deadline reminders
     let uniqueKey = `${type}`;
     if (data.announcementId) {
       uniqueKey += `-${data.announcementId}`;
@@ -216,7 +262,6 @@ async function createNotificationsForUsers(
       uniqueKey += `-${data.placementId}`;
     }
     
-    // ✅ ALWAYS include reminderDate for deadline reminders
     if (type === "deadline_reminder") {
       const reminderDate = data.reminderDate || new Date().toISOString().substring(0, 10);
       uniqueKey += `-${reminderDate}`;
@@ -233,11 +278,9 @@ async function createNotificationsForUsers(
     let totalCreated = 0;
 
     for (const userId of userIds) {
-      // ✅ Create deterministic notification ID
       const notificationId = `${userId}_${uniqueKey}`;
       const notificationRef = db.collection("notifications").doc(notificationId);
 
-      // ✅ Use set with merge to prevent duplicates (idempotent operation)
       batch.set(
         notificationRef,
         {
@@ -276,7 +319,7 @@ async function createNotificationsForUsers(
     }
 
     console.log(
-      `✅ Processed ${totalCreated} notifications (duplicates automatically prevented by document ID)`
+      `✅ Processed ${totalCreated} notifications`
     );
     return totalCreated;
   } catch (error) {
@@ -319,7 +362,6 @@ export const onAnnouncementCreated = onDocumentCreated(
     console.log(`📢 onAnnouncementCreated triggered for: ${announcementId}`);
     console.log(`📢 Event ID: ${event.id}`);
     
-    // ✅ FIX: Add small delay to debounce rapid triggers
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     try {
@@ -344,7 +386,6 @@ export const onAnnouncementCreated = onDocumentCreated(
             throw new Error("Notification already sent");
           }
           
-          // Atomically set the flag
           transaction.update(announcementRef, {
             notification_sent: true,
             notification_sent_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -366,6 +407,7 @@ export const onAnnouncementCreated = onDocumentCreated(
         }
         throw error;
       }
+      
       const message = announcementData.message || "New announcement posted";
       const category = announcementData.category || "General";
       const deadline = announcementData.deadline || null;
@@ -409,20 +451,19 @@ export const onAnnouncementCreated = onDocumentCreated(
 
       console.log(`✅ Created ${notificationsCreated} notifications`);
 
-  if (notificationsCreated > 0) {
-      await sendFCMNotifications(
-        userIds, 
-        notificationTitle, 
-        notificationBody, 
-        {
-          type: "announcement",
-          announcementId: announcementId,
-          category: category,
-        },
-        "user" // ✅ Mobile app will only show if current user has role "user"
-      );
+      if (notificationsCreated > 0) {
+        await sendFCMNotifications(
+          userIds, 
+          notificationTitle, 
+          notificationBody, 
+          {
+            type: "announcement",
+            announcementId: announcementId,
+            category: category,
+          },
+          "user"
+        );
       }
-    
 
       return { success: true, notificationsCreated, eventId: event.id };
     } catch (error) {
@@ -435,7 +476,9 @@ export const onAnnouncementCreated = onDocumentCreated(
 export const checkUpcomingDeadlines = onSchedule(
   {
     schedule: "0 6,18 * * *",
+  
     timeZone: "Asia/Manila",
+    region: "us-central1",
   },
   async (event) => {
     const now = new Date(
@@ -447,7 +490,7 @@ export const checkUpcomingDeadlines = onSchedule(
     console.log("🔍 Checking for upcoming deadlines...");
     console.log(`📅 Reminder date key: ${reminderDateKey}`);
     
-    // ✅ FIX: Add idempotency check for scheduled function
+    // ✅ Idempotency check
     const runLogRef = db.collection("scheduled_runs").doc(`deadlines_${reminderDateKey}`);
     
     try {
@@ -459,7 +502,7 @@ export const checkUpcomingDeadlines = onSchedule(
       });
       console.log(`✅ Acquired lock for deadline check on ${reminderDateKey}`);
     } catch (error: any) {
-      if (error.code === 6) { // ALREADY_EXISTS
+      if (error.code === 6) {
         console.log(`⚠️ Deadline check already ran today (${reminderDateKey})`);
         return;
       }
@@ -476,7 +519,6 @@ export const checkUpcomingDeadlines = onSchedule(
         })}`
       );
 
-      // Calculate the target date (3 days from now)
       const targetDate = new Date(now);
       targetDate.setDate(targetDate.getDate() + 3);
       targetDate.setHours(23, 59, 59, 999);
@@ -503,263 +545,263 @@ export const checkUpcomingDeadlines = onSchedule(
       console.log(`👤 Found ${allUserIds.length} active users.`);
 
       // ✅ Check Announcements
-   const announcementsSnapshot = await db
-  .collection("announcements")
-  .where("deleted", "==", false)
-  .where("deadline", "!=", null)
-  .get();
+      const announcementsSnapshot = await db
+        .collection("announcements")
+        .where("deleted", "==", false)
+        .where("deadline", "!=", null)
+        .get();
 
-console.log(
-  `📋 Found ${announcementsSnapshot.size} announcements with deadlines`
-);
+      console.log(
+        `📋 Found ${announcementsSnapshot.size} announcements with deadlines`
+      );
 
-for (const announcementDoc of announcementsSnapshot.docs) {
-  const data = announcementDoc.data();
-  const announcementId = announcementDoc.id;
-  const { deadline, message = "", category = "General" } = data;
+      for (const announcementDoc of announcementsSnapshot.docs) {
+        const data = announcementDoc.data();
+        const announcementId = announcementDoc.id;
+        const { deadline, message = "", category = "General" } = data;
 
-  if (!deadline || typeof deadline.toDate !== 'function') {
-    console.log(`⚠️ Skipping announcement ${announcementId}: invalid deadline`);
-    continue;
-  }
+        if (!deadline || typeof deadline.toDate !== 'function') {
+          console.log(`⚠️ Skipping announcement ${announcementId}: invalid deadline`);
+          continue;
+        }
 
-  const deadlineDate = deadline.toDate();
-  const deadlineLocal = new Date(
-    deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-  );
-  deadlineLocal.setHours(0, 0, 0, 0);
+        const deadlineDate = deadline.toDate();
+        const deadlineLocal = new Date(
+          deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+        );
+        deadlineLocal.setHours(0, 0, 0, 0);
 
-  const diffMs = deadlineLocal.getTime() - now.getTime();
-  const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
+        const diffMs = deadlineLocal.getTime() - now.getTime();
+        const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-  console.log(`📋 Announcement ${announcementId}: ${daysUntilDeadline} days until deadline`);
+        console.log(`📋 Announcement ${announcementId}: ${daysUntilDeadline} days until deadline`);
 
-  if (daysUntilDeadline === 3) {
-    const title = `⏰ Deadline Reminder: ${category} Announcement`;
-    const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-    const body = `${message.substring(0, 80)}${
-      message.length > 80 ? "..." : ""
-    } | Deadline in 3 days: ${formattedDate}`;
+        if (daysUntilDeadline === 3) {
+          const title = `⏰ Deadline Reminder: ${category} Announcement`;
+          const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          });
+          const body = `${message.substring(0, 80)}${
+            message.length > 80 ? "..." : ""
+          } | Deadline in 3 days: ${formattedDate}`;
 
-    const notificationsCreated = await createNotificationsForUsers(
-      allUserIds,
-      "user",
-      title,
-      body,
-      "deadline_reminder",
-      {
-        announcementId,
-        category,
-        deadline: deadlineLocal.toISOString(),
-        message,
-        daysUntilDeadline: "3",
-        reminderDate: reminderDateKey,
+          const notificationsCreated = await createNotificationsForUsers(
+            allUserIds,
+            "user",
+            title,
+            body,
+            "deadline_reminder",
+            {
+              announcementId,
+              category,
+              deadline: deadlineLocal.toISOString(),
+              message,
+              daysUntilDeadline: "3",
+              reminderDate: reminderDateKey,
+            }
+          );
+
+          totalNotificationsCreated += notificationsCreated;
+          processedItems.push({
+            type: 'announcement',
+            id: announcementId,
+            category,
+            deadline: deadlineLocal.toISOString(),
+            notificationsSent: notificationsCreated,
+          });
+
+          // ✅ FIX: Don't pass targetUserId for deadline reminders (they're for all users)
+          if (notificationsCreated > 0) {
+            await sendFCMNotifications(
+              allUserIds, 
+              title, 
+              body, 
+              {
+                type: "deadline_reminder",
+                announcementId,
+                category,
+                daysUntilDeadline: "3",
+              },
+              "user"
+              // ✅ NO targetUserId parameter - this is for all users
+            );
+          }
+        }
       }
-    );
 
-    totalNotificationsCreated += notificationsCreated;
-    processedItems.push({
-      type: 'announcement',
-      id: announcementId,
-      category,
-      deadline: deadlineLocal.toISOString(),
-      notificationsSent: notificationsCreated,
-    });
+      // ✅ Check Scholarships
+      const scholarshipsSnapshot = await db
+        .collection("scholarships")
+        .where("deadline", "!=", null)
+        .get();
 
-    // ✅ FIX: Send FCM INSIDE the loop for EACH item
- if (notificationsCreated > 0) {
-  await sendFCMNotifications(
-    allUserIds, 
-    title, 
-    body, 
-    {
-      type: "deadline_reminder",
-      announcementId, // or scholarshipId, placementId
-      category,
-      daysUntilDeadline: "3",
-    },
-    "user" // ✅ Mobile app will only show if current user has role "user"
-  );
-}
-  }
-}
+      console.log(
+        `🎓 Found ${scholarshipsSnapshot.size} scholarships with deadlines`
+      );
 
-// ✅ FIXED: Check Scholarships
-const scholarshipsSnapshot = await db
-  .collection("scholarships")
-  .where("deadline", "!=", null)
-  .get();
+      for (const scholarshipDoc of scholarshipsSnapshot.docs) {
+        const data = scholarshipDoc.data();
+        const scholarshipId = scholarshipDoc.id;
+        const { deadline, name = "", scholarshipProvider = "" } = data;
 
-console.log(
-  `🎓 Found ${scholarshipsSnapshot.size} scholarships with deadlines`
-);
+        if (!deadline || typeof deadline.toDate !== 'function') {
+          console.log(`⚠️ Skipping scholarship ${scholarshipId}: invalid deadline`);
+          continue;
+        }
 
-for (const scholarshipDoc of scholarshipsSnapshot.docs) {
-  const data = scholarshipDoc.data();
-  const scholarshipId = scholarshipDoc.id;
-  const { deadline, name = "", scholarshipProvider = "" } = data;
+        const deadlineDate = deadline.toDate();
+        const deadlineLocal = new Date(
+          deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+        );
+        deadlineLocal.setHours(0, 0, 0, 0);
 
-  if (!deadline || typeof deadline.toDate !== 'function') {
-    console.log(`⚠️ Skipping scholarship ${scholarshipId}: invalid deadline`);
-    continue;
-  }
+        const diffMs = deadlineLocal.getTime() - now.getTime();
+        const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-  const deadlineDate = deadline.toDate();
-  const deadlineLocal = new Date(
-    deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-  );
-  deadlineLocal.setHours(0, 0, 0, 0);
+        console.log(`🎓 Scholarship ${scholarshipId} (${name}): ${daysUntilDeadline} days until deadline`);
 
-  const diffMs = deadlineLocal.getTime() - now.getTime();
-  const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
+        if (daysUntilDeadline === 3) {
+          const title = `⏰ Scholarship Deadline Reminder`;
+          const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          });
+          const body = `${name} (${scholarshipProvider}) - Deadline in 3 days: ${formattedDate}`;
 
-  console.log(`🎓 Scholarship ${scholarshipId} (${name}): ${daysUntilDeadline} days until deadline`);
+          const notificationsCreated = await createNotificationsForUsers(
+            allUserIds,
+            "user",
+            title,
+            body,
+            "deadline_reminder",
+            {
+              scholarshipId,
+              name,
+              scholarshipProvider,
+              deadline: deadlineLocal.toISOString(),
+              daysUntilDeadline: "3",
+              reminderDate: reminderDateKey,
+            }
+          );
 
-  if (daysUntilDeadline === 3) {
-    const title = `⏰ Scholarship Deadline Reminder`;
-    const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-    const body = `${name} (${scholarshipProvider}) - Deadline in 3 days: ${formattedDate}`;
+          totalNotificationsCreated += notificationsCreated;
+          processedItems.push({
+            type: 'scholarship',
+            id: scholarshipId,
+            name,
+            deadline: deadlineLocal.toISOString(),
+            notificationsSent: notificationsCreated,
+          });
 
-    const notificationsCreated = await createNotificationsForUsers(
-      allUserIds,
-      "user",
-      title,
-      body,
-      "deadline_reminder",
-      {
-        scholarshipId,
-        name,
-        scholarshipProvider,
-        deadline: deadlineLocal.toISOString(),
-        daysUntilDeadline: "3",
-        reminderDate: reminderDateKey,
+          if (notificationsCreated > 0) {
+            await sendFCMNotifications(
+              allUserIds, 
+              title, 
+              body, 
+              {
+                type: "deadline_reminder",
+                scholarshipId,
+                name,
+                daysUntilDeadline: "3",
+              },
+              "user"
+              // ✅ NO targetUserId parameter
+            );
+          }
+        }
       }
-    );
 
-    totalNotificationsCreated += notificationsCreated;
-    processedItems.push({
-      type: 'scholarship',
-      id: scholarshipId,
-      name,
-      deadline: deadlineLocal.toISOString(),
-      notificationsSent: notificationsCreated,
-    });
+      // ✅ Check Placements
+      const placementsSnapshot = await db
+        .collection("placements")
+        .where("deadline", "!=", null)
+        .where("isRecruiting", "==", true)
+        .get();
 
-    // ✅ FIX: Send FCM INSIDE the loop for EACH item
-   if (notificationsCreated > 0) {
-  await sendFCMNotifications(
-    allUserIds, 
-    title, 
-    body, 
-    {
-      type: "deadline_reminder",
-      scholarshipId, // or scholarshipId, placementId
-      name,
-      daysUntilDeadline: "3",
-    },
-    "user" // ✅ Mobile app will only show if current user has role "user"
-  );
-}
-  }
-}
+      console.log(
+        `💼 Found ${placementsSnapshot.size} placements with deadlines`
+      );
 
-// ✅ FIXED: Check Placements
-const placementsSnapshot = await db
-  .collection("placements")
-  .where("deadline", "!=", null)
-  .where("isRecruiting", "==", true)
-  .get();
+      for (const placementDoc of placementsSnapshot.docs) {
+        const data = placementDoc.data();
+        const placementId = placementDoc.id;
+        const { deadline, partnerCompany = "" } = data;
 
-console.log(
-  `💼 Found ${placementsSnapshot.size} placements with deadlines`
-);
+        if (!deadline || typeof deadline.toDate !== 'function') {
+          console.log(`⚠️ Skipping placement ${placementId}: invalid deadline`);
+          continue;
+        }
 
-for (const placementDoc of placementsSnapshot.docs) {
-  const data = placementDoc.data();
-  const placementId = placementDoc.id;
-  const { deadline, partnerCompany = "" } = data;
+        const deadlineDate = deadline.toDate();
+        const deadlineLocal = new Date(
+          deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+        );
+        deadlineLocal.setHours(0, 0, 0, 0);
 
-  if (!deadline || typeof deadline.toDate !== 'function') {
-    console.log(`⚠️ Skipping placement ${placementId}: invalid deadline`);
-    continue;
-  }
+        const diffMs = deadlineLocal.getTime() - now.getTime();
+        const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-  const deadlineDate = deadline.toDate();
-  const deadlineLocal = new Date(
-    deadlineDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-  );
-  deadlineLocal.setHours(0, 0, 0, 0);
+        console.log(`💼 Placement ${placementId} (${partnerCompany}): ${daysUntilDeadline} days until deadline`);
 
-  const diffMs = deadlineLocal.getTime() - now.getTime();
-  const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
+        if (daysUntilDeadline === 3) {
+          const title = `⏰ Placement Deadline Reminder`;
+          const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          });
+          const body = `${partnerCompany} placement - Deadline in 3 days: ${formattedDate}`;
 
-  console.log(`💼 Placement ${placementId} (${partnerCompany}): ${daysUntilDeadline} days until deadline`);
+          const notificationsCreated = await createNotificationsForUsers(
+            allUserIds,
+            "user",
+            title,
+            body,
+            "deadline_reminder",
+            {
+              placementId,
+              partnerCompany,
+              deadline: deadlineLocal.toISOString(),
+              daysUntilDeadline: "3",
+              reminderDate: reminderDateKey,
+            }
+          );
 
-  if (daysUntilDeadline === 3) {
-    const title = `⏰ Placement Deadline Reminder`;
-    const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-    const body = `${partnerCompany} placement - Deadline in 3 days: ${formattedDate}`;
+          totalNotificationsCreated += notificationsCreated;
+          processedItems.push({
+            type: 'placement',
+            id: placementId,
+            company: partnerCompany,
+            deadline: deadlineLocal.toISOString(),
+            notificationsSent: notificationsCreated,
+          });
 
-    const notificationsCreated = await createNotificationsForUsers(
-      allUserIds,
-      "user",
-      title,
-      body,
-      "deadline_reminder",
-      {
-        placementId,
-        partnerCompany,
-        deadline: deadlineLocal.toISOString(),
-        daysUntilDeadline: "3",
-        reminderDate: reminderDateKey,
+          if (notificationsCreated > 0) {
+            await sendFCMNotifications(
+              allUserIds, 
+              title, 
+              body, 
+              {
+                type: "deadline_reminder",
+                placementId,
+                partnerCompany,
+                daysUntilDeadline: "3",
+              },
+              "user"
+              // ✅ NO targetUserId parameter
+            );
+          }
+        }
       }
-    );
-
-    totalNotificationsCreated += notificationsCreated;
-    processedItems.push({
-      type: 'placement',
-      id: placementId,
-      company: partnerCompany,
-      deadline: deadlineLocal.toISOString(),
-      notificationsSent: notificationsCreated,
-    });
-
-    // ✅ FIX: Send FCM INSIDE the loop for EACH item
-   if (notificationsCreated > 0) {
-  await sendFCMNotifications(
-    allUserIds, 
-    title, 
-    body, 
-    {
-      type: "deadline_reminder",
-      placementId, // or scholarshipId, placementId
-      partnerCompany,
-      daysUntilDeadline: "3",
-    },
-    "user" // ✅ Mobile app will only show if current user has role "user"
-  );
-}
-  }
-}
 
       console.log(
         `✅ Done. Created ${totalNotificationsCreated} notifications in total.`
       );
       console.log("📊 Processed items:", JSON.stringify(processedItems, null, 2));
       
-      // ✅ Update run log with success
       await runLogRef.update({
         status: "completed",
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -771,7 +813,6 @@ for (const placementDoc of placementsSnapshot.docs) {
     } catch (error) {
       console.error("❌ Error checking deadlines:", error);
       
-      // ✅ Update run log with failure
       await runLogRef.update({
         status: "failed",
         error: String(error),
@@ -966,7 +1007,6 @@ export const onEscalationCreated = onDocumentCreated(
       console.log(`🆕 New escalation: ${escalationId}`);
       console.log(`🆕 Event ID: ${event.id}`);
 
-      // ✅ FIX: Add idempotency check for escalation notifications
       const idempotencyRef = db.collection("notification_processing")
         .doc(`escalation_created_${escalationId}_${event.id}`);
       
@@ -980,7 +1020,7 @@ export const onEscalationCreated = onDocumentCreated(
         });
         console.log(`✅ Idempotency lock acquired for escalation ${escalationId}`);
       } catch (error: any) {
-        if (error.code === 6) { // ALREADY_EXISTS
+        if (error.code === 6) {
           console.log(`⚠️ Notification already being processed for escalation ${escalationId} (event: ${event.id})`);
           return { success: false, reason: "already_processing" };
         }
@@ -1010,103 +1050,104 @@ export const onEscalationCreated = onDocumentCreated(
         80
       )}${question.length > 80 ? "..." : ""}`;
 
-      const staffSnapshot = await db
-        .collection("users")
-        .where("role", "==", "staff")
-        .get();
+      // ✅ FIXED: Get staff and admin users separately
+      const staffIds = await getUsersByRole("staff");
+      const adminIds = await getUsersByRole("admin");
 
-      const adminSnapshot = await db
-        .collection("users")
-        .where("role", "==", "admin")
-        .get();
-
-      if (staffSnapshot.empty) {
+      if (staffIds.length === 0) {
         console.log("⚠️ No staff members found");
         await idempotencyRef.update({ 
           status: "completed",
           reason: "no_staff",
           completedAt: admin.firestore.FieldValue.serverTimestamp()
         });
-        return;
       }
 
-      if (adminSnapshot.empty) {
+      if (adminIds.length === 0) {
         console.log("⚠️ No admin found");
         await idempotencyRef.update({ 
           status: "completed",
           reason: "no_admin",
           completedAt: admin.firestore.FieldValue.serverTimestamp()
         });
+      }
+
+      if (staffIds.length === 0 && adminIds.length === 0) {
         return;
       }
 
-      const staffIds = staffSnapshot.docs.map((doc) => doc.id);
-      const adminIds = adminSnapshot.docs.map((doc) => doc.id);
+      let staffNotifications = 0;
+      let adminNotifications = 0;
 
-      const staffNotifications = await createNotificationsForUsers(
-        staffIds,
-        "staff",
-        notificationTitle,
-        notificationBody,
-        "new_escalation",
-        {
-          escalationId: escalationId,
-          question: question,
-          userId: userId,
-          conversationId: conversationId,
-          eventId: event.id,
+      // Create notifications for staff
+      if (staffIds.length > 0) {
+        staffNotifications = await createNotificationsForUsers(
+          staffIds,
+          "staff",
+          notificationTitle,
+          notificationBody,
+          "new_escalation",
+          {
+            escalationId: escalationId,
+            question: question,
+            userId: userId,
+            conversationId: conversationId,
+            eventId: event.id,
+          }
+        );
+
+        if (staffNotifications > 0) {
+          await sendFCMNotifications(
+            staffIds,
+            notificationTitle,
+            notificationBody,
+            {
+              type: "new_escalation",
+              escalationId: escalationId,
+              conversationId: conversationId || "",
+            },
+            "staff"
+          );
         }
-      );
+      }
 
-      const adminNotifications = await createNotificationsForUsers(
-        adminIds,
-        "admin",
-        notificationTitle,
-        notificationBody,
-        "new_escalation",
-        {
-          escalationId: escalationId,
-          question: question,
-          userId: userId,
-          conversationId: conversationId,
-          eventId: event.id,
+      // Create notifications for admins
+      if (adminIds.length > 0) {
+        adminNotifications = await createNotificationsForUsers(
+          adminIds,
+          "admin",
+          notificationTitle,
+          notificationBody,
+          "new_escalation",
+          {
+            escalationId: escalationId,
+            question: question,
+            userId: userId,
+            conversationId: conversationId,
+            eventId: event.id,
+          }
+        );
+
+        if (adminNotifications > 0) {
+          await sendFCMNotifications(
+            adminIds,
+            notificationTitle,
+            notificationBody,
+            {
+              type: "new_escalation",
+              escalationId: escalationId,
+              conversationId: conversationId || "",
+            },
+            "admin"
+          );
         }
-      );
-
-       if (staffNotifications > 0) {
-      await sendFCMNotifications(
-        staffIds,
-        notificationTitle,
-        notificationBody,
-        {
-          type: "new_escalation",
-          escalationId: escalationId,
-          conversationId: conversationId || "",
-        },
-        "staff" // ✅ Mobile app will only show if current user has role "staff"
-      );
-    }
-
-      if (adminNotifications > 0) {
-      await sendFCMNotifications(
-        adminIds,
-        notificationTitle,
-        notificationBody,
-        {
-          type: "new_escalation",
-          escalationId: escalationId,
-          conversationId: conversationId || "",
-        },
-        "admin" // ✅ Mobile app will only show if current user has role "admin"
-      );
-    }
+      }
 
       console.log(
         `✅ Notifications sent with escalationId: ${escalationId}, conversationId: ${conversationId}`
       );
       console.log(`✅ Created ${staffNotifications} staff + ${adminNotifications} admin notifications`);
       
-      // ✅ Update idempotency record with success
       await idempotencyRef.update({ 
         status: "completed",
         notificationsCreated: staffNotifications + adminNotifications,
@@ -1117,7 +1158,6 @@ export const onEscalationCreated = onDocumentCreated(
     } catch (error) {
       console.error("Error creating escalation notification:", error);
       
-      // ✅ Update idempotency record with failure
       try {
         const idempotencyRef = db.collection("notification_processing")
           .doc(`escalation_created_${event.params.escalationId}_${event.id}`);
@@ -1166,7 +1206,6 @@ export const onEscalationReplied = onDocumentUpdated(
       console.log(`💬 Staff or Admin replied to escalation: ${escalationId}`);
       console.log(`💬 Event ID: ${event.id}`);
 
-      // ✅ FIX: Add idempotency check for escalation reply notifications
       const idempotencyRef = db.collection("notification_processing")
         .doc(`escalation_reply_${escalationId}_${event.id}`);
       
@@ -1180,7 +1219,7 @@ export const onEscalationReplied = onDocumentUpdated(
         });
         console.log(`✅ Idempotency lock acquired for escalation reply ${escalationId}`);
       } catch (error: any) {
-        if (error.code === 6) { // ALREADY_EXISTS
+        if (error.code === 6) {
           console.log(`⚠️ Reply notification already being processed for escalation ${escalationId} (event: ${event.id})`);
           return { success: false, reason: "already_processing" };
         }
@@ -1203,6 +1242,31 @@ export const onEscalationReplied = onDocumentUpdated(
         });
         return;
       }
+
+      // ✅ Verify user exists and is active
+      const userDoc = await db.collection("users").doc(userId).get();
+      if (!userDoc.exists) {
+        console.log(`⚠️ User ${userId} not found, skipping notification`);
+        await idempotencyRef.update({ 
+          status: "completed",
+          reason: "user_not_found",
+          completedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        return;
+      }
+
+      const userData = userDoc.data();
+      if (!userData?.isActive) {
+        console.log(`⚠️ User ${userId} is not active, skipping notification`);
+        await idempotencyRef.update({ 
+          status: "completed",
+          reason: "user_not_active",
+          completedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        return;
+      }
+
+      console.log(`✅ Verified user ${userId} exists and is active`);
 
       const notificationTitle =
         responderRole === "admin"
@@ -1230,31 +1294,36 @@ export const onEscalationReplied = onDocumentUpdated(
           adminResponse,
           conversationId,
           eventId: event.id,
+          targetUserId: userId, // ✅ Add for Firestore
         }
       );
 
-if (notificationsCreated > 0) {
-      await sendFCMNotifications(
-        [userId],
-        notificationTitle,
-        `${notificationBody}\n\n${responseMessage}`,
-        {
-          type: "escalation_reply",
-          escalationId,
-          conversationId: conversationId || "",
-        },
-        "user" // ✅ Mobile app will only show if current user has role "user"
-      );
-    }
+      if (notificationsCreated > 0) {
+        console.log(`📤 Sending FCM to ONLY user ${userId}`);
+        
+        // ✅ CRITICAL FIX: Pass targetUserId as 6th parameter
+        await sendFCMNotifications(
+          [userId],
+          notificationTitle,
+          `${notificationBody}\n\n${responseMessage}`,
+          {
+            type: "escalation_reply",
+            escalationId,
+            conversationId: conversationId || "",
+          },
+          "user",
+          userId // ✅ This is the critical fix - targetUserId parameter
+        );
+      }
 
       console.log(
-        `✅ Reply notification sent (${responderRole}) with escalationId: ${escalationId}`
+        `✅ Reply notification sent (${responderRole}) to user ${userId}`
       );
       
-      // ✅ Update idempotency record with success
       await idempotencyRef.update({ 
         status: "completed",
         notificationsCreated: notificationsCreated,
+        targetUserId: userId,
         completedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       
@@ -1262,7 +1331,6 @@ if (notificationsCreated > 0) {
     } catch (error) {
       console.error("Error creating escalation reply notification:", error);
       
-      // ✅ Update idempotency record with failure
       try {
         const idempotencyRef = db.collection("notification_processing")
           .doc(`escalation_reply_${event.params.escalationId}_${event.id}`);

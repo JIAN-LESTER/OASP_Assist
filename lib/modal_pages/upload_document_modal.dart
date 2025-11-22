@@ -156,6 +156,8 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
   bool _isProcessingImage = false;
 
    bool  _isProcessing = true;
+   bool _fileProcessed = false;
+     bool _fileReady = false; 
 
   final List<String> _predefinedCategories = [
     'Admission',
@@ -172,12 +174,12 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
     super.dispose();
   }
 
-  Future<void> _pickFile() async {
+Future<void> _pickFile() async {
   try {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'txt', 'docx', 'doc'],
-      withData: true, // ✅ CRITICAL: Must be true for web
+      withData: true,
     );
 
     if (result != null && result.files.single.bytes != null) {
@@ -185,15 +187,14 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
       final fileBytes = result.files.single.bytes!;
 
       setState(() {
-        // ✅ Store bytes reference instead of File object for web
         _selectedFileName = fileName;
         _isProcessing = true;
+        _fileReady = false;
       });
 
       String extractedText;
       final extension = fileName.split('.').last.toLowerCase();
 
-      // ✅ Use bytes-based extraction for all file types
       if (extension == 'pdf') {
         extractedText = await _fileService.extractTextFromPdfBytes(fileBytes);
       } else if (extension == 'docx' || extension == 'doc') {
@@ -209,19 +210,23 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
       setState(() {
         _extractedText = extractedText;
-        if (_titleController.text.isEmpty) {
-          _titleController.text = fileName.split('.').first;
-        }
+        _fileReady = true;
+        // ✅ ALWAYS update title when a new file is uploaded
+        _titleController.text = fileName.split('.').first;
         _isProcessing = false;
       });
 
       _showTopRightAlert('File processed successfully!', AlertType.success);
     }
   } catch (e) {
-    setState(() => _isProcessing = false);
+    setState(() {
+      _isProcessing = false;
+      _fileReady = false;
+    });
     _showTopRightAlert('Error processing file: $e', AlertType.error);
   }
 }
+
   Future<void> _pickImageFromGallery() async {
     try {
       final XFile? image = await _imagePicker.pickImage(
@@ -253,53 +258,55 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
     }
   }
 
-  Future<void> _processImage(XFile image) async {
+ Future<void> _processImage(XFile image) async {
+  setState(() {
+    _isProcessingImage = true;
+  });
+
+  try {
+    final inputImage = InputImage.fromFilePath(image.path);
+    final RecognizedText recognizedText = await _textRecognizer.processImage(
+      inputImage,
+    );
+
+    String extractedText = recognizedText.text;
+
+    if (extractedText.trim().isEmpty) {
+      _showTopRightAlert('No text found in image', AlertType.warning);
+      setState(() {
+        _isProcessingImage = false;
+      });
+      return;
+    }
+
+    final fileName = 'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
     setState(() {
-      _isProcessingImage = true;
+      _selectedFile = File(image.path);
+      _selectedFileName = fileName;
+      _extractedText = extractedText;
+      _fileReady = true; // ✅ Add this
+      _isProcessingImage = false;
+      
+      // ✅ ALWAYS update title when a new image is processed
+      _titleController.text = 'Document from Image ${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year}';
     });
 
-    try {
-      final inputImage = InputImage.fromFilePath(image.path);
-      final RecognizedText recognizedText = await _textRecognizer.processImage(
-        inputImage,
-      );
-
-      String extractedText = recognizedText.text;
-
-      if (extractedText.trim().isEmpty) {
-        _showTopRightAlert('No text found in image', AlertType.warning);
-        setState(() {
-          _isProcessingImage = false;
-        });
-        return;
-      }
-
-      setState(() {
-        _selectedFile = File(image.path);
-        _selectedFileName =
-            'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        _extractedText = extractedText;
-        _isProcessingImage = false;
-
-        if (_titleController.text.isEmpty) {
-          _titleController.text = 'Document from Image';
-        }
-      });
-
-      _showTopRightAlert(
-        'Text extracted successfully! Found ${extractedText.split(' ').length} words',
-        AlertType.success,
-      );
-    } catch (e) {
-      setState(() {
-        _isProcessingImage = false;
-      });
-      _showTopRightAlert(
-        'Error extracting text from image: $e',
-        AlertType.error,
-      );
-    }
+    _showTopRightAlert(
+      'Text extracted successfully! Found ${extractedText.split(' ').length} words',
+      AlertType.success,
+    );
+  } catch (e) {
+    setState(() {
+      _isProcessingImage = false;
+      _fileReady = false; // ✅ Add this
+    });
+    _showTopRightAlert(
+      'Error extracting text from image: $e',
+      AlertType.error,
+    );
   }
+}
 
   void _showUploadOptionsBottomSheet() {
     showModalBottomSheet(
@@ -867,90 +874,101 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
     );
   }
 
-  Widget _buildFileUploadArea() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFAFBFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color:
-              _selectedFile != null
-                  ? const Color(0xFF2E7D32).withOpacity(0.4)
-                  : const Color(0xFFE5E7EB),
-          width: 2,
-        ),
+ Widget _buildFileUploadArea() {
+  return Container(
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: const Color(0xFFFAFBFC),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color:
+            _fileReady // ✅ Use _fileReady instead of _selectedFile
+                ? const Color(0xFF2E7D32).withOpacity(0.4)
+                : const Color(0xFFE5E7EB),
+        width: 2,
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: _isProcessingImage ? null : _showUploadOptionsBottomSheet,
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: widget.isMobile ? 20 : 32,
-              vertical: widget.isMobile ? 24 : 32,
-            ),
-            child: Column(
-              children: [
-                if (_isProcessingImage)
-                  Column(
-                    children: [
-                      CircularProgressIndicator(color: const Color(0xFF2E7D32)),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Extracting text from image...',
-                        style: TextStyle(
-                          fontSize: widget.isMobile ? 14 : 16,
-                          color: const Color(0xFF374151),
-                          fontWeight: FontWeight.w500,
-                        ),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: _isProcessingImage ? null : _showUploadOptionsBottomSheet,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.isMobile ? 20 : 32,
+            vertical: widget.isMobile ? 24 : 32,
+          ),
+          child: Column(
+            children: [
+              if (_isProcessingImage)
+                Column(
+                  children: [
+                    CircularProgressIndicator(color: const Color(0xFF2E7D32)),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Extracting text from image...',
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 14 : 16,
+                        color: const Color(0xFF374151),
+                        fontWeight: FontWeight.w500,
                       ),
-                    ],
-                  )
-                else
-                  Column(
-                    children: [
-                      Container(
-                        width: widget.isMobile ? 56 : 72,
-                        height: widget.isMobile ? 56 : 72,
-                        decoration: BoxDecoration(
-                          color:
-                              _selectedFile != null
-                                  ? const Color(0xFF2E7D32)
-                                  :  Colors.green,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          _selectedFile != null
-                              ? Icons.insert_drive_file
-                              : Icons.upload_file,
-                          color: Colors.white,
-                          size: widget.isMobile ? 28 : 32,
-                        ),
+                    ),
+                  ],
+                )
+              else
+                Column(
+                  children: [
+                    Container(
+                      width: widget.isMobile ? 56 : 72,
+                      height: widget.isMobile ? 56 : 72,
+                      decoration: BoxDecoration(
+                        color:
+                            _fileReady // ✅ Use _fileReady
+                                ? const Color(0xFF2E7D32)
+                                : Colors.green,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-
-                      const SizedBox(height: 8),
-                      Text(
-                        _selectedFile != null
-                            ? 'File ready for upload'
-                            : 'Documents: PDF, TXT, DOC, DOCX • Images: JPG, PNG',
-                        style: TextStyle(
-                          fontSize: widget.isMobile ? 13 : 14,
-                          color: const Color(0xFF9CA3AF),
-                          fontWeight: FontWeight.w400,
-                        ),
-                        textAlign: TextAlign.center,
+                      child: Icon(
+                        _fileReady // ✅ Use _fileReady
+                            ? Icons.insert_drive_file
+                            : Icons.upload_file,
+                        color: Colors.white,
+                        size: widget.isMobile ? 28 : 32,
                       ),
-                    ],
-                  ),
-              ],
-            ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _fileReady // ✅ Use _fileReady
+                          ? _selectedFileName ?? 'File ready for upload'
+                          : 'Click to upload document or image',
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 15 : 16,
+                        color: const Color(0xFF1F2937),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _fileReady // ✅ Use _fileReady
+                          ? 'File ready for upload'
+                          : 'Documents: PDF, TXT, DOC, DOCX • Images: JPG, PNG',
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 13 : 14,
+                        color: const Color(0xFF9CA3AF),
+                        fontWeight: FontWeight.w400,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildCategorySection() {
     return Column(
@@ -1070,61 +1088,61 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
         ),
         const SizedBox(width: 12),
         // Upload Button
-        Expanded(
-          child: SizedBox(
-            height: buttonHeight,
-            child: ElevatedButton(
-              onPressed:
-                  (_isUploading || _selectedFile == null)
-                      ? null
-                      : _uploadDocument,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E7D32),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                disabledBackgroundColor: const Color(0xFFE5E7EB),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(borderRadius),
-                ),
-                padding: EdgeInsets.symmetric(
-                  horizontal: widget.isMobile ? 16 : 20,
+       Expanded(
+  child: SizedBox(
+    height: buttonHeight,
+    child: ElevatedButton(
+      onPressed:
+          (_isUploading || !_fileReady) // ✅ Check _fileReady instead of _selectedFile
+              ? null
+              : _uploadDocument,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF2E7D32),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        disabledBackgroundColor: const Color(0xFFE5E7EB),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        padding: EdgeInsets.symmetric(
+          horizontal: widget.isMobile ? 16 : 20,
+        ),
+      ),
+      child:
+          _isUploading
+              ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Uploading...',
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              )
+              : Text(
+                'Upload Document',
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              child:
-                  _isUploading
-                      ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Uploading...',
-                            style: TextStyle(
-                              fontSize: fontSize,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      )
-                      : Text(
-                        'Upload Document',
-                        style: TextStyle(
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-            ),
-          ),
-        ),
+    ),
+  ),
+),
       ],
     );
   }
