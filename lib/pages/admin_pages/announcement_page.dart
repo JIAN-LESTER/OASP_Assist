@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/services/fb_sync.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -2059,8 +2060,7 @@ final deadlineController = TextEditingController(text: deadlineText);
   }
 }
 
-// ANNOUNCEMENT CARD COMPONENT
-class AnnouncementCard extends StatelessWidget {
+class AnnouncementCard extends StatefulWidget {
   final DocumentSnapshot announcement;
   final int index;
   final bool isDesktop;
@@ -2077,14 +2077,38 @@ class AnnouncementCard extends StatelessWidget {
   });
 
   @override
+  State<AnnouncementCard> createState() => _AnnouncementCardState();
+}
+
+class _AnnouncementCardState extends State<AnnouncementCard> {
+  int _currentImageIndex = 0;
+  final PageController _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final data = announcement.data() as Map<String, dynamic>;
+    final data = widget.announcement.data() as Map<String, dynamic>;
     final message = data['message'] ?? "";
     final category = data['category'] ?? 'General';
     final deadline = data['deadline'];
-    final hasImage =
-        data['full_picture'] != null && data['full_picture'].isNotEmpty;
+    
+    // ✅ Get images array (backward compatible with old single image field)
+    List<String> images = [];
+    if (data['images'] is List) {
+      images = List<String>.from(data['images']);
+    } else if (data['full_picture'] != null && data['full_picture'].isNotEmpty) {
+      images = [data['full_picture']];
+    }
+    
+    final hasImages = images.isNotEmpty;
+    final imageCount = data['image_count'] ?? images.length;
     final createdTime = _formatDate(data['created_time']);
+    final hasOCR = data['has_image_text'] == true;
 
     return Container(
       decoration: BoxDecoration(
@@ -2097,367 +2121,568 @@ class AnnouncementCard extends StatelessWidget {
             offset: const Offset(0, 8),
             spreadRadius: -4,
           ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
         ],
         border: Border.all(color: Colors.grey[300]!, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Padding(
-            padding: EdgeInsets.all(isDesktop ? 24 : 20),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Category icon
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        getColorForCategory(category).withOpacity(0.9),
-                        getColorForCategory(category),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: getColorForCategory(category).withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    _getCategoryIcon(category),
-                    color: Colors.white,
-                    size: 26,
-                  ),
-                ),
-                const SizedBox(width: 18),
-                // Title and metadata
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  getColorForCategory(
-                                    category,
-                                  ).withOpacity(0.15),
-                                  getColorForCategory(
-                                    category,
-                                  ).withOpacity(0.08),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: getColorForCategory(
-                                  category,
-                                ).withOpacity(0.2),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Text(
-                              category.toUpperCase(),
-                              style: TextStyle(
-                                color: getColorForCategory(
-                                  category,
-                                ).withOpacity(0.9),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.access_time_rounded,
-                                  size: 14,
-                                  color: Colors.grey[600],
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  createdTime,
-                                  style: TextStyle(
-                                    color: Colors.grey[700],
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _getPreviewText(message),
-                        style: TextStyle(
-                          fontSize: isDesktop ? 18 : 16,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.grey[900],
-                          height: 1.3,
-                          letterSpacing: -0.3,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // Header (existing code)
+          _buildHeader(category, createdTime, imageCount, hasOCR),
 
-          // Deadline notice
-          if (deadline != null)
-            Container(
-              margin: EdgeInsets.fromLTRB(
-                isDesktop ? 24 : 20,
-                0,
-                isDesktop ? 24 : 20,
-                isDesktop ? 20 : 16,
+          // Deadline notice (existing code)
+          if (deadline != null) _buildDeadline(deadline),
+
+          // Message content
+          if (message.isNotEmpty) _buildMessage(message),
+
+          // ✅ ENHANCED: Multiple Images Display
+          if (hasImages) _buildImageGallery(images),
+
+          // Action buttons (existing code)
+          _buildActionButtons(data),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================================
+  // ✅ NEW: Image Gallery Widget with Carousel
+  // ============================================================================
+  
+  Widget _buildImageGallery(List<String> images) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        widget.isDesktop ? 24 : 20,
+        0,
+        widget.isDesktop ? 24 : 20,
+        widget.isDesktop ? 20 : 16,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image carousel
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              height: widget.isDesktop ? 400 : 300,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
               ),
-              // padding: const EdgeInsets.all(16),
-              // decoration: BoxDecoration(
-              //   gradient: LinearGradient(
-              //     colors: [
-              //       Colors.orange[50]!,
-              //       Colors.orange[100]!.withOpacity(0.3),
-              //     ],
-              //   ),
-              //   borderRadius: BorderRadius.circular(8),
-              //   border: Border.all(color: Colors.orange[300]!, width: 1.5),
-              //   boxShadow: [
-              //     BoxShadow(
-              //       color: Colors.orange[100]!.withOpacity(0.5),
-              //       blurRadius: 8,
-              //       offset: const Offset(0, 2),
-              //     ),
-              //   ],
-              // ),
-              child: Row(
+              child: Stack(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.orange[600],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.schedule_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                  // Image PageView
+                  PageView.builder(
+                    controller: _pageController,
+                    itemCount: images.length,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentImageIndex = index;
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      return GestureDetector(
+                        onTap: () => _showFullScreenImage(context, images, index),
+                        child: Image.network(
+                          images[index],
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildImageError();
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return _buildImageLoading(loadingProgress);
+                          },
+                        ),
+                      );
+                    },
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'DEADLINE',
-                          style: TextStyle(
-                            color: Colors.orange[800],
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
 
-                        // ✅ Format the Firestore Timestamp into readable text
-                        Text(
-                          DateFormat(
-                            'MMMM d, yyyy',
-                          ).format((deadline as Timestamp).toDate()),
-                          style: TextStyle(
-                            color: Colors.orange[900],
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            letterSpacing: -0.2,
+                  // Navigation arrows (for multiple images)
+                  if (images.length > 1) ...[
+                    _buildNavigationArrow(
+                      alignment: Alignment.centerLeft,
+                      icon: Icons.chevron_left,
+                      onTap: () {
+                        if (_currentImageIndex > 0) {
+                          _pageController.previousPage(
+                            duration: Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      },
+                      enabled: _currentImageIndex > 0,
+                    ),
+                    _buildNavigationArrow(
+                      alignment: Alignment.centerRight,
+                      icon: Icons.chevron_right,
+                      onTap: () {
+                        if (_currentImageIndex < images.length - 1) {
+                          _pageController.nextPage(
+                            duration: Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      },
+                      enabled: _currentImageIndex < images.length - 1,
+                    ),
+                  ],
+
+                  // Image counter badge
+                  if (images.length > 1)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.photo_library,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              '${_currentImageIndex + 1}/${images.length}',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // Fullscreen button
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _showFullScreenImage(context, images, _currentImageIndex),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Icon(
+                            Icons.fullscreen,
+                            color: Colors.white,
+                            size: 20,
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
+          ),
 
-          // Message content
-          if (message.isNotEmpty)
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                isDesktop ? 24 : 20,
-                0,
-                isDesktop ? 24 : 20,
-                isDesktop ? 20 : 16,
-              ),
-              child: Text(
-                message,
-                style: TextStyle(
-                  fontSize: isDesktop ? 15 : 14,
-                  height: 1.7,
-                  color: Colors.grey[700],
-                  letterSpacing: 0.1,
-                ),
+          // Thumbnail strip (for multiple images)
+          if (images.length > 1) ...[
+            SizedBox(height: 12),
+            SizedBox(
+              height: 70,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: images.length,
+                itemBuilder: (context, index) {
+                  return _buildThumbnail(images[index], index);
+                },
               ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
 
-          // Image
-          if (hasImage)
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                isDesktop ? 24 : 20,
-                0,
-                isDesktop ? 24 : 20,
-                isDesktop ? 20 : 16,
+  // ============================================================================
+  // ✅ NEW: Thumbnail Widget
+  // ============================================================================
+
+  Widget _buildThumbnail(String imageUrl, int index) {
+    final isActive = index == _currentImageIndex;
+    
+    return GestureDetector(
+      onTap: () {
+        _pageController.animateToPage(
+          index,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      },
+      child: Container(
+        width: 70,
+        margin: EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isActive ? Colors.green[600]! : Colors.grey[300]!,
+            width: isActive ? 3 : 1,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                color: Colors.grey[200],
+                child: Icon(Icons.image, color: Colors.grey[400]),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================================
+  // ✅ NEW: Navigation Arrow Widget
+  // ============================================================================
+
+  Widget _buildNavigationArrow({
+    required AlignmentGeometry alignment,
+    required IconData icon,
+    required VoidCallback onTap,
+    required bool enabled,
+  }) {
+    if (!enabled) return SizedBox.shrink();
+
+    return Align(
+      alignment: alignment,
+      child: Padding(
+        padding: EdgeInsets.all(8),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(24),
+            child: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.6),
+                shape: BoxShape.circle,
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
+              child: Icon(
+                icon,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================================
+  // ✅ NEW: Full Screen Image Viewer
+  // ============================================================================
+
+  void _showFullScreenImage(BuildContext context, List<String> images, int initialIndex) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FullScreenImageGallery(
+          images: images,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
+
+  // ============================================================================
+  // Helper Widgets
+  // ============================================================================
+
+  Widget _buildHeader(String category, String createdTime, int imageCount, bool hasOCR) {
+    return Padding(
+      padding: EdgeInsets.all(widget.isDesktop ? 24 : 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  getColorForCategory(category).withOpacity(0.9),
+                  getColorForCategory(category),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              getCategoryIcon(category),
+              color: Colors.white,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            getColorForCategory(category).withOpacity(0.15),
+                            getColorForCategory(category).withOpacity(0.08),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        category.toUpperCase(),
+                        style: TextStyle(
+                          color: getColorForCategory(category),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    
+                    // ✅ NEW: Image count badge
+                    if (imageCount > 1) ...[
+                      SizedBox(width: 8),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.blue[200]!),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.photo_library, size: 12, color: Colors.blue[700]),
+                            SizedBox(width: 4),
+                            Text(
+                              '$imageCount',
+                              style: TextStyle(
+                                color: Colors.blue[700],
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                  ),
-                  child: Image.network(
-                    data['full_picture'],
-                    width: double.infinity,
-                    height: isDesktop ? 350 : 280,
-                    fit: BoxFit.cover,
-                    errorBuilder:
-                        (context, error, stackTrace) => Container(
-                          height: isDesktop ? 350 : 280,
+                    
+                    // ✅ NEW: OCR indicator
+                    if (hasOCR) ...[
+                      SizedBox(width: 8),
+                      Tooltip(
+                        message: 'Text extracted from image(s)',
+                        child: Container(
+                          padding: EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Colors.grey[100]!, Colors.grey[200]!],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
+                            color: Colors.purple[50],
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[300],
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.image_not_supported_outlined,
-                                  color: Colors.grey[600],
-                                  size: 48,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Unable to load image',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
+                          child: Icon(
+                            Icons.text_fields,
+                            size: 14,
+                            color: Colors.purple[700],
                           ),
                         ),
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Container(
-                        height: isDesktop ? 350 : 280,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 3,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.green[600]!,
+                      ),
+                    ],
+                    
+                    Spacer(),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.access_time_rounded, size: 14, color: Colors.grey[600]),
+                          SizedBox(width: 4),
+                          Text(
+                            createdTime,
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-
-          // Action buttons
-          Container(
-            padding: EdgeInsets.all(isDesktop ? 24 : 20),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(12),
-                bottomRight: Radius.circular(12),
-              ),
-              border: Border(
-                top: BorderSide(color: Colors.grey[200]!, width: 1),
-              ),
-            ),
-
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Flexible(
-                  child: _buildActionButton(
-                    icon: Icons.open_in_new_rounded,
-                    label: 'View on Facebook',
-                    onTap: () => _launchUrl(data['permalink_url']),
-                    isPrimary: true,
-                  ),
-                ),
-
-                const SizedBox(width: 8),
-                _buildIconButton(
-                  icon: Icons.edit_rounded,
-                  onTap: () => onEdit(announcement),
-                  color: Colors.blue,
-                ),
-                const SizedBox(width: 8),
-                _buildIconButton(
-                  icon: Icons.delete_rounded,
-                  onTap: () => onDelete(announcement),
-                  color: Colors.red,
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeadline(dynamic deadline) {
+    return Container(
+      margin: EdgeInsets.fromLTRB(
+        widget.isDesktop ? 24 : 20,
+        0,
+        widget.isDesktop ? 24 : 20,
+        widget.isDesktop ? 20 : 16,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.orange[600],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.schedule_rounded, color: Colors.white, size: 20),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'DEADLINE',
+                  style: TextStyle(
+                    color: Colors.orange[800],
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  DateFormat('MMMM d, yyyy').format((deadline as Timestamp).toDate()),
+                  style: TextStyle(
+                    color: Colors.orange[900],
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessage(String message) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        widget.isDesktop ? 24 : 20,
+        0,
+        widget.isDesktop ? 24 : 20,
+        widget.isDesktop ? 20 : 16,
+      ),
+      child: Text(
+        message,
+        style: TextStyle(
+          fontSize: widget.isDesktop ? 15 : 14,
+          height: 1.7,
+          color: Colors.grey[700],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageError() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.grey[100]!, Colors.grey[200]!],
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.image_not_supported_outlined, color: Colors.grey[600], size: 48),
+          SizedBox(height: 12),
+          Text(
+            'Unable to load image',
+            style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageLoading(ImageChunkEvent loadingProgress) {
+    return Container(
+      color: Colors.grey[100],
+      child: Center(
+        child: CircularProgressIndicator(
+          value: loadingProgress.expectedTotalBytes != null
+              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+              : null,
+          strokeWidth: 3,
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(Map<String, dynamic> data) {
+    return Container(
+      padding: EdgeInsets.all(widget.isDesktop ? 24 : 20),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(12),
+          bottomRight: Radius.circular(12),
+        ),
+        border: Border(top: BorderSide(color: Colors.grey[200]!)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Flexible(
+            child: _buildActionButton(
+              icon: Icons.open_in_new_rounded,
+              label: 'View on Facebook',
+              onTap: () => _launchUrl(data['permalink_url']),
+              isPrimary: true,
+            ),
+          ),
+          SizedBox(width: 8),
+          _buildIconButton(
+            icon: Icons.edit_rounded,
+            onTap: () => widget.onEdit(widget.announcement),
+            color: Colors.blue,
+          ),
+          SizedBox(width: 8),
+          _buildIconButton(
+            icon: Icons.delete_rounded,
+            onTap: () => widget.onDelete(widget.announcement),
+            color: Colors.red,
           ),
         ],
       ),
@@ -2470,57 +2695,37 @@ class AnnouncementCard extends StatelessWidget {
     required VoidCallback onTap,
     required bool isPrimary,
   }) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 200, maxWidth: 240),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-            decoration: BoxDecoration(
-              gradient:
-                  isPrimary
-                      ? LinearGradient(
-                        colors: [Colors.green[600]!, Colors.green[700]!],
-                      )
-                      : null,
-              color: isPrimary ? null : Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isPrimary ? Colors.green[700]! : Colors.grey[300]!,
-                width: isPrimary ? 0 : 1.5,
-              ),
-              boxShadow: [
-                if (isPrimary)
-                  BoxShadow(
-                    color: Colors.green[600]!.withOpacity(0.4),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-              ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          decoration: BoxDecoration(
+            gradient: isPrimary
+                ? LinearGradient(colors: [Colors.green[600]!, Colors.green[700]!])
+                : null,
+            color: isPrimary ? null : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isPrimary ? Colors.green[700]! : Colors.grey[300]!,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: 20,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 20, color: isPrimary ? Colors.white : Colors.grey[700]),
+              SizedBox(width: 10),
+              Text(
+                label,
+                style: TextStyle(
                   color: isPrimary ? Colors.white : Colors.grey[700],
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isPrimary ? Colors.white : Colors.grey[700],
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -2538,46 +2743,16 @@ class AnnouncementCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+            border: Border.all(color: color.withOpacity(0.3)),
           ),
           child: Icon(icon, size: 18, color: color),
         ),
       ),
     );
-  }
-
-  String _getPreviewText(String message) {
-    final firstLine = message.split('\n').first;
-    if (firstLine.length <= 60) return firstLine;
-    return '${firstLine.substring(0, 60)}...';
-  }
-
-  String _formatDate(String? dateString) {
-    if (dateString == null) return 'Unknown date';
-
-    try {
-      final date = DateTime.parse(dateString);
-      final now = DateTime.now();
-      final difference = now.difference(date);
-
-      if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}m ago';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}h ago';
-      } else if (difference.inDays == 1) {
-        return 'Yesterday';
-      } else if (difference.inDays < 7) {
-        return '${difference.inDays}d ago';
-      } else {
-        return DateFormat('MMM d, yyyy').format(date);
-      }
-    } catch (e) {
-      return 'Unknown date';
-    }
   }
 
   void _launchUrl(String? url) {
@@ -2586,53 +2761,142 @@ class AnnouncementCard extends StatelessWidget {
     }
   }
 
-  IconData _getCategoryIcon(String? category) {
-    switch (category?.toLowerCase()) {
-      case 'admission':
-        return Icons.school_rounded;
-      case 'scholarship':
-        return Icons.event_rounded;
-      case 'placement':
-        return Icons.priority_high_rounded;
-      case 'general':
-        return Icons.info_rounded;
-      default:
-        return Icons.campaign_rounded;
+  String _formatDate(String? dateString) {
+    if (dateString == null) return 'Unknown date';
+    try {
+      final date = DateTime.parse(dateString);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+      
+      if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+      if (difference.inHours < 24) return '${difference.inHours}h ago';
+      if (difference.inDays == 1) return 'Yesterday';
+      if (difference.inDays < 7) return '${difference.inDays}d ago';
+      return DateFormat('MMM d, yyyy').format(date);
+    } catch (e) {
+      return 'Unknown date';
     }
   }
 }
 
-// UTILITY FUNCTIONS
-Color getColorForCategory(String category) {
-  switch (category.toLowerCase()) {
-    case 'admission':
-      return Colors.blue;
-    case 'scholarship':
-      return Colors.purple;
-    case 'placement':
-      return Colors.orange;
-    case 'general':
-      return Colors.green;
-    default:
-      return Colors.green;
-  }
+// ============================================================================
+// ✅ NEW: Full Screen Image Gallery
+// ============================================================================
+
+class FullScreenImageGallery extends StatefulWidget {
+  final List<String> images;
+  final int initialIndex;
+
+  const FullScreenImageGallery({
+    super.key,
+    required this.images,
+    required this.initialIndex,
+  });
+
+  @override
+  State<FullScreenImageGallery> createState() => _FullScreenImageGalleryState();
 }
 
-IconData getCategoryIcon(String category) {
-  switch (category.toLowerCase()) {
-    case 'admission':
-      return Icons.school_rounded;
-    case 'scholarship':
-      return Icons.event_rounded;
-    case 'placement':
-      return Icons.priority_high_rounded;
-    case 'general':
-      return Icons.info_rounded;
-    default:
-      return Icons.campaign_rounded;
-  }
-}
+class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
+  late PageController _pageController;
+  late int _currentIndex;
 
-Color getCategoryColor(String category) {
-  return getColorForCategory(category);
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            itemCount: widget.images.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              return InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Center(
+                  child: Image.network(
+                    widget.images[index],
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(Icons.error, color: Colors.white, size: 64);
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+          
+          // Close button
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(24),
+                    child: Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.close, color: Colors.white, size: 24),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          // Image counter
+          if (widget.images.length > 1)
+            SafeArea(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Text(
+                      '${_currentIndex + 1} / ${widget.images.length}',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

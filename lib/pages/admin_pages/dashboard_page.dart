@@ -1024,32 +1024,31 @@ Widget dashboardContents(
             // Web/Desktop: fixed layout with Expanded
             return Column(
               children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: LazyLoadWidget(
-                          delay: const Duration(milliseconds: 100),
-                          builder:
-                              (context) => buildCategoryDistributionCard(
-                                inq?.categoryDistribution ?? {},
-                              ),
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: LazyLoadWidget(
-                          delay: const Duration(milliseconds: 200),
-                          builder:
-                              (context) => buildInquiryTrendCard(
-                                inq?.inquiryTrend ?? [],
-                                selectedTimeFrame,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                 SizedBox(
+      height: 400, // set your desired fixed height
+      child: Row(
+        children: [
+          Expanded(
+            child: LazyLoadWidget(
+              delay: const Duration(milliseconds: 100),
+              builder: (context) => buildCategoryDistributionCard(
+                inq?.categoryDistribution ?? {},
+              ),
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: LazyLoadWidget(
+              delay: const Duration(milliseconds: 200),
+              builder: (context) => buildInquiryTrendCard(
+                inq?.inquiryTrend ?? [],
+                selectedTimeFrame,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
                 const SizedBox(height: 20),
                 Expanded(
                   child: Row(

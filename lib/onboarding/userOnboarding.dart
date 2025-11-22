@@ -164,7 +164,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
 
       setState(() {
         _programs = [...futures[0]];
-        _scholarships = [...futures[1], 'Others']; // FIX: Changed from futures[2] to futures[1]
+        _scholarships = [...futures[1], 'Others']; 
       });
     } catch (e) {
       print('Error loading dropdown data: $e');

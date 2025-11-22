@@ -23,29 +23,41 @@ interface FacebookPost {
   permalink_url?: string;
   attachments?: any;
 }
+// interface FacebookAttachment {
+//   media?: { image?: { src: string } };
+//   subattachments?: { data: Array<{ media?: { image?: { src: string } } }> };
+// }
+
+interface ScheduleEntry {
+  date: string;
+  dayOfWeek: string;
+  year: string;
+  locations: string[];
+  time?: string;
+}
 
 interface CohereResult {
   category: string;
   deadline: string | null;
 }
 
-interface AnnouncementData {
-  announcementId: string; // ✅ Unique ID field
-  message: string;
-  created_time: string;
-  full_picture: string;
-  original_image_url: string;
-  permalink_url: string;
-  category: string;
-  deadline: admin.firestore.Timestamp | null;
-  deleted: boolean; // ✅ Soft delete flag
-  fetched_at: admin.firestore.FieldValue;
-  processed_by_cohere: boolean;
-  stored_in_storage: boolean;
-  notification_sent: boolean;
-  ocr_text?: string;
-  has_image_text: boolean;
-}
+// interface AnnouncementData {
+//   announcementId: string; // ✅ Unique ID field
+//   message: string;
+//   created_time: string;
+//   full_picture: string;
+//   original_image_url: string;
+//   permalink_url: string;
+//   category: string;
+//   deadline: admin.firestore.Timestamp | null;
+//   deleted: boolean; // ✅ Soft delete flag
+//   fetched_at: admin.firestore.FieldValue;
+//   processed_by_cohere: boolean;
+//   stored_in_storage: boolean;
+//   notification_sent: boolean;
+//   ocr_text?: string;
+//   has_image_text: boolean;
+// }
 
 // ============================================================================
 // ✅ NEW: OCR FUNCTIONS FOR IMAGE TEXT EXTRACTION
@@ -54,6 +66,201 @@ interface AnnouncementData {
 /**
  * Extract text from image using Google Cloud Vision API
  */
+
+function extractAllImagesFromPost(post: FacebookPost): string[] {
+  const images: string[] = [];
+  
+  // 1. Add full_picture if exists
+  if (post.full_picture) {
+    images.push(post.full_picture);
+  }
+  
+  // 2. Extract from attachments (handles multiple images)
+  if (post.attachments?.data) {
+    for (const attachment of post.attachments.data) {
+      // Single image attachment
+      if (attachment.media?.image?.src) {
+        const src = attachment.media.image.src;
+        if (!images.includes(src)) {
+          images.push(src);
+        }
+      }
+      
+      // Multiple images (subattachments - album/carousel)
+      if (attachment.subattachments?.data) {
+        for (const sub of attachment.subattachments.data) {
+          if (sub.media?.image?.src) {
+            const src = sub.media.image.src;
+            if (!images.includes(src)) {
+              images.push(src);
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  console.log(`📸 Found ${images.length} image(s) in post`);
+  return images;
+}
+
+async function downloadAndUploadAllImages(
+  imageUrls: string[],
+  postId: string
+): Promise<string[]> {
+  const uploadedUrls: string[] = [];
+  
+  for (let i = 0; i < imageUrls.length; i++) {
+    const imageUrl = imageUrls[i];
+    try {
+      console.log(`📥 Downloading image ${i + 1}/${imageUrls.length} for post ${postId}`);
+      
+      const response = await axios.get(imageUrl, {
+        responseType: "arraybuffer",
+        timeout: 30000,
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; OASP-Bot/1.0)' },
+      } as any);
+      
+      const buffer = Buffer.from(response.data as Buffer);
+      const contentType = response.headers["content-type"] || "image/jpeg";
+      const ext = contentType.split("/")[1]?.split(';')[0] || "jpg";
+      
+      // Use index suffix for multiple images
+      const fileName = imageUrls.length > 1 
+        ? `announcements/${postId}_${i}.${ext}`
+        : `announcements/${postId}.${ext}`;
+      
+      const bucket = storage.bucket();
+      const file = bucket.file(fileName);
+      
+      await file.save(buffer, {
+        metadata: {
+          contentType,
+          cacheControl: 'public, max-age=31536000',
+          metadata: { postId, imageIndex: i.toString() },
+        },
+        public: true,
+      });
+      
+      const [signedUrl] = await file.getSignedUrl({
+        action: 'read',
+        expires: '03-01-2500',
+      });
+      
+      uploadedUrls.push(signedUrl);
+      console.log(`✅ Uploaded image ${i + 1}: ${fileName}`);
+      
+    } catch (error: any) {
+      console.error(`❌ Error uploading image ${i + 1} for post ${postId}:`, error.message);
+      // Still add original URL as fallback
+      uploadedUrls.push(imageUrl);
+    }
+  }
+  
+  return uploadedUrls;
+}
+
+function extractSchedulesFromOCR(ocrText: string): ScheduleEntry[] {
+  const schedules: ScheduleEntry[] = [];
+  const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean);
+  
+  // Pattern for dates like "OCT 26", "NOV 8", etc.
+  const datePattern = /^(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*(\d{1,2})$/i;
+  const dayPattern = /^(SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY)$/i;
+  const yearPattern = /^(20\d{2})$/;
+  const timePattern = /(\d{1,2}(?::\d{2})?\s*(?:am|pm))/gi;
+  
+  let currentYear = "";
+  let currentDate = "";
+  let currentDay = "";
+  let currentLocations: string[] = [];
+  let currentTime = "";
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Check for year
+    const yearMatch = line.match(yearPattern);
+    if (yearMatch) {
+      // Save previous entry if exists
+      if (currentDate && currentLocations.length > 0) {
+        schedules.push({
+          date: currentDate,
+          dayOfWeek: currentDay,
+          year: currentYear || new Date().getFullYear().toString(),
+          locations: [...currentLocations],
+          time: currentTime,
+        });
+        currentLocations = [];
+        currentTime = "";
+      }
+      currentYear = yearMatch[1];
+      continue;
+    }
+    
+    // Check for date (e.g., "OCT 26")
+    const dateMatch = line.match(datePattern);
+    if (dateMatch) {
+      // Save previous entry
+      if (currentDate && currentLocations.length > 0) {
+        schedules.push({
+          date: currentDate,
+          dayOfWeek: currentDay,
+          year: currentYear || new Date().getFullYear().toString(),
+          locations: [...currentLocations],
+          time: currentTime,
+        });
+        currentLocations = [];
+        currentTime = "";
+      }
+      currentDate = `${dateMatch[1].toUpperCase()} ${dateMatch[2]}`;
+      continue;
+    }
+    
+    // Check for day of week
+    const dayMatch = line.match(dayPattern);
+    if (dayMatch) {
+      currentDay = dayMatch[1].toUpperCase();
+      continue;
+    }
+    
+    // Check for time patterns
+    const timeMatches = line.match(timePattern);
+    if (timeMatches && line.includes('|')) {
+      currentTime = line; // e.g., "9-11 am | 1-3 pm"
+      continue;
+    }
+    
+    // Check for locations (contains city/place names)
+    if (line.includes('Campus') || line.includes('City') || 
+        line.includes('Butuan') || line.includes('Surigao') ||
+        line.includes('Gingoog') || line.includes('Bayugan') ||
+        line.includes('University') || line.includes('In-Campus')) {
+      // Clean up location
+      let location = line.replace(/[()]/g, ' ').trim();
+      if (location) {
+        currentLocations.push(location);
+      }
+    }
+  }
+  
+  // Don't forget last entry
+  if (currentDate && currentLocations.length > 0) {
+    schedules.push({
+      date: currentDate,
+      dayOfWeek: currentDay,
+      year: currentYear || new Date().getFullYear().toString(),
+      locations: [...currentLocations],
+      time: currentTime,
+    });
+  }
+  
+  console.log(`📅 Extracted ${schedules.length} schedule entries from OCR`);
+  return schedules;
+}
+
+
+
 async function extractTextFromImage(imageUrl: string): Promise<string> {
   try {
     console.log(`🔍 Extracting text from image: ${imageUrl.substring(0, 100)}...`);
@@ -360,79 +567,79 @@ function parseDeadlineToTimestamp(deadline: string | null): admin.firestore.Time
   }
 }
 
-async function downloadAndUploadImage(
-  imageUrl: string,
-  postId: string
-): Promise<string> {
-  try {
-    console.log(`📥 Downloading image for post ${postId}`);
-    console.log(`🔗 Source URL: ${imageUrl.substring(0, 100)}...`);
+// async function downloadAndUploadImage(
+//   imageUrl: string,
+//   postId: string
+// ): Promise<string> {
+//   try {
+//     console.log(`📥 Downloading image for post ${postId}`);
+//     console.log(`🔗 Source URL: ${imageUrl.substring(0, 100)}...`);
     
-    const response = await axios.get(imageUrl, {
-      responseType: "arraybuffer",
-      timeout: 30000,
-      maxBodyLength: 50 * 1024 * 1024,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; OASP-Bot/1.0)',
-      },
-    } as any);
+//     const response = await axios.get(imageUrl, {
+//       responseType: "arraybuffer",
+//       timeout: 30000,
+//       maxBodyLength: 50 * 1024 * 1024,
+//       headers: {
+//         'User-Agent': 'Mozilla/5.0 (compatible; OASP-Bot/1.0)',
+//       },
+//     } as any);
     
-    const buffer = Buffer.from(response.data as Buffer);
-    const contentType = response.headers["content-type"] || "image/jpeg";
+//     const buffer = Buffer.from(response.data as Buffer);
+//     const contentType = response.headers["content-type"] || "image/jpeg";
     
-    console.log(`📊 Image size: ${(buffer.length / 1024 / 1024).toFixed(2)} MB`);
-    console.log(`📊 Content type: ${contentType}`);
+//     console.log(`📊 Image size: ${(buffer.length / 1024 / 1024).toFixed(2)} MB`);
+//     console.log(`📊 Content type: ${contentType}`);
     
-    if (!contentType.startsWith('image/')) {
-      throw new Error(`Invalid content type: ${contentType}`);
-    }
+//     if (!contentType.startsWith('image/')) {
+//       throw new Error(`Invalid content type: ${contentType}`);
+//     }
     
-    const ext = contentType.split("/")[1]?.split(';')[0] || "jpg";
-    const fileName = `announcements/${postId}.${ext}`;
+//     const ext = contentType.split("/")[1]?.split(';')[0] || "jpg";
+//     const fileName = `announcements/${postId}.${ext}`;
     
-    const bucket = storage.bucket();
-    const file = bucket.file(fileName);
+//     const bucket = storage.bucket();
+//     const file = bucket.file(fileName);
     
-    console.log(`⬆️ Uploading to: ${fileName}`);
+//     console.log(`⬆️ Uploading to: ${fileName}`);
     
-    await file.save(buffer, {
-      metadata: {
-        contentType: contentType,
-        cacheControl: 'public, max-age=31536000',
-        metadata: {
-          postId: postId,
-          uploadedAt: new Date().toISOString(),
-          originalUrl: imageUrl.substring(0, 500),
-        },
-      },
-      public: true,
-    });
+//     await file.save(buffer, {
+//       metadata: {
+//         contentType: contentType,
+//         cacheControl: 'public, max-age=31536000',
+//         metadata: {
+//           postId: postId,
+//           uploadedAt: new Date().toISOString(),
+//           originalUrl: imageUrl.substring(0, 500),
+//         },
+//       },
+//       public: true,
+//     });
     
-    const [signedUrl] = await file.getSignedUrl({
-      action: 'read',
-      expires: '03-01-2500',
-    });
+//     const [signedUrl] = await file.getSignedUrl({
+//       action: 'read',
+//       expires: '03-01-2500',
+//     });
     
-    console.log(`✅ Image uploaded successfully`);
-    console.log(`🔗 Signed URL: ${signedUrl.substring(0, 100)}...`);
+//     console.log(`✅ Image uploaded successfully`);
+//     console.log(`🔗 Signed URL: ${signedUrl.substring(0, 100)}...`);
     
-    return signedUrl;
+//     return signedUrl;
     
-  } catch (error: any) {
-    console.error(`❌ Error uploading image for post ${postId}:`, error.message);
+//   } catch (error: any) {
+//     console.error(`❌ Error uploading image for post ${postId}:`, error.message);
     
-    if (error.response) {
-      console.error(`❌ HTTP Status: ${error.response.status}`);
-      console.error(`❌ Response data:`, error.response.data);
-    }
+//     if (error.response) {
+//       console.error(`❌ HTTP Status: ${error.response.status}`);
+//       console.error(`❌ Response data:`, error.response.data);
+//     }
     
-    if (error.code === 'ECONNABORTED') {
-      console.error(`❌ Download timeout for ${postId}`);
-    }
+//     if (error.code === 'ECONNABORTED') {
+//       console.error(`❌ Download timeout for ${postId}`);
+//     }
     
-    return "";
-  }
-}
+//     return "";
+//   }
+// }
 
 async function analyzeAnnouncement(message: string, cohereKey: string): Promise<CohereResult> {
   try {
@@ -684,30 +891,49 @@ interface ExtractedPlacementData {
   isRecruiting: boolean;
 }
 
-async function extractAdmissionData(message: string, cohereKey: string): Promise<ExtractedAdmissionData> {
+async function extractAdmissionData(
+  message: string, 
+  cohereKey: string,
+  ocrText?: string
+): Promise<ExtractedAdmissionData> {
+  // First, try to extract schedules directly from OCR if available
+  let extractedSchedules: ScheduleEntry[] = [];
+  if (ocrText) {
+    extractedSchedules = extractSchedulesFromOCR(ocrText);
+  }
+  
   try {
     const prompt = `Extract admission information from this announcement. Return ONLY valid JSON.
 
 Announcement: "${message}"
+${ocrText ? `\nImage Text (OCR):\n"${ocrText}"` : ''}
 
 Extract these fields:
-- title: A short descriptive title for the admission (max 100 chars)
+- title: A short descriptive title (max 100 chars)
 - content: The full announcement content
-- steps: Array of enrollment/application steps mentioned
-- requirements: Array of required documents or requirements
-- contacts: Array of contact information (email, phone, office)
-- academicYear: Object with "start" year and optionally "end" year (e.g., {"start": 2024, "end": 2025})
-- schedules: Array of schedule objects with "date", "dayOfWeek", and "locations" array
+- steps: Array of enrollment/application steps
+- requirements: Array of required documents
+- contacts: Array of contact information
+- academicYear: Object {"start": 2026, "end": 2027} - extract from text like "AY 2026-2027"
+- schedules: Array of schedule objects. IMPORTANT: Extract ALL dates and locations from the text.
+  Each schedule should have: "date" (e.g., "OCT 26"), "dayOfWeek" (e.g., "SUNDAY"), 
+  "year" (e.g., "2025"), "locations" (array of location strings), "time" (if available)
+
+CRITICAL: Extract EVERY date mentioned with ALL its associated locations. 
+For example, if NOV 8 has both "Butuan" and "Surigao", include BOTH locations.
 
 Respond ONLY in this JSON format:
 {
   "title": "string",
   "content": "string",
-  "steps": ["step1", "step2"],
-  "requirements": ["req1", "req2"],
-  "contacts": ["contact1"],
-  "academicYear": {"start": 2024, "end": 2025},
-  "schedules": [{"date": "OCT 4, 2025", "dayOfWeek": "SATURDAY", "locations": ["Location 1"]}]
+  "steps": [],
+  "requirements": [],
+  "contacts": [],
+  "academicYear": {"start": 2026, "end": 2027},
+  "schedules": [
+    {"date": "OCT 26", "dayOfWeek": "SUNDAY", "year": "2025", "locations": ["In-Campus (Central Mindanao University)"], "time": "9-11 am | 1-3 pm"},
+    {"date": "NOV 8", "dayOfWeek": "SATURDAY", "year": "2025", "locations": ["Butuan, Agusan del Norte", "Surigao, Surigao del Norte"], "time": ""}
+  ]
 }`;
 
     const response = await axios.post<{ text?: string }>(
@@ -715,7 +941,7 @@ Respond ONLY in this JSON format:
       {
         model: "command-r-08-2024",
         message: prompt,
-        max_tokens: 1000,
+        max_tokens: 2000, // Increased for more schedule data
         temperature: 0.1,
       },
       {
@@ -730,6 +956,15 @@ Respond ONLY in this JSON format:
     const jsonStr = extractJsonFromResponse(text);
     const result = JSON.parse(jsonStr);
 
+    // Merge Cohere results with direct OCR extraction (OCR extraction as fallback)
+    let finalSchedules = result.schedules || [];
+    
+    // If Cohere didn't extract schedules well, use OCR extraction
+    if (finalSchedules.length < extractedSchedules.length) {
+      console.log(`⚠️ Cohere extracted ${finalSchedules.length} schedules, OCR found ${extractedSchedules.length}. Using OCR.`);
+      finalSchedules = extractedSchedules;
+    }
+
     return {
       title: result.title || message.substring(0, 100),
       content: message,
@@ -737,10 +972,12 @@ Respond ONLY in this JSON format:
       requirements: Array.isArray(result.requirements) ? result.requirements : [],
       contacts: Array.isArray(result.contacts) ? result.contacts : [],
       academicYear: result.academicYear || null,
-      schedules: Array.isArray(result.schedules) ? result.schedules : [],
+      schedules: finalSchedules,
     };
   } catch (error) {
     console.error("Error extracting admission data:", error);
+    
+    // Fallback: use direct OCR extraction
     return {
       title: message.substring(0, 100),
       content: message,
@@ -748,7 +985,7 @@ Respond ONLY in this JSON format:
       requirements: [],
       contacts: [],
       academicYear: null,
-      schedules: [],
+      schedules: extractedSchedules,
     };
   }
 }
@@ -879,7 +1116,8 @@ async function createAdmissionFromAnnouncement(
   postId: string,
   message: string,
   deadline: admin.firestore.Timestamp | null,
-  cohereKey: string
+  cohereKey: string,
+  ocrText?: string // ✅ NEW: Accept OCR text separately
 ): Promise<void> {
   try {
     const admissionRef = db.collection("admissions").doc(postId);
@@ -887,22 +1125,20 @@ async function createAdmissionFromAnnouncement(
     
     if (existingDoc.exists) {
       const existingData = existingDoc.data();
-      
-      // ✅ If deleted, don't recreate or restore
       if (existingData?.deleted === true) {
-        console.log(`⏭️ Skipping admission for post ${postId} - it was deleted by user`);
+        console.log(`⏭️ Skipping admission for post ${postId} - deleted`);
         return;
       }
-      
       console.log(`Admission already exists for post ${postId}`);
       return;
     }
 
-    const extractedData = await extractAdmissionData(message, cohereKey);
+    // ✅ Pass OCR text to extraction function
+    const extractedData = await extractAdmissionData(message, cohereKey, ocrText);
 
     await admissionRef.set({
       id: postId,
-      announcementId: postId, // ✅ Link to announcement
+      announcementId: postId,
       title: extractedData.title,
       content: extractedData.content,
       source: "Facebook Announcement",
@@ -911,14 +1147,14 @@ async function createAdmissionFromAnnouncement(
       steps: extractedData.steps,
       requirements: extractedData.requirements,
       links: [],
-      schedules: extractedData.schedules,
+      schedules: extractedData.schedules, // ✅ Now contains all schedules with all locations
       deadline: deadline,
-      deleted: false, // ✅ Soft delete flag
+      deleted: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       autoGenerated: true,
     });
 
-    console.log(`✅ Created admission from announcement ${postId}`);
+    console.log(`✅ Created admission with ${extractedData.schedules.length} schedules`);
   } catch (error) {
     console.error(`❌ Error creating admission from announcement ${postId}:`, error);
   }
@@ -1072,121 +1308,119 @@ async function processPost(post: FacebookPost, cohereKey: string): Promise<void>
   const postRef = db.collection("announcements").doc(postId);
   const doc = await postRef.get();
   
-  // ✅ Extract text from image if present
-  let ocrText = "";
-  let hasImageText = false;
+  // ✅ Extract ALL images from the post
+  const allImageUrls = extractAllImagesFromPost(post);
+  console.log(`📸 Post ${postId} has ${allImageUrls.length} image(s)`);
   
-  if (post.full_picture) {
-    console.log(`🖼️ Post ${postId} has an image, attempting OCR...`);
-    
+  // ✅ Extract text from ALL images via OCR
+  let combinedOcrText = "";
+  const ocrResults: string[] = [];
+  
+  for (let i = 0; i < allImageUrls.length; i++) {
+    console.log(`🔍 Running OCR on image ${i + 1}/${allImageUrls.length}...`);
     try {
-      ocrText = await extractTextFromImage(post.full_picture);
-      
+      const ocrText = await extractTextFromImage(allImageUrls[i]);
       if (ocrText && ocrText.trim().length > 0) {
-        hasImageText = true;
-        console.log(`✅ Extracted ${ocrText.length} characters from image`);
-      } else {
-        console.log(`⚠️ No text found in image for post ${postId}`);
+        ocrResults.push(ocrText);
       }
-    } catch (ocrError: any) {
-      console.error(`⚠️ OCR failed for post ${postId}:`, ocrError.message);
+    } catch (err: any) {
+      console.error(`⚠️ OCR failed for image ${i + 1}:`, err.message);
     }
   }
   
-  // ✅ Combine original message + OCR text for AI analysis ONLY
+  combinedOcrText = ocrResults.join('\n\n---\n\n');
+  const hasImageText = ocrResults.length > 0;
+  
+  console.log(`📝 Combined OCR text length: ${combinedOcrText.length} chars from ${ocrResults.length} image(s)`);
+  
+  // Combine message + OCR for analysis
   let messageForAnalysis = originalMessage;
-  
-  if (hasImageText && ocrText) {
-    if (originalMessage.trim().length === 0) {
-      messageForAnalysis = ocrText;
-      console.log(`📝 Using OCR text for analysis (no caption)`);
-    } else {
-      messageForAnalysis = `${originalMessage}\n\n[Image Text]:\n${ocrText}`;
-      console.log(`📝 Combined caption with OCR text for analysis`);
-    }
+  if (hasImageText) {
+    messageForAnalysis = originalMessage 
+      ? `${originalMessage}\n\n[Image Text]:\n${combinedOcrText}`
+      : combinedOcrText;
   }
   
-  // Skip if no content after OCR attempt
   if (!messageForAnalysis || messageForAnalysis.trim().length === 0) {
     console.log(`Skipping post ${postId} - no message or image text`);
     return;
   }
   
-  // Download and upload image
-  let imageUrl = "";
-  if (post.full_picture) {
-    imageUrl = await downloadAndUploadImage(post.full_picture, postId);
+  // ✅ Download and upload ALL images
+  let uploadedImageUrls: string[] = [];
+  if (allImageUrls.length > 0) {
+    uploadedImageUrls = await downloadAndUploadAllImages(allImageUrls, postId);
   }
   
   if (!doc.exists) {
-    // ✅ NEW ANNOUNCEMENT
-    console.log(`Creating new post: ${postId}`);
+    // NEW ANNOUNCEMENT
+    console.log(`Creating new post: ${postId} with ${uploadedImageUrls.length} images`);
     
     const cohereResult = await analyzeAnnouncement(messageForAnalysis, cohereKey);
     const deadlineTimestamp = parseDeadlineToTimestamp(cohereResult.deadline);
     
-    const newData: AnnouncementData = {
-      announcementId: postId, // ✅ Unique announcement ID
+    const newData = {
+      announcementId: postId,
       message: originalMessage,
       created_time: post.created_time,
-      full_picture: imageUrl || post.full_picture || "",
-      original_image_url: post.full_picture || "",
+      // ✅ Store array of images
+      images: uploadedImageUrls,
+      image_count: uploadedImageUrls.length,
+      // Keep full_picture for backward compatibility (first image)
+      full_picture: uploadedImageUrls[0] || "",
+      original_image_urls: allImageUrls,
       permalink_url: post.permalink_url || "",
       category: cohereResult.category || "General",
       deadline: deadlineTimestamp || null,
-      deleted: false, // ✅ Soft delete flag
+      deleted: false,
       fetched_at: admin.firestore.FieldValue.serverTimestamp(),
       processed_by_cohere: true,
-      stored_in_storage: !!imageUrl,
+      stored_in_storage: uploadedImageUrls.length > 0,
       notification_sent: false,
-      ocr_text: ocrText || "",
+      ocr_text: combinedOcrText || "",
       has_image_text: hasImageText,
     };
     
     await postRef.set(newData);
 
-    // ✅ Create category-specific document with announcementId reference
+    // Create category-specific document with OCR text for better extraction
     const category = cohereResult.category?.toLowerCase() || "general";
     
     if (category === "admission") {
-      await createAdmissionFromAnnouncement(postId, messageForAnalysis, deadlineTimestamp, cohereKey);
+      await createAdmissionFromAnnouncement(
+        postId, 
+        messageForAnalysis, 
+        deadlineTimestamp, 
+        cohereKey,
+        combinedOcrText // ✅ Pass OCR text separately
+      );
     } else if (category === "scholarship") {
       await createScholarshipFromAnnouncement(postId, messageForAnalysis, deadlineTimestamp, cohereKey);
     } else if (category === "placement") {
       await createPlacementFromAnnouncement(postId, messageForAnalysis, deadlineTimestamp, cohereKey);
     }
     
-    console.log(`✅ Post ${postId} processed with category: ${category}${hasImageText ? ' (with image OCR)' : ''}`);
+    console.log(`✅ Post ${postId} processed: ${category}, ${uploadedImageUrls.length} images`);
     
   } else {
-    // ✅ EXISTING ANNOUNCEMENT
+    // EXISTING - update with multiple images
     const docData = doc.data();
     
-    // ✅ CRITICAL: If deleted, SKIP and don't restore
     if (docData?.deleted === true) {
-      console.log(`⏭️ Skipping post ${postId} - user has deleted it (deleted: true)`);
-      return; // ✅ Don't restore deleted posts
-    }
-    
-    // ✅ REGULAR UPDATE (not deleted)
-    console.log(`Updating existing post: ${postId}`);
-    
-    let updatedDeadline = docData?.deadline;
-    if (!updatedDeadline && messageForAnalysis) {
-      console.log(`🔍 Re-analyzing post ${postId} for missing deadline`);
-      const cohereResult = await analyzeAnnouncement(messageForAnalysis, cohereKey);
-      updatedDeadline = parseDeadlineToTimestamp(cohereResult.deadline);
+      console.log(`⏭️ Skipping deleted post ${postId}`);
+      return;
     }
     
     await postRef.update({
       message: originalMessage,
-      full_picture: imageUrl || docData?.full_picture || post.full_picture || "",
+      images: uploadedImageUrls.length > 0 ? uploadedImageUrls : docData?.images || [],
+      image_count: uploadedImageUrls.length || docData?.image_count || 0,
+      full_picture: uploadedImageUrls[0] || docData?.full_picture || "",
       permalink_url: post.permalink_url || "",
-      deadline: updatedDeadline || docData?.deadline || null,
       last_synced_at: admin.firestore.FieldValue.serverTimestamp(),
-      stored_in_storage: !!imageUrl || docData?.stored_in_storage || false,
-      ocr_text: ocrText || docData?.ocr_text || "",
-      has_image_text: hasImageText || docData?.has_image_text || false,
+      stored_in_storage: uploadedImageUrls.length > 0 || docData?.stored_in_storage,
+      ocr_text: combinedOcrText || docData?.ocr_text || "",
+      has_image_text: hasImageText || docData?.has_image_text,
     });
   }
 }
