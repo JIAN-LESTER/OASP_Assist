@@ -196,71 +196,95 @@ export async function generateCohereResponse(
 
 function getContextualContent(chunks: any[], bestChunk: any): string {
   try {
-    console.log(`📝 Processing ${chunks.length} chunk(s)`);
-    console.log(
-      "📝 Best chunk metadata keys:",
-      Object.keys(bestChunk.metadata || {})
-    );
+    console.log(`\n📝 getContextualContent called:`);
+    console.log(`   Total chunks: ${chunks.length}`);
+    console.log(`   Best chunk ID: ${bestChunk.id}`);
 
     if (chunks.length === 1) {
+      // 🔥 Single chunk - try all possible field names in priority order
+      const metadata = bestChunk.metadata || {};
+
+      console.log(`   Metadata keys: ${Object.keys(metadata).join(", ")}`);
+
       const text =
-        bestChunk.metadata?.text ||
-        bestChunk.metadata?.content ||
-        bestChunk.metadata?.chunk_text ||
-        bestChunk.metadata?.body ||
+        metadata.text || // Priority 1: Primary field
+        metadata.content || // Priority 2: Fallback
+        metadata.chunk_text || // Priority 3: Alternative naming
+        metadata.body || // Priority 4: Another alternative
+        metadata.message || // Priority 5: For announcements
         "";
 
       if (!text || text.trim().length === 0) {
-        console.log("⚠️ Warning: No text content found in metadata");
+        console.log(`⚠️ WARNING: No text content found!`);
         console.log(
-          "📝 Metadata keys available:",
-          Object.keys(bestChunk.metadata || {})
+          `   Available metadata:`,
+          JSON.stringify(metadata, null, 2)
         );
+        return "";
       }
 
       const cleanText = text.trim();
-      console.log(`📝 Single chunk content length: ${cleanText.length}`);
+      console.log(`   ✅ Single chunk content: ${cleanText.length} chars`);
+      console.log(`   Preview: ${cleanText.substring(0, 150)}...`);
       return cleanText;
     }
 
-    const sortedChunks = chunks
-      .slice()
-      .sort(
-        (a, b) =>
-          (a.metadata?.chunkIndex ?? a.metadata?.chunk_index ?? 0) -
-          (b.metadata?.chunkIndex ?? b.metadata?.chunk_index ?? 0)
-      );
+    // 🔥 Multiple chunks - combine contextual chunks
+    console.log(`   Processing ${chunks.length} chunks for context...`);
+
+    // Sort by chunk index
+    const sortedChunks = chunks.slice().sort((a, b) => {
+      const aIndex = a.metadata?.chunkIndex ?? a.metadata?.chunk_index ?? 0;
+      const bIndex = b.metadata?.chunkIndex ?? b.metadata?.chunk_index ?? 0;
+      return aIndex - bIndex;
+    });
 
     const bestChunkIndex =
       bestChunk.metadata?.chunkIndex ?? bestChunk.metadata?.chunk_index ?? 0;
 
+    console.log(`   Best chunk index: ${bestChunkIndex}`);
+
+    // Get surrounding chunks (±1 from best chunk)
     const contextChunks = sortedChunks.filter((chunk) => {
       const chunkIndex =
         chunk.metadata?.chunkIndex ?? chunk.metadata?.chunk_index ?? 0;
       return Math.abs(chunkIndex - bestChunkIndex) <= 1;
     });
 
-    contextChunks.sort(
-      (a, b) =>
-        (a.metadata?.chunkIndex ?? a.metadata?.chunk_index ?? 0) -
-        (b.metadata?.chunkIndex ?? b.metadata?.chunk_index ?? 0)
-    );
+    console.log(`   Context chunks selected: ${contextChunks.length}`);
+
+    // Sort context chunks by index
+    contextChunks.sort((a, b) => {
+      const aIndex = a.metadata?.chunkIndex ?? a.metadata?.chunk_index ?? 0;
+      const bIndex = b.metadata?.chunkIndex ?? b.metadata?.chunk_index ?? 0;
+      return aIndex - bIndex;
+    });
 
     const contentParts: string[] = [];
-    for (const chunk of contextChunks) {
+
+    for (let i = 0; i < contextChunks.length; i++) {
+      const chunk = contextChunks[i];
+      const chunkIndex =
+        chunk.metadata?.chunkIndex ?? chunk.metadata?.chunk_index ?? 0;
+
+      // 🔥 Try all possible content field names
       const content =
         chunk.metadata?.text ||
         chunk.metadata?.content ||
         chunk.metadata?.chunk_text ||
         chunk.metadata?.body ||
+        chunk.metadata?.message ||
         "";
 
       const cleanContent = content.trim();
+
       if (cleanContent.length > 0) {
         contentParts.push(cleanContent);
+        console.log(`   ✅ Chunk ${chunkIndex}: ${cleanContent.length} chars`);
       } else {
+        console.log(`   ⚠️ Chunk ${chunkIndex}: Empty content`);
         console.log(
-          `⚠️ Empty content in chunk index ${chunk.metadata?.chunkIndex}`
+          `      Metadata keys: ${Object.keys(chunk.metadata || {}).join(", ")}`
         );
       }
     }
@@ -269,19 +293,36 @@ function getContextualContent(chunks: any[], bestChunk: any): string {
       console.log(
         `❌ No content parts found across ${contextChunks.length} chunks`
       );
+
+      // 🔥 DEBUG: Log first chunk's full metadata
+      if (contextChunks.length > 0) {
+        console.log(
+          `   Sample chunk metadata:`,
+          JSON.stringify(contextChunks[0]?.metadata, null, 2)
+        );
+      }
+
       return "";
     }
 
     const result = contentParts.join("\n\n").trim();
     console.log(
-      `📝 Combined content length: ${result.length} from ${contentParts.length} chunks`
+      `   ✅ Combined content: ${result.length} chars from ${contentParts.length} chunks`
     );
+    console.log(`   Preview: ${result.substring(0, 200)}...`);
+
     return result;
   } catch (error) {
-    console.error("Error getting contextual content:", error);
+    console.error("❌ Error in getContextualContent:", error);
+
+    // 🔥 Fallback with detailed logging
     const fallback =
-      bestChunk.metadata?.text || bestChunk.metadata?.content || "";
-    console.log(`📝 Using fallback, length: ${fallback.length}`);
+      bestChunk.metadata?.text ||
+      bestChunk.metadata?.content ||
+      bestChunk.metadata?.message ||
+      "";
+
+    console.log(`   Using fallback: ${fallback.length} chars`);
     return fallback;
   }
 }
@@ -429,7 +470,9 @@ async function findMatchingFAQ(
       .where("answer", "!=", "")
       .get();
 
-    console.log(`📚 Total FAQs retrieved from Firestore: ${faqSnapshot.docs.length}`);
+    console.log(
+      `📚 Total FAQs retrieved from Firestore: ${faqSnapshot.docs.length}`
+    );
 
     if (faqSnapshot.docs.length === 0) {
       console.log(`❌ No FAQs found in database!`);
@@ -444,9 +487,9 @@ async function findMatchingFAQ(
     let highestSimilarity = 0;
     let processedCount = 0;
     let skippedCount = 0;
-    const allSimilarities: Array<{ 
+    const allSimilarities: Array<{
       id: string;
-      question: string; 
+      question: string;
       similarity: number;
       hasAnswer: boolean;
       hasEmbedding: boolean;
@@ -465,20 +508,35 @@ async function findMatchingFAQ(
       }
 
       if (!faqAnswer || faqAnswer.trim().length === 0) {
-        console.log(`⚠️ [${doc.id}] Skipping: Empty answer for "${faqQuestion.substring(0, 50)}..."`);
+        console.log(
+          `⚠️ [${doc.id}] Skipping: Empty answer for "${faqQuestion.substring(
+            0,
+            50
+          )}..."`
+        );
         skippedCount++;
         continue;
       }
 
       let faqEmbedding: number[];
-      
+
       // Check if embedding exists
-      if (data.embedding && Array.isArray(data.embedding) && data.embedding.length > 0) {
+      if (
+        data.embedding &&
+        Array.isArray(data.embedding) &&
+        data.embedding.length > 0
+      ) {
         faqEmbedding = data.embedding;
-        console.log(`✅ [${doc.id}] Using existing embedding (${faqEmbedding.length} dimensions)`);
+        console.log(
+          `✅ [${doc.id}] Using existing embedding (${faqEmbedding.length} dimensions)`
+        );
       } else {
-        console.log(`🔧 [${doc.id}] Generating new embedding for: "${faqQuestion.substring(0, 50)}..."`);
-        
+        console.log(
+          `🔧 [${
+            doc.id
+          }] Generating new embedding for: "${faqQuestion.substring(0, 50)}..."`
+        );
+
         try {
           // ✅ IMPORTANT: Use "search_document" for FAQs to match the query type
           faqEmbedding = await generateCohereEmbedding(
@@ -488,13 +546,18 @@ async function findMatchingFAQ(
           );
 
           // Save the embedding
-          await doc.ref.update({ 
+          await doc.ref.update({
             embedding: faqEmbedding,
-            embeddingUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+            embeddingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
-          console.log(`✅ [${doc.id}] Embedding generated and saved (${faqEmbedding.length} dimensions)`);
+          console.log(
+            `✅ [${doc.id}] Embedding generated and saved (${faqEmbedding.length} dimensions)`
+          );
         } catch (embError) {
-          console.error(`❌ [${doc.id}] Failed to generate embedding:`, embError);
+          console.error(
+            `❌ [${doc.id}] Failed to generate embedding:`,
+            embError
+          );
           skippedCount++;
           continue;
         }
@@ -502,7 +565,9 @@ async function findMatchingFAQ(
 
       // ✅ Verify embedding dimensions match
       if (faqEmbedding.length !== queryEmbedding.length) {
-        console.log(`⚠️ [${doc.id}] Dimension mismatch: FAQ=${faqEmbedding.length}, Query=${queryEmbedding.length}`);
+        console.log(
+          `⚠️ [${doc.id}] Dimension mismatch: FAQ=${faqEmbedding.length}, Query=${queryEmbedding.length}`
+        );
         skippedCount++;
         continue;
       }
@@ -523,7 +588,13 @@ async function findMatchingFAQ(
       console.log(`📊 [${doc.id}]`);
       console.log(`   Question: "${faqQuestion.substring(0, 60)}..."`);
       console.log(`   Answer: ${faqAnswer.length} chars`);
-      console.log(`   Similarity: ${similarity.toFixed(4)} ${similarity >= similarityThreshold ? "✅ ABOVE THRESHOLD" : "❌ BELOW THRESHOLD"}`);
+      console.log(
+        `   Similarity: ${similarity.toFixed(4)} ${
+          similarity >= similarityThreshold
+            ? "✅ ABOVE THRESHOLD"
+            : "❌ BELOW THRESHOLD"
+        }`
+      );
 
       if (similarity > highestSimilarity && similarity >= similarityThreshold) {
         highestSimilarity = similarity;
@@ -532,7 +603,9 @@ async function findMatchingFAQ(
           answer: faqAnswer,
           similarity: similarity,
         };
-        console.log(`🎯 [${doc.id}] NEW BEST MATCH! Similarity: ${similarity.toFixed(4)}`);
+        console.log(
+          `🎯 [${doc.id}] NEW BEST MATCH! Similarity: ${similarity.toFixed(4)}`
+        );
       }
     }
 
@@ -554,7 +627,11 @@ async function findMatchingFAQ(
       .forEach((item, index) => {
         const status = item.hasAnswer ? "✅" : "❌";
         const embStatus = item.hasEmbedding ? "✅" : "❌";
-        console.log(`   ${index + 1}. [${item.similarity.toFixed(4)}] ${status}Answer ${embStatus}Emb - ${item.question}`);
+        console.log(
+          `   ${index + 1}. [${item.similarity.toFixed(
+            4
+          )}] ${status}Answer ${embStatus}Emb - ${item.question}`
+        );
       });
 
     if (bestMatch) {
@@ -563,7 +640,9 @@ async function findMatchingFAQ(
       console.log(`✅ Question: "${bestMatch.question}"`);
       console.log(`✅ Similarity: ${bestMatch.similarity.toFixed(4)}`);
       console.log(`✅ Answer length: ${bestMatch.answer.length} chars`);
-      console.log(`✅ Answer preview: "${bestMatch.answer.substring(0, 100)}..."`);
+      console.log(
+        `✅ Answer preview: "${bestMatch.answer.substring(0, 100)}..."`
+      );
       console.log(`✅ ===========================================`);
 
       // Update FAQ stats
@@ -582,18 +661,22 @@ async function findMatchingFAQ(
       console.log(`❌ NO FAQ MATCH FOUND`);
       console.log(`❌ Best similarity: ${highestSimilarity.toFixed(4)}`);
       console.log(`❌ Required: ${similarityThreshold}`);
-      console.log(`❌ Gap: ${(similarityThreshold - highestSimilarity).toFixed(4)}`);
+      console.log(
+        `❌ Gap: ${(similarityThreshold - highestSimilarity).toFixed(4)}`
+      );
       console.log(`❌ ===========================================`);
     }
 
     return bestMatch;
   } catch (error) {
     console.error("❌ Error in findMatchingFAQ:", error);
-    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+    console.error(
+      "Error stack:",
+      error instanceof Error ? error.stack : "No stack trace"
+    );
     return null;
   }
 }
-
 
 async function retrieveRelevantDocuments(
   query: string,
@@ -634,18 +717,25 @@ async function retrieveRelevantDocuments(
 
     if (!similarChunks.matches || similarChunks.matches.length === 0) {
       console.log("❌ No similar document chunks found in Pinecone");
-      console.log("⚠️ Check if documents are indexed in Pinecone");
       return [];
     }
 
     console.log(`📊 Found ${similarChunks.matches.length} similar chunks`);
 
+    // 🔥 NEW: Log first match details for debugging
     if (similarChunks.matches.length > 0) {
       const firstMatch = similarChunks.matches[0];
-      console.log(`📝 First match score: ${firstMatch.score}`);
+      console.log(`📝 First match details:`);
+      console.log(`   ID: ${firstMatch.id}`);
+      console.log(`   Score: ${firstMatch.score}`);
       console.log(
-        "📝 First match metadata keys:",
-        Object.keys(firstMatch.metadata || {})
+        `   Metadata keys: ${Object.keys(firstMatch.metadata || {}).join(", ")}`
+      );
+      console.log(`   Has 'text': ${!!firstMatch.metadata?.text}`);
+      console.log(`   Has 'content': ${!!firstMatch.metadata?.content}`);
+      console.log(`   Text length: ${firstMatch.metadata?.text?.length || 0}`);
+      console.log(
+        `   Content length: ${firstMatch.metadata?.content?.length || 0}`
       );
     }
 
@@ -661,26 +751,30 @@ async function retrieveRelevantDocuments(
       console.log(
         `❌ No chunks meet minimum similarity threshold of ${minSimilarityScore}`
       );
-      console.log(
-        `⚠️ Best score found: ${similarChunks.matches[0]?.score || 0}`
-      );
       return [];
     }
 
+    // 🔥 CRITICAL FIX: Better document grouping
     const documentChunks: { [key: string]: any[] } = {};
 
     for (const chunk of filteredChunks) {
       const metadata = chunk.metadata || {};
 
+      // 🔥 PRIORITY ORDER for docId extraction
       const originalDocId =
-        metadata.docId ||
-        metadata.originalDocId ||
-        metadata.documentId ||
-        metadata.id ||
-        chunk.id?.split("_chunk_")[0];
+        metadata.docId || // Primary
+        metadata.originalDocId || // Secondary
+        metadata.categoryDocId || // For category-synced docs
+        metadata.documentId || // Fallback
+        chunk.id?.split("_chunk_")[0]; // Last resort
 
+      console.log(`📝 Processing chunk: ${chunk.id}`);
+      console.log(`   docId: ${originalDocId}`);
+      console.log(`   score: ${chunk.score?.toFixed(3)}`);
       console.log(
-        `📝 Chunk ${chunk.id}: docId = ${originalDocId}, score = ${chunk.score}`
+        `   text length: ${
+          metadata.text?.length || metadata.content?.length || 0
+        }`
       );
 
       if (originalDocId) {
@@ -713,20 +807,33 @@ async function retrieveRelevantDocuments(
     for (const docId of Object.keys(documentChunks)) {
       const chunks = documentChunks[docId];
 
+      // Sort by score
       chunks.sort((a, b) => (b.score || 0) - (a.score || 0));
 
       const bestChunk = chunks[0];
       const bestScore = bestChunk.score || 0;
 
+      console.log(`\n📄 Processing document: ${docId}`);
+      console.log(`   Chunks: ${chunks.length}`);
+      console.log(`   Best score: ${bestScore.toFixed(3)}`);
+
+      // 🔥 CRITICAL: Get contextual content
       const contextualContent = getContextualContent(chunks, bestChunk);
 
       if (!contextualContent || contextualContent.trim().length === 0) {
         console.log(
           `⚠️ Empty contextual content for document ${docId}, skipping`
         );
+        console.log(
+          `   Best chunk metadata:`,
+          JSON.stringify(bestChunk.metadata, null, 2)
+        );
         continue;
       }
 
+      console.log(`   ✅ Content extracted: ${contextualContent.length} chars`);
+
+      // Try to get metadata from Firestore
       const docMetadata = await getDocumentMetadata(docId);
 
       const result = {
@@ -735,19 +842,16 @@ async function retrieveRelevantDocuments(
           docMetadata?.ib_title ||
           docMetadata?.title ||
           bestChunk.metadata?.originalTitle ||
-          bestChunk.metadata?.fileName ||
           bestChunk.metadata?.title ||
+          bestChunk.metadata?.fileName ||
           "Untitled Document",
         content: contextualContent,
-        source:
-          docMetadata?.source ||
-          bestChunk.metadata?.source ||
-          bestChunk.metadata?.fileName ||
-          "Unknown",
+        source: docMetadata?.source || bestChunk.metadata?.source || "Unknown",
         categoryID:
           docMetadata?.category ||
           docMetadata?.categoryID ||
           bestChunk.metadata?.category ||
+          bestChunk.metadata?.categoryID ||
           "General",
         similarity_score: bestScore,
         chunk_info: {
@@ -762,15 +866,23 @@ async function retrieveRelevantDocuments(
 
       results.push(result);
       console.log(
-        `✅ Added result: ${result.ib_title} (score: ${bestScore.toFixed(3)})`
+        `✅ Added result: "${result.ib_title}" (${bestScore.toFixed(3)})`
       );
     }
 
+    // Sort by similarity score
     results.sort((a, b) => b.similarity_score - a.similarity_score);
 
     const topResults = results.slice(0, topK);
 
-    console.log(`🎯 Final results: ${topResults.length} documents retrieved`);
+    console.log(`\n🎯 Final results: ${topResults.length} documents retrieved`);
+    topResults.forEach((r, i) => {
+      console.log(
+        `   ${i + 1}. "${r.ib_title}" - ${r.similarity_score.toFixed(3)}`
+      );
+      console.log(`      Content: ${r.content.substring(0, 100)}...`);
+    });
+
     return topResults;
   } catch (error) {
     console.error("❌ Error retrieving relevant documents:", error);
@@ -798,6 +910,7 @@ async function getDocumentMetadata(docId: string): Promise<any> {
 // MAIN FUNCTION
 // ============================================================================
 
+
 export const generateAnswer = onRequest(
   {
     secrets: [PINECONE_API_KEY, COHERE_API_KEY],
@@ -820,7 +933,7 @@ export const generateAnswer = onRequest(
         query,
         conversationHistory = [],
         topK = 5,
-        minSimilarityScore = 0.3,
+        minSimilarityScore = 0.2,
         stream = true,
       } = req.body;
 
@@ -832,12 +945,16 @@ export const generateAnswer = onRequest(
         return;
       }
 
-      console.log(`🤖 Generating answer for: "${query}" (streaming: ${stream})`);
+      console.log(`\n🤖 ========================================`);
+      console.log(`🤖 Query: "${query}"`);
+      console.log(`🤖 Streaming: ${stream}`);
+      console.log(`🤖 Settings: topK=${topK}, minSimilarity=${minSimilarityScore}`);
+      console.log(`🤖 ========================================\n`);
 
       const pineconeKey = PINECONE_API_KEY.value();
       const cohereKey = COHERE_API_KEY.value();
 
-      // ✅ Generate embedding FIRST
+      // Generate embedding
       console.log("🔧 Generating query embedding...");
       const queryEmbedding = await generateCohereEmbedding(
         query,
@@ -845,24 +962,21 @@ export const generateAnswer = onRequest(
         "search_query"
       );
 
-      console.log(`✅ Generated embedding with ${queryEmbedding.length} dimensions`);
+      console.log(`✅ Embedding: ${queryEmbedding.length} dimensions`);
 
-      // ✅ Check FAQ IMMEDIATELY with lower threshold
-      console.log("🔍 Checking FAQ database...");
+      // Check FAQ first
+      console.log("\n🔍 Checking FAQ database...");
       const faqMatch = await findMatchingFAQ(
         query,
         queryEmbedding,
         cohereKey,
-        0.85 // ✅ Lower threshold for better matching
+        0.75
       );
 
       if (faqMatch) {
-        console.log(`✅ Using FAQ answer (similarity: ${faqMatch.similarity.toFixed(3)})`);
-        console.log(`📝 FAQ Question: "${faqMatch.question}"`);
-        console.log(`📝 Answer length: ${faqMatch.answer.length} characters`);
+        console.log(`✅ Using FAQ answer`);
 
         if (stream) {
-          // Streaming response for FAQ
           res.setHeader("Content-Type", "text/event-stream");
           res.setHeader("Cache-Control", "no-cache");
           res.setHeader("Connection", "keep-alive");
@@ -870,8 +984,6 @@ export const generateAnswer = onRequest(
 
           const answer = faqMatch.answer;
           const chunkSize = 10;
-
-          console.log(`🌊 Starting FAQ streaming (${answer.length} chars)...`);
 
           for (let i = 0; i < answer.length; i += chunkSize) {
             const chunk = answer.substring(
@@ -886,11 +998,9 @@ export const generateAnswer = onRequest(
               })}\n\n`
             );
 
-            // Small delay to simulate streaming
             await new Promise((resolve) => setTimeout(resolve, 30));
           }
 
-          // Send metadata and end signal
           res.write(
             `data: ${JSON.stringify({
               type: "message-end",
@@ -898,38 +1008,32 @@ export const generateAnswer = onRequest(
                 source: "faq",
                 faqQuestion: faqMatch.question,
                 similarity: faqMatch.similarity,
-                answerLength: faqMatch.answer.length,
               },
             })}\n\n`
           );
           res.write("data: [DONE]\n\n");
           res.end();
-
-          console.log("✅ FAQ streaming complete");
         } else {
-          // Non-streaming response for FAQ
           res.json({
             answer: faqMatch.answer,
             source: "faq",
             faqQuestion: faqMatch.question,
             similarity: faqMatch.similarity,
           });
-
-          console.log("✅ FAQ response sent (non-streaming)");
         }
         return;
       }
 
-      console.log("ℹ️ No FAQ match found, proceeding with document retrieval...");
+      console.log("ℹ️ No FAQ match, proceeding with document retrieval...");
 
-      // ✅ Initialize Pinecone
+      // Initialize Pinecone
       const pineconeClient = new Pinecone({ apiKey: pineconeKey });
       const pineconeIndex = pineconeClient.Index("oasp-assist");
 
-      // ✅ Build conversation context
+      // Build conversation context
       const contextHistory = buildConversationContext(conversationHistory);
 
-      // ✅ Enhance query with context
+      // Enhance query
       const contextualQuery = await enhanceQueryWithContext(
         query,
         contextHistory,
@@ -938,62 +1042,81 @@ export const generateAnswer = onRequest(
 
       console.log(`🔍 Enhanced query: "${contextualQuery}"`);
 
-      // ✅ Retrieve relevant documents
-      const results = await retrieveRelevantDocuments(
-        contextualQuery,
-        queryEmbedding,
-        pineconeIndex,
-        topK,
-        minSimilarityScore
-      );
+      // ✅ PROGRESSIVE THRESHOLD RETRIEVAL
+      console.log(`\n📊 ========================================`);
+      console.log(`📊 PROGRESSIVE THRESHOLD SEARCH`);
+      console.log(`📊 ========================================`);
+      
+      const thresholds = [0.35, 0.25, 0.18, 0.12];
+      let results: any[] = [];
+      let usedThreshold = minSimilarityScore;
 
-      if (results.length === 0) {
-        console.log("❌ No relevant documents found");
-        const errorMsg =
-          "Sorry, I couldn't find relevant information about that topic. Please contact OASP staff for assistance.";
-
-        if (stream) {
-          res.setHeader("Content-Type", "text/event-stream");
-          res.setHeader("Cache-Control", "no-cache");
-          res.setHeader("Connection", "keep-alive");
-          res.setHeader("X-Accel-Buffering", "no");
-
-          res.write(
-            `data: ${JSON.stringify({
-              type: "content-delta",
-              delta: { message: { content: { text: errorMsg } } },
-            })}\n\n`
-          );
-          res.write(
-            `data: ${JSON.stringify({
-              type: "message-end",
-              metadata: { source: "no_documents" },
-            })}\n\n`
-          );
-          res.write("data: [DONE]\n\n");
-          res.end();
-        } else {
-          res.json({
-            answer: errorMsg,
-            source: "no_documents",
-          });
+      for (const threshold of thresholds) {
+        if (threshold < minSimilarityScore) {
+          console.log(`⏭️ Skip threshold ${threshold} (below minimum ${minSimilarityScore})`);
+          continue;
         }
-        return;
+        
+        console.log(`\n🔍 Attempting threshold: ${threshold}`);
+        
+        results = await retrieveRelevantDocuments(
+          contextualQuery,
+          queryEmbedding,
+          pineconeIndex,
+          topK,
+          threshold
+        );
+        
+        if (results.length > 0) {
+          usedThreshold = threshold;
+          console.log(`✅ SUCCESS! Found ${results.length} documents`);
+          console.log(`📊 Used threshold: ${threshold}`);
+          break;
+        }
+        
+        console.log(`⚠️ No results at ${threshold}, trying lower...`);
       }
 
-      console.log(`📚 Using ${results.length} documents for context`);
+      console.log(`\n📊 ========================================`);
+      if (results.length === 0) {
+        console.log(`❌ FINAL: No documents found (tried all thresholds)`);
+      } else {
+        console.log(`✅ FINAL: ${results.length} documents (threshold: ${usedThreshold})`);
+      }
+      console.log(`📊 ========================================\n`);
 
-      // ✅ Build document context and prompt
-      const documentContext = buildDocumentContext(results);
-      const prompt = buildContextAwarePrompt(
-        query,
-        documentContext,
-        contextHistory
-      );
+      let prompt: string;
+      let documentContext = "";
 
-      console.log("🤖 Generating AI response...");
+      if (results.length === 0) {
+        console.log("⚠️ Using general knowledge mode");
+        
+        prompt = `You are OASP Assist, the official assistant for Central Mindanao University's Office of Admissions, Scholarships, and Placements.
 
-      // ✅ Generate response (streaming or non-streaming)
+CONTEXT:
+The user asked a question but no specific documents were found in the knowledge base.
+
+CONVERSATION HISTORY:
+${contextHistory}
+
+CURRENT QUESTION: "${query}"
+
+INSTRUCTIONS:
+- Provide a helpful, general answer based on your knowledge about university admissions, scholarships, and placements
+- Be honest if you don't have specific information about CMU's policies
+- Suggest contacting OASP staff for specific details when appropriate
+- Keep your response conversational and helpful
+
+Please provide a helpful response:`;
+
+      } else {
+        console.log(`📚 Using ${results.length} documents (threshold: ${usedThreshold})`);
+        
+        documentContext = buildDocumentContext(results);
+        prompt = buildContextAwarePrompt(query, documentContext, contextHistory);
+      }
+
+      // Generate response
       if (stream) {
         res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
@@ -1023,9 +1146,7 @@ export const generateAnswer = onRequest(
             }
           }
 
-          // If no content was streamed, provide fallback
           if (!hasContent) {
-            console.log("⚠️ No content streamed, sending fallback message");
             const fallbackMsg =
               "I'm having trouble processing your question right now. Please try again or contact OASP staff for assistance.";
             res.write(
@@ -1037,7 +1158,6 @@ export const generateAnswer = onRequest(
             fullResponse = fallbackMsg;
           }
 
-          // Send metadata and end signal
           res.write(
             `data: ${JSON.stringify({
               type: "message-end",
@@ -1045,13 +1165,8 @@ export const generateAnswer = onRequest(
                 source: "knowledge_base",
                 documentsUsed: results.length,
                 documentTitles: results.map((r) => r.ib_title),
+                usedThreshold: usedThreshold,
                 responseLength: fullResponse.length,
-                topDocumentScores: results
-                  .slice(0, 3)
-                  .map((r) => ({
-                    title: r.ib_title,
-                    score: r.similarity_score,
-                  })),
               },
             })}\n\n`
           );
@@ -1100,7 +1215,7 @@ export const generateAnswer = onRequest(
         }
 
         console.log(`✅ Generated answer (${answer.length} chars)`);
-        
+
         res.json({
           answer: answer.trim(),
           source: "knowledge_base",
@@ -1178,17 +1293,21 @@ export const debugFAQs = onRequest(
   async (req, res) => {
     try {
       const db = admin.firestore();
-      
+
       console.log("🔍 Checking FAQ collection...");
-      
+
       const allFAQs = await db.collection("faqs").get();
-      console.log(`📚 Total documents in 'faqs' collection: ${allFAQs.docs.length}`);
+      console.log(
+        `📚 Total documents in 'faqs' collection: ${allFAQs.docs.length}`
+      );
 
       const faqsWithAnswers = await db
         .collection("faqs")
         .where("answer", "!=", "")
         .get();
-      console.log(`✅ FAQs with non-empty answers: ${faqsWithAnswers.docs.length}`);
+      console.log(
+        `✅ FAQs with non-empty answers: ${faqsWithAnswers.docs.length}`
+      );
 
       const report = {
         total: allFAQs.docs.length,
@@ -1204,7 +1323,11 @@ export const debugFAQs = onRequest(
           question: data.question || "NO QUESTION",
           hasAnswer: !!(data.answer && data.answer.trim().length > 0),
           answerLength: data.answer ? data.answer.length : 0,
-          hasEmbedding: !!(data.embedding && Array.isArray(data.embedding) && data.embedding.length > 0),
+          hasEmbedding: !!(
+            data.embedding &&
+            Array.isArray(data.embedding) &&
+            data.embedding.length > 0
+          ),
           embeddingDimensions: data.embedding ? data.embedding.length : 0,
           category: data.category || "NO CATEGORY",
           similarityCount: data.similarityCount || 0,
@@ -1216,7 +1339,9 @@ export const debugFAQs = onRequest(
 📄 FAQ: ${doc.id}
    Question: ${data.question ? data.question.substring(0, 60) : "MISSING"}...
    Has Answer: ${faqInfo.hasAnswer} (${faqInfo.answerLength} chars)
-   Has Embedding: ${faqInfo.hasEmbedding} (${faqInfo.embeddingDimensions} dimensions)
+   Has Embedding: ${faqInfo.hasEmbedding} (${
+          faqInfo.embeddingDimensions
+        } dimensions)
    Category: ${faqInfo.category}
    Times Asked: ${faqInfo.similarityCount}
         `);
@@ -1225,7 +1350,11 @@ export const debugFAQs = onRequest(
       res.json(report);
     } catch (error) {
       console.error("Error debugging FAQs:", error);
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   }
 );
@@ -1240,33 +1369,35 @@ export const reembedAllFAQsV3 = onRequest(
   async (req, res) => {
     try {
       const cohereKey = COHERE_API_KEY.value();
-      
-      console.log('🔄 Re-embedding all FAQs with embed-multilingual-v3.0');
-      
+
+      console.log("🔄 Re-embedding all FAQs with embed-multilingual-v3.0");
+
       const faqSnapshot = await db.collection("faqs").get();
       console.log(`📚 Found ${faqSnapshot.docs.length} FAQs`);
-      
+
       let successCount = 0;
       let errorCount = 0;
-      
+
       for (const doc of faqSnapshot.docs) {
         const data = doc.data();
         const question = data.question as string;
-        
+
         if (!question) {
           errorCount++;
           continue;
         }
-        
+
         try {
-          console.log(`🔧 [${doc.id}] Embedding: "${question.substring(0, 50)}..."`);
-          
+          console.log(
+            `🔧 [${doc.id}] Embedding: "${question.substring(0, 50)}..."`
+          );
+
           const response = await axios.post(
             "https://api.cohere.ai/v1/embed",
             {
               texts: [question],
               model: "embed-multilingual-v3.0",
-              input_type: "search_document",  // FAQs are documents
+              input_type: "search_document", // FAQs are documents
             },
             {
               headers: {
@@ -1276,30 +1407,30 @@ export const reembedAllFAQsV3 = onRequest(
               timeout: 30000,
             }
           );
-          
-          const embedding = (response.data as { embeddings: number[][] }).embeddings[0];
-          
+
+          const embedding = (response.data as { embeddings: number[][] })
+            .embeddings[0];
+
           await doc.ref.update({
             embedding: embedding,
             embeddingModel: "embed-multilingual-v3.0",
             embeddingDimensions: embedding.length,
             embeddingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
-          
+
           successCount++;
           console.log(`✅ [${doc.id}] Done - ${embedding.length} dims`);
-          
+
           // Rate limit protection
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
+          await new Promise((resolve) => setTimeout(resolve, 100));
         } catch (error) {
           errorCount++;
           console.error(`❌ [${doc.id}] Failed:`, error);
         }
       }
-      
+
       console.log(`✅ Complete: ${successCount} success, ${errorCount} errors`);
-      
+
       res.json({
         success: true,
         model: "embed-multilingual-v3.0",
@@ -1307,10 +1438,102 @@ export const reembedAllFAQsV3 = onRequest(
         successCount,
         errorCount,
       });
-      
     } catch (error) {
       console.error("❌ Error:", error);
       res.status(500).json({ error: String(error) });
+    }
+  }
+);
+
+
+
+export const debugPineconeVector = onRequest(
+  {
+    secrets: [PINECONE_API_KEY],
+    cors: true,
+  },
+  async (req, res) => {
+    try {
+      const { vectorId, query } = req.body;
+
+      const pineconeKey = PINECONE_API_KEY.value();
+      const pineconeClient = new Pinecone({ apiKey: pineconeKey });
+      const pineconeIndex = pineconeClient.Index("oasp-assist");
+
+      if (vectorId) {
+        // Fetch specific vector by ID
+        const result = await pineconeIndex.fetch([vectorId]);
+
+        res.json({
+          success: true,
+          vector: result.records?.[vectorId],
+          metadata: result.records?.[vectorId]?.metadata,
+          metadataKeys: Object.keys(result.records?.[vectorId]?.metadata || {}),
+          hasText: !!result.records?.[vectorId]?.metadata?.text,
+          hasContent: !!result.records?.[vectorId]?.metadata?.content,
+          textLength:
+            typeof result.records?.[vectorId]?.metadata?.text === "string"
+              ? result.records?.[vectorId]?.metadata?.text.length
+              : Array.isArray(result.records?.[vectorId]?.metadata?.text)
+              ? result.records?.[vectorId]?.metadata?.text.length
+              : 0,
+          contentLength:
+            typeof result.records?.[vectorId]?.metadata?.content === "string"
+              ? result.records?.[vectorId]?.metadata?.content.length
+              : Array.isArray(result.records?.[vectorId]?.metadata?.content)
+              ? result.records?.[vectorId]?.metadata?.content.length
+              : 0,
+        });
+      } else if (query) {
+        // Query similar vectors
+        const cohereKey = COHERE_API_KEY.value();
+        const embedding = await generateCohereEmbedding(
+          query,
+          cohereKey,
+          "search_query"
+        );
+
+        const queryResult = await pineconeIndex.query({
+          vector: embedding,
+          topK: 5,
+          includeMetadata: true,
+        });
+
+        const matches = queryResult.matches?.map((match) => {
+          const rawText = match.metadata?.text ?? match.metadata?.content ?? "";
+          let textPreview = "";
+          if (typeof rawText === "string") {
+            textPreview = rawText.substring(0, 200);
+          } else if (Array.isArray(rawText)) {
+            textPreview = rawText.join(" ").substring(0, 200);
+          } else {
+            textPreview = String(rawText).substring(0, 200);
+          }
+          return {
+            id: match.id,
+            score: match.score,
+            metadataKeys: Object.keys(match.metadata || {}),
+            hasText: !!match.metadata?.text,
+            hasContent: !!match.metadata?.content,
+            textPreview,
+            title: match.metadata?.title || match.metadata?.originalTitle,
+            source: match.metadata?.source,
+            category: match.metadata?.category,
+          };
+        });
+
+        res.json({
+          success: true,
+          query,
+          matchCount: matches?.length || 0,
+          matches,
+        });
+      } else {
+        res.status(400).json({ error: "Provide either vectorId or query" });
+      }
+    } catch (error: any) {
+      console.error("Error:", error);
+      res.status(500).json({ error: error.message });
     }
   }
 );

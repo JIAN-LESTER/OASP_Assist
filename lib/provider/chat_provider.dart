@@ -60,8 +60,6 @@ class ChatProvider extends ChangeNotifier {
   int count = 1;
   bool _isCreatingMessage = false;
 
-
-
   VoidCallback? _onMessageAdded;
 
   ChatProvider(this._retriever);
@@ -104,7 +102,9 @@ class ChatProvider extends ChangeNotifier {
 
   StreamSubscription<QuerySnapshot>? _messagesSubscription;
 
-  final String _apiKey = "IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
+  // final String _apiKey = "IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
+
+    final String _apiKey = "jGVDZpXJocGrUpJkP2YAMrQAIkcCQu7YITqcRr5h";
 
   bool _isSettingConversation = false;
 
