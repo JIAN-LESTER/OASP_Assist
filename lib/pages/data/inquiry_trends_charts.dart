@@ -99,15 +99,19 @@ Color _getColorForCategory(String category) {
 }
 
 Color _getSeasonColor(String season) {
-  switch (season.toLowerCase()) {
-    case 'cmucat admission and scholarship application':
+  switch (season) {
+    case 'Enrollment':
       return const Color(0xff3b82f6); // Blue
-    case 'enrollment':
-      return const Color(0xff10b981); // Green
-    case 'regular classes':
-      return const Color(0xfff59e0b); // Amber
-    case 'christmas':
-      return const Color(0xffef4444); // Red
+    case 'CMUCAT and 2nd Sem Midterms':
+      return const Color.fromARGB(255, 122, 3, 138); // Blue
+    case 'Posting of CMUCAT Scores and 2nd Sem Final Term':
+      return const Color.fromARGB(255, 254, 171, 4); // Blue
+    case '1st Sem Midterms':
+      return const Color.fromARGB(255, 223, 23, 23); // Blue
+    case 'Opening of Classes':
+      return const Color.fromARGB(255, 236, 22, 197); // Green
+    case '1st Sem Final Term and Christmas Break':
+      return const Color.fromARGB(255, 11, 245, 31); // Amber
     default:
       return Colors.grey[500]!;
   }

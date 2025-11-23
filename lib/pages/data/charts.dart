@@ -67,7 +67,7 @@ Widget buildStatCard(String title, String value, Color color, IconData icon) {
                       color: color,
                     ),
                     overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
+                    maxLines: 2,
                   ),
                 ),
               ],

@@ -1,4 +1,4 @@
-import 'package:capstone_project/pages/admin_pages/affiliation.dart';
+
 import 'package:capstone_project/pages/admin_pages/scholarship_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';

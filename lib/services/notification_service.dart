@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:capstone_project/icon_and_color.dart';
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+
+    await Firebase.initializeApp();
   print('📬 ===== BACKGROUND MESSAGE =====');
   print('📬 Message ID: ${message.messageId}');
   print('📬 Title: ${message.notification?.title ?? message.data['title']}');

@@ -270,7 +270,6 @@ class StatDataManagement {
       latestFAQDate = data['question'] as String? ?? 'N/A';
     }
 
-
     // Get most asked question from separate query
     if (mostAskedFAQ.isNotEmpty) {
       final mostAskedDoc = mostAskedFAQ.first;
@@ -342,65 +341,6 @@ class StatDataManagement {
     );
   }
 
-  // ==================== AFFILIATION DATA ====================
-  Future<AffiliationData> getAffiliationData() async {
-    const cacheKey = 'affiliations';
-
-    if (_affiliationCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
-      return _affiliationCache[cacheKey]!;
-    }
-
-    try {
-      final users = await _getUsersOptimized();
-      final data = _processAffiliationData(users: users);
-
-      _affiliationCache[cacheKey] = data;
-      _updateCacheTimestamp(cacheKey);
-
-      return data;
-    } catch (e) {
-      print('Error fetching affiliation data: $e');
-      return const AffiliationData(
-        totalAffiliations: 0,
-        dominantAffiliation: 'N/A',
-      );
-    }
-  }
-
-  AffiliationData _processAffiliationData({
-    required List<QueryDocumentSnapshot> users,
-  }) {
-    final affiliationCounts = <String, int>{};
-    int totalAffiliations = 0;
-
-    for (final doc in users) {
-      final data = doc.data() as Map<String, dynamic>;
-      final affiliation = data['affiliation']?.toString();
-
-      if (affiliation != null &&
-          affiliation.isNotEmpty &&
-          affiliation != 'null' &&
-          affiliation.toLowerCase() != 'null') {
-        totalAffiliations++;
-        affiliationCounts[affiliation] =
-            (affiliationCounts[affiliation] ?? 0) + 1;
-      }
-    }
-
-    String dominantAffiliation = 'N/A';
-    if (affiliationCounts.isNotEmpty) {
-      dominantAffiliation =
-          affiliationCounts.entries
-              .reduce((a, b) => a.value > b.value ? a : b)
-              .key;
-    }
-
-    return AffiliationData(
-      totalAffiliations: totalAffiliations,
-      dominantAffiliation: dominantAffiliation,
-    );
-  }
-
   // ==================== PROGRAM DATA ====================
   Future<ProgramData> getProgramData() async {
     const cacheKey = 'programs';
@@ -411,7 +351,8 @@ class StatDataManagement {
 
     try {
       final users = await _getUsersOptimized();
-      final data = _processProgramData(users: users);
+      final programs = await _getPrograms();
+      final data = _processProgramData(users: users, programs: programs);
 
       _programCache[cacheKey] = data;
       _updateCacheTimestamp(cacheKey);
@@ -425,15 +366,9 @@ class StatDataManagement {
 
   ProgramData _processProgramData({
     required List<QueryDocumentSnapshot> users,
+    required List<QueryDocumentSnapshot> programs,
   }) {
     final programCounts = <String, int>{};
-
-    for (final doc in users) {
-      final data = doc.data() as Map<String, dynamic>;
-      final program = data['program']?.toString() ?? 'Unknown';
-
-      programCounts[program] = (programCounts[program] ?? 0) + 1;
-    }
 
     String dominantProgram = 'N/A';
     if (programCounts.isNotEmpty) {
@@ -442,7 +377,7 @@ class StatDataManagement {
     }
 
     return ProgramData(
-      totalProgram: programCounts.length,
+      totalProgram: programs.length,
       dominantProgram: dominantProgram,
     );
   }
@@ -547,7 +482,7 @@ class StatDataManagement {
     );
   }
 
-  // ==================== PLACEMENT DATA ====================
+
   Future<PlacementData> getPlacementData() async {
     const cacheKey = 'placements';
 
@@ -573,49 +508,45 @@ class StatDataManagement {
     }
   }
 
-  PlacementData _processPlacementData({
-    required List<QueryDocumentSnapshot> placements,
-  }) {
-    String vacantCompanies = 'N/A';
-    String approachingDeadline = 'N/A';
-    int totalCompanies = 0;
-    final now = DateTime.now();
-    final threenDaysFromNow = now.add(const Duration(days: 3));
+PlacementData _processPlacementData({
+  required List<QueryDocumentSnapshot> placements,
+}) {
+  int totalCompanies = placements.length;
+  int vacantCount = 0;
+  String approachingDeadline = 'N/A';
 
-    final companyCounts = <String, int>{};
+  final now = DateTime.now();
+  final threeDaysFromNow = now.add(const Duration(days: 3));
 
-    for (final doc in placements) {
-      final data = doc.data() as Map<String, dynamic>;
-      final company = data['companyName'] as String? ?? 'Unknown';
-      final isVacant = data['isRecruiting'] as bool? ?? false;
-      final deadline = data['deadline'];
+  for (final doc in placements) {
+    final data = doc.data() as Map<String, dynamic>;
 
-      companyCounts[company] = (companyCounts[company] ?? 0) + 1;
+    final company = data['companyName'] as String? ?? 'Unknown';
+    final isVacant = data['isRecruiting'] as bool? ?? false;
+    final deadline = data['deadline'];
 
-      if (isVacant && vacantCompanies == 'N/A') {
-        vacantCompanies = company;
-      }
-
-      if (deadline is Timestamp && approachingDeadline == 'N/A') {
-        final deadlineDate = deadline.toDate();
-        if (deadlineDate.isAfter(now) &&
-            deadlineDate.isBefore(threenDaysFromNow)) {
-          approachingDeadline = company;
-        }
-      }
+    // ✅ Count all placements that are currently recruiting
+    if (isVacant) {
+      vacantCount++;
     }
 
-    totalCompanies = companyCounts.length;
+    // ✅ Find the FIRST company with deadline within the next 3 days
+    if (approachingDeadline == 'N/A' && deadline is Timestamp) {
+      final deadlineDate = deadline.toDate();
 
-    return PlacementData(
-      totalCompanies: totalCompanies,
-      vacantCompanies: vacantCompanies,
-      approachingDeadline: approachingDeadline,
-    );
+      if (deadlineDate.isAfter(now) &&
+          deadlineDate.isBefore(threeDaysFromNow)) {
+        approachingDeadline = company;
+      }
+    }
   }
 
-
-
+  return PlacementData(
+    totalCompanies: totalCompanies,
+    vacantCompanies: vacantCount.toString(),
+    approachingDeadline: approachingDeadline,
+  );
+}
   // ==================== FIRESTORE QUERY METHODS ====================
   Future<List<QueryDocumentSnapshot>> _getUsersOptimized() async {
     final snapshot = await _firestore.collection('users').get();
@@ -624,6 +555,11 @@ class StatDataManagement {
 
   Future<List<QueryDocumentSnapshot>> _getFAQs() async {
     final snapshot = await _firestore.collection('faqs').get();
+    return snapshot.docs;
+  }
+
+  Future<List<QueryDocumentSnapshot>> _getPrograms() async {
+    final snapshot = await _firestore.collection('programs').get();
     return snapshot.docs;
   }
 
@@ -661,7 +597,6 @@ class StatDataManagement {
     return snapshot.docs;
   }
 
-  
   Future<List<QueryDocumentSnapshot>> _getLatestFAQ() async {
     final snapshot =
         await _firestore
@@ -671,7 +606,6 @@ class StatDataManagement {
             .get();
     return snapshot.docs;
   }
-
 
   Future<List<QueryDocumentSnapshot>> _getNewUsers(DateTime startDate) async {
     final snapshot =

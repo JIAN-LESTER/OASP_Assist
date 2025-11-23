@@ -307,41 +307,76 @@ Future<void> saveToAdmission(Admissions ad) async {
   }
 }
 
-  Future<void> saveMultipleScholarships(List<Scholarship> scholarships) async {
-    try {
-      // Use batch write for better performance
-      WriteBatch batch = firestore.batch();
+ Future<void> saveMultipleScholarships(List<Scholarship> scholarships) async {
+  try {
+    // Use batch write for better performance
+    WriteBatch batch = firestore.batch();
 
-      for (Scholarship scholarship in scholarships) {
-        final sanitizedId = sanitizeId(scholarship.scholarshipID);
-        final docRef = firestore.collection('scholarships').doc(sanitizedId);
+    for (Scholarship scholarship in scholarships) {
+      final sanitizedId = sanitizeId(scholarship.scholarshipID);
+      final docRef = firestore.collection('scholarships').doc(sanitizedId);
 
-        batch.set(docRef, {
-          'scholarshipID': sanitizedId,
-          'name': scholarship.name,
-          'sourceId': scholarship.sourceId,
-          'description': scholarship.description,
-          'scholarshipProvider': scholarship.scholarshipProvider,
-          'eligibilityRequirements': scholarship.eligibilityRequirements,
-          'privileges': scholarship.privileges,
-          'deadline':
-              scholarship.deadline != null
-                  ? Timestamp.fromDate(scholarship.deadline!)
-                  : null,
-          'applicationLink': scholarship.applicationLink,
-          'createdAt': Timestamp.fromDate(scholarship.createdAt),
-        });
-      }
-
-      await batch.commit();
-      print('✅ Batch saved ${scholarships.length} scholarships successfully');
-    } catch (e) {
-      print('❌ Error batch saving scholarships: $e');
-      rethrow;
+      batch.set(docRef, {
+        'scholarshipID': sanitizedId,
+        'name': scholarship.name,
+        'sourceId': scholarship.sourceId,
+        'description': scholarship.description,
+        'scholarshipProvider': scholarship.scholarshipProvider,
+        'eligibilityRequirements': scholarship.eligibilityRequirements,
+        'privileges': scholarship.privileges,
+        'deadline':
+            scholarship.deadline != null
+                ? Timestamp.fromDate(scholarship.deadline!)
+                : null,
+        'applicationLink': scholarship.applicationLink,
+        'deleted': false,
+        'createdAt': Timestamp.fromDate(scholarship.createdAt),
+      });
     }
-  }
 
-  Future<void> saveMultiplePlacements(List<Placement> placements) async {
+    await batch.commit();
+    print('✅ Batch saved ${scholarships.length} scholarships successfully');
+
+    // 🔥 NEW: Create Information Bank entries for each scholarship
+    int created = 0;
+    int skipped = 0;
+    
+    for (Scholarship scholarship in scholarships) {
+      try {
+        final infoBankId = 'scholarship_${scholarship.scholarshipID}';
+        final infoBankSanitized = sanitizeId(infoBankId);
+        
+        // Check if already exists
+        final existingInfoBank = await firestore
+            .collection('information_bank')
+            .doc(infoBankSanitized)
+            .get();
+
+        if (existingInfoBank.exists) {
+          print('ℹ️ Information Bank entry already exists for scholarship ${scholarship.scholarshipID}');
+          skipped++;
+          continue;
+        }
+
+        await _createInfoBankFromScholarship(scholarship);
+        created++;
+        
+      } catch (e) {
+        print('⚠️ Error creating Information Bank for scholarship ${scholarship.scholarshipID}: $e');
+        // Continue with other scholarships
+      }
+    }
+    
+    print('✅ Information Bank: $created created, $skipped skipped');
+    
+  } catch (e) {
+    print('❌ Error batch saving scholarships: $e');
+    rethrow;
+  }
+}
+
+/// Save multiple placements in batch WITH automatic Information Bank creation
+Future<void> saveMultiplePlacements(List<Placement> placements) async {
   try {
     WriteBatch batch = firestore.batch();
 
@@ -358,15 +393,867 @@ Future<void> saveToAdmission(Admissions ad) async {
         'deadline': placement.deadline != null
             ? Timestamp.fromDate(placement.deadline!)
             : null,
+        'deleted': false,
         'createdAt': Timestamp.fromDate(placement.createdAt),
-      }, SetOptions(merge: true)); // important
+      }, SetOptions(merge: true));
     }
 
     await batch.commit();
     print('✅ Batch saved ${placements.length} placements successfully');
+    
+    // 🔥 NEW: Create Information Bank entries for each placement
+    int created = 0;
+    int skipped = 0;
+    
+    for (Placement placement in placements) {
+      try {
+        final infoBankId = 'placement_${placement.placementID}';
+        final infoBankSanitized = sanitizeId(infoBankId);
+        
+        // Check if already exists
+        final existingInfoBank = await firestore
+            .collection('information_bank')
+            .doc(infoBankSanitized)
+            .get();
+
+        if (existingInfoBank.exists) {
+          print('ℹ️ Information Bank entry already exists for placement ${placement.placementID}');
+          skipped++;
+          continue;
+        }
+
+        await _createInfoBankFromPlacement(placement);
+        created++;
+        
+      } catch (e) {
+        print('⚠️ Error creating Information Bank for placement ${placement.placementID}: $e');
+        // Continue with other placements
+      }
+    }
+    
+    print('✅ Information Bank: $created created, $skipped skipped');
+    
   } catch (e) {
     print('❌ Error batch saving placements: $e');
     rethrow;
+  }
+}
+
+Future<void> updateInfoBankFromAdmission(Admissions admission) async {
+  try {
+    final infoBankId = 'admission_${admission.id}';
+    final sanitizedId = sanitizeId(infoBankId);
+    
+    final existingDoc = await firestore
+        .collection('information_bank')
+        .doc(sanitizedId)
+        .get();
+    
+    if (!existingDoc.exists) {
+      // Doesn't exist yet, create new
+      await _createInfoBankFromAdmission(admission);
+      return;
+    }
+    
+    print('🔄 Updating existing Information Bank entry for admission ${admission.id}');
+    
+    // Get existing chunk IDs to delete from Pinecone
+    final existingData = existingDoc.data()!;
+    final oldChunkIds = List<String>.from(existingData['chunkIds'] ?? []);
+    
+    // Delete old Pinecone vectors
+    if (oldChunkIds.isNotEmpty) {
+      await _pineconeService.deleteDocuments(oldChunkIds);
+      print('🗑️ Deleted ${oldChunkIds.length} old Pinecone vectors');
+    }
+    
+    // Create new embeddings with updated content
+    final isHealthy = await _pineconeService.isHealthy();
+    if (!isHealthy) {
+      print('⚠️ Pinecone not available - skipping update');
+      return;
+    }
+
+    final textContent = _formatAdmissionAsText(admission);
+    final title = admission.title;
+    final chunks = _splitIntoChunks(textContent, title, 'admission_category');
+    
+    final chunkIds = <String>[];
+    String? parentPineconeId;
+
+    for (int i = 0; i < chunks.length; i++) {
+      final chunk = chunks[i];
+      final embedding = await _cohereService.embedText(
+        chunk.text,
+        inputType: 'search_document',
+      );
+
+      final chunkTitle = chunks.length > 1
+          ? '$title (Part ${i + 1}/${chunks.length})'
+          : title;
+
+      final metadata = {
+        'docId': admission.id,
+        'originalDocId': admission.id,
+        'documentId': admission.id,
+        'categoryDocId': admission.id,
+        'text': chunk.text,
+        'content': chunk.text,
+        'title': chunkTitle,
+        'originalTitle': title,
+        'fileName': title,
+        'chunkIndex': i,
+        'chunk_index': i,
+        'totalChunks': chunks.length,
+        'chunkCount': chunks.length,
+        'isFirstChunk': i == 0,
+        'isLastChunk': i == chunks.length - 1,
+        'source': 'admission_category',
+        'category': 'admission',
+        'categoryID': 'admission',
+        'categoryType': 'admission',
+        'chunkSize': chunk.text.length,
+        'createdAt': DateTime.now().toIso8601String(),
+        'syncedFromCategory': true,
+        'academicYear': admission.academicYear != null 
+            ? '${admission.academicYear!['start']}-${admission.academicYear!['end'] ?? ''}'
+            : null,
+        'hasSchedules': admission.schedules != null && admission.schedules!.isNotEmpty,
+        'scheduleCount': admission.schedules?.length ?? 0,
+      };
+
+      await _pineconeService.insertDocument(
+        id: chunk.id,
+        embedding: embedding,
+        title: chunkTitle,
+        content: chunk.text,
+        source: 'admission_category',
+        category: 'admission',
+        metadata: metadata,
+      );
+
+      chunkIds.add(chunk.id);
+      if (i == 0) {
+        parentPineconeId = chunk.id;
+      }
+    }
+
+    // Update Information Bank document
+    await firestore.collection('information_bank').doc(sanitizedId).update({
+      'content': textContent,
+      'ib_title': title,
+      'title': title,
+      'pinecone_id': parentPineconeId,
+      'totalChunks': chunks.length,
+      'chunkIds': chunkIds,
+      'chunked': chunks.length > 1,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    print('✅ Information Bank entry updated with ${chunks.length} new Pinecone vectors');
+
+  } catch (e) {
+    print('⚠️ Error updating Information Bank from admission: $e');
+  }
+}
+
+/// Update Information Bank for scholarship (for individual updates)
+Future<void> updateInfoBankFromScholarship(Scholarship scholarship) async {
+  try {
+    final infoBankId = 'scholarship_${scholarship.scholarshipID}';
+    final sanitizedId = sanitizeId(infoBankId);
+    
+    final existingDoc = await firestore
+        .collection('information_bank')
+        .doc(sanitizedId)
+        .get();
+    
+    if (!existingDoc.exists) {
+      await _createInfoBankFromScholarship(scholarship);
+      return;
+    }
+    
+    print('🔄 Updating existing Information Bank entry for scholarship ${scholarship.scholarshipID}');
+    
+    final existingData = existingDoc.data()!;
+    final oldChunkIds = List<String>.from(existingData['chunkIds'] ?? []);
+    
+    if (oldChunkIds.isNotEmpty) {
+      await _pineconeService.deleteDocuments(oldChunkIds);
+      print('🗑️ Deleted ${oldChunkIds.length} old Pinecone vectors');
+    }
+    
+    final isHealthy = await _pineconeService.isHealthy();
+    if (!isHealthy) {
+      print('⚠️ Pinecone not available - skipping update');
+      return;
+    }
+
+    final textContent = _formatScholarshipAsText(scholarship);
+    final title = scholarship.name;
+    final chunks = _splitIntoChunks(textContent, title, 'scholarship_category');
+    
+    final chunkIds = <String>[];
+    String? parentPineconeId;
+
+    for (int i = 0; i < chunks.length; i++) {
+      final chunk = chunks[i];
+      final embedding = await _cohereService.embedText(
+        chunk.text,
+        inputType: 'search_document',
+      );
+
+      final chunkTitle = chunks.length > 1
+          ? '$title (Part ${i + 1}/${chunks.length})'
+          : title;
+
+      final metadata = {
+        'docId': scholarship.scholarshipID,
+        'originalDocId': scholarship.scholarshipID,
+        'documentId': scholarship.scholarshipID,
+        'categoryDocId': scholarship.scholarshipID,
+        'text': chunk.text,
+        'content': chunk.text,
+        'title': chunkTitle,
+        'originalTitle': title,
+        'fileName': title,
+        'chunkIndex': i,
+        'chunk_index': i,
+        'totalChunks': chunks.length,
+        'chunkCount': chunks.length,
+        'isFirstChunk': i == 0,
+        'isLastChunk': i == chunks.length - 1,
+        'source': 'scholarship_category',
+        'category': 'scholarship',
+        'categoryID': 'scholarship',
+        'categoryType': 'scholarship',
+        'chunkSize': chunk.text.length,
+        'createdAt': DateTime.now().toIso8601String(),
+        'syncedFromCategory': true,
+        'scholarshipProvider': scholarship.scholarshipProvider,
+        'hasDeadline': scholarship.deadline != null,
+      };
+
+      await _pineconeService.insertDocument(
+        id: chunk.id,
+        embedding: embedding,
+        title: chunkTitle,
+        content: chunk.text,
+        source: 'scholarship_category',
+        category: 'scholarship',
+        metadata: metadata,
+      );
+
+      chunkIds.add(chunk.id);
+      if (i == 0) {
+        parentPineconeId = chunk.id;
+      }
+    }
+
+    await firestore.collection('information_bank').doc(sanitizedId).update({
+      'content': textContent,
+      'ib_title': title,
+      'title': title,
+      'pinecone_id': parentPineconeId,
+      'totalChunks': chunks.length,
+      'chunkIds': chunkIds,
+      'chunked': chunks.length > 1,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    print('✅ Information Bank entry updated with ${chunks.length} new Pinecone vectors');
+
+  } catch (e) {
+    print('⚠️ Error updating Information Bank from scholarship: $e');
+  }
+}
+
+/// Update Information Bank for placement (for individual updates)
+Future<void> updateInfoBankFromPlacement(Placement placement) async {
+  try {
+    final infoBankId = 'placement_${placement.placementID}';
+    final sanitizedId = sanitizeId(infoBankId);
+    
+    final existingDoc = await firestore
+        .collection('information_bank')
+        .doc(sanitizedId)
+        .get();
+    
+    if (!existingDoc.exists) {
+      await _createInfoBankFromPlacement(placement);
+      return;
+    }
+    
+    print('🔄 Updating existing Information Bank entry for placement ${placement.placementID}');
+    
+    final existingData = existingDoc.data()!;
+    final oldChunkIds = List<String>.from(existingData['chunkIds'] ?? []);
+    
+    if (oldChunkIds.isNotEmpty) {
+      await _pineconeService.deleteDocuments(oldChunkIds);
+      print('🗑️ Deleted ${oldChunkIds.length} old Pinecone vectors');
+    }
+    
+    final isHealthy = await _pineconeService.isHealthy();
+    if (!isHealthy) {
+      print('⚠️ Pinecone not available - skipping update');
+      return;
+    }
+
+    final textContent = _formatPlacementAsText(placement);
+    final title = '${placement.partnerCompany} - Job Placement';
+    final chunks = _splitIntoChunks(textContent, title, 'placement_category');
+    
+    final chunkIds = <String>[];
+    String? parentPineconeId;
+
+    for (int i = 0; i < chunks.length; i++) {
+      final chunk = chunks[i];
+      final embedding = await _cohereService.embedText(
+        chunk.text,
+        inputType: 'search_document',
+      );
+
+      final chunkTitle = chunks.length > 1
+          ? '$title (Part ${i + 1}/${chunks.length})'
+          : title;
+
+      final metadata = {
+        'docId': placement.placementID,
+        'originalDocId': placement.placementID,
+        'documentId': placement.placementID,
+        'categoryDocId': placement.placementID,
+        'text': chunk.text,
+        'content': chunk.text,
+        'title': chunkTitle,
+        'originalTitle': title,
+        'fileName': title,
+        'chunkIndex': i,
+        'chunk_index': i,
+        'totalChunks': chunks.length,
+        'chunkCount': chunks.length,
+        'isFirstChunk': i == 0,
+        'isLastChunk': i == chunks.length - 1,
+        'source': 'placement_category',
+        'category': 'placement',
+        'categoryID': 'placement',
+        'categoryType': 'placement',
+        'chunkSize': chunk.text.length,
+        'createdAt': DateTime.now().toIso8601String(),
+        'syncedFromCategory': true,
+        'partnerCompany': placement.partnerCompany,
+        'isRecruiting': placement.isRecruiting,
+        'positionCount': placement.positions.length,
+      };
+
+      await _pineconeService.insertDocument(
+        id: chunk.id,
+        embedding: embedding,
+        title: chunkTitle,
+        content: chunk.text,
+        source: 'placement_category',
+        category: 'placement',
+        metadata: metadata,
+      );
+
+      chunkIds.add(chunk.id);
+      if (i == 0) {
+        parentPineconeId = chunk.id;
+      }
+    }
+
+    await firestore.collection('information_bank').doc(sanitizedId).update({
+      'content': textContent,
+      'ib_title': title,
+      'title': title,
+      'pinecone_id': parentPineconeId,
+      'totalChunks': chunks.length,
+      'chunkIds': chunkIds,
+      'chunked': chunks.length > 1,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    print('✅ Information Bank entry updated with ${chunks.length} new Pinecone vectors');
+
+  } catch (e) {
+    print('⚠️ Error updating Information Bank from placement: $e');
+  }
+}
+
+Future<void> _createInfoBankFromAdmission(Admissions admission) async {
+  try {
+    final isHealthy = await _pineconeService.isHealthy();
+    if (!isHealthy) {
+      print('⚠️ Pinecone not available - skipping Information Bank creation');
+      return;
+    }
+
+    final textContent = _formatAdmissionAsText(admission);
+    final title = admission.title;
+    final chunks = _splitIntoChunks(textContent, title, 'admission_category');
+    
+    print('📄 Creating Information Bank: ${chunks.length} chunks for admission ${admission.id}');
+
+    final chunkIds = <String>[];
+    String? parentPineconeId;
+
+    for (int i = 0; i < chunks.length; i++) {
+      final chunk = chunks[i];
+      final embedding = await _cohereService.embedText(
+        chunk.text,
+        inputType: 'search_document',
+      );
+
+      final chunkTitle = chunks.length > 1
+          ? '$title (Part ${i + 1}/${chunks.length})'
+          : title;
+
+      final metadata = {
+        'docId': admission.id,
+        'originalDocId': admission.id,
+        'documentId': admission.id,
+        'categoryDocId': admission.id,
+        'text': chunk.text,
+        'content': chunk.text,
+        'title': chunkTitle,
+        'originalTitle': title,
+        'fileName': title,
+        'chunkIndex': i,
+        'chunk_index': i,
+        'totalChunks': chunks.length,
+        'chunkCount': chunks.length,
+        'isFirstChunk': i == 0,
+        'isLastChunk': i == chunks.length - 1,
+        'source': 'admission_category',
+        'category': 'admission',
+        'categoryID': 'admission',
+        'categoryType': 'admission',
+        'chunkSize': chunk.text.length,
+        'createdAt': DateTime.now().toIso8601String(),
+        'syncedFromCategory': true,
+        'academicYear': admission.academicYear != null 
+            ? '${admission.academicYear!['start']}-${admission.academicYear!['end'] ?? ''}'
+            : null,
+        'hasSchedules': admission.schedules != null && admission.schedules!.isNotEmpty,
+        'scheduleCount': admission.schedules?.length ?? 0,
+      };
+
+      await _pineconeService.insertDocument(
+        id: chunk.id,
+        embedding: embedding,
+        title: chunkTitle,
+        content: chunk.text,
+        source: 'admission_category',
+        category: 'admission',
+        metadata: metadata,
+      );
+
+      chunkIds.add(chunk.id);
+      if (i == 0) {
+        parentPineconeId = chunk.id;
+      }
+    }
+
+    final infoBankId = 'admission_${admission.id}';
+    final sanitizedId = sanitizeId(infoBankId);
+
+    await firestore.collection('information_bank').doc(sanitizedId).set({
+      'ibID': sanitizedId,
+      'id': sanitizedId,
+      'ib_title': title,
+      'title': title,
+      'content': textContent,
+      'source': 'admission_category',
+      'category': 'admission',
+      'categoryID': 'admission',
+      'categoryType': 'admission',
+      'categoryDocumentId': admission.id,
+      'pinecone_id': parentPineconeId,
+      'totalChunks': chunks.length,
+      'chunkIds': chunkIds,
+      'chunked': chunks.length > 1,
+      'chunkSize': maxChunkSize,
+      'chunkOverlap': chunkOverlap,
+      'syncedFromCategory': true,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    print('✅ Information Bank created: ${chunks.length} Pinecone vectors');
+
+  } catch (e) {
+    print('⚠️ Error creating Information Bank from admission: $e');
+  }
+}
+
+/// Create Information Bank entry from Scholarship
+Future<void> _createInfoBankFromScholarship(Scholarship scholarship) async {
+  try {
+    final isHealthy = await _pineconeService.isHealthy();
+    if (!isHealthy) {
+      print('⚠️ Pinecone not available - skipping Information Bank creation');
+      return;
+    }
+
+    final textContent = _formatScholarshipAsText(scholarship);
+    final title = scholarship.name;
+    final chunks = _splitIntoChunks(textContent, title, 'scholarship_category');
+    
+    print('📄 Creating Information Bank: ${chunks.length} chunks for scholarship ${scholarship.scholarshipID}');
+
+    final chunkIds = <String>[];
+    String? parentPineconeId;
+
+    for (int i = 0; i < chunks.length; i++) {
+      final chunk = chunks[i];
+      final embedding = await _cohereService.embedText(
+        chunk.text,
+        inputType: 'search_document',
+      );
+
+      final chunkTitle = chunks.length > 1
+          ? '$title (Part ${i + 1}/${chunks.length})'
+          : title;
+
+      final metadata = {
+        'docId': scholarship.scholarshipID,
+        'originalDocId': scholarship.scholarshipID,
+        'documentId': scholarship.scholarshipID,
+        'categoryDocId': scholarship.scholarshipID,
+        'text': chunk.text,
+        'content': chunk.text,
+        'title': chunkTitle,
+        'originalTitle': title,
+        'fileName': title,
+        'chunkIndex': i,
+        'chunk_index': i,
+        'totalChunks': chunks.length,
+        'chunkCount': chunks.length,
+        'isFirstChunk': i == 0,
+        'isLastChunk': i == chunks.length - 1,
+        'source': 'scholarship_category',
+        'category': 'scholarship',
+        'categoryID': 'scholarship',
+        'categoryType': 'scholarship',
+        'chunkSize': chunk.text.length,
+        'createdAt': DateTime.now().toIso8601String(),
+        'syncedFromCategory': true,
+        'scholarshipProvider': scholarship.scholarshipProvider,
+        'hasDeadline': scholarship.deadline != null,
+      };
+
+      await _pineconeService.insertDocument(
+        id: chunk.id,
+        embedding: embedding,
+        title: chunkTitle,
+        content: chunk.text,
+        source: 'scholarship_category',
+        category: 'scholarship',
+        metadata: metadata,
+      );
+
+      chunkIds.add(chunk.id);
+      if (i == 0) {
+        parentPineconeId = chunk.id;
+      }
+    }
+
+    final infoBankId = 'scholarship_${scholarship.scholarshipID}';
+    final sanitizedId = sanitizeId(infoBankId);
+
+    await firestore.collection('information_bank').doc(sanitizedId).set({
+      'ibID': sanitizedId,
+      'id': sanitizedId,
+      'ib_title': title,
+      'title': title,
+      'content': textContent,
+      'source': 'scholarship_category',
+      'category': 'scholarship',
+      'categoryID': 'scholarship',
+      'categoryType': 'scholarship',
+      'categoryDocumentId': scholarship.scholarshipID,
+      'pinecone_id': parentPineconeId,
+      'totalChunks': chunks.length,
+      'chunkIds': chunkIds,
+      'chunked': chunks.length > 1,
+      'chunkSize': maxChunkSize,
+      'chunkOverlap': chunkOverlap,
+      'syncedFromCategory': true,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    print('✅ Information Bank created: ${chunks.length} Pinecone vectors');
+
+  } catch (e) {
+    print('⚠️ Error creating Information Bank from scholarship: $e');
+  }
+}
+
+/// Create Information Bank entry from Placement
+Future<void> _createInfoBankFromPlacement(Placement placement) async {
+  try {
+    final isHealthy = await _pineconeService.isHealthy();
+    if (!isHealthy) {
+      print('⚠️ Pinecone not available - skipping Information Bank creation');
+      return;
+    }
+
+    final textContent = _formatPlacementAsText(placement);
+    final title = '${placement.partnerCompany} - Job Placement';
+    final chunks = _splitIntoChunks(textContent, title, 'placement_category');
+    
+    print('📄 Creating Information Bank: ${chunks.length} chunks for placement ${placement.placementID}');
+
+    final chunkIds = <String>[];
+    String? parentPineconeId;
+
+    for (int i = 0; i < chunks.length; i++) {
+      final chunk = chunks[i];
+      final embedding = await _cohereService.embedText(
+        chunk.text,
+        inputType: 'search_document',
+      );
+
+      final chunkTitle = chunks.length > 1
+          ? '$title (Part ${i + 1}/${chunks.length})'
+          : title;
+
+      final metadata = {
+        'docId': placement.placementID,
+        'originalDocId': placement.placementID,
+        'documentId': placement.placementID,
+        'categoryDocId': placement.placementID,
+        'text': chunk.text,
+        'content': chunk.text,
+        'title': chunkTitle,
+        'originalTitle': title,
+        'fileName': title,
+        'chunkIndex': i,
+        'chunk_index': i,
+        'totalChunks': chunks.length,
+        'chunkCount': chunks.length,
+        'isFirstChunk': i == 0,
+        'isLastChunk': i == chunks.length - 1,
+        'source': 'placement_category',
+        'category': 'placement',
+        'categoryID': 'placement',
+        'categoryType': 'placement',
+        'chunkSize': chunk.text.length,
+        'createdAt': DateTime.now().toIso8601String(),
+        'syncedFromCategory': true,
+        'partnerCompany': placement.partnerCompany,
+        'isRecruiting': placement.isRecruiting,
+        'positionCount': placement.positions.length,
+      };
+
+      await _pineconeService.insertDocument(
+        id: chunk.id,
+        embedding: embedding,
+        title: chunkTitle,
+        content: chunk.text,
+        source: 'placement_category',
+        category: 'placement',
+        metadata: metadata,
+      );
+
+      chunkIds.add(chunk.id);
+      if (i == 0) {
+        parentPineconeId = chunk.id;
+      }
+    }
+
+    final infoBankId = 'placement_${placement.placementID}';
+    final sanitizedId = sanitizeId(infoBankId);
+
+    await firestore.collection('information_bank').doc(sanitizedId).set({
+      'ibID': sanitizedId,
+      'id': sanitizedId,
+      'ib_title': title,
+      'title': title,
+      'content': textContent,
+      'source': 'placement_category',
+      'category': 'placement',
+      'categoryID': 'placement',
+      'categoryType': 'placement',
+      'categoryDocumentId': placement.placementID,
+      'pinecone_id': parentPineconeId,
+      'totalChunks': chunks.length,
+      'chunkIds': chunkIds,
+      'chunked': chunks.length > 1,
+      'chunkSize': maxChunkSize,
+      'chunkOverlap': chunkOverlap,
+      'syncedFromCategory': true,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    print('✅ Information Bank created: ${chunks.length} Pinecone vectors');
+
+  } catch (e) {
+    print('⚠️ Error creating Information Bank from placement: $e');
+  }
+}
+
+// ============================================================================
+// Helper functions for formatting category data as text
+// ============================================================================
+
+String _formatAdmissionAsText(Admissions admission) {
+  final buffer = StringBuffer();
+
+  buffer.writeln('ADMISSION INFORMATION\n');
+  buffer.writeln('Title: ${admission.title}\n');
+  buffer.writeln('Content: ${admission.content}\n');
+
+  if (admission.academicYear != null) {
+    buffer.write('Academic Year: ${admission.academicYear!['start']}');
+    if (admission.academicYear!['end'] != null) {
+      buffer.write('-${admission.academicYear!['end']}');
+    }
+    buffer.writeln('\n');
+  }
+
+  if (admission.steps != null && admission.steps!.isNotEmpty) {
+    buffer.writeln('Steps:');
+    for (int i = 0; i < admission.steps!.length; i++) {
+      buffer.writeln('${i + 1}. ${admission.steps![i]}');
+    }
+    buffer.writeln();
+  }
+
+  if (admission.requirements != null && admission.requirements!.isNotEmpty) {
+    buffer.writeln('Requirements:');
+    for (final req in admission.requirements!) {
+      buffer.writeln('- $req');
+    }
+    buffer.writeln();
+  }
+
+  if (admission.schedules != null && admission.schedules!.isNotEmpty) {
+    buffer.writeln('Schedules:');
+    for (final schedule in admission.schedules!) {
+      buffer.write('- ${schedule['date']} (${schedule['dayOfWeek']})');
+      if (schedule['year'] != null) {
+        buffer.write(' ${schedule['year']}');
+      }
+      buffer.write(': ${(schedule['locations'] as List).join(', ')}');
+      if (schedule['time'] != null && schedule['time'].isNotEmpty) {
+        buffer.write(' at ${schedule['time']}');
+      }
+      buffer.writeln();
+    }
+    buffer.writeln();
+  }
+
+  if (admission.contact != null && admission.contact!.isNotEmpty) {
+    buffer.writeln('Contact Information:');
+    for (final contact in admission.contact!) {
+      buffer.writeln('- $contact');
+    }
+  }
+
+  return buffer.toString().trim();
+}
+
+String _formatScholarshipAsText(Scholarship scholarship) {
+  final buffer = StringBuffer();
+
+  buffer.writeln('SCHOLARSHIP INFORMATION\n');
+  buffer.writeln('Name: ${scholarship.name}\n');
+  buffer.writeln('Description: ${scholarship.description}\n');
+  buffer.writeln('Provider: ${scholarship.scholarshipProvider}\n');
+
+  if (scholarship.eligibilityRequirements.isNotEmpty) {
+    buffer.writeln('Eligibility Requirements:');
+    for (final req in scholarship.eligibilityRequirements) {
+      buffer.writeln('- $req');
+    }
+    buffer.writeln();
+  }
+
+  if (scholarship.privileges.isNotEmpty) {
+    buffer.writeln('Privileges/Benefits:');
+    for (final priv in scholarship.privileges) {
+      buffer.writeln('- $priv');
+    }
+    buffer.writeln();
+  }
+
+  if (scholarship.deadline != null) {
+    buffer.writeln('Deadline: ${scholarship.deadline!.toString().split(' ')[0]}\n');
+  }
+
+  if (scholarship.applicationLink.isNotEmpty) {
+    buffer.writeln('Application Link: ${scholarship.applicationLink}');
+  }
+
+  return buffer.toString().trim();
+}
+
+String _formatPlacementAsText(Placement placement) {
+  final buffer = StringBuffer();
+
+  buffer.writeln('JOB PLACEMENT INFORMATION\n');
+  buffer.writeln('Company: ${placement.partnerCompany}\n');
+  buffer.writeln('Status: ${placement.isRecruiting ? 'Currently Recruiting' : 'Not Currently Recruiting'}\n');
+
+  if (placement.positions.isNotEmpty) {
+    buffer.writeln('Available Positions:');
+    for (final position in placement.positions) {
+      buffer.writeln('- $position');
+    }
+    buffer.writeln();
+  }
+
+  if (placement.contacts.isNotEmpty) {
+    buffer.writeln('Contact Information:');
+    for (final contact in placement.contacts) {
+      buffer.writeln('- $contact');
+    }
+    buffer.writeln();
+  }
+
+  if (placement.deadline != null) {
+    buffer.writeln('Deadline: ${placement.deadline!.toString().split(' ')[0]}');
+  }
+
+  return buffer.toString().trim();
+}
+
+Future<void> syncAnnouncementsToInfoBank() async {
+  try {
+    final announcementsSnapshot = await firestore
+        .collection('announcements')
+        .where('category', whereIn: ['Admission', 'Scholarship', 'Placement'])
+        .get();
+
+    for (final doc in announcementsSnapshot.docs) {
+      final data = doc.data();
+      final category = (data['category'] as String).toLowerCase();
+      
+      // Check if category document exists
+      final categoryId = doc.id;
+      final categoryDoc = await firestore
+          .collection('${category}s')
+          .doc(categoryId)
+          .get();
+      
+      if (categoryDoc.exists) {
+        // Check if info bank entry exists
+        final infoBankId = '${category}_$categoryId';
+        final infoBankDoc = await firestore
+            .collection('information_bank')
+            .doc(infoBankId)
+            .get();
+        
+        if (!infoBankDoc.exists) {
+          print('⚠️ Missing Info Bank for $category $categoryId - needs manual sync');
+        }
+      }
+    }
+  } catch (e) {
+    print('❌ Error checking Info Bank sync: $e');
   }
 }
 

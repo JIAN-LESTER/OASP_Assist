@@ -1067,9 +1067,11 @@ Color _getAffiliationColor(String affiliation) {
       return Colors.green[600]!;
     case 'staff':
       return Colors.orange[600]!;
-    case 'alumni':
+    case 'parent':
       return Colors.purple[600]!;
-    case 'guest':
+    case 'employer':
+      return const Color.fromARGB(255, 170, 36, 36);
+    case 'incoming freshman applicant':
       return Colors.teal[600]!;
     default:
       return Colors.grey[600]!;

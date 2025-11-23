@@ -1,5 +1,5 @@
 import 'package:capstone_project/pages/admin_pages/admission_management.dart';
-import 'package:capstone_project/pages/admin_pages/affiliation.dart';
+
 import 'package:capstone_project/pages/admin_pages/announcement_page.dart';
 import 'package:capstone_project/pages/admin_pages/dashboard_page.dart';
 import 'package:capstone_project/pages/admin_pages/faq_page.dart';

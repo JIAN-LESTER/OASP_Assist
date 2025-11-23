@@ -114,8 +114,8 @@ class FirebaseService {
       final uid = data['uid'] as String?;
       if (uid != null) {
         userLookup[uid] = {
-          'year': data['year'] ?? 'Unknown',
-          'program': data['program'] ?? 'Unknown',
+          'year': data['year'] ?? 'N/A',
+          'program': data['program'] ?? 'N/A',
         };
       }
     }
@@ -487,8 +487,8 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
     // Get user info from cached lookup
     final userInfo = userLookup[userId];
     if (userInfo != null) {
-      final year = userInfo['year'] ?? 'Unknown';
-      final program = userInfo['program'] ?? 'Unknown';
+      final year = userInfo['year'] ?? 'N/A';
+      final program = userInfo['program'] ?? 'N/A';
 
       uniqueUsersByYear.putIfAbsent(year, () => <String>{});
       uniqueUsersByYear[year]!.add(userId);
@@ -610,67 +610,88 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
 }
 
   UserDemographicsReportsData _processUserDemographicsReportsData({
-    required List<QueryDocumentSnapshot> users,
-    required List<QueryDocumentSnapshot> activeUsers,
-    required List<QueryDocumentSnapshot> newUsers,
-    required List<QueryDocumentSnapshot> messages,
-  }) {
-    final usersByYear = <String, int>{};
-    final usersByProgram = <String, int>{};
-    final enrollmentStatus = <String, int>{'Enrolled': 0, 'Not Enrolled': 0};
-    final scholarshipTypes = <String, int>{};
-    final affiliationTypes = <String, int>{};
-    int affiliatedCount = 0;
+  required List<QueryDocumentSnapshot> users,
+  required List<QueryDocumentSnapshot> activeUsers,
+  required List<QueryDocumentSnapshot> newUsers,
+  required List<QueryDocumentSnapshot> messages,
+}) {
+  final usersByYear = <String, int>{};
+  final usersByProgram = <String, int>{};
+  final enrollmentStatus = <String, int>{'Enrolled': 0, 'Not Enrolled': 0};
+  final scholarshipTypes = <String, int>{};
+  final affiliationTypes = <String, int>{};
 
-    for (final doc in users) {
-      final data = doc.data() as Map<String, dynamic>;
+  int affiliationCount = 0; // <-- ONLY Freshman Applicant count
 
-      final year = data['year']?.toString() ?? 'Unknown';
-      final program = data['program']?.toString() ?? 'Unknown';
-      final affiliationValue = data['affiliation']?.toString();
-      final scholarshipValue = data['scholarship']?.toString();
-      final isEnrolled = data['isEnrolled'];
+  for (final doc in users) {
+    final data = doc.data() as Map<String, dynamic>;
 
-      usersByYear[year] = (usersByYear[year] ?? 0) + 1;
-      usersByProgram[program] = (usersByProgram[program] ?? 0) + 1;
+    final year = data['year']?.toString() ?? 'N/A';
+    final program = data['program']?.toString() ?? 'N/A';
+    final rawAffiliation = data['affiliation']?.toString();
+final affiliationValue = rawAffiliation?.trim();
 
-      if (affiliationValue != null &&
-          affiliationValue.isNotEmpty &&
-          affiliationValue != 'null' &&
-          affiliationValue.toLowerCase() != 'null') {
-        affiliatedCount++;
-        affiliationTypes[affiliationValue] =
-            (affiliationTypes[affiliationValue] ?? 0) + 1;
-      }
+    final scholarshipValue = data['scholarship']?.toString();
+    final isEnrolled = data['isEnrolled'];
 
-      if (scholarshipValue != null &&
-          scholarshipValue.isNotEmpty &&
-          scholarshipValue != 'null' &&
-          scholarshipValue.toLowerCase() != 'null') {
-        scholarshipTypes[scholarshipValue] =
-            (scholarshipTypes[scholarshipValue] ?? 0) + 1;
-      }
+    usersByYear[year] = (usersByYear[year] ?? 0) + 1;
+    usersByProgram[program] = (usersByProgram[program] ?? 0) + 1;
 
-      if (isEnrolled == true) {
-        enrollmentStatus['Enrolled'] = (enrollmentStatus['Enrolled'] ?? 0) + 1;
-      } else {
-        enrollmentStatus['Not Enrolled'] =
-            (enrollmentStatus['Not Enrolled'] ?? 0) + 1;
-      }
+    // --------------------------------------------------------
+    // 1️⃣ affiliationTypes → counts ALL affiliation values
+    // --------------------------------------------------------
+    if (affiliationValue != null &&
+        affiliationValue.isNotEmpty &&
+        affiliationValue != 'null' &&
+        affiliationValue.toLowerCase() != 'null') {
+      affiliationTypes[affiliationValue] =
+          (affiliationTypes[affiliationValue] ?? 0) + 1;
     }
 
-    return UserDemographicsReportsData(
-      activeUsers: activeUsers.length,
-      newlyRegisteredUsers: newUsers.length,
-      affiliatedUsers: affiliatedCount,
-      totalUsers: users.length,
-      usersByYear: usersByYear,
-      usersByProgram: usersByProgram,
-      userAffiliations: affiliationTypes,
-      scholarshipTypes: scholarshipTypes,
-      enrollmentStatus: enrollmentStatus,
-    );
+    // --------------------------------------------------------
+    // 2️⃣ affiliationCount → ONLY count “Incoming Freshman Applicant”
+    // --------------------------------------------------------
+    const targetAffiliation = 'Incoming Freshman Applicant';
+
+  if (affiliationValue?.toLowerCase() == targetAffiliation.toLowerCase()) {
+  affiliationCount++;
+}
+
+
+    // --------------------------------------------------------
+    // Scholarship Type Count
+    // --------------------------------------------------------
+    if (scholarshipValue != null &&
+        scholarshipValue.isNotEmpty &&
+        scholarshipValue != 'null' &&
+        scholarshipValue.toLowerCase() != 'null') {
+      scholarshipTypes[scholarshipValue] =
+          (scholarshipTypes[scholarshipValue] ?? 0) + 1;
+    }
+
+    // --------------------------------------------------------
+    // Enrollment Status Count
+    // --------------------------------------------------------
+    if (isEnrolled == true) {
+      enrollmentStatus['Enrolled'] = (enrollmentStatus['Enrolled'] ?? 0) + 1;
+    } else {
+      enrollmentStatus['Not Enrolled'] =
+          (enrollmentStatus['Not Enrolled'] ?? 0) + 1;
+    }
   }
+
+  return UserDemographicsReportsData(
+    activeUsers: activeUsers.length,
+    newlyRegisteredUsers: newUsers.length,
+    affiliatedUsers: affiliationCount, // <-- ONLY freshman applicants
+    totalUsers: users.length,
+    usersByYear: usersByYear,
+    usersByProgram: usersByProgram,
+    userAffiliations: affiliationTypes, // <-- ALL affiliations
+    scholarshipTypes: scholarshipTypes,
+    enrollmentStatus: enrollmentStatus,
+  );
+}
 
   String _getDateKey(DateTime date, String timeFrame) {
   switch (timeFrame) {
@@ -793,11 +814,13 @@ List<ChartData> _buildResponseTimeTrend(
   }
 
   String _getSeason(int month) {
-    if (month >= 3 && month <= 5)
-      return 'CMUCAT Admission and Scholarship Application';
-    if (month >= 6 && month <= 8) return 'Enrollment';
-    if (month >= 9 && month <= 11) return 'Regular Classes';
-    return 'Christmas';
+    if (month >= 6 && month <= 8) return 'Enrollment'; 
+    if (month >= 1 && month <= 3) return 'CMUCAT and 2nd Sem Midterms';
+    if (month >= 4 && month <= 5) return 'Posting of CMUCAT Scores and 2nd Sem Final Term';
+    if (month == 8) return 'Opening of Classes';
+    if (month >= 11 && month <= 12) return '1st Sem Final Term and Christmas Break';
+    if (month >= 9 && month <= 11) return '1st Sem Midterms';
+    return 'Regular Classes';
   }
 
   List<ChartData>? _generateHourlyUsageTrend(

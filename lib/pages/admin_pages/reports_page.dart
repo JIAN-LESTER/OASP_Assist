@@ -1241,7 +1241,7 @@ List<Widget> buildUserDemographicsReport(
           const SizedBox(width: 12),
           Expanded(
             child: buildStatCard(
-              'Affiliated Users',
+              'Incoming Freshman Users',
               '${data?.affiliatedUsers ?? 0}',
               Colors.purple,
               Icons.business,
@@ -1308,7 +1308,7 @@ List<Widget> buildUserDemographicsReport(
           const SizedBox(width: 20),
           Expanded(
             child: buildStatCard(
-              'Affiliated Users',
+              'Incoming Freshman Users',
               '${data?.affiliatedUsers ?? 0}',
               Colors.purple,
               Icons.business,

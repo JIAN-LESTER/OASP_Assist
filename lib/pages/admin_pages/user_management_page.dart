@@ -558,8 +558,8 @@ Widget _buildUserList({
                                 : data['role'] == 'staff'
                                 ? 'OASP Staff'
                                 : (data['role'] ?? 'N/A'),
-                        year: data['year']?.toString() ?? '-',
-                        program: data['program'] ?? '-',
+                        year: data['year']?.toString() ?? 'N/A',
+                        program: data['program'] ?? 'N/A',
                         status:
                             data['isActive'] == true ? 'Active' : 'Inactive',
                         onNavigateToPage: onNavigateToPage,

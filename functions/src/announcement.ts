@@ -7,7 +7,9 @@
 
   // Define secrets
   const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
-  const GOOGLE_VISION_API_KEY = defineSecret("GOOGLE_VISION_API_KEY"); // ✅ NEW: For OCR
+const GOOGLE_VISION_API_KEY = defineSecret("GOOGLE_VISION_API_KEY"); // ✅ NEW: For OCR
+const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
+  const PINECONE_HOST = defineSecret("PINECONE_HOST");
 
   const db = admin.firestore();
   const storage = admin.storage();
@@ -22,7 +24,13 @@
     full_picture?: string;
     permalink_url?: string;
     attachments?: any;
-  }
+}
+  
+interface CategoryToInfoBankConfig {
+  includeInSearch: boolean;
+  autoSync: boolean;
+  generateSummary: boolean;
+}
   // interface FacebookAttachment {
   //   media?: { image?: { src: string } };
   //   subattachments?: { data: Array<{ media?: { image?: { src: string } } }> };
@@ -67,153 +75,125 @@
    * Extract text from image using Google Cloud Vision API
    */
 
-  function normalizeImageUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    // Remove tracking params and get base image path
-    // Facebook URLs often have different query params for same image
-    const pathParts = parsed.pathname.split('/');
-    // Get the image identifier (usually last meaningful segment)
-    const imageId = pathParts.filter(p => p && !p.includes('_n') && p.length > 10).pop();
-    return imageId || parsed.pathname;
-  } catch {
-    return url;
-  }
-}
+//   function normalizeImageUrl(url: string): string {
+//   try {
+//     const parsed = new URL(url);
+//     // Remove tracking params and get base image path
+//     // Facebook URLs often have different query params for same image
+//     const pathParts = parsed.pathname.split('/');
+//     // Get the image identifier (usually last meaningful segment)
+//     const imageId = pathParts.filter(p => p && !p.includes('_n') && p.length > 10).pop();
+//     return imageId || parsed.pathname;
+//   } catch {
+//     return url;
+//   }
+// }
 
-  function extractAllImagesFromPost(post: FacebookPost): string[] {
+function extractAllImagesFromPost(post: FacebookPost): string[] {
   const images: string[] = [];
-  const seenNormalized = new Set<string>();
   
-  const addImage = (url: string) => {
-    if (!url) return;
-    const normalized = normalizeImageUrl(url);
-    if (!seenNormalized.has(normalized)) {
-      seenNormalized.add(normalized);
-      images.push(url);
-    }
-  };
+  // 🔥 FIX: Simple extraction without deduplication
+  console.log(`📸 Extracting images from post...`);
   
   // Extract from attachments FIRST (higher quality)
   if (post.attachments?.data) {
-    for (const attachment of post.attachments.data) {
+    console.log(`  📎 Found ${post.attachments.data.length} attachment(s)`);
+    
+    for (let idx = 0; idx < post.attachments.data.length; idx++) {
+      const attachment = post.attachments.data[idx];
+      
       // Multiple images (subattachments - album/carousel)
       if (attachment.subattachments?.data) {
-        for (const sub of attachment.subattachments.data) {
+        console.log(`  📸 Album with ${attachment.subattachments.data.length} images`);
+        for (let subIdx = 0; subIdx < attachment.subattachments.data.length; subIdx++) {
+          const sub = attachment.subattachments.data[subIdx];
           if (sub.media?.image?.src) {
-            addImage(sub.media.image.src);
+            console.log(`    🖼️ Subattachment ${subIdx + 1}: ${sub.media.image.src.substring(0, 80)}...`);
+            images.push(sub.media.image.src);
           }
         }
       }
       // Single image attachment
       else if (attachment.media?.image?.src) {
-        addImage(attachment.media.image.src);
+        console.log(`    🖼️ Single image: ${attachment.media.image.src.substring(0, 80)}...`);
+        images.push(attachment.media.image.src);
       }
     }
   }
   
   // Only add full_picture if we found NO images from attachments
-  // (full_picture is usually a lower-res preview)
   if (images.length === 0 && post.full_picture) {
-    addImage(post.full_picture);
+    console.log(`  📸 Using full_picture (no attachments found)`);
+    images.push(post.full_picture);
   }
   
-  console.log(`📸 Found ${images.length} unique image(s) in post`);
+  console.log(`✅ Extracted ${images.length} image(s) from post`);
   return images;
 }
 
-function deduplicateOcrResults(ocrResults: string[]): string {
-  const uniqueTexts: string[] = [];
-  const seenNormalized = new Set<string>();
-  
-  for (const text of ocrResults) {
-    // Normalize: lowercase, remove extra whitespace, remove special chars
-    const normalized = text.toLowerCase()
-      .replace(/\s+/g, ' ')
-      .replace(/[^a-z0-9\s]/g, '')
-      .trim();
-    
-    // Skip if we've seen very similar text (>80% overlap)
-    let isDuplicate = false;
-    for (const seen of seenNormalized) {
-      if (similarity(normalized, seen) > 0.8) {
-        isDuplicate = true;
-        break;
-      }
-    }
-    
-    if (!isDuplicate && normalized.length > 20) {
-      seenNormalized.add(normalized);
-      uniqueTexts.push(text);
-    }
-  }
-  
-  return uniqueTexts.join('\n\n---\n\n');
-}
-
-function similarity(a: string, b: string): number {
-  const wordsA = new Set(a.split(' '));
-  const wordsB = new Set(b.split(' '));
-  const intersection = [...wordsA].filter(w => wordsB.has(w)).length;
-  const union = new Set([...wordsA, ...wordsB]).size;
-  return union > 0 ? intersection / union : 0;
-}
-
   async function downloadAndUploadAllImages(
-    imageUrls: string[],
-    postId: string
-  ): Promise<string[]> {
-    const uploadedUrls: string[] = [];
-    
-    for (let i = 0; i < imageUrls.length; i++) {
-      const imageUrl = imageUrls[i];
-      try {
-        console.log(`📥 Downloading image ${i + 1}/${imageUrls.length} for post ${postId}`);
-        
-        const response = await axios.get(imageUrl, {
-          responseType: "arraybuffer",
-          timeout: 30000,
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; OASP-Bot/1.0)' },
-        } as any);
-        
-        const buffer = Buffer.from(response.data as Buffer);
-        const contentType = response.headers["content-type"] || "image/jpeg";
-        const ext = contentType.split("/")[1]?.split(';')[0] || "jpg";
-        
-        // Use index suffix for multiple images
-        const fileName = imageUrls.length > 1 
-          ? `announcements/${postId}_${i}.${ext}`
-          : `announcements/${postId}.${ext}`;
-        
-        const bucket = storage.bucket();
-        const file = bucket.file(fileName);
-        
-        await file.save(buffer, {
-          metadata: {
-            contentType,
-            cacheControl: 'public, max-age=31536000',
-            metadata: { postId, imageIndex: i.toString() },
+  imageUrls: string[],
+  postId: string
+): Promise<string[]> {
+  const uploadedUrls: string[] = [];
+  
+  console.log(`📥 Starting download of ${imageUrls.length} image(s) for post ${postId}`);
+  
+  for (let i = 0; i < imageUrls.length; i++) {
+    const imageUrl = imageUrls[i];
+    try {
+      console.log(`  📥 Downloading image ${i + 1}/${imageUrls.length}...`);
+      
+      const response = await axios.get(imageUrl, {
+        responseType: "arraybuffer",
+        timeout: 30000,
+        maxBodyLength: 50 * 1024 * 1024,
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; OASP-Bot/1.0)' },
+      } as any);
+      
+      const buffer = Buffer.from(response.data as Buffer);
+      const contentType = response.headers["content-type"] || "image/jpeg";
+      const ext = contentType.split("/")[1]?.split(';')[0] || "jpg";
+      
+      // 🔥 FIX: Use index suffix for multiple images
+      const fileName = imageUrls.length > 1 
+        ? `announcements/${postId}_${i}.${ext}`
+        : `announcements/${postId}.${ext}`;
+      
+      const bucket = storage.bucket();
+      const file = bucket.file(fileName);
+      
+      await file.save(buffer, {
+        metadata: {
+          contentType,
+          cacheControl: 'public, max-age=31536000',
+          metadata: { 
+            postId, 
+            imageIndex: i.toString(),
+            totalImages: imageUrls.length.toString()
           },
-          public: true,
-        });
-        
-        const [signedUrl] = await file.getSignedUrl({
-          action: 'read',
-          expires: '03-01-2500',
-        });
-        
-        uploadedUrls.push(signedUrl);
-        console.log(`✅ Uploaded image ${i + 1}: ${fileName}`);
-        
-      } catch (error: any) {
-        console.error(`❌ Error uploading image ${i + 1} for post ${postId}:`, error.message);
-        // Still add original URL as fallback
-        uploadedUrls.push(imageUrl);
-      }
+        },
+        public: true,
+      });
+      
+      const [signedUrl] = await file.getSignedUrl({
+        action: 'read',
+        expires: '03-01-2500',
+      });
+      
+      uploadedUrls.push(signedUrl);
+      console.log(`  ✅ Uploaded image ${i + 1}/${imageUrls.length}: ${fileName}`);
+      
+    } catch (error: any) {
+      console.error(`  ❌ Error uploading image ${i + 1}:`, error.message);
+      // Add original URL as fallback
+      uploadedUrls.push(imageUrl);
     }
-    
-    return uploadedUrls;
   }
+  
+  console.log(`✅ Uploaded ${uploadedUrls.length}/${imageUrls.length} images for post ${postId}`);
+  return uploadedUrls;
+}
 
   function extractSchedulesFromOCR(ocrText: string): ScheduleEntry[] {
   const schedules: ScheduleEntry[] = [];
@@ -1228,7 +1208,10 @@ Respond ONLY in this JSON format:
   }
 }
 
-  async function createAdmissionFromAnnouncement(
+ /**
+ * Create Admission document AND sync to Information Bank with Pinecone
+ */
+async function createAdmissionFromAnnouncement(
   postId: string,
   message: string,
   deadline: admin.firestore.Timestamp | null,
@@ -1246,10 +1229,37 @@ Respond ONLY in this JSON format:
         console.log(`⏭️ Skipping admission for post ${postId} - deleted`);
         return;
       }
-      console.log(`Admission already exists for post ${postId}`);
+      
+      console.log(`✅ Admission already exists for post ${postId}`);
+      
+      // ✅ Check if Information Bank exists
+      const infoBankId = `admission_${postId}`;
+      const infoBankDoc = await db.collection('information_bank').doc(infoBankId).get();
+      
+      if (infoBankDoc.exists) {
+        console.log(`✅ Information Bank also exists - skipping`);
+        return;
+      }
+      
+      // ✅ Admission exists but Info Bank missing - create it
+      console.log(`📋 Creating Information Bank for existing admission...`);
+      
+      const extractedData = await extractAdmissionData(message, cohereKey, ocrText, imageCount);
+      
+      await createInfoBankFromCategory(
+        postId,
+        'admission',
+        extractedData,
+        cohereKey
+      );
+      
+      console.log(`✅ Information Bank created for existing admission`);
       return;
     }
 
+    // Both missing - create both
+    console.log(`✨ Creating new admission and Information Bank...`);
+    
     const extractedData = await extractAdmissionData(message, cohereKey, ocrText, imageCount);
 
     await admissionRef.set({
@@ -1268,15 +1278,28 @@ Respond ONLY in this JSON format:
       deleted: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       autoGenerated: true,
-      processedImageCount: imageCount || 0, // ✅ Track how many images were processed
+      processedImageCount: imageCount || 0,
     });
 
-    console.log(`✅ Created admission with ${extractedData.schedules.length} schedules from ${imageCount || 0} images`);
-  } catch (error) {
+    console.log(`✅ Created admission with ${extractedData.schedules.length} schedules`);
+
+    await createInfoBankFromCategory(
+      postId,
+      'admission',
+      extractedData,
+      cohereKey
+    );
+
+    console.log(`✅ Admission + Information Bank synced to Pinecone`);
+    
+  } catch (error: any) {
     console.error(`❌ Error creating admission from announcement ${postId}:`, error);
+    throw error;
   }
 }
-
+/**
+ * Create Scholarship document AND sync to Information Bank with Pinecone
+ */
 async function createScholarshipFromAnnouncement(
   postId: string,
   message: string,
@@ -1291,23 +1314,47 @@ async function createScholarshipFromAnnouncement(
     
     if (existingDoc.exists) {
       const existingData = existingDoc.data();
-      
-      // ✅ If deleted, don't recreate or restore
       if (existingData?.deleted === true) {
-        console.log(`⏭️ Skipping scholarship for post ${postId} - it was deleted by user`);
+        console.log(`⏭️ Skipping scholarship for post ${postId} - deleted`);
         return;
       }
       
-      console.log(`Scholarship already exists for post ${postId}`);
+      console.log(`✅ Scholarship already exists for post ${postId}`);
+      
+      // ✅ Check if Information Bank exists
+      const infoBankId = `scholarship_${postId}`;
+      const infoBankDoc = await db.collection('information_bank').doc(infoBankId).get();
+      
+      if (infoBankDoc.exists) {
+        console.log(`✅ Information Bank also exists - skipping`);
+        return;
+      }
+      
+      // ✅ Scholarship exists but Info Bank missing - create it
+      console.log(`📋 Creating Information Bank for existing scholarship...`);
+      
+      const extractedData = await extractScholarshipData(message, cohereKey, ocrText, imageCount);
+      
+      await createInfoBankFromCategory(
+        postId,
+        'scholarship',
+        extractedData,
+        cohereKey
+      );
+      
+      console.log(`✅ Information Bank created for existing scholarship`);
       return;
     }
 
+    // Both missing - create both
+    console.log(`✨ Creating new scholarship and Information Bank...`);
+    
     const extractedData = await extractScholarshipData(message, cohereKey, ocrText, imageCount);
 
     await scholarshipRef.set({
       scholarshipID: postId,
       sourceId: postId,
-      announcementId: postId, // ✅ Link to announcement
+      announcementId: postId,
       name: extractedData.name,
       description: extractedData.description,
       scholarshipProvider: extractedData.scholarshipProvider,
@@ -1315,19 +1362,56 @@ async function createScholarshipFromAnnouncement(
       privileges: extractedData.privileges,
       deadline: deadline ? deadline.toDate() : null,
       applicationLink: extractedData.applicationLink,
-      deleted: false, // ✅ Soft delete flag
+      deleted: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       autoGenerated: true,
-      processedImageCount: imageCount || 0, // ✅ Track how many images were processed
+      processedImageCount: imageCount || 0,
     });
 
-    console.log(`✅ Created scholarship from announcement ${postId} (${imageCount || 0} images processed)`);
-  } catch (error) {
+    console.log(`✅ Created scholarship from announcement ${postId}`);
+
+    await createInfoBankFromCategory(
+      postId,
+      'scholarship',
+      extractedData,
+      cohereKey
+    );
+
+    console.log(`✅ Scholarship + Information Bank synced to Pinecone`);
+    
+  } catch (error: any) {
     console.error(`❌ Error creating scholarship from announcement ${postId}:`, error);
+    throw error;
   }
 }
+export const debugInfoBank = onCall(
+  { cors: true, secrets: [COHERE_API_KEY] },
+  async (request) => {
+    const announcementId = request.data.announcementId;
+    
+    const announcement = await db.collection('announcements').doc(announcementId).get();
+    const category = announcement.data()?.category?.toLowerCase();
+    
+    const categoryDoc = await db.collection(`${category}s`).doc(announcementId).get();
+    const infoBankDoc = await db.collection('information_bank').doc(`${category}_${announcementId}`).get();
+    
+    return {
+      announcement: announcement.exists,
+      categoryDoc: categoryDoc.exists,
+      infoBankDoc: infoBankDoc.exists,
+      details: {
+        category,
+        announcementData: announcement.data(),
+        categoryData: categoryDoc.data(),
+        infoBankData: infoBankDoc.data(),
+      }
+    };
+  }
+);
 
-// ✅ UPDATED: Placement creation with OCR text and image count
+/**
+ * Create Placement document AND sync to Information Bank with Pinecone
+ */
 async function createPlacementFromAnnouncement(
   postId: string,
   message: string,
@@ -1340,40 +1424,613 @@ async function createPlacementFromAnnouncement(
     const placementRef = db.collection("placements").doc(postId);
     const existingDoc = await placementRef.get();
     
+    // ✅ NEW: Check if placement exists
     if (existingDoc.exists) {
       const existingData = existingDoc.data();
-      
-      // ✅ If deleted, don't recreate or restore
       if (existingData?.deleted === true) {
-        console.log(`⏭️ Skipping placement for post ${postId} - it was deleted by user`);
+        console.log(`⏭️ Skipping placement for post ${postId} - deleted`);
         return;
       }
       
-      console.log(`Placement already exists for post ${postId}`);
+      console.log(`✅ Placement already exists for post ${postId}`);
+      
+      // ✅ NEW: Check if Information Bank exists
+      const infoBankId = `placement_${postId}`;
+      const infoBankDoc = await db.collection('information_bank').doc(infoBankId).get();
+      
+      if (infoBankDoc.exists) {
+        console.log(`✅ Information Bank also exists - skipping`);
+        return;
+      }
+      
+      // ✅ NEW: Placement exists but Info Bank missing - create it
+      console.log(`📋 Creating Information Bank for existing placement...`);
+      
+      const extractedData = await extractPlacementData(message, cohereKey, ocrText, imageCount);
+      
+      await createInfoBankFromCategory(
+        postId,
+        'placement',
+        extractedData,
+        cohereKey
+      );
+      
+      console.log(`✅ Information Bank created for existing placement`);
       return;
     }
 
+    // Both placement and Info Bank are missing - create both
+    console.log(`✨ Creating new placement and Information Bank...`);
+    
     const extractedData = await extractPlacementData(message, cohereKey, ocrText, imageCount);
 
+    // 1️⃣ Save to Placements collection
     await placementRef.set({
       placementID: postId,
-      announcementId: postId, // ✅ Link to announcement
+      announcementId: postId,
       partnerCompany: extractedData.partnerCompany,
       positions: extractedData.positions,
       contacts: extractedData.contacts,
       isRecruiting: extractedData.isRecruiting,
       deadline: deadline ? deadline.toDate() : null,
-      deleted: false, // ✅ Soft delete flag
+      deleted: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       autoGenerated: true,
-      processedImageCount: imageCount || 0, // ✅ Track how many images were processed
+      processedImageCount: imageCount || 0,
     });
 
-    console.log(`✅ Created placement from announcement ${postId} (${imageCount || 0} images processed)`);
-  } catch (error) {
+    console.log(`✅ Created placement from announcement ${postId}`);
+
+    // 2️⃣ Create Information Bank entry
+    await createInfoBankFromCategory(
+      postId,
+      'placement',
+      extractedData,
+      cohereKey
+    );
+
+    console.log(`✅ Placement + Information Bank synced to Pinecone`);
+    
+  } catch (error: any) {
     console.error(`❌ Error creating placement from announcement ${postId}:`, error);
+    throw error; // Re-throw to make error visible
   }
 }
+
+async function createInfoBankFromCategory(
+  documentId: string,
+  categoryType: 'admission' | 'scholarship' | 'placement',
+  extractedData: any,
+  cohereKey: string
+): Promise<void> {
+  const functionStart = Date.now();
+  
+  console.log(`\n🏦 ========================================`);
+  console.log(`🏦 START: createInfoBankFromCategory`);
+  console.log(`🏦 Category: ${categoryType}`);
+  console.log(`🏦 Document ID: ${documentId}`);
+  console.log(`🏦 ========================================`);
+  
+  try {
+    // ✅ STEP 1: Validate inputs
+    console.log(`\n📋 STEP 1: Validating inputs...`);
+    
+    if (!documentId || documentId.trim().length === 0) {
+      throw new Error('documentId is empty or invalid');
+    }
+    
+    if (!categoryType || !['admission', 'scholarship', 'placement'].includes(categoryType)) {
+      throw new Error(`Invalid categoryType: ${categoryType}`);
+    }
+    
+    if (!extractedData) {
+      throw new Error('extractedData is null or undefined');
+    }
+    
+    console.log(`   ✅ Inputs validated`);
+    console.log(`   📊 extractedData keys: ${Object.keys(extractedData).join(', ')}`);
+
+    // ✅ STEP 2: Create Information Bank ID
+    const infoBankId = `${categoryType}_${documentId}`;
+    console.log(`   📌 Info Bank ID: ${infoBankId}`);
+
+    // ✅ STEP 3: Check if already exists
+    console.log(`\n📋 STEP 3: Checking if entry exists...`);
+    const existingDoc = await db.collection('information_bank').doc(infoBankId).get();
+
+    if (existingDoc.exists) {
+      console.log(`   ℹ️ Entry already exists - updating timestamp`);
+      await db.collection('information_bank').doc(infoBankId).update({
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      console.log(`   ✅ Timestamp updated`);
+      return;
+    }
+
+    // ✅ STEP 4: Format content
+    console.log(`\n📋 STEP 4: Formatting content...`);
+    const textContent = formatCategoryAsText(categoryType, extractedData);
+    const title = getCategoryTitle(categoryType, extractedData);
+
+    console.log(`   📝 Title: "${title}"`);
+    console.log(`   📝 Content: ${textContent.length} chars`);
+
+    if (!textContent || textContent.trim().length === 0) {
+      throw new Error('Formatted content is empty');
+    }
+
+    // ✅ STEP 5: Split into chunks
+    console.log(`\n📋 STEP 5: Splitting into chunks...`);
+    const chunks = splitIntoChunks(textContent, title, `${categoryType}_category`);
+    console.log(`   📄 Created ${chunks.length} chunk(s)`);
+
+    let parentPineconeId: string | null = null;
+    const chunkIds: string[] = [];
+
+    // ✅ STEP 6: Process each chunk with retries
+    console.log(`\n📋 STEP 6: Processing ${chunks.length} chunks...`);
+    
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`\n   📌 Chunk ${i + 1}/${chunks.length}`);
+      console.log(`      Text: ${chunk.text.length} chars`);
+
+      // Generate embedding with retry
+      let embedding: number[] | null = null;
+      let retries = 3;
+      
+      while (retries > 0 && !embedding) {
+        try {
+          console.log(`      🔄 Generating embedding (attempt ${4 - retries}/3)...`);
+          
+          const embeddingResponse = await axios.post<{ embeddings: { float: number[][] } }>(
+            "https://api.cohere.ai/v1/embed",
+            {
+              model: "embed-english-v3.0",
+              texts: [chunk.text],
+              input_type: "search_document",
+              embedding_types: ["float"],
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${cohereKey}`,
+                "Content-Type": "application/json",
+              },
+              timeout: 30000,
+            }
+          );
+
+          // Safely access the response data and validate
+          const potentialEmbedding = (embeddingResponse.data?.embeddings as any)?.float?.[0] as number[] | undefined;
+          if (potentialEmbedding && Array.isArray(potentialEmbedding) && potentialEmbedding.length > 0) {
+            embedding = potentialEmbedding;
+          } else {
+            throw new Error("Invalid embedding response");
+          }
+          
+          console.log(`      ✅ Embedding: ${embedding.length} dimensions`);
+          
+        } catch (error: any) {
+          retries--;
+          console.error(`      ❌ Attempt failed: ${error.message}`);
+          
+          if (retries > 0) {
+            console.log(`      ⏳ Retrying in 2s...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          } else {
+            throw new Error(`Failed after 3 attempts: ${error.message}`);
+          }
+        }
+      }
+
+      if (!embedding) {
+        throw new Error("Embedding generation failed");
+      }
+
+      const chunkTitle = chunks.length > 1
+        ? `${title} (Part ${i + 1}/${chunks.length})`
+        : title;
+
+      // ✅ CRITICAL: Consistent metadata structure matching Flutter expectations
+      const metadata = {
+        // === DOCUMENT IDs (Flutter primary lookup fields) ===
+        'docId': documentId,
+        'originalDocId': documentId,
+        'documentId': documentId,
+        'categoryDocId': documentId,
+        
+        // === CONTENT (Flutter expects 'text' first) ===
+        'text': chunk.text,
+        'content': chunk.text,
+        
+        // === TITLES ===
+        'title': chunkTitle,
+        'originalTitle': title,
+        'fileName': title,
+        
+        // === CHUNKING INFO ===
+        'chunkIndex': i,
+        'chunk_index': i,
+        'totalChunks': chunks.length,
+        'chunkCount': chunks.length,
+        'isFirstChunk': i === 0,
+        'isLastChunk': i === chunks.length - 1,
+        
+        // === SOURCE & CATEGORY ===
+        'source': `${categoryType}_category`,
+        'category': categoryType,
+        'categoryID': categoryType,
+        'categoryType': categoryType,
+        
+        // === METADATA ===
+        'chunkSize': chunk.text.length,
+        'createdAt': new Date().toISOString(),
+        'syncedFromCategory': true,
+        'autoGeneratedFromAnnouncement': true,
+        
+        // === CATEGORY-SPECIFIC ===
+        ...getCategorySpecificMetadata(categoryType, extractedData),
+      };
+
+      // Store in Pinecone with retry
+      console.log(`      🔄 Storing in Pinecone...`);
+      let stored = false;
+      retries = 3;
+      
+      while (retries > 0 && !stored) {
+        try {
+          await storePineconeVector(chunk.id, embedding, metadata);
+          stored = true;
+          console.log(`      ✅ Stored in Pinecone`);
+        } catch (error: any) {
+          retries--;
+          console.error(`      ❌ Storage failed: ${error.message}`);
+          
+          if (retries > 0) {
+            console.log(`      ⏳ Retrying in 2s...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          } else {
+            throw new Error(`Pinecone storage failed: ${error.message}`);
+          }
+        }
+      }
+
+      chunkIds.push(chunk.id);
+      if (i === 0) parentPineconeId = chunk.id;
+    }
+
+    // ✅ STEP 7: Save to Firestore
+    console.log(`\n📋 STEP 7: Saving to Firestore...`);
+    
+    const firestoreData = {
+      ibID: infoBankId,
+      id: infoBankId,
+      ib_title: title,
+      title: title,
+      content: textContent,
+      source: `${categoryType}_category`,
+      category: categoryType,
+      categoryID: categoryType,
+      categoryType: categoryType,
+      categoryDocumentId: documentId,
+      announcementId: documentId,
+      pinecone_id: parentPineconeId,
+      totalChunks: chunks.length,
+      chunkIds: chunkIds,
+      chunked: chunks.length > 1,
+      chunkSize: 1000,
+      chunkOverlap: 200,
+      syncedFromCategory: true,
+      autoGeneratedFromAnnouncement: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.collection('information_bank').doc(infoBankId).set(firestoreData);
+    console.log(`   ✅ Firestore write successful`);
+
+    const totalElapsed = Date.now() - functionStart;
+    
+    console.log(`\n🏦 ========================================`);
+    console.log(`🏦 SUCCESS: Info Bank Created`);
+    console.log(`🏦 ID: ${infoBankId}`);
+    console.log(`🏦 Chunks: ${chunks.length}`);
+    console.log(`🏦 Time: ${totalElapsed}ms`);
+    console.log(`🏦 ========================================\n`);
+
+  } catch (error: any) {
+    const totalElapsed = Date.now() - functionStart;
+    
+    console.error(`\n❌ ========================================`);
+    console.error(`❌ FAILURE: Info Bank Creation Failed`);
+    console.error(`❌ Category: ${categoryType}`);
+    console.error(`❌ Document: ${documentId}`);
+    console.error(`❌ Error: ${error.message}`);
+    console.error(`❌ Stack:`);
+    console.error(error.stack);
+    console.error(`❌ Time: ${totalElapsed}ms`);
+    console.error(`❌ ========================================\n`);
+    
+    // ✅ NEW: Log to Firestore error collection for tracking
+    try {
+      await db.collection('info_bank_errors').add({
+        categoryType,
+        documentId,
+        infoBankId: `${categoryType}_${documentId}`,
+        errorType: error.constructor.name,
+        errorMessage: error.message,
+        errorStack: error.stack,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        extractedDataKeys: extractedData ? Object.keys(extractedData) : [],
+      });
+      console.log(`   📝 Error logged to Firestore`);
+    } catch (logError: any) {
+      console.error(`   ❌ Failed to log error: ${logError.message}`);
+    }
+    
+    // ✅ IMPORTANT: Re-throw to make failures visible
+    // This ensures you know when Info Bank creation fails
+    throw new Error(`Info Bank creation failed for ${categoryType} ${documentId}: ${error.message}`);
+  }
+}
+
+
+
+function getCategoryTitle(
+  categoryType: 'admission' | 'scholarship' | 'placement',
+  data: any
+): string {
+  if (categoryType === 'admission') {
+    return data.title || 'Admission Information';
+  } else if (categoryType === 'scholarship') {
+    return data.name || 'Scholarship Information';
+  } else if (categoryType === 'placement') {
+    return `${data.partnerCompany || 'Company'} - Job Placement`;
+  }
+  return 'Category Information';
+}
+
+function getCategorySpecificMetadata(
+  categoryType: 'admission' | 'scholarship' | 'placement',
+  data: any
+): Record<string, any> {
+  if (categoryType === 'admission') {
+    return {
+      'academicYear': data.academicYear ? JSON.stringify(data.academicYear) : null,
+      'hasSchedules': (data.schedules?.length || 0) > 0,
+      'scheduleCount': data.schedules?.length || 0,
+    };
+  } else if (categoryType === 'scholarship') {
+    return {
+      'scholarshipProvider': data.scholarshipProvider || '',
+      'hasApplicationLink': !!data.applicationLink,
+    };
+  } else if (categoryType === 'placement') {
+    return {
+      'partnerCompany': data.partnerCompany || '',
+      'isRecruiting': data.isRecruiting || false,
+      'positionCount': data.positions?.length || 0,
+    };
+  }
+  return {};
+}
+
+function splitIntoChunks(
+  content: string,
+  title: string,
+  source: string
+): Array<{id: string, text: string}> {
+  const maxChunkSize = 1000;
+  const chunkOverlap = 200;
+  const chunks: Array<{id: string, text: string}> = [];
+  
+  // Clean content
+  const cleanContent = content
+    .replace(/\r\n|\r/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n[ \t]*\n/g, '\n\n')
+    .trim();
+  
+  if (cleanContent.length <= maxChunkSize) {
+    return [{
+      id: generateChunkId(),
+      text: cleanContent
+    }];
+  }
+  
+  // Split by sentences
+  const sentences = cleanContent.split(/[.!?]+/).filter(s => s.trim());
+  
+  let currentChunk = '';
+  
+  for (const sentence of sentences) {
+    const trimmedSentence = sentence.trim();
+    if (!trimmedSentence) continue;
+    
+    const proposedChunk = currentChunk 
+      ? `${currentChunk}. ${trimmedSentence}`
+      : trimmedSentence;
+    
+    if (proposedChunk.length > maxChunkSize && currentChunk) {
+      chunks.push({
+        id: generateChunkId(),
+        text: currentChunk.trim()
+      });
+      
+      // Start new chunk with overlap
+      const overlapText = getOverlapText(currentChunk, chunkOverlap);
+      currentChunk = overlapText 
+        ? `${overlapText}. ${trimmedSentence}`
+        : trimmedSentence;
+    } else {
+      currentChunk = proposedChunk;
+    }
+  }
+  
+  if (currentChunk) {
+    chunks.push({
+      id: generateChunkId(),
+      text: currentChunk.trim()
+    });
+  }
+  
+  return chunks;
+}
+
+function getOverlapText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  const substring = text.substring(text.length - maxLength);
+  const spaceIndex = substring.indexOf(' ');
+  if (spaceIndex > 0) {
+    return substring.substring(spaceIndex + 1).trim();
+  }
+  return substring.trim();
+}
+
+function generateChunkId(): string {
+  return `chunk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+async function storePineconeVector(
+  id: string,
+  embedding: number[],
+  metadata: any
+): Promise<void> {
+  // ✅ Get both from secrets
+  const PINECONE_KEY = PINECONE_API_KEY.value();
+  const PINECONE_URL = PINECONE_HOST.value(); // ✅ Changed from process.env
+  
+  console.log(`🔍 Pinecone credentials check:`);
+  console.log(`   API Key available: ${!!PINECONE_KEY}`);
+  console.log(`   Host available: ${!!PINECONE_URL}`);
+  console.log(`   Host value: ${PINECONE_URL || 'NOT SET'}`);
+  
+  if (!PINECONE_KEY) {
+    throw new Error(
+      "Pinecone API Key not configured. Run: firebase functions:secrets:set PINECONE_API_KEY"
+    );
+  }
+  
+  if (!PINECONE_URL) {
+    throw new Error(
+      "Pinecone Host not configured. Run: firebase functions:secrets:set PINECONE_HOST"
+    );
+  }
+  
+  // Validate embedding
+  if (!Array.isArray(embedding) || embedding.length === 0) {
+    throw new Error(`Invalid embedding for vector ${id}: not an array or empty`);
+  }
+  
+  // Validate metadata has required fields
+  const requiredFields = ['docId', 'text', 'title'];
+  const missingFields = requiredFields.filter(field => !metadata[field]);
+  
+  if (missingFields.length > 0) {
+    console.warn(`⚠️ Missing metadata fields for vector ${id}: ${missingFields.join(', ')}`);
+  }
+  
+  try {
+    console.log(`📤 Storing vector ${id} in Pinecone...`);
+    console.log(`   Embedding dimensions: ${embedding.length}`);
+    console.log(`   Metadata fields: ${Object.keys(metadata).length}`);
+    
+    const response = await axios.post(
+      `${PINECONE_URL}/vectors/upsert`, // ✅ Use PINECONE_URL
+      {
+        vectors: [{
+          id: id,
+          values: embedding,
+          metadata: metadata
+        }]
+      },
+      {
+        headers: {
+          'Api-Key': PINECONE_KEY,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        timeout: 30000,
+        validateStatus: (status) => status < 500,
+      }
+    );
+    
+    if (response.status !== 200) {
+      console.error(`❌ Pinecone returned non-200 status: ${response.status}`);
+      console.error(`   Response data:`, JSON.stringify(response.data));
+      throw new Error(`Pinecone API returned status ${response.status}: ${JSON.stringify(response.data)}`);
+    }
+    
+    console.log(`   ✅ Vector ${id} stored successfully`);
+    
+  } catch (error: any) {
+    console.error(`❌ Pinecone storage error for vector ${id}:`);
+    console.error(`   Error type: ${error.constructor.name}`);
+    console.error(`   Error message: ${error.message}`);
+    
+    if (error.response) {
+      console.error(`   HTTP Status: ${error.response.status}`);
+      console.error(`   Response data:`, JSON.stringify(error.response.data));
+    }
+    
+    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      throw new Error(`Cannot connect to Pinecone. Check PINECONE_HOST: ${PINECONE_URL}`);
+    }
+    
+    throw new Error(`Pinecone storage failed: ${error.message}`);
+  }
+}
+
+export const batchSyncCategoriesToInfoBank = onCall(
+  {
+    cors: true,
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [COHERE_API_KEY, PINECONE_API_KEY],
+  },
+  async (request) => {
+    try {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+      
+      const categoryTypes: Array<'admission' | 'scholarship' | 'placement'> = 
+        ['admission', 'scholarship', 'placement'];
+      
+      let totalSynced = 0;
+      let totalFailed = 0;
+      
+      for (const categoryType of categoryTypes) {
+        console.log(`🔄 Syncing all ${categoryType} documents...`);
+        
+        const snapshot = await db.collection(`${categoryType}s`)
+          .where('deleted', '==', false)
+          .get();
+        
+        for (const doc of snapshot.docs) {
+          try {
+            await syncCategoryToInfoBank(categoryType, doc.id, COHERE_API_KEY.value());
+            totalSynced++;
+          } catch (error) {
+            console.error(`❌ Failed to sync ${categoryType} ${doc.id}:`, error);
+            totalFailed++;
+          }
+        }
+      }
+      
+      return {
+        success: true,
+        message: `Synced ${totalSynced} category documents to Information Bank`,
+        synced: totalSynced,
+        failed: totalFailed
+      };
+      
+    } catch (error: any) {
+      console.error("❌ Batch sync error:", error);
+      throw new HttpsError("internal", error.message);
+    }
+  }
+);
 
   export const cleanupDeletedAnnouncement = onDocumentUpdated(
     {
@@ -1425,56 +2082,76 @@ async function createPlacementFromAnnouncement(
   // ✅ ENHANCED: processPost with IMAGE OCR SUPPORT
   // ============================================================================
 
- async function processPost(post: FacebookPost, cohereKey: string): Promise<void> {
+async function processPost(post: FacebookPost, cohereKey: string): Promise<void> {
   const postId = post.id;
   const originalMessage = post.message || "";
+  
+  console.log(`\n========================================`);
+  console.log(`🔍 Processing post: ${postId}`);
+  console.log(`========================================`);
   
   const postRef = db.collection("announcements").doc(postId);
   const doc = await postRef.get();
   
+  // Extract ALL images
   const allImageUrls = extractAllImagesFromPost(post);
-  console.log(`📸 Post ${postId} has ${allImageUrls.length} image(s)`);
+  console.log(`📸 Post has ${allImageUrls.length} image(s)`);
   
+  // Process OCR for ALL images
   let combinedOcrText = "";
   const ocrResults: string[] = [];
   
-  for (let i = 0; i < allImageUrls.length; i++) {
-    console.log(`🔍 Running OCR on image ${i + 1}/${allImageUrls.length}...`);
-    try {
-      const ocrText = await extractTextFromImage(allImageUrls[i]);
-      if (ocrText && ocrText.trim().length > 0) {
-        ocrResults.push(ocrText);
+  if (allImageUrls.length > 0) {
+    console.log(`🔍 Running OCR on ${allImageUrls.length} image(s)...`);
+    
+    for (let i = 0; i < allImageUrls.length; i++) {
+      console.log(`  🔍 Processing image ${i + 1}/${allImageUrls.length}...`);
+      try {
+        const ocrText = await extractTextFromImage(allImageUrls[i]);
+        if (ocrText && ocrText.trim().length > 0) {
+          ocrResults.push(ocrText);
+          console.log(`  ✅ Extracted ${ocrText.length} chars from image ${i + 1}`);
+        } else {
+          console.log(`  ⚠️ No text found in image ${i + 1}`);
+        }
+      } catch (err: any) {
+        console.error(`  ❌ OCR failed for image ${i + 1}:`, err.message);
       }
-    } catch (err: any) {
-      console.error(`⚠️ OCR failed for image ${i + 1}:`, err.message);
     }
+    
+    combinedOcrText = combineOcrResults(ocrResults);
+    console.log(`📝 Total OCR: ${combinedOcrText.length} chars from ${ocrResults.length}/${allImageUrls.length} images`);
   }
   
-  combinedOcrText = deduplicateOcrResults(ocrResults);
   const hasImageText = ocrResults.length > 0;
   
-  console.log(`📝 OCR: ${combinedOcrText.length} chars from ${ocrResults.length}/${allImageUrls.length} images`);
-  
+  // Combine message with OCR text
   let messageForAnalysis = originalMessage;
   if (hasImageText) {
     messageForAnalysis = originalMessage 
-      ? `${originalMessage}\n\n[Image Text]:\n${combinedOcrText}`
+      ? `${originalMessage}\n\n[Text from ${ocrResults.length} image(s)]:\n${combinedOcrText}`
       : combinedOcrText;
   }
   
   if (!messageForAnalysis || messageForAnalysis.trim().length === 0) {
-    console.log(`Skipping post ${postId} - no content`);
+    console.log(`⏭️ Skipping post ${postId} - no content`);
     return;
   }
   
+  // Upload ALL images to storage
   let uploadedImageUrls: string[] = [];
   if (allImageUrls.length > 0) {
     uploadedImageUrls = await downloadAndUploadAllImages(allImageUrls, postId);
+    console.log(`✅ Stored ${uploadedImageUrls.length} images in Firebase Storage`);
   }
   
+  // ============================================================================
+  // ✅ NEW DOCUMENT PATH
+  // ============================================================================
   if (!doc.exists) {
-    console.log(`Creating new post: ${postId} with ${uploadedImageUrls.length} images, ${ocrResults.length} with text`);
+    console.log(`✨ Creating new announcement...`);
     
+    // Analyze with Cohere
     const cohereResult = await analyzeAnnouncement(messageForAnalysis, cohereKey);
     const deadlineTimestamp = parseDeadlineToTimestamp(cohereResult.deadline);
     
@@ -1497,43 +2174,29 @@ async function createPlacementFromAnnouncement(
       ocr_text: combinedOcrText || "",
       has_image_text: hasImageText,
       ocr_processed_count: ocrResults.length,
+      ocr_success_count: ocrResults.length,
+      total_image_count: allImageUrls.length,
     };
     
     await postRef.set(newData);
+    console.log(`✅ Created announcement document`);
 
-    const category = cohereResult.category?.toLowerCase() || "general";
+    // Create category-specific documents AND Information Bank
+    await createCategoryAndInfoBank(
+      postId,
+      cohereResult.category,
+      messageForAnalysis,
+      deadlineTimestamp,
+      cohereKey,
+      combinedOcrText,
+      allImageUrls.length
+    );
     
-    if (category === "admission") {
-      await createAdmissionFromAnnouncement(
-        postId, 
-        messageForAnalysis, 
-        deadlineTimestamp, 
-        cohereKey,
-        combinedOcrText,
-        allImageUrls.length
-      );
-    } else if (category === "scholarship") {
-      await createScholarshipFromAnnouncement(
-        postId, 
-        messageForAnalysis, 
-        deadlineTimestamp, 
-        cohereKey,
-        combinedOcrText,
-        allImageUrls.length
-      );
-    } else if (category === "placement") {
-      await createPlacementFromAnnouncement(
-        postId, 
-        messageForAnalysis, 
-        deadlineTimestamp, 
-        cohereKey,
-        combinedOcrText,
-        allImageUrls.length
-      );
-    }
+    console.log(`✅ Post ${postId} processing complete\n`);
     
-    console.log(`✅ Post ${postId}: ${category}, ${uploadedImageUrls.length} images, ${ocrResults.length} OCR`);
-    
+  // ============================================================================
+  // ✅ EXISTING DOCUMENT PATH - NOW ALSO CREATES/UPDATES INFO BANK
+  // ============================================================================
   } else {
     const docData = doc.data();
     
@@ -1542,6 +2205,10 @@ async function createPlacementFromAnnouncement(
       return;
     }
     
+    console.log(`🔄 Updating existing announcement...`);
+    
+    
+    // Update announcement
     await postRef.update({
       message: originalMessage,
       images: uploadedImageUrls.length > 0 ? uploadedImageUrls : docData?.images || [],
@@ -1553,8 +2220,135 @@ async function createPlacementFromAnnouncement(
       ocr_text: combinedOcrText || docData?.ocr_text || "",
       has_image_text: hasImageText || docData?.has_image_text,
       ocr_processed_count: ocrResults.length || docData?.ocr_processed_count || 0,
+      total_image_count: allImageUrls.length,
     });
+    
+    console.log(`✅ Updated announcement document`);
+    
+    // ✅ NEW: Create/update category documents and Information Bank if needed
+    const category = docData?.category?.toLowerCase() || "";
+    
+    if (category && ['admission', 'scholarship', 'placement'].includes(category)) {
+      console.log(`\n🔄 Checking category document and Information Bank...`);
+      
+      // Check if category document exists
+      const categoryDoc = await db.collection(`${category}s`).doc(postId).get();
+      
+      // Check if Information Bank entry exists
+      const infoBankId = `${category}_${postId}`;
+      const infoBankDoc = await db.collection('information_bank').doc(infoBankId).get();
+      
+      const needsCategoryDoc = !categoryDoc.exists;
+      const needsInfoBank = !infoBankDoc.exists;
+      
+      console.log(`   📊 Category doc exists: ${categoryDoc.exists}`);
+      console.log(`   📊 Info Bank exists: ${infoBankDoc.exists}`);
+      
+      if (needsCategoryDoc || needsInfoBank) {
+        console.log(`   🔧 Creating missing documents...`);
+        
+        // Get deadline from announcement
+        const deadlineTimestamp = docData?.deadline || null;
+        
+        // Create missing category/Info Bank documents
+        await createCategoryAndInfoBank(
+          postId,
+          category.charAt(0).toUpperCase() + category.slice(1), // Capitalize
+          messageForAnalysis,
+          deadlineTimestamp,
+          cohereKey,
+          combinedOcrText,
+          allImageUrls.length
+        );
+        
+        console.log(`   ✅ Missing documents created`);
+      } else {
+        console.log(`   ℹ️ All documents already exist`);
+      }
+    }
+    
+    console.log(`✅ Update complete\n`);
   }
+}
+
+async function createCategoryAndInfoBank(
+  postId: string,
+  category: string,
+  messageForAnalysis: string,
+  deadlineTimestamp: admin.firestore.Timestamp | null,
+  cohereKey: string,
+  ocrText: string,
+  imageCount: number
+): Promise<void> {
+  const categoryLower = category.toLowerCase();
+  console.log(`📋 Creating ${category} document AND Information Bank...`);
+  
+  try {
+    if (categoryLower === "admission") {
+      await createAdmissionFromAnnouncement(
+        postId, 
+        messageForAnalysis, 
+        deadlineTimestamp, 
+        cohereKey,
+        ocrText,
+        imageCount
+      );
+      console.log(`✅ Admission + Information Bank created`);
+      
+    } else if (categoryLower === "scholarship") {
+      await createScholarshipFromAnnouncement(
+        postId, 
+        messageForAnalysis, 
+        deadlineTimestamp, 
+        cohereKey,
+        ocrText,
+        imageCount
+      );
+      console.log(`✅ Scholarship + Information Bank created`);
+      
+    } else if (categoryLower === "placement") {
+      await createPlacementFromAnnouncement(
+        postId, 
+        messageForAnalysis, 
+        deadlineTimestamp, 
+        cohereKey,
+        ocrText,
+        imageCount
+      );
+      console.log(`✅ Placement + Information Bank created`);
+      
+    } else {
+      console.log(`ℹ️ General category - no special processing`);
+    }
+    
+  } catch (categoryError: any) {
+    console.error(`❌ ERROR: Failed to create category/info bank: ${categoryError.message}`);
+    console.error(`   Stack: ${categoryError.stack}`);
+    
+    // ✅ Log to error collection
+    try {
+      await db.collection('category_creation_errors').add({
+        postId,
+        category: categoryLower,
+        errorMessage: categoryError.message,
+        errorStack: categoryError.stack,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (logError) {
+      console.error(`   ❌ Failed to log error:`, logError);
+    }
+    
+    // ✅ Re-throw to make error visible
+    throw categoryError;
+  }
+}
+function combineOcrResults(ocrResults: string[]): string {
+  if (ocrResults.length === 0) return "";
+  
+  console.log(`📝 Combining ${ocrResults.length} OCR result(s)`);
+  return ocrResults
+    .filter(text => text.trim().length > 0)
+    .join('\n\n---IMAGE SEPARATOR---\n\n');
 }
 
   async function softDeleteCategoryDocument(
@@ -1594,31 +2388,32 @@ async function createPlacementFromAnnouncement(
   // ============================================================================
 
   export const syncFacebookPosts = onSchedule(
-    {
-      schedule: "every 1 hours",
-      timeZone: "Asia/Manila",
-      timeoutSeconds: 540,
-      memory: "1GiB",
-      secrets: [COHERE_API_KEY, GOOGLE_VISION_API_KEY], // ✅ NEW: Add Vision API key
-    },
-    async (event) => {
-      try {
-        console.log("Starting Facebook posts sync...");
-        
-        const posts = await fetchFacebookPosts();
-        console.log(`Fetched ${posts.length} posts from Facebook`);
-        
-        for (const post of posts) {
-          await processPost(post, COHERE_API_KEY.value());
-        }
-        
-        console.log("Facebook sync completed successfully");
-      } catch (error) {
-        console.error("Error syncing Facebook posts:", error);
-        throw error;
+  {
+    schedule: "every 1 hours",
+    timeZone: "Asia/Manila",
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [COHERE_API_KEY, GOOGLE_VISION_API_KEY, PINECONE_API_KEY, PINECONE_HOST], // ✅ Added
+  },
+  async (event) => {
+    try {
+      console.log("Starting Facebook posts sync...");
+      
+      const posts = await fetchFacebookPosts();
+      console.log(`Fetched ${posts.length} posts from Facebook`);
+      
+      for (const post of posts) {
+        await processPost(post, COHERE_API_KEY.value());
       }
+      
+      console.log("Facebook sync completed successfully");
+    } catch (error) {
+      console.error("Error syncing Facebook posts:", error);
+      throw error;
     }
-  );
+  }
+);
+
 
   async function syncFacebookPostsLogic(): Promise<any> {
     try {
@@ -1674,90 +2469,90 @@ async function createPlacementFromAnnouncement(
     }
   }
 
-  export const manualSyncFacebookPosts = onCall(
-    {
-      cors: true,
-      timeoutSeconds: 540,
-      memory: "1GiB",
-      secrets: [COHERE_API_KEY, GOOGLE_VISION_API_KEY], // ✅ NEW
-    },
-    async (request) => {
-      console.log("========================================");
-      console.log("🔥 manualSyncFacebookPosts (callable) called");
-      console.log("========================================");
+ export const manualSyncFacebookPosts = onCall(
+  {
+    cors: true,
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [COHERE_API_KEY, GOOGLE_VISION_API_KEY, PINECONE_API_KEY, PINECONE_HOST], // ✅ Added
+  },
+  async (request) => {
+    console.log("========================================");
+    console.log("🔥 manualSyncFacebookPosts (callable) called");
+    console.log("========================================");
 
-      try {
-        if (!request.auth) {
-          throw new HttpsError("unauthenticated", "Authentication required");
-        }
-
-        const result = await syncFacebookPostsLogic();
-        return result;
-        
-      } catch (error: any) {
-        console.error("❌ Sync error:", error);
-        
-        if (error instanceof HttpsError) {
-          throw error;
-        }
-        
-        throw new HttpsError(
-          "internal",
-          error.message || "Sync failed"
-        );
+    try {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Authentication required");
       }
+
+      const result = await syncFacebookPostsLogic();
+      return result;
+      
+    } catch (error: any) {
+      console.error("❌ Sync error:", error);
+      
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      
+      throw new HttpsError(
+        "internal",
+        error.message || "Sync failed"
+      );
     }
-  );
+  }
+);
 
-  export const manualSyncFacebookPostsHttp = onRequest(
-    {
-      cors: true,
-      timeoutSeconds: 540,
-      memory: "1GiB",
-      secrets: [COHERE_API_KEY, GOOGLE_VISION_API_KEY], // ✅ NEW
-    },
-    async (req, res) => {
-      res.set("Access-Control-Allow-Origin", "*");
-      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+ export const manualSyncFacebookPostsHttp = onRequest(
+  {
+    cors: true,
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [COHERE_API_KEY, GOOGLE_VISION_API_KEY, PINECONE_API_KEY, PINECONE_HOST], // ✅ Added
+  },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-      if (req.method === "OPTIONS") {
-        res.status(204).send("");
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    try {
+      console.log("========================================");
+      console.log("🔥 manualSyncFacebookPosts (HTTP) called");
+      console.log("========================================");
+      
+      const authHeader = req.headers.authorization as string | undefined;
+      const userId = await verifyAuthToken(authHeader);
+      
+      if (!userId) {
+        res.status(401).json({ 
+          error: "unauthenticated",
+          message: "Please log in first"
+        });
         return;
       }
-
-      try {
-        console.log("========================================");
-        console.log("🔥 manualSyncFacebookPosts (HTTP) called");
-        console.log("========================================");
-        
-        const authHeader = req.headers.authorization as string | undefined;
-        const userId = await verifyAuthToken(authHeader);
-        
-        if (!userId) {
-          res.status(401).json({ 
-            error: "unauthenticated",
-            message: "Please log in first"
-          });
-          return;
-        }
-        
-        console.log(`✅ Authenticated as: ${userId}`);
-        
-        const result = await syncFacebookPostsLogic();
-        
-        res.json({ result });
-        
-      } catch (error: any) {
-        console.error("❌ Sync HTTP error:", error);
-        res.status(500).json({ 
-          error: "internal",
-          message: error.message || "Sync failed",
-          details: error.toString()
-        });
-      }
+      
+      console.log(`✅ Authenticated as: ${userId}`);
+      
+      const result = await syncFacebookPostsLogic();
+      
+      res.json({ result });
+      
+    } catch (error: any) {
+      console.error("❌ Sync HTTP error:", error);
+      res.status(500).json({ 
+        error: "internal",
+        message: error.message || "Sync failed",
+        details: error.toString()
+      });
     }
-  );
+  }
+);
 
   export const reprocessExistingAnnouncements = onCall(
     {
@@ -1818,7 +2613,576 @@ async function createPlacementFromAnnouncement(
       }
     }
 );
+
+async function syncCategoryToInfoBank(
+  categoryType: 'admission' | 'scholarship' | 'placement',
+  documentId: string,
+  cohereKey: string,
+  config: CategoryToInfoBankConfig = {
+    includeInSearch: true,
+    autoSync: true,
+    generateSummary: true
+  }
+): Promise<void> {
+  try {
+    console.log(`🔄 Syncing ${categoryType} document ${documentId} to Information Bank...`);
+    
+    // Fetch the category document
+    const categoryDoc = await db.collection(`${categoryType}s`).doc(documentId).get();
+    
+    if (!categoryDoc.exists) {
+      console.warn(`⚠️ ${categoryType} document ${documentId} not found`);
+      return;
+    }
+    
+    const categoryData = categoryDoc.data()!;
+    
+    // Skip if deleted
+    if (categoryData.deleted === true) {
+      console.log(`⏭️ Skipping deleted ${categoryType} document ${documentId}`);
+      return;
+    }
+    
+    // Convert category data to searchable text content
+    const textContent = formatCategoryAsText(categoryType, categoryData);
+    
+    // Generate title for Information Bank
+    const title = generateInfoBankTitle(categoryType, categoryData);
+    
+    // Split into chunks (for long content)
+    const chunks = splitIntoChunks(textContent, title, `${categoryType}_category`);
+    console.log(`📄 Split ${categoryType} into ${chunks.length} chunks`);
+    
+    // Generate embeddings and store in Pinecone
+    const chunkIds: string[] = [];
+    let parentPineconeId: string | null = null;
+    
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      
+      // Generate embedding using Cohere
+            const embeddingResponse = await axios.post<{ embeddings: { float: number[][] } }>(
+              "https://api.cohere.ai/v1/embed",
+              {
+                model: "embed-english-v3.0",
+                texts: [chunk.text],
+                input_type: "search_document",
+                embedding_types: ["float"],
+              },
+              {
+                headers: {
+                  "Authorization": `Bearer ${cohereKey}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+            
+            const embedding = embeddingResponse.data?.embeddings?.float?.[0];
+            if (!embedding || !Array.isArray(embedding)) {
+              throw new Error("Invalid embedding response from Cohere API");
+            }
+            
+            const chunkTitle = chunks.length > 1 
+              ? `${title} (Part ${i + 1}/${chunks.length})`
+              : title;
+      
+      // 🔥 CRITICAL: Flat metadata structure for Pinecone (matching Flutter code)
+      const metadata = {
+        // === DOCUMENT IDENTIFICATION ===
+        'docId': documentId,
+        'originalDocId': documentId,
+        'documentId': documentId,
+        'categoryDocId': documentId, // Link back to category document
+        
+        // === CONTENT ===
+        'text': chunk.text,
+        'content': chunk.text,
+        
+        // === TITLES ===
+        'title': chunkTitle,
+        'originalTitle': title,
+        'fileName': title,
+        
+        // === CHUNKING INFO ===
+        'chunkIndex': i,
+        'chunk_index': i,
+        'totalChunks': chunks.length,
+        'chunkCount': chunks.length,
+        'isFirstChunk': i === 0,
+        'isLastChunk': i === chunks.length - 1,
+        
+        // === SOURCE & CATEGORY ===
+        'source': `${categoryType}_category`,
+        'category': categoryType,
+        'categoryID': categoryType,
+        'categoryType': categoryType, // admission, scholarship, or placement
+        
+        // === ADDITIONAL METADATA ===
+        'chunkSize': chunk.text.length,
+        'createdAt': new Date().toISOString(),
+        'syncedFromCategory': true,
+        
+        // === CATEGORY-SPECIFIC DATA ===
+        ...(categoryType === 'admission' && {
+          'academicYear': categoryData.academicYear || null,
+          'hasSchedules': (categoryData.schedules?.length || 0) > 0,
+          'scheduleCount': categoryData.schedules?.length || 0,
+        }),
+        ...(categoryType === 'scholarship' && {
+          'scholarshipProvider': categoryData.scholarshipProvider || '',
+          'hasDeadline': !!categoryData.deadline,
+        }),
+        ...(categoryType === 'placement' && {
+          'partnerCompany': categoryData.partnerCompany || '',
+          'isRecruiting': categoryData.isRecruiting || false,
+        }),
+      };
+      
+      // Store in Pinecone
+      await storePineconeVector(
+        chunk.id,
+        embedding,
+        metadata
+      );
+      
+      chunkIds.push(chunk.id);
+      
+      if (i === 0) {
+        parentPineconeId = chunk.id;
+      }
+      
+      console.log(`  ✓ Chunk ${i + 1}/${chunks.length} embedded and stored`);
+    }
+    
+    // Save to Information Bank collection
+    const infoBankId = `${categoryType}_${documentId}`;
+    await db.collection('information_bank').doc(infoBankId).set({
+      'ibID': infoBankId,
+      'id': infoBankId,
+      'ib_title': title,
+      'title': title,
+      'content': textContent,
+      'source': `${categoryType}_category`,
+      'category': categoryType,
+      'categoryID': categoryType,
+      'categoryType': categoryType,
+      'categoryDocumentId': documentId, // Link to original category document
+      'pinecone_id': parentPineconeId,
+      'totalChunks': chunks.length,
+      'chunkIds': chunkIds,
+      'chunked': chunks.length > 1,
+      'chunkSize': 1000, // maxChunkSize
+      'chunkOverlap': 200, // chunkOverlap
+      'syncedFromCategory': true,
+      'createdAt': admin.firestore.FieldValue.serverTimestamp(),
+      'updatedAt': admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    console.log(`✅ ${categoryType} document synced to Information Bank with ${chunks.length} Pinecone vectors`);
+    
+  } catch (error) {
+    console.error(`❌ Error syncing ${categoryType} to Information Bank:`, error);
+    throw error;
+  }
+}
+
+function formatCategoryAsText(
+  categoryType: 'admission' | 'scholarship' | 'placement',
+  data: any
+): string {
+  console.log(`   🔄 Formatting ${categoryType} data as text...`);
   
+  const buffer: string[] = [];
+
+  try {
+    if (categoryType === 'admission') {
+      buffer.push('ADMISSION INFORMATION\n');
+      buffer.push(`Title: ${data.title || 'Untitled'}\n`);
+      buffer.push(`Content: ${data.content || 'No content'}\n`);
+      
+      if (data.academicYear) {
+        buffer.push(`Academic Year: ${data.academicYear.start || ''}`);
+        if (data.academicYear.end) {
+          buffer.push(`-${data.academicYear.end}`);
+        }
+        buffer.push('\n');
+      }
+      
+      if (data.steps && Array.isArray(data.steps) && data.steps.length > 0) {
+        buffer.push('Steps:\n');
+        data.steps.forEach((step: string, i: number) => {
+          buffer.push(`${i + 1}. ${step}\n`);
+        });
+      }
+      
+      if (data.requirements && Array.isArray(data.requirements) && data.requirements.length > 0) {
+        buffer.push('Requirements:\n');
+        data.requirements.forEach((req: string) => {
+          buffer.push(`- ${req}\n`);
+        });
+      }
+      
+      if (data.schedules && Array.isArray(data.schedules) && data.schedules.length > 0) {
+        buffer.push('Schedules:\n');
+        data.schedules.forEach((schedule: any) => {
+          buffer.push(`- ${schedule.date || ''} (${schedule.dayOfWeek || ''})`);
+          if (schedule.year) buffer.push(` ${schedule.year}`);
+          if (schedule.locations && Array.isArray(schedule.locations)) {
+            buffer.push(`: ${schedule.locations.join(', ')}`);
+          }
+          if (schedule.time) {
+            buffer.push(` at ${schedule.time}`);
+          }
+          buffer.push('\n');
+        });
+      }
+      
+      if (data.contacts && Array.isArray(data.contacts) && data.contacts.length > 0) {
+        buffer.push('Contact Information:\n');
+        data.contacts.forEach((contact: string) => {
+          buffer.push(`- ${contact}\n`);
+        });
+      }
+      
+    } else if (categoryType === 'scholarship') {
+      buffer.push('SCHOLARSHIP INFORMATION\n');
+      buffer.push(`Name: ${data.name || 'Untitled'}\n`);
+      buffer.push(`Description: ${data.description || 'No description'}\n`);
+      buffer.push(`Provider: ${data.scholarshipProvider || 'Unknown'}\n`);
+      
+      if (data.eligibilityRequirements && Array.isArray(data.eligibilityRequirements) && data.eligibilityRequirements.length > 0) {
+        buffer.push('Eligibility Requirements:\n');
+        data.eligibilityRequirements.forEach((req: string) => {
+          buffer.push(`- ${req}\n`);
+        });
+      }
+      
+      if (data.privileges && Array.isArray(data.privileges) && data.privileges.length > 0) {
+        buffer.push('Privileges/Benefits:\n');
+        data.privileges.forEach((priv: string) => {
+          buffer.push(`- ${priv}\n`);
+        });
+      }
+      
+      if (data.applicationLink) {
+        buffer.push(`Application Link: ${data.applicationLink}\n`);
+      }
+      
+    } else if (categoryType === 'placement') {
+      buffer.push('JOB PLACEMENT INFORMATION\n');
+      buffer.push(`Company: ${data.partnerCompany || 'Unknown'}\n`);
+      buffer.push(`Status: ${data.isRecruiting ? 'Currently Recruiting' : 'Not Currently Recruiting'}\n`);
+      
+      if (data.positions && Array.isArray(data.positions) && data.positions.length > 0) {
+        buffer.push('Available Positions:\n');
+        data.positions.forEach((position: string) => {
+          buffer.push(`- ${position}\n`);
+        });
+      }
+      
+      if (data.contacts && Array.isArray(data.contacts) && data.contacts.length > 0) {
+        buffer.push('Contact Information:\n');
+        data.contacts.forEach((contact: string) => {
+          buffer.push(`- ${contact}\n`);
+        });
+      }
+    }
+    
+    const result = buffer.join('').trim();
+    console.log(`   ✅ Formatted text: ${result.length} chars`);
+    return result;
+    
+  } catch (error: any) {
+    console.error(`   ❌ Error formatting text: ${error.message}`);
+    return `${categoryType.toUpperCase()} INFORMATION\nError formatting content: ${error.message}`;
+  }
+}
+
+
+
+
+function generateInfoBankTitle(
+  categoryType: 'admission' | 'scholarship' | 'placement',
+  data: any
+): string {
+  if (categoryType === 'admission') {
+    return data.title || 'Admission Information';
+  } else if (categoryType === 'scholarship') {
+    return data.name || 'Scholarship Information';
+  } else if (categoryType === 'placement') {
+    return `${data.partnerCompany || 'Company'} - Job Placement`;
+  }
+  return 'Category Information';
+}
+
+
+export const testCreateInfoBank = onCall(
+  {
+    cors: true,
+    timeoutSeconds: 300,
+    secrets: [COHERE_API_KEY, PINECONE_API_KEY],
+  },
+  async (request) => {
+    try {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+
+      const { announcementId } = request.data;
+
+      if (!announcementId) {
+        throw new HttpsError("invalid-argument", "announcementId is required");
+      }
+
+      console.log(`\n🧪 ========================================`);
+      console.log(`🧪 TEST: Creating Information Bank for ${announcementId}`);
+      console.log(`🧪 ========================================\n`);
+
+      // Get announcement
+      console.log(`📋 Step 1: Fetching announcement...`);
+      const announcementDoc = await db.collection('announcements').doc(announcementId).get();
+
+      if (!announcementDoc.exists) {
+        throw new HttpsError("not-found", `Announcement ${announcementId} not found`);
+      }
+
+      const announcementData = announcementDoc.data()!;
+      console.log(`   ✅ Announcement found`);
+      console.log(`   📊 Category: ${announcementData.category}`);
+      console.log(`   📊 Message length: ${(announcementData.message || '').length} chars`);
+      console.log(`   📊 Has OCR: ${announcementData.has_image_text || false}`);
+
+      const category = announcementData.category?.toLowerCase();
+
+      if (!category || !['admission', 'scholarship', 'placement'].includes(category)) {
+        throw new HttpsError(
+          "invalid-argument", 
+          `Invalid category: ${category}. Must be admission, scholarship, or placement`
+        );
+      }
+
+      // Get category document
+      console.log(`\n📋 Step 2: Fetching ${category} document...`);
+      const categoryDoc = await db.collection(`${category}s`).doc(announcementId).get();
+
+      if (!categoryDoc.exists) {
+        throw new HttpsError("not-found", `${category} document ${announcementId} not found`);
+      }
+
+      const categoryData = categoryDoc.data()!;
+      console.log(`   ✅ Category document found`);
+      console.log(`   📊 Fields: ${Object.keys(categoryData).join(', ')}`);
+
+      // Prepare extracted data
+      console.log(`\n📋 Step 3: Preparing extracted data...`);
+      let extractedData: any = {};
+
+      if (category === 'admission') {
+        extractedData = {
+          title: categoryData.title || 'Admission Information',
+          content: categoryData.content || '',
+          steps: categoryData.steps || [],
+          requirements: categoryData.requirements || [],
+          contacts: categoryData.contact || [],
+          academicYear: categoryData.academicYear || null,
+          schedules: categoryData.schedules || [],
+        };
+        console.log(`   ✅ Admission data prepared`);
+        console.log(`      - Steps: ${extractedData.steps.length}`);
+        console.log(`      - Requirements: ${extractedData.requirements.length}`);
+        console.log(`      - Schedules: ${extractedData.schedules.length}`);
+      } else if (category === 'scholarship') {
+        extractedData = {
+          name: categoryData.name || 'Scholarship Information',
+          description: categoryData.description || '',
+          scholarshipProvider: categoryData.scholarshipProvider || '',
+          eligibilityRequirements: categoryData.eligibilityRequirements || [],
+          privileges: categoryData.privileges || [],
+          applicationLink: categoryData.applicationLink || '',
+        };
+        console.log(`   ✅ Scholarship data prepared`);
+        console.log(`      - Eligibility: ${extractedData.eligibilityRequirements.length}`);
+        console.log(`      - Privileges: ${extractedData.privileges.length}`);
+      } else if (category === 'placement') {
+        extractedData = {
+          partnerCompany: categoryData.partnerCompany || 'Company',
+          positions: categoryData.positions || [],
+          contacts: categoryData.contacts || [],
+          isRecruiting: categoryData.isRecruiting !== false,
+        };
+        console.log(`   ✅ Placement data prepared`);
+        console.log(`      - Company: ${extractedData.partnerCompany}`);
+        console.log(`      - Positions: ${extractedData.positions.length}`);
+      }
+
+      // Check if Information Bank entry already exists
+      const infoBankId = `${category}_${announcementId}`;
+      const existingInfoBank = await db.collection('information_bank').doc(infoBankId).get();
+
+      if (existingInfoBank.exists) {
+        console.log(`\n⚠️ Information Bank entry already exists: ${infoBankId}`);
+        console.log(`   Deleting existing entry first...`);
+        await db.collection('information_bank').doc(infoBankId).delete();
+        console.log(`   ✅ Existing entry deleted`);
+      }
+
+      // Create Information Bank entry
+      console.log(`\n📋 Step 4: Creating Information Bank entry...`);
+      await createInfoBankFromCategory(
+        announcementId,
+        category as 'admission' | 'scholarship' | 'placement',
+        extractedData,
+        COHERE_API_KEY.value()
+      );
+
+      // Verify creation
+      console.log(`\n📋 Step 5: Verifying creation...`);
+      const verifyInfoBank = await db.collection('information_bank').doc(infoBankId).get();
+
+      if (!verifyInfoBank.exists) {
+        throw new Error('Information Bank entry was not created');
+      }
+
+      const infoBankData = verifyInfoBank.data()!;
+      console.log(`   ✅ Information Bank entry verified`);
+      console.log(`   📊 Total chunks: ${infoBankData.totalChunks}`);
+      console.log(`   📊 Pinecone ID: ${infoBankData.pinecone_id}`);
+      console.log(`   📊 Content length: ${(infoBankData.content || '').length} chars`);
+
+      const result = {
+        success: true,
+        message: `Information Bank entry created successfully`,
+        announcementId,
+        category,
+        infoBankId,
+        data: {
+          totalChunks: infoBankData.totalChunks,
+          pineconeId: infoBankData.pinecone_id,
+          contentLength: (infoBankData.content || '').length,
+          title: infoBankData.title,
+        },
+      };
+
+      console.log(`\n🧪 ========================================`);
+      console.log(`🧪 TEST SUCCESSFUL`);
+      console.log(`🧪 ========================================\n`);
+
+      return result;
+
+    } catch (error: any) {
+      console.error(`\n❌ ========================================`);
+      console.error(`❌ TEST FAILED`);
+      console.error(`❌ Error: ${error.message}`);
+      console.error(`❌ ========================================\n`);
+      
+      throw new HttpsError(
+        "internal",
+        `Test failed: ${error.message}`,
+        { originalError: error.toString() }
+      );
+    }
+  }
+);
+
+// ============================================================================
+// ✅ LIST ALL INFORMATION BANK ENTRIES
+// ============================================================================
+
+export const listInfoBankEntries = onCall(
+  { cors: true, secrets: [] },
+  async (request) => {
+    try {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+
+      console.log('📋 Listing all Information Bank entries...');
+
+      const snapshot = await db.collection('information_bank').get();
+
+      const entries = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || data.ib_title,
+          category: data.category,
+          source: data.source,
+          totalChunks: data.totalChunks,
+          pineconeId: data.pinecone_id,
+          contentLength: (data.content || '').length,
+          createdAt: data.createdAt?.toDate?.()?.toISOString?.() || 'Unknown',
+          syncedFromCategory: data.syncedFromCategory || false,
+        };
+      });
+
+      console.log(`✅ Found ${entries.length} Information Bank entries`);
+
+      return {
+        success: true,
+        count: entries.length,
+        entries: entries.sort((a, b) => 
+          (b.createdAt || '').localeCompare(a.createdAt || '')
+        ),
+      };
+
+    } catch (error: any) {
+      console.error('❌ Error listing entries:', error);
+      throw new HttpsError("internal", error.message);
+    }
+  }
+);
+
+// ============================================================================
+// ✅ DELETE SPECIFIC INFORMATION BANK ENTRY
+// ============================================================================
+
+export const deleteInfoBankEntry = onCall(
+  { cors: true, secrets: [] },
+  async (request) => {
+    try {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+
+      const { infoBankId } = request.data;
+
+      if (!infoBankId) {
+        throw new HttpsError("invalid-argument", "infoBankId is required");
+      }
+
+      console.log(`🗑️ Deleting Information Bank entry: ${infoBankId}`);
+
+      const doc = await db.collection('information_bank').doc(infoBankId).get();
+
+      if (!doc.exists) {
+        throw new HttpsError("not-found", `Entry ${infoBankId} not found`);
+      }
+
+      const data = doc.data()!;
+      const chunkIds = data.chunkIds || [];
+
+      console.log(`   📄 Entry has ${chunkIds.length} Pinecone chunks`);
+
+      // TODO: Delete Pinecone vectors (requires Pinecone service)
+      // await pineconeService.deleteVectors(chunkIds);
+
+      await doc.ref.delete();
+
+      console.log(`✅ Deleted Information Bank entry: ${infoBankId}`);
+
+      return {
+        success: true,
+        message: `Deleted entry ${infoBankId}`,
+        deletedChunks: chunkIds.length,
+      };
+
+    } catch (error: any) {
+      console.error('❌ Error deleting entry:', error);
+      throw new HttpsError("internal", error.message);
+    }
+  }
+);
+
 
 
   

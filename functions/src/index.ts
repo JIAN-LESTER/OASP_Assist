@@ -27,6 +27,13 @@ export {
   manualSyncFacebookPostsHttp,
   reprocessExistingAnnouncements,
   cleanupDeletedAnnouncement,
+  // ✅ Information Bank diagnostic and sync functions
+  debugInfoBank,
+  batchSyncCategoriesToInfoBank,
+  // ✅ Test and debugging functions
+  testCreateInfoBank,
+  listInfoBankEntries,
+  deleteInfoBankEntry,
 } from "./announcement";
 
 // Facebook Token Management Functions
@@ -45,8 +52,6 @@ export {
   cleanupOldNotifications,
   onEscalationCreated,
   onEscalationReplied,
-  
-  
 } from "./notification";
 
 // Health Check & Test Functions

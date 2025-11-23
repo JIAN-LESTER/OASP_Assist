@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:capstone_project/icon_and_color.dart';
+import 'package:capstone_project/pages/admin_pages/testAnnouncement.dart';
 import 'package:capstone_project/services/fb_sync.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -59,18 +60,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
         SnackBar(content: Text('Error loading announcements: $e')),
       );
     }
-  }
-
-  Future<String?> _getAuthToken() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        return await user.getIdToken();
-      }
-    } catch (e) {
-      print('Error getting auth token: $e');
-    }
-    return null;
   }
 
   // Manual refresh button (keep as is for manual sync)
@@ -764,6 +753,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                   foregroundColor: Colors.white,
                 ),
               ),
+              InfoBankTestWidget(),
             ],
           ),
     );
@@ -911,6 +901,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                   right: 32,
                   child: _buildRefreshButton(isDesktop: true),
                 ),
+                
               ],
             ),
           ),
@@ -1127,111 +1118,210 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   }
 
   // MAIN CONTENT
-  Widget _buildMainContent({required bool isDesktop}) {
-    if (isLoading) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
-              strokeWidth: 3,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Loading announcements...',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final displayedAnnouncements = filteredAnnouncements;
-
-    if (displayedAnnouncements.isEmpty) {
-      return Center(
-        child: Container(
-          padding: const EdgeInsets.all(48),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
+Widget _buildMainContent({required bool isDesktop}) {
+  return StreamBuilder<QuerySnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('announcements')
+        .where('deleted', isEqualTo: false)
+        .orderBy('created_time', descending: true)
+        .snapshots(),
+    builder: (context, snapshot) {
+      // Loading state
+      if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+        return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.announcement_outlined,
-                  size: 64,
-                  color: Colors.green[400],
-                ),
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
+                strokeWidth: 3,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               Text(
-                'No announcements found',
+                'Loading announcements...',
                 style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Try adjusting your search or check back later for updates',
-                style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-                textAlign: TextAlign.center,
               ),
             ],
           ),
+        );
+      }
+
+      // Error state
+      if (snapshot.hasError) {
+        return Center(
+          child: Container(
+            padding: const EdgeInsets.all(48),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.red[400],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Error loading announcements',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  snapshot.error.toString(),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // Filter announcements based on search and category
+      final allAnnouncements = snapshot.data?.docs ?? [];
+      final displayedAnnouncements = _filterAnnouncementsFromDocs(allAnnouncements);
+
+      // Empty state
+      if (displayedAnnouncements.isEmpty) {
+        return Center(
+          child: Container(
+            padding: const EdgeInsets.all(48),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.announcement_outlined,
+                    size: 64,
+                    color: Colors.green[400],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'No announcements found',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Try adjusting your search or check back later for updates',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // List view
+      return RefreshIndicator(
+        onRefresh: _refreshFromFacebook,
+        color: Colors.green[600],
+        child: ListView.builder(
+          padding:
+              isDesktop
+                  ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
+                  : EdgeInsets.zero,
+          itemCount: displayedAnnouncements.length,
+          itemBuilder: (context, index) {
+            return Center(
+              child: Container(
+                constraints:
+                    isDesktop ? const BoxConstraints(maxWidth: 1100) : null,
+                padding: EdgeInsets.only(bottom: isDesktop ? 24 : 16),
+                child: AnnouncementCard(
+                  announcement: displayedAnnouncements[index],
+                  index: index,
+                  isDesktop: isDesktop,
+                  onEdit: _editAnnouncement,
+                  onDelete: _deleteAnnouncement,
+                ),
+              ),
+            );
+          },
         ),
       );
+    },
+  );
+}
+
+List<DocumentSnapshot> _filterAnnouncementsFromDocs(List<DocumentSnapshot> docs) {
+  var filtered = docs.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final message = data['message'] ?? '';
+    final category = data['category'] ?? '';
+
+    String normalizedSelectedCategory =
+        selectedCategory.trim().toLowerCase();
+    String normalizedDocCategory = category.trim().toLowerCase();
+
+    bool categoryMatches =
+        normalizedSelectedCategory == 'all categories'.toLowerCase() ||
+        normalizedDocCategory == normalizedSelectedCategory ||
+        normalizedDocCategory ==
+            _sentenceCase(normalizedSelectedCategory);
+
+    if (!categoryMatches) {
+      return false;
     }
 
-    return RefreshIndicator(
-      onRefresh: _refreshFromFacebook,
-      color: Colors.green[600],
-      child: ListView.builder(
-        padding:
-            isDesktop
-                ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
-                : EdgeInsets.zero,
-        itemCount: displayedAnnouncements.length,
-        itemBuilder: (context, index) {
-          return Center(
-            child: Container(
-              constraints:
-                  isDesktop ? const BoxConstraints(maxWidth: 1100) : null,
-              padding: EdgeInsets.only(bottom: isDesktop ? 24 : 16),
-              child: AnnouncementCard(
-                announcement: displayedAnnouncements[index],
-                index: index,
-                isDesktop: isDesktop,
-                onEdit: _editAnnouncement,
-                onDelete: _deleteAnnouncement,
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
+    if (_searchController.text.isNotEmpty) {
+      final query = _searchController.text.toLowerCase();
+      final querySentence = _sentenceCase(query);
+      return message.toLowerCase().contains(query) ||
+          message.contains(querySentence);
+    }
+
+    return true;
+  }).toList();
+
+  return filtered;
+}
 
   // SIDEBAR
   Widget _buildSidebar() {
@@ -2194,26 +2284,7 @@ Widget build(BuildContext context) {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ✅ Image count label (if multiple)
-        if (images.length > 1) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Icon(Icons.collections, size: 16, color: Colors.grey[600]),
-                SizedBox(width: 6),
-                Text(
-                  '${images.length} Images',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+
         
         // Main image display
         ClipRRect(
@@ -2561,71 +2632,8 @@ Widget _buildThumbnail(String imageUrl, int index, List<String> allImages) {
                     ),
                   ),
                   
-                  // ✅ ENHANCED: Image count badge with OCR indicator
-                  if (imageCount > 1) ...[
-                    SizedBox(width: 8),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.blue[50],
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.blue[200]!),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.photo_library, size: 12, color: Colors.blue[700]),
-                          SizedBox(width: 4),
-                          Text(
-                            '$imageCount',
-                            style: TextStyle(
-                              color: Colors.blue[700],
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  
-                  // ✅ ENHANCED: OCR indicator showing how many images had text
-                  if (hasOCR) ...[
-                    SizedBox(width: 8),
-                    Tooltip(
-                      message: 'Text extracted from $ocrProcessedCount of $imageCount image(s)',
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.purple[50],
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.purple[200]!),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.text_fields,
-                              size: 12,
-                              color: Colors.purple[700],
-                            ),
-                            if (ocrProcessedCount > 0) ...[
-                              SizedBox(width: 4),
-                              Text(
-                                '$ocrProcessedCount',
-                                style: TextStyle(
-                                  color: Colors.purple[700],
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                  
+                
+        
                   Spacer(),
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),

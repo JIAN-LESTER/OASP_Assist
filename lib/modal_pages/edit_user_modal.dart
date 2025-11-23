@@ -5,7 +5,7 @@ import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 import 'package:capstone_project/modal_pages/programs.modal.dart';
-import 'package:capstone_project/pages/admin_pages/affiliation.dart';
+
 import 'package:capstone_project/pages/admin_pages/scholarship_management.dart';
 import 'package:capstone_project/modal_pages/user_info.dart';
 import 'package:capstone_project/services/admin_functions.dart';
