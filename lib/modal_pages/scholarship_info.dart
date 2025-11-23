@@ -7,27 +7,6 @@ import 'package:capstone_project/modal_pages/scholarship_edit.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
 
-// Custom delete handler that uses SnackbarUtil
-Future<void> handleScholarshipDelete(
-  BuildContext context,
-  DocumentSnapshot doc,
-) async {
-  try {
-    await FirebaseFirestore.instance
-        .collection('scholarships')
-        .doc(doc.id)
-        .delete();
-
-    if (context.mounted) {
-      SnackbarUtil.showSuccess(context, 'Scholarship deleted successfully');
-    }
-  } catch (e) {
-    if (context.mounted) {
-      SnackbarUtil.showError(context, 'Failed to delete scholarship: $e');
-    }
-  }
-}
-
 void showSCInfoModal(
   BuildContext context,
   DocumentSnapshot doc, {

@@ -2,6 +2,7 @@ import 'package:capstone_project/modal_pages/add_edit_admission.dart';
 import 'package:capstone_project/modal_pages/add_edit_scholarship.dart';
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:capstone_project/pages/data/statcard_management.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:capstone_project/modal_pages/admission_info.dart';
 import 'package:capstone_project/modal_pages/admission_edit.dart';
@@ -59,22 +60,37 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
         isLoading = false;
       });
     } catch (e) {
-      print("Error loading information bank data: $e");
+      print("Error loading admission data: $e");
       if (!mounted) return;
       setState(() {
         isLoading = false;
       });
+      SnackbarUtil.showError(context, "Failed to load admission data");
     }
   }
 
   void _loadAdmissions() {
-    FirebaseFirestore.instance.collection('admissions').snapshots().listen((
-      snapshot,
-    ) {
-      setState(() {
-        allAdmissions = snapshot.docs;
-      });
-    });
+    FirebaseFirestore.instance
+        .collection('admissions')
+        .snapshots()
+        .listen(
+          (snapshot) {
+            if (mounted) {
+              setState(() {
+                allAdmissions = snapshot.docs;
+              });
+            }
+          },
+          onError: (error) {
+            print("Error loading admissions: $error");
+            if (mounted) {
+              SnackbarUtil.showError(
+                context,
+                "Failed to load admissions: $error",
+              );
+            }
+          },
+        );
   }
 
   @override
@@ -1024,7 +1040,7 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                       widget.doc,
                       DeleteConfigs.admissions,
                       'admissions',
-                      customDeleteHandler: handleAdmissionDelete
+                      customDeleteHandler: handleAdmissionDelete,
                     );
                   }
                 },
@@ -1044,9 +1060,9 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete, size: 18),
+                            Icon(Icons.delete, size: 18, color: Colors.red),
                             SizedBox(width: 8),
-                            Text('Delete'),
+                            Text('Delete', style: TextStyle(color: Colors.red)),
                           ],
                         ),
                       ),
@@ -1141,7 +1157,7 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                     widget.doc,
                     DeleteConfigs.admissions,
                     'admissions',
-                    customDeleteHandler: handleAdmissionDelete
+                    customDeleteHandler: handleAdmissionDelete,
                   );
                 }
               },
@@ -1161,9 +1177,9 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete, size: 18),
+                          Icon(Icons.delete, size: 18, color: Colors.red),
                           SizedBox(width: 8),
-                          Text('Delete'),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
                         ],
                       ),
                     ),
