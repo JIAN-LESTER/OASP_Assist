@@ -216,104 +216,136 @@ function similarity(a: string, b: string): number {
   }
 
   function extractSchedulesFromOCR(ocrText: string): ScheduleEntry[] {
-    const schedules: ScheduleEntry[] = [];
-    const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean);
+  const schedules: ScheduleEntry[] = [];
+  const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean);
+  
+  // Pattern for dates like "OCT 26", "NOV 8", etc.
+  const datePattern = /^(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*(\d{1,2})$/i;
+  const dayPattern = /^(SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY)$/i;
+  const yearPattern = /^(20\d{2})$/;
+  const timePattern = /(\d{1,2}(?::\d{2})?\s*(?:am|pm))/gi;
+  
+  // ✅ NEW: Filter out header/common text that appears on all images
+  const headerKeywords = [
+    'central mindanao university',
+    'academic paradise',
+    'cmucat schedule',
+    'the academic paradise of the south'
+  ];
+  
+  let currentYear = "";
+  let currentDate = "";
+  let currentDay = "";
+  let currentLocations: string[] = [];
+  let currentTime = "";
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineLower = line.toLowerCase();
     
-    // Pattern for dates like "OCT 26", "NOV 8", etc.
-    const datePattern = /^(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*(\d{1,2})$/i;
-    const dayPattern = /^(SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY)$/i;
-    const yearPattern = /^(20\d{2})$/;
-    const timePattern = /(\d{1,2}(?::\d{2})?\s*(?:am|pm))/gi;
-    
-    let currentYear = "";
-    let currentDate = "";
-    let currentDay = "";
-    let currentLocations: string[] = [];
-    let currentTime = "";
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      
-      // Check for year
-      const yearMatch = line.match(yearPattern);
-      if (yearMatch) {
-        // Save previous entry if exists
-        if (currentDate && currentLocations.length > 0) {
-          schedules.push({
-            date: currentDate,
-            dayOfWeek: currentDay,
-            year: currentYear || new Date().getFullYear().toString(),
-            locations: [...currentLocations],
-            time: currentTime,
-          });
-          currentLocations = [];
-          currentTime = "";
-        }
-        currentYear = yearMatch[1];
-        continue;
-      }
-      
-      // Check for date (e.g., "OCT 26")
-      const dateMatch = line.match(datePattern);
-      if (dateMatch) {
-        // Save previous entry
-        if (currentDate && currentLocations.length > 0) {
-          schedules.push({
-            date: currentDate,
-            dayOfWeek: currentDay,
-            year: currentYear || new Date().getFullYear().toString(),
-            locations: [...currentLocations],
-            time: currentTime,
-          });
-          currentLocations = [];
-          currentTime = "";
-        }
-        currentDate = `${dateMatch[1].toUpperCase()} ${dateMatch[2]}`;
-        continue;
-      }
-      
-      // Check for day of week
-      const dayMatch = line.match(dayPattern);
-      if (dayMatch) {
-        currentDay = dayMatch[1].toUpperCase();
-        continue;
-      }
-      
-      // Check for time patterns
-      const timeMatches = line.match(timePattern);
-      if (timeMatches && line.includes('|')) {
-        currentTime = line; // e.g., "9-11 am | 1-3 pm"
-        continue;
-      }
-      
-      // Check for locations (contains city/place names)
-      if (line.includes('Campus') || line.includes('City') || 
-          line.includes('Butuan') || line.includes('Surigao') ||
-          line.includes('Gingoog') || line.includes('Bayugan') ||
-          line.includes('University') || line.includes('In-Campus')) {
-        // Clean up location
-        let location = line.replace(/[()]/g, ' ').trim();
-        if (location) {
-          currentLocations.push(location);
-        }
-      }
+    // ✅ Skip header text that appears on all images
+    if (headerKeywords.some(keyword => lineLower.includes(keyword))) {
+      continue;
     }
     
-    // Don't forget last entry
-    if (currentDate && currentLocations.length > 0) {
-      schedules.push({
-        date: currentDate,
-        dayOfWeek: currentDay,
-        year: currentYear || new Date().getFullYear().toString(),
-        locations: [...currentLocations],
-        time: currentTime,
-      });
+    // Check for year
+    const yearMatch = line.match(yearPattern);
+    if (yearMatch) {
+      // Save previous entry if exists
+      if (currentDate && currentLocations.length > 0) {
+        schedules.push({
+          date: currentDate,
+          dayOfWeek: currentDay,
+          year: currentYear || new Date().getFullYear().toString(),
+          locations: [...currentLocations],
+          time: currentTime,
+        });
+        currentLocations = [];
+        currentTime = "";
+      }
+      currentYear = yearMatch[1];
+      continue;
     }
     
-    console.log(`📅 Extracted ${schedules.length} schedule entries from OCR`);
-    return schedules;
+    // Check for date (e.g., "OCT 26")
+    const dateMatch = line.match(datePattern);
+    if (dateMatch) {
+      // Save previous entry
+      if (currentDate && currentLocations.length > 0) {
+        schedules.push({
+          date: currentDate,
+          dayOfWeek: currentDay,
+          year: currentYear || new Date().getFullYear().toString(),
+          locations: [...currentLocations],
+          time: currentTime,
+        });
+        currentLocations = [];
+        currentTime = "";
+      }
+      currentDate = `${dateMatch[1].toUpperCase()} ${dateMatch[2]}`;
+      continue;
+    }
+    
+    // Check for day of week
+    const dayMatch = line.match(dayPattern);
+    if (dayMatch) {
+      currentDay = dayMatch[1].toUpperCase();
+      continue;
+    }
+    
+    // Check for time patterns
+    const timeMatches = line.match(timePattern);
+    if (timeMatches && (line.includes('|') || line.includes('-'))) {
+      currentTime = line; // e.g., "9-11 am | 1-3 pm"
+      continue;
+    }
+    
+    // ✅ ENHANCED: Better location detection
+    // Check for locations (contains city/place names)
+    const locationKeywords = [
+      'campus', 'city', 'butuan', 'surigao', 'gingoog', 'bayugan',
+      'university', 'in-campus', 'agusan', 'davao', 'kalilangan',
+      'impasug', 'quezon', 'malaybalay', 'san francisco', 'elpa',
+      'tandag', 'luna', 'kapalong', 'norte', 'sur', 'del norte',
+      'del sur', 'zamboanga', 'ozamiz', 'misamis', 'occidental',
+      'oriental', 'pagadian', 'lapasan', 'national high school',
+      'nhs', 'cagayan de oro', 'college'
+    ];
+    
+    const isLocation = locationKeywords.some(keyword => lineLower.includes(keyword));
+    
+    // ✅ Exclude if it's just "In-Campus" without more specific info
+    const isGenericInCampus = lineLower === 'in-campus' || 
+                               (lineLower.includes('in-campus') && 
+                                lineLower.includes('central mindanao'));
+    
+    if (isLocation && !isGenericInCampus) {
+      // Clean up location
+      let location = line.replace(/[()]/g, ' ').trim();
+      if (location && location.length > 3) {
+        currentLocations.push(location);
+      }
+    }
   }
-
+  
+  // Don't forget last entry
+  if (currentDate && currentLocations.length > 0) {
+    schedules.push({
+      date: currentDate,
+      dayOfWeek: currentDay,
+      year: currentYear || new Date().getFullYear().toString(),
+      locations: [...currentLocations],
+      time: currentTime,
+    });
+  }
+  
+  console.log(`📅 Extracted ${schedules.length} schedule entries from OCR`);
+  schedules.forEach((s, i) => {
+    console.log(`   ${i + 1}. ${s.date} (${s.dayOfWeek}): ${s.locations.join(', ')}`);
+  });
+  
+  return schedules;
+}
 
 
   async function extractTextFromImage(imageUrl: string): Promise<string> {
@@ -946,365 +978,402 @@ function similarity(a: string, b: string): number {
     isRecruiting: boolean;
   }
 
-  async function extractAdmissionData(
-    message: string, 
-    cohereKey: string,
-    ocrText?: string
-  ): Promise<ExtractedAdmissionData> {
-    // First, try to extract schedules directly from OCR if available
-    let extractedSchedules: ScheduleEntry[] = [];
-    if (ocrText) {
-      extractedSchedules = extractSchedulesFromOCR(ocrText);
+ async function extractAdmissionData(
+  message: string, 
+  cohereKey: string,
+  ocrText?: string,
+  imageCount?: number
+): Promise<ExtractedAdmissionData> {
+  let extractedSchedules: ScheduleEntry[] = [];
+  if (ocrText) {
+    extractedSchedules = extractSchedulesFromOCR(ocrText);
+    console.log(`📅 Extracted ${extractedSchedules.length} schedules from ${imageCount || 0} image(s)`);
+  }
+  
+  try {
+    const prompt = `Extract admission information from this announcement. The content includes text from ${imageCount || 0} schedule images. Return ONLY valid JSON.
+
+Announcement: "${message}"
+${ocrText ? `\nImage Text (OCR from ${imageCount || 0} image(s)):\n"${ocrText}"` : ''}
+
+CRITICAL INSTRUCTIONS FOR SCHEDULES:
+1. Ignore generic header text like "Central Mindanao University" and "CMUCAT Schedule"
+2. Extract SPECIFIC location information for EACH date
+3. Look for city names, school names, and venue details
+4. For "In-Campus" entries, include the time information
+5. Each date can have MULTIPLE locations - list them all
+6. Format: {"date": "OCT 4", "dayOfWeek": "SATURDAY", "year": "2025", "locations": ["Kalilangan, Bukidnon", "Impasug-ong, Bukidnon"], "time": ""}
+
+Examples of what to extract:
+- "OCT 4 SATURDAY" with "Kalilangan, Bukidnon" and "Impasug-ong, Bukidnon" → 2 separate locations
+- "NOV 8 SATURDAY" with "Butuan, Agusan del Norte" and "Surigao, Surigao del Norte" → 2 separate locations  
+- "OCT 26 SUNDAY In-Campus (Central Mindanao University) 9-11 am | 1-3 pm" → location: "In-Campus (Central Mindanao University)", time: "9-11 am | 1-3 pm"
+
+Extract these fields:
+- title: A short descriptive title (max 100 chars)
+- content: The full announcement content including image text
+- steps: Array of enrollment/application steps
+- requirements: Array of required documents (extract from BOTH text and images)
+- contacts: Array of contact information (extract from BOTH text and images)
+- academicYear: Object {"start": 2026, "end": 2027}
+- schedules: Array of schedule objects with SPECIFIC locations for each date
+
+Respond ONLY in this JSON format:
+{
+  "title": "CMUCAT Schedule AY 2026-2027",
+  "content": "string with image text",
+  "steps": ["step1", "step2"],
+  "requirements": ["req1", "req2"],
+  "contacts": ["contact1", "email@example.com"],
+  "academicYear": {"start": 2026, "end": 2027},
+  "schedules": [
+    {"date": "OCT 4", "dayOfWeek": "SATURDAY", "year": "2025", "locations": ["Kalilangan, Bukidnon", "Impasug-ong, Bukidnon"], "time": ""},
+    {"date": "OCT 11", "dayOfWeek": "SATURDAY", "year": "2025", "locations": ["Quezon, Bukidnon", "Malaybalay City, Bukidnon"], "time": ""},
+    {"date": "OCT 26", "dayOfWeek": "SUNDAY", "year": "2025", "locations": ["In-Campus (Central Mindanao University)"], "time": "9-11 am | 1-3 pm"}
+  ]
+}`;
+
+    const response = await axios.post<{ text?: string }>(
+      "https://api.cohere.ai/v1/chat",
+      {
+        model: "command-r-08-2024",
+        message: prompt,
+        max_tokens: 2500,
+        temperature: 0.1,
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${cohereKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const text = String(response.data?.text ?? "").trim();
+    const jsonStr = extractJsonFromResponse(text);
+    const result = JSON.parse(jsonStr);
+
+    let finalSchedules = result.schedules || [];
+    if (finalSchedules.length < extractedSchedules.length) {
+      console.log(`⚠️ Using OCR schedules: ${extractedSchedules.length} vs Cohere: ${finalSchedules.length}`);
+      finalSchedules = extractedSchedules;
     }
     
-    try {
-      const prompt = `Extract admission information from this announcement. Return ONLY valid JSON.
+    let enhancedContent = result.content || message;
+    if (ocrText && !enhancedContent.includes(ocrText.substring(0, 50))) {
+      enhancedContent = `${message}\n\n[Information from ${imageCount || 0} image(s)]:\n${ocrText}`;
+    }
 
-  Announcement: "${message}"
-  ${ocrText ? `\nImage Text (OCR):\n"${ocrText}"` : ''}
+    return {
+      title: result.title || message.substring(0, 100),
+      content: enhancedContent,
+      steps: Array.isArray(result.steps) ? result.steps : [],
+      requirements: Array.isArray(result.requirements) ? result.requirements : [],
+      contacts: Array.isArray(result.contacts) ? result.contacts : [],
+      academicYear: result.academicYear || null,
+      schedules: finalSchedules,
+    };
+  } catch (error) {
+    console.error("Error extracting admission data:", error);
+    return {
+      title: message.substring(0, 100),
+      content: ocrText ? `${message}\n\n[Image Text]:\n${ocrText}` : message,
+      steps: [],
+      requirements: [],
+      contacts: [],
+      academicYear: null,
+      schedules: extractedSchedules,
+    };
+  }
+}
 
-  Extract these fields:
-  - title: A short descriptive title (max 100 chars)
-  - content: The full announcement content
-  - steps: Array of enrollment/application steps
-  - requirements: Array of required documents
-  - contacts: Array of contact information
-  - academicYear: Object {"start": 2026, "end": 2027} - extract from text like "AY 2026-2027"
-  - schedules: Array of schedule objects. IMPORTANT: Extract ALL dates and locations from the text.
-    Each schedule should have: "date" (e.g., "OCT 26"), "dayOfWeek" (e.g., "SUNDAY"), 
-    "year" (e.g., "2025"), "locations" (array of location strings), "time" (if available)
 
-  CRITICAL: Extract EVERY date mentioned with ALL its associated locations. 
-  For example, if NOV 8 has both "Butuan" and "Surigao", include BOTH locations.
+ async function extractScholarshipData(
+  message: string, 
+  cohereKey: string,
+  ocrText?: string,
+  imageCount?: number
+): Promise<ExtractedScholarshipData> {
+  try {
+    const prompt = `Extract scholarship information from this announcement. Content may include text from ${imageCount || 0} image(s). Return ONLY valid JSON.
 
-  Respond ONLY in this JSON format:
-  {
-    "title": "string",
-    "content": "string",
-    "steps": [],
-    "requirements": [],
-    "contacts": [],
-    "academicYear": {"start": 2026, "end": 2027},
-    "schedules": [
-      {"date": "OCT 26", "dayOfWeek": "SUNDAY", "year": "2025", "locations": ["In-Campus (Central Mindanao University)"], "time": "9-11 am | 1-3 pm"},
-      {"date": "NOV 8", "dayOfWeek": "SATURDAY", "year": "2025", "locations": ["Butuan, Agusan del Norte", "Surigao, Surigao del Norte"], "time": ""}
-    ]
-  }`;
+Announcement: "${message}"
+${ocrText ? `\nImage Text (OCR from ${imageCount || 0} image(s)):\n"${ocrText}"` : ''}
 
-      const response = await axios.post<{ text?: string }>(
-        "https://api.cohere.ai/v1/chat",
-        {
-          model: "command-r-08-2024",
-          message: prompt,
-          max_tokens: 2000, // Increased for more schedule data
-          temperature: 0.1,
+Extract these fields (look in BOTH text and images):
+- name: The scholarship name/title
+- description: Brief description including info from images
+- scholarshipProvider: Organization offering the scholarship
+- eligibilityRequirements: Array of eligibility criteria (from text AND images)
+- privileges: Array of benefits (tuition, stipend, allowance, etc.)
+- applicationLink: URL for application if mentioned
+
+Respond ONLY in this JSON format:
+{
+  "name": "string",
+  "description": "string including image details",
+  "scholarshipProvider": "string",
+  "eligibilityRequirements": ["req from text", "req from image"],
+  "privileges": ["benefit1", "benefit2"],
+  "applicationLink": "string or empty"
+}`;
+
+    const response = await axios.post<{ text?: string }>(
+      "https://api.cohere.ai/v1/chat",
+      {
+        model: "command-r-08-2024",
+        message: prompt,
+        max_tokens: 1500,
+        temperature: 0.1,
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${cohereKey}`,
+          "Content-Type": "application/json",
         },
-        {
-          headers: {
-            "Authorization": `Bearer ${cohereKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const text = String(response.data?.text ?? "").trim();
-      const jsonStr = extractJsonFromResponse(text);
-      const result = JSON.parse(jsonStr);
-
-      // Merge Cohere results with direct OCR extraction (OCR extraction as fallback)
-      let finalSchedules = result.schedules || [];
-      
-      // If Cohere didn't extract schedules well, use OCR extraction
-      if (finalSchedules.length < extractedSchedules.length) {
-        console.log(`⚠️ Cohere extracted ${finalSchedules.length} schedules, OCR found ${extractedSchedules.length}. Using OCR.`);
-        finalSchedules = extractedSchedules;
       }
+    );
 
-      return {
-        title: result.title || message.substring(0, 100),
-        content: message,
-        steps: Array.isArray(result.steps) ? result.steps : [],
-        requirements: Array.isArray(result.requirements) ? result.requirements : [],
-        contacts: Array.isArray(result.contacts) ? result.contacts : [],
-        academicYear: result.academicYear || null,
-        schedules: finalSchedules,
-      };
-    } catch (error) {
-      console.error("Error extracting admission data:", error);
-      
-      // Fallback: use direct OCR extraction
-      return {
-        title: message.substring(0, 100),
-        content: message,
-        steps: [],
-        requirements: [],
-        contacts: [],
-        academicYear: null,
-        schedules: extractedSchedules,
-      };
+    const text = String(response.data?.text ?? "").trim();
+    const jsonStr = extractJsonFromResponse(text);
+    const result = JSON.parse(jsonStr);
+
+    // ✅ Enhance description with OCR text
+    let enhancedDescription = result.description || message;
+    if (ocrText && !enhancedDescription.includes(ocrText.substring(0, 50))) {
+      enhancedDescription = `${result.description || message}\n\n[Details from ${imageCount || 0} image(s)]:\n${ocrText}`;
     }
+
+    return {
+      name: result.name || "Scholarship Announcement",
+      description: enhancedDescription,
+      scholarshipProvider: result.scholarshipProvider || "",
+      eligibilityRequirements: Array.isArray(result.eligibilityRequirements) ? result.eligibilityRequirements : [],
+      privileges: Array.isArray(result.privileges) ? result.privileges : [],
+      applicationLink: result.applicationLink || "",
+    };
+  } catch (error) {
+    console.error("Error extracting scholarship data:", error);
+    return {
+      name: "Scholarship Announcement",
+      description: ocrText ? `${message}\n\n[Image Text]:\n${ocrText}` : message,
+      scholarshipProvider: "",
+      eligibilityRequirements: [],
+      privileges: [],
+      applicationLink: "",
+    };
   }
+}
 
-  async function extractScholarshipData(message: string, cohereKey: string): Promise<ExtractedScholarshipData> {
-    try {
-      const prompt = `Extract scholarship information from this announcement. Return ONLY valid JSON.
+  async function extractPlacementData(
+  message: string, 
+  cohereKey: string,
+  ocrText?: string,
+  imageCount?: number
+): Promise<ExtractedPlacementData> {
+  try {
+    const prompt = `Extract job placement/hiring information from this announcement. Content may include text from ${imageCount || 0} image(s). Return ONLY valid JSON.
 
-  Announcement: "${message}"
+Announcement: "${message}"
+${ocrText ? `\nImage Text (OCR from ${imageCount || 0} image(s)):\n"${ocrText}"` : ''}
 
-  Extract these fields:
-  - name: The scholarship name/title
-  - description: Brief description of the scholarship
-  - scholarshipProvider: Organization or entity offering the scholarship
-  - eligibilityRequirements: Array of eligibility criteria
-  - privileges: Array of benefits (tuition, stipend, allowance, etc.)
-  - applicationLink: URL for application if mentioned
+Extract these fields (look in BOTH text and images):
+- partnerCompany: Company name that is hiring
+- positions: Array of job positions/titles available (from text AND images)
+- contacts: Array of contact information for application (from text AND images)
+- isRecruiting: Boolean indicating if currently accepting applications (default true)
 
-  Respond ONLY in this JSON format:
-  {
-    "name": "string",
-    "description": "string",
-    "scholarshipProvider": "string",
-    "eligibilityRequirements": ["req1", "req2"],
-    "privileges": ["benefit1", "benefit2"],
-    "applicationLink": "string or empty"
-  }`;
+Respond ONLY in this JSON format:
+{
+  "partnerCompany": "string",
+  "positions": ["position1 from text", "position2 from image"],
+  "contacts": ["contact1", "email@example.com"],
+  "isRecruiting": true
+}`;
 
-      const response = await axios.post<{ text?: string }>(
-        "https://api.cohere.ai/v1/chat",
-        {
-          model: "command-r-08-2024",
-          message: prompt,
-          max_tokens: 1000,
-          temperature: 0.1,
+    const response = await axios.post<{ text?: string }>(
+      "https://api.cohere.ai/v1/chat",
+      {
+        model: "command-r-08-2024",
+        message: prompt,
+        max_tokens: 1500,
+        temperature: 0.1,
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${cohereKey}`,
+          "Content-Type": "application/json",
         },
-        {
-          headers: {
-            "Authorization": `Bearer ${cohereKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      }
+    );
 
-      const text = String(response.data?.text ?? "").trim();
-      const jsonStr = extractJsonFromResponse(text);
-      const result = JSON.parse(jsonStr);
+    const text = String(response.data?.text ?? "").trim();
+    const jsonStr = extractJsonFromResponse(text);
+    const result = JSON.parse(jsonStr);
 
-      return {
-        name: result.name || "Scholarship Announcement",
-        description: result.description || message,
-        scholarshipProvider: result.scholarshipProvider || "",
-        eligibilityRequirements: Array.isArray(result.eligibilityRequirements) ? result.eligibilityRequirements : [],
-        privileges: Array.isArray(result.privileges) ? result.privileges : [],
-        applicationLink: result.applicationLink || "",
-      };
-    } catch (error) {
-      console.error("Error extracting scholarship data:", error);
-      return {
-        name: "Scholarship Announcement",
-        description: message,
-        scholarshipProvider: "",
-        eligibilityRequirements: [],
-        privileges: [],
-        applicationLink: "",
-      };
-    }
+    return {
+      partnerCompany: result.partnerCompany || "Company",
+      positions: Array.isArray(result.positions) ? result.positions : [],
+      contacts: Array.isArray(result.contacts) ? result.contacts : [],
+      isRecruiting: result.isRecruiting !== false,
+    };
+  } catch (error) {
+    console.error("Error extracting placement data:", error);
+    return {
+      partnerCompany: "Company",
+      positions: [],
+      contacts: [],
+      isRecruiting: true,
+    };
   }
-
-  async function extractPlacementData(message: string, cohereKey: string): Promise<ExtractedPlacementData> {
-    try {
-      const prompt = `Extract job placement/hiring information from this announcement. Return ONLY valid JSON.
-
-  Announcement: "${message}"
-
-  Extract these fields:
-  - partnerCompany: Company name that is hiring
-  - positions: Array of job positions/titles available
-  - contacts: Array of contact information for application
-  - isRecruiting: Boolean indicating if currently accepting applications (default true)
-
-  Respond ONLY in this JSON format:
-  {
-    "partnerCompany": "string",
-    "positions": ["position1", "position2"],
-    "contacts": ["contact1"],
-    "isRecruiting": true
-  }`;
-
-      const response = await axios.post<{ text?: string }>(
-        "https://api.cohere.ai/v1/chat",
-        {
-          model: "command-r-08-2024",
-          message: prompt,
-          max_tokens: 1000,
-          temperature: 0.1,
-        },
-        {
-          headers: {
-            "Authorization": `Bearer ${cohereKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const text = String(response.data?.text ?? "").trim();
-      const jsonStr = extractJsonFromResponse(text);
-      const result = JSON.parse(jsonStr);
-
-      return {
-        partnerCompany: result.partnerCompany || "Company",
-        positions: Array.isArray(result.positions) ? result.positions : [],
-        contacts: Array.isArray(result.contacts) ? result.contacts : [],
-        isRecruiting: result.isRecruiting !== false,
-      };
-    } catch (error) {
-      console.error("Error extracting placement data:", error);
-      return {
-        partnerCompany: "Company",
-        positions: [],
-        contacts: [],
-        isRecruiting: true,
-      };
-    }
-  }
+}
 
   async function createAdmissionFromAnnouncement(
-    postId: string,
-    message: string,
-    deadline: admin.firestore.Timestamp | null,
-    cohereKey: string,
-    ocrText?: string // ✅ NEW: Accept OCR text separately
-  ): Promise<void> {
-    try {
-      const admissionRef = db.collection("admissions").doc(postId);
-      const existingDoc = await admissionRef.get();
-      
-      if (existingDoc.exists) {
-        const existingData = existingDoc.data();
-        if (existingData?.deleted === true) {
-          console.log(`⏭️ Skipping admission for post ${postId} - deleted`);
-          return;
-        }
-        console.log(`Admission already exists for post ${postId}`);
+  postId: string,
+  message: string,
+  deadline: admin.firestore.Timestamp | null,
+  cohereKey: string,
+  ocrText?: string,
+  imageCount?: number
+): Promise<void> {
+  try {
+    const admissionRef = db.collection("admissions").doc(postId);
+    const existingDoc = await admissionRef.get();
+    
+    if (existingDoc.exists) {
+      const existingData = existingDoc.data();
+      if (existingData?.deleted === true) {
+        console.log(`⏭️ Skipping admission for post ${postId} - deleted`);
         return;
       }
-
-      // ✅ Pass OCR text to extraction function
-      const extractedData = await extractAdmissionData(message, cohereKey, ocrText);
-
-      await admissionRef.set({
-        id: postId,
-        announcementId: postId,
-        title: extractedData.title,
-        content: extractedData.content,
-        source: "Facebook Announcement",
-        academicYear: extractedData.academicYear,
-        contact: extractedData.contacts,
-        steps: extractedData.steps,
-        requirements: extractedData.requirements,
-        links: [],
-        schedules: extractedData.schedules, // ✅ Now contains all schedules with all locations
-        deadline: deadline,
-        deleted: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        autoGenerated: true,
-      });
-
-      console.log(`✅ Created admission with ${extractedData.schedules.length} schedules`);
-    } catch (error) {
-      console.error(`❌ Error creating admission from announcement ${postId}:`, error);
+      console.log(`Admission already exists for post ${postId}`);
+      return;
     }
-  }
 
-  async function createScholarshipFromAnnouncement(
-    postId: string,
-    message: string,
-    deadline: admin.firestore.Timestamp | null,
-    cohereKey: string
-  ): Promise<void> {
-    try {
-      const scholarshipRef = db.collection("scholarships").doc(postId);
-      const existingDoc = await scholarshipRef.get();
+    const extractedData = await extractAdmissionData(message, cohereKey, ocrText, imageCount);
+
+    await admissionRef.set({
+      id: postId,
+      announcementId: postId,
+      title: extractedData.title,
+      content: extractedData.content,
+      source: "Facebook Announcement",
+      academicYear: extractedData.academicYear,
+      contact: extractedData.contacts,
+      steps: extractedData.steps,
+      requirements: extractedData.requirements,
+      links: [],
+      schedules: extractedData.schedules,
+      deadline: deadline,
+      deleted: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      autoGenerated: true,
+      processedImageCount: imageCount || 0, // ✅ Track how many images were processed
+    });
+
+    console.log(`✅ Created admission with ${extractedData.schedules.length} schedules from ${imageCount || 0} images`);
+  } catch (error) {
+    console.error(`❌ Error creating admission from announcement ${postId}:`, error);
+  }
+}
+
+async function createScholarshipFromAnnouncement(
+  postId: string,
+  message: string,
+  deadline: admin.firestore.Timestamp | null,
+  cohereKey: string,
+  ocrText?: string,
+  imageCount?: number
+): Promise<void> {
+  try {
+    const scholarshipRef = db.collection("scholarships").doc(postId);
+    const existingDoc = await scholarshipRef.get();
+    
+    if (existingDoc.exists) {
+      const existingData = existingDoc.data();
       
-      if (existingDoc.exists) {
-        const existingData = existingDoc.data();
-        
-        // ✅ If deleted, don't recreate or restore
-        if (existingData?.deleted === true) {
-          console.log(`⏭️ Skipping scholarship for post ${postId} - it was deleted by user`);
-          return;
-        }
-        
-        console.log(`Scholarship already exists for post ${postId}`);
+      // ✅ If deleted, don't recreate or restore
+      if (existingData?.deleted === true) {
+        console.log(`⏭️ Skipping scholarship for post ${postId} - it was deleted by user`);
         return;
       }
-
-      const extractedData = await extractScholarshipData(message, cohereKey);
-
-      await scholarshipRef.set({
-        scholarshipID: postId,
-        sourceId: postId,
-        announcementId: postId, // ✅ Link to announcement
-        name: extractedData.name,
-        description: extractedData.description,
-        scholarshipProvider: extractedData.scholarshipProvider,
-        eligibilityRequirements: extractedData.eligibilityRequirements,
-        privileges: extractedData.privileges,
-        deadline: deadline ? deadline.toDate() : null,
-        applicationLink: extractedData.applicationLink,
-        deleted: false, // ✅ Soft delete flag
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        autoGenerated: true,
-      });
-
-      console.log(`✅ Created scholarship from announcement ${postId}`);
-    } catch (error) {
-      console.error(`❌ Error creating scholarship from announcement ${postId}:`, error);
-    }
-  }
-
-  async function createPlacementFromAnnouncement(
-    postId: string,
-    message: string,
-    deadline: admin.firestore.Timestamp | null,
-    cohereKey: string
-  ): Promise<void> {
-    try {
-      const placementRef = db.collection("placements").doc(postId);
-      const existingDoc = await placementRef.get();
       
-      if (existingDoc.exists) {
-        const existingData = existingDoc.data();
-        
-        // ✅ If deleted, don't recreate or restore
-        if (existingData?.deleted === true) {
-          console.log(`⏭️ Skipping placement for post ${postId} - it was deleted by user`);
-          return;
-        }
-        
-        console.log(`Placement already exists for post ${postId}`);
+      console.log(`Scholarship already exists for post ${postId}`);
+      return;
+    }
+
+    const extractedData = await extractScholarshipData(message, cohereKey, ocrText, imageCount);
+
+    await scholarshipRef.set({
+      scholarshipID: postId,
+      sourceId: postId,
+      announcementId: postId, // ✅ Link to announcement
+      name: extractedData.name,
+      description: extractedData.description,
+      scholarshipProvider: extractedData.scholarshipProvider,
+      eligibilityRequirements: extractedData.eligibilityRequirements,
+      privileges: extractedData.privileges,
+      deadline: deadline ? deadline.toDate() : null,
+      applicationLink: extractedData.applicationLink,
+      deleted: false, // ✅ Soft delete flag
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      autoGenerated: true,
+      processedImageCount: imageCount || 0, // ✅ Track how many images were processed
+    });
+
+    console.log(`✅ Created scholarship from announcement ${postId} (${imageCount || 0} images processed)`);
+  } catch (error) {
+    console.error(`❌ Error creating scholarship from announcement ${postId}:`, error);
+  }
+}
+
+// ✅ UPDATED: Placement creation with OCR text and image count
+async function createPlacementFromAnnouncement(
+  postId: string,
+  message: string,
+  deadline: admin.firestore.Timestamp | null,
+  cohereKey: string,
+  ocrText?: string,
+  imageCount?: number
+): Promise<void> {
+  try {
+    const placementRef = db.collection("placements").doc(postId);
+    const existingDoc = await placementRef.get();
+    
+    if (existingDoc.exists) {
+      const existingData = existingDoc.data();
+      
+      // ✅ If deleted, don't recreate or restore
+      if (existingData?.deleted === true) {
+        console.log(`⏭️ Skipping placement for post ${postId} - it was deleted by user`);
         return;
       }
-
-      const extractedData = await extractPlacementData(message, cohereKey);
-
-      await placementRef.set({
-        placementID: postId,
-        announcementId: postId, // ✅ Link to announcement
-        partnerCompany: extractedData.partnerCompany,
-        positions: extractedData.positions,
-        contacts: extractedData.contacts,
-        isRecruiting: extractedData.isRecruiting,
-        deadline: deadline ? deadline.toDate() : null,
-        deleted: false, // ✅ Soft delete flag
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        autoGenerated: true,
-      });
-
-      console.log(`✅ Created placement from announcement ${postId}`);
-    } catch (error) {
-      console.error(`❌ Error creating placement from announcement ${postId}:`, error);
+      
+      console.log(`Placement already exists for post ${postId}`);
+      return;
     }
+
+    const extractedData = await extractPlacementData(message, cohereKey, ocrText, imageCount);
+
+    await placementRef.set({
+      placementID: postId,
+      announcementId: postId, // ✅ Link to announcement
+      partnerCompany: extractedData.partnerCompany,
+      positions: extractedData.positions,
+      contacts: extractedData.contacts,
+      isRecruiting: extractedData.isRecruiting,
+      deadline: deadline ? deadline.toDate() : null,
+      deleted: false, // ✅ Soft delete flag
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      autoGenerated: true,
+      processedImageCount: imageCount || 0, // ✅ Track how many images were processed
+    });
+
+    console.log(`✅ Created placement from announcement ${postId} (${imageCount || 0} images processed)`);
+  } catch (error) {
+    console.error(`❌ Error creating placement from announcement ${postId}:`, error);
   }
+}
 
   export const cleanupDeletedAnnouncement = onDocumentUpdated(
     {
@@ -1356,129 +1425,137 @@ function similarity(a: string, b: string): number {
   // ✅ ENHANCED: processPost with IMAGE OCR SUPPORT
   // ============================================================================
 
-  async function processPost(post: FacebookPost, cohereKey: string): Promise<void> {
-    const postId = post.id;
-    const originalMessage = post.message || "";
-    
-    const postRef = db.collection("announcements").doc(postId);
-    const doc = await postRef.get();
-    
-    // ✅ Extract ALL images from the post
-    const allImageUrls = extractAllImagesFromPost(post);
-    console.log(`📸 Post ${postId} has ${allImageUrls.length} image(s)`);
-    
-    // ✅ Extract text from ALL images via OCR
-    let combinedOcrText = "";
-    const ocrResults: string[] = [];
-    
-    for (let i = 0; i < allImageUrls.length; i++) {
-      console.log(`🔍 Running OCR on image ${i + 1}/${allImageUrls.length}...`);
-      try {
-        const ocrText = await extractTextFromImage(allImageUrls[i]);
-        if (ocrText && ocrText.trim().length > 0) {
-          ocrResults.push(ocrText);
-        }
-      } catch (err: any) {
-        console.error(`⚠️ OCR failed for image ${i + 1}:`, err.message);
+ async function processPost(post: FacebookPost, cohereKey: string): Promise<void> {
+  const postId = post.id;
+  const originalMessage = post.message || "";
+  
+  const postRef = db.collection("announcements").doc(postId);
+  const doc = await postRef.get();
+  
+  const allImageUrls = extractAllImagesFromPost(post);
+  console.log(`📸 Post ${postId} has ${allImageUrls.length} image(s)`);
+  
+  let combinedOcrText = "";
+  const ocrResults: string[] = [];
+  
+  for (let i = 0; i < allImageUrls.length; i++) {
+    console.log(`🔍 Running OCR on image ${i + 1}/${allImageUrls.length}...`);
+    try {
+      const ocrText = await extractTextFromImage(allImageUrls[i]);
+      if (ocrText && ocrText.trim().length > 0) {
+        ocrResults.push(ocrText);
       }
+    } catch (err: any) {
+      console.error(`⚠️ OCR failed for image ${i + 1}:`, err.message);
+    }
+  }
+  
+  combinedOcrText = deduplicateOcrResults(ocrResults);
+  const hasImageText = ocrResults.length > 0;
+  
+  console.log(`📝 OCR: ${combinedOcrText.length} chars from ${ocrResults.length}/${allImageUrls.length} images`);
+  
+  let messageForAnalysis = originalMessage;
+  if (hasImageText) {
+    messageForAnalysis = originalMessage 
+      ? `${originalMessage}\n\n[Image Text]:\n${combinedOcrText}`
+      : combinedOcrText;
+  }
+  
+  if (!messageForAnalysis || messageForAnalysis.trim().length === 0) {
+    console.log(`Skipping post ${postId} - no content`);
+    return;
+  }
+  
+  let uploadedImageUrls: string[] = [];
+  if (allImageUrls.length > 0) {
+    uploadedImageUrls = await downloadAndUploadAllImages(allImageUrls, postId);
+  }
+  
+  if (!doc.exists) {
+    console.log(`Creating new post: ${postId} with ${uploadedImageUrls.length} images, ${ocrResults.length} with text`);
+    
+    const cohereResult = await analyzeAnnouncement(messageForAnalysis, cohereKey);
+    const deadlineTimestamp = parseDeadlineToTimestamp(cohereResult.deadline);
+    
+    const newData = {
+      announcementId: postId,
+      message: originalMessage,
+      created_time: post.created_time,
+      images: uploadedImageUrls,
+      image_count: uploadedImageUrls.length,
+      full_picture: uploadedImageUrls[0] || "",
+      original_image_urls: allImageUrls,
+      permalink_url: post.permalink_url || "",
+      category: cohereResult.category || "General",
+      deadline: deadlineTimestamp || null,
+      deleted: false,
+      fetched_at: admin.firestore.FieldValue.serverTimestamp(),
+      processed_by_cohere: true,
+      stored_in_storage: uploadedImageUrls.length > 0,
+      notification_sent: false,
+      ocr_text: combinedOcrText || "",
+      has_image_text: hasImageText,
+      ocr_processed_count: ocrResults.length,
+    };
+    
+    await postRef.set(newData);
+
+    const category = cohereResult.category?.toLowerCase() || "general";
+    
+    if (category === "admission") {
+      await createAdmissionFromAnnouncement(
+        postId, 
+        messageForAnalysis, 
+        deadlineTimestamp, 
+        cohereKey,
+        combinedOcrText,
+        allImageUrls.length
+      );
+    } else if (category === "scholarship") {
+      await createScholarshipFromAnnouncement(
+        postId, 
+        messageForAnalysis, 
+        deadlineTimestamp, 
+        cohereKey,
+        combinedOcrText,
+        allImageUrls.length
+      );
+    } else if (category === "placement") {
+      await createPlacementFromAnnouncement(
+        postId, 
+        messageForAnalysis, 
+        deadlineTimestamp, 
+        cohereKey,
+        combinedOcrText,
+        allImageUrls.length
+      );
     }
     
-    combinedOcrText = deduplicateOcrResults(ocrResults);
-    const hasImageText = ocrResults.length > 0;
+    console.log(`✅ Post ${postId}: ${category}, ${uploadedImageUrls.length} images, ${ocrResults.length} OCR`);
     
-    console.log(`📝 Combined OCR text length: ${combinedOcrText.length} chars from ${ocrResults.length} image(s)`);
+  } else {
+    const docData = doc.data();
     
-    // Combine message + OCR for analysis
-    let messageForAnalysis = originalMessage;
-    if (hasImageText) {
-      messageForAnalysis = originalMessage 
-        ? `${originalMessage}\n\n[Image Text]:\n${combinedOcrText}`
-        : combinedOcrText;
-    }
-    
-    if (!messageForAnalysis || messageForAnalysis.trim().length === 0) {
-      console.log(`Skipping post ${postId} - no message or image text`);
+    if (docData?.deleted === true) {
+      console.log(`⏭️ Skipping deleted post ${postId}`);
       return;
     }
     
-    // ✅ Download and upload ALL images
-    let uploadedImageUrls: string[] = [];
-    if (allImageUrls.length > 0) {
-      uploadedImageUrls = await downloadAndUploadAllImages(allImageUrls, postId);
-    }
-    
-    if (!doc.exists) {
-      // NEW ANNOUNCEMENT
-      console.log(`Creating new post: ${postId} with ${uploadedImageUrls.length} images`);
-      
-      const cohereResult = await analyzeAnnouncement(messageForAnalysis, cohereKey);
-      const deadlineTimestamp = parseDeadlineToTimestamp(cohereResult.deadline);
-      
-      const newData = {
-        announcementId: postId,
-        message: originalMessage,
-        created_time: post.created_time,
-        // ✅ Store array of images
-        images: uploadedImageUrls,
-        image_count: uploadedImageUrls.length,
-        // Keep full_picture for backward compatibility (first image)
-        full_picture: uploadedImageUrls[0] || "",
-        original_image_urls: allImageUrls,
-        permalink_url: post.permalink_url || "",
-        category: cohereResult.category || "General",
-        deadline: deadlineTimestamp || null,
-        deleted: false,
-        fetched_at: admin.firestore.FieldValue.serverTimestamp(),
-        processed_by_cohere: true,
-        stored_in_storage: uploadedImageUrls.length > 0,
-        notification_sent: false,
-        ocr_text: combinedOcrText || "",
-        has_image_text: hasImageText,
-      };
-      
-      await postRef.set(newData);
-
-      // Create category-specific document with OCR text for better extraction
-      const category = cohereResult.category?.toLowerCase() || "general";
-      
-      if (category === "admission") {
-        await createAdmissionFromAnnouncement(
-          postId, 
-          messageForAnalysis, 
-          deadlineTimestamp, 
-          cohereKey,
-          combinedOcrText // ✅ Pass OCR text separately
-        );
-      } else if (category === "scholarship") {
-        await createScholarshipFromAnnouncement(postId, messageForAnalysis, deadlineTimestamp, cohereKey);
-      } else if (category === "placement") {
-        await createPlacementFromAnnouncement(postId, messageForAnalysis, deadlineTimestamp, cohereKey);
-      }
-      
-      console.log(`✅ Post ${postId} processed: ${category}, ${uploadedImageUrls.length} images`);
-      
-    } else {
-      // EXISTING - update with multiple images
-      const docData = doc.data();
-      
-      if (docData?.deleted === true) {
-        console.log(`⏭️ Skipping deleted post ${postId}`);
-        return;
-      }
-      
-      await postRef.update({
-        message: originalMessage,
-        images: uploadedImageUrls.length > 0 ? uploadedImageUrls : docData?.images || [],
-        image_count: uploadedImageUrls.length || docData?.image_count || 0,
-        full_picture: uploadedImageUrls[0] || docData?.full_picture || "",
-        permalink_url: post.permalink_url || "",
-        last_synced_at: admin.firestore.FieldValue.serverTimestamp(),
-        stored_in_storage: uploadedImageUrls.length > 0 || docData?.stored_in_storage,
-        ocr_text: combinedOcrText || docData?.ocr_text || "",
-        has_image_text: hasImageText || docData?.has_image_text,
-      });
-    }
+    await postRef.update({
+      message: originalMessage,
+      images: uploadedImageUrls.length > 0 ? uploadedImageUrls : docData?.images || [],
+      image_count: uploadedImageUrls.length || docData?.image_count || 0,
+      full_picture: uploadedImageUrls[0] || docData?.full_picture || "",
+      permalink_url: post.permalink_url || "",
+      last_synced_at: admin.firestore.FieldValue.serverTimestamp(),
+      stored_in_storage: uploadedImageUrls.length > 0 || docData?.stored_in_storage,
+      ocr_text: combinedOcrText || docData?.ocr_text || "",
+      has_image_text: hasImageText || docData?.has_image_text,
+      ocr_processed_count: ocrResults.length || docData?.ocr_processed_count || 0,
+    });
   }
+}
 
   async function softDeleteCategoryDocument(
     announcementId: string,
@@ -1740,5 +1817,8 @@ function similarity(a: string, b: string): number {
         throw new HttpsError("internal", error.message);
       }
     }
-  );
+);
+  
 
+
+  

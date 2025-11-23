@@ -2097,28 +2097,43 @@ Widget build(BuildContext context) {
   final category = data['category'] ?? 'General';
   final deadline = data['deadline'];
   
-  // ✅ FIX: Properly get images array with type safety
+  // ✅ FIXED: Properly extract images array with better type safety and validation
   List<String> images = [];
   
   // Check for new 'images' array field first
   if (data['images'] != null && data['images'] is List) {
     images = (data['images'] as List)
-        .whereType<String>()
-        .where((url) => url.isNotEmpty)
+        .map((item) {
+          if (item is String) return item;
+          if (item is Map && item.containsKey('url')) return item['url'].toString();
+          return '';
+        })
+        .where((url) => url.isNotEmpty && url.startsWith('http'))
         .toList();
   }
   
   // Fallback to single 'full_picture' for backward compatibility
   if (images.isEmpty && 
       data['full_picture'] != null && 
-      (data['full_picture'] as String).isNotEmpty) {
+      (data['full_picture'] as String).isNotEmpty &&
+      (data['full_picture'] as String).startsWith('http')) {
     images = [data['full_picture'] as String];
+  }
+  
+  // ✅ Log for debugging
+  print('📸 Post ${widget.announcement.id}: Found ${images.length} images');
+  if (images.isNotEmpty) {
+    print('   First image: ${images[0].substring(0, 100)}...');
+    if (images.length > 1) {
+      print('   Last image: ${images[images.length - 1].substring(0, 100)}...');
+    }
   }
   
   final hasImages = images.isNotEmpty;
   final imageCount = data['image_count'] ?? images.length;
   final createdTime = _formatDate(data['created_time']);
   final hasOCR = data['has_image_text'] == true;
+  final ocrProcessedCount = data['ocr_processed_count'] ?? 0;
 
   return Container(
     decoration: BoxDecoration(
@@ -2137,7 +2152,7 @@ Widget build(BuildContext context) {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildHeader(category, createdTime, imageCount, hasOCR),
+        _buildHeader(category, createdTime, imageCount, hasOCR, ocrProcessedCount),
         if (deadline != null) _buildDeadline(deadline),
         if (message.isNotEmpty) _buildMessage(message),
         // ✅ Pass the properly extracted images list
@@ -2147,12 +2162,24 @@ Widget build(BuildContext context) {
     ),
   );
 }
+
+  void _showFullScreenImage(BuildContext context, List<String> images, int initialIndex) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FullScreenImageGallery(
+          images: images,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
   // ============================================================================
   // ✅ NEW: Image Gallery Widget with Carousel
   // ============================================================================
   
   Widget _buildImageGallery(List<String> images) {
-  // Reset page controller if image count changed
+  // Reset page controller if needed
   if (_pageController.hasClients && images.length == 1) {
     _currentImageIndex = 0;
   }
@@ -2167,6 +2194,27 @@ Widget build(BuildContext context) {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ✅ Image count label (if multiple)
+        if (images.length > 1) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Icon(Icons.collections, size: 16, color: Colors.grey[600]),
+                SizedBox(width: 6),
+                Text(
+                  '${images.length} Images',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        
         // Main image display
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
@@ -2177,9 +2225,7 @@ Widget build(BuildContext context) {
               borderRadius: BorderRadius.circular(12),
             ),
             child: images.length == 1
-                // Single image - simple display
                 ? _buildSingleImage(images[0])
-                // Multiple images - carousel
                 : _buildImageCarousel(images),
           ),
         ),
@@ -2202,6 +2248,7 @@ Widget build(BuildContext context) {
     ),
   );
 }
+
 Widget _buildSingleImage(String imageUrl) {
   return GestureDetector(
     onTap: () => _showFullScreenImage(context, [imageUrl], 0),
@@ -2228,6 +2275,7 @@ Widget _buildSingleImage(String imageUrl) {
     ),
   );
 }
+
 
 // Multiple images carousel
 Widget _buildImageCarousel(List<String> images) {
@@ -2329,6 +2377,7 @@ Widget _buildImageCarousel(List<String> images) {
   );
 }
 
+
 Widget _buildFullscreenButton(List<String> images, int index) {
   return Material(
     color: Colors.transparent,
@@ -2411,191 +2460,204 @@ Widget _buildThumbnail(String imageUrl, int index, List<String> allImages) {
   );
 }
 
-  Widget _buildNavigationArrow({
-    required AlignmentGeometry alignment,
-    required IconData icon,
-    required VoidCallback onTap,
-    required bool enabled,
-  }) {
-    if (!enabled) return SizedBox.shrink();
+ Widget _buildNavigationArrow({
+  required AlignmentGeometry alignment,
+  required IconData icon,
+  required VoidCallback onTap,
+  required bool enabled,
+}) {
+  if (!enabled) return SizedBox.shrink();
 
-    return Align(
-      alignment: alignment,
-      child: Padding(
-        padding: EdgeInsets.all(8),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(24),
-            child: Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: Colors.white,
-                size: 28,
-              ),
+  return Align(
+    alignment: alignment,
+    child: Padding(
+      padding: EdgeInsets.all(8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.6),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 28,
             ),
           ),
         ),
       ),
-    );
-  }
-
+    ),
+  );
+}
   // ============================================================================
   // ✅ NEW: Full Screen Image Viewer
   // ============================================================================
 
-  void _showFullScreenImage(BuildContext context, List<String> images, int initialIndex) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => FullScreenImageGallery(
-          images: images,
-          initialIndex: initialIndex,
-        ),
-      ),
-    );
-  }
+
 
   // ============================================================================
   // Helper Widgets
   // ============================================================================
 
-  Widget _buildHeader(String category, String createdTime, int imageCount, bool hasOCR) {
-    return Padding(
-      padding: EdgeInsets.all(widget.isDesktop ? 24 : 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  getColorForCategory(category).withOpacity(0.9),
-                  getColorForCategory(category),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(8),
+ Widget _buildHeader(
+  String category, 
+  String createdTime, 
+  int imageCount, 
+  bool hasOCR,
+  int ocrProcessedCount
+) {
+  return Padding(
+    padding: EdgeInsets.all(widget.isDesktop ? 24 : 20),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                getColorForCategory(category).withOpacity(0.9),
+                getColorForCategory(category),
+              ],
             ),
-            child: Icon(
-              getCategoryIcon(category),
-              color: Colors.white,
-              size: 26,
-            ),
+            borderRadius: BorderRadius.circular(8),
           ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            getColorForCategory(category).withOpacity(0.15),
-                            getColorForCategory(category).withOpacity(0.08),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(8),
+          child: Icon(
+            getCategoryIcon(category),
+            color: Colors.white,
+            size: 26,
+          ),
+        ),
+        const SizedBox(width: 18),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          getColorForCategory(category).withOpacity(0.15),
+                          getColorForCategory(category).withOpacity(0.08),
+                        ],
                       ),
-                      child: Text(
-                        category.toUpperCase(),
-                        style: TextStyle(
-                          color: getColorForCategory(category),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      category.toUpperCase(),
+                      style: TextStyle(
+                        color: getColorForCategory(category),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    
-                    // ✅ NEW: Image count badge
-                    if (imageCount > 1) ...[
-                      SizedBox(width: 8),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.blue[200]!),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.photo_library, size: 12, color: Colors.blue[700]),
-                            SizedBox(width: 4),
-                            Text(
-                              '$imageCount',
-                              style: TextStyle(
-                                color: Colors.blue[700],
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    
-                    // ✅ NEW: OCR indicator
-                    if (hasOCR) ...[
-                      SizedBox(width: 8),
-                      Tooltip(
-                        message: 'Text extracted from image(s)',
-                        child: Container(
-                          padding: EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.purple[50],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Icon(
-                            Icons.text_fields,
-                            size: 14,
-                            color: Colors.purple[700],
-                          ),
-                        ),
-                      ),
-                    ],
-                    
-                    Spacer(),
+                  ),
+                  
+                  // ✅ ENHANCED: Image count badge with OCR indicator
+                  if (imageCount > 1) ...[
+                    SizedBox(width: 8),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: Colors.blue[50],
                         borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.blue[200]!),
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.access_time_rounded, size: 14, color: Colors.grey[600]),
+                          Icon(Icons.photo_library, size: 12, color: Colors.blue[700]),
                           SizedBox(width: 4),
                           Text(
-                            createdTime,
+                            '$imageCount',
                             style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              color: Colors.blue[700],
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
                       ),
                     ),
                   ],
-                ),
-              ],
-            ),
+                  
+                  // ✅ ENHANCED: OCR indicator showing how many images had text
+                  if (hasOCR) ...[
+                    SizedBox(width: 8),
+                    Tooltip(
+                      message: 'Text extracted from $ocrProcessedCount of $imageCount image(s)',
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.purple[50],
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.purple[200]!),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.text_fields,
+                              size: 12,
+                              color: Colors.purple[700],
+                            ),
+                            if (ocrProcessedCount > 0) ...[
+                              SizedBox(width: 4),
+                              Text(
+                                '$ocrProcessedCount',
+                                style: TextStyle(
+                                  color: Colors.purple[700],
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  
+                  Spacer(),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.access_time_rounded, size: 14, color: Colors.grey[600]),
+                        SizedBox(width: 4),
+                        Text(
+                          createdTime,
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
+
 
   Widget _buildDeadline(dynamic deadline) {
     return Container(

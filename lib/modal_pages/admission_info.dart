@@ -705,13 +705,7 @@ Widget _buildActionButtons(
               doc,
               DeleteConfigs.admissions,
               'admissions',
-              customDeleteHandler: (context, doc) async {
-                await handleComplexDocumentDelete(
-                  context,
-                  doc,
-                  'admissions',
-                );
-              },
+              customDeleteHandler: handleAdmissionDelete
             ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
@@ -1026,13 +1020,7 @@ Widget _buildFullContentActionButtons(
               doc,
               DeleteConfigs.admissions,
               'admissions',
-              customDeleteHandler: (context, doc) async {
-                await handleComplexDocumentDelete(
-                  context,
-                  doc,
-                  'admissions',
-                );
-              },
+              customDeleteHandler: handleAdmissionDelete
             ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(

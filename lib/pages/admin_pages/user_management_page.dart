@@ -292,6 +292,7 @@ class MobileUserManagement extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
+                         key: const ValueKey('users_stream'),
                         stream:
                             FirebaseFirestore.instance
                                 .collection('users')
@@ -656,9 +657,9 @@ Widget _buildUserRow({
                   ),
                   decoration: BoxDecoration(
                     color:
-                        role == 'Admin'
+                        role == 'OASP Admin'
                             ? Colors.red[700]
-                            : role == 'Staff'
+                            : role == 'OASP Staff'
                             ? Colors.orange[700]
                             : Colors.blue[700],
                     borderRadius: BorderRadius.circular(4),
@@ -668,9 +669,9 @@ Widget _buildUserRow({
                     style: TextStyle(
                       fontSize: 12,
                       color:
-                          role == 'Admin'
+                          role == 'OASP Admin'
                               ? Colors.red[50]
-                              : role == 'Staff'
+                              : role == 'OASP Staff'
                               ? Colors.orange[50]
                               : Colors.blue[50],
                       fontWeight: FontWeight.w500,
@@ -691,9 +692,9 @@ Widget _buildUserRow({
                   ),
                   decoration: BoxDecoration(
                     color:
-                        role == 'Admin'
+                        role == 'OASP Admin'
                             ? Colors.red[700]
-                            : role == 'Staff'
+                            : role == 'OASP Staff'
                             ? Colors.orange[700]
                             : Colors.blue[700],
                     borderRadius: BorderRadius.circular(4),
@@ -703,9 +704,9 @@ Widget _buildUserRow({
                     style: TextStyle(
                       fontSize: 12,
                       color:
-                          role == 'Admin'
+                          role == 'OASP Admin'
                               ? Colors.red[50]
-                              : role == 'Staff'
+                              : role == 'OASP Staff'
                               ? Colors.orange[50]
                               : Colors.blue[50],
                       fontWeight: FontWeight.w500,

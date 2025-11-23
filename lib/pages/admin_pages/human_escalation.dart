@@ -21,13 +21,15 @@ class _HumanEscalationState extends State<HumanEscalation>
   String _selectedFilter = 'all';
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  late AnimationController _refreshAnimationController;
+  late AnimationController _refreshAnimationController; 
   
   final List<String> _filterOptions = [
     'all',
     'pending',
     'resolved',
   ];
+
+   bool _hasAutoOpened = false;
 
   @override
   void initState() {
@@ -398,6 +400,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                     
                     // Enhanced Stats Row - Responsive
                     StreamBuilder<QuerySnapshot>(
+                       key: const ValueKey('escalations_stats'),
                       stream: FirebaseFirestore.instance.collection('escalations').snapshots(),
                       builder: (context, snapshot) {
                         if (!snapshot.hasData) {
@@ -468,6 +471,7 @@ class _HumanEscalationState extends State<HumanEscalation>
             // Enhanced List - Responsive
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
+                 key: const ValueKey('escalations_list'),
                 stream: FirebaseFirestore.instance
                     .collection('escalations')
                     .orderBy('createdAt', descending: true)

@@ -294,7 +294,7 @@ Future<void> saveToAdmission(Admissions ad) async {
       'contact': ad.contact,
       'requirements': ad.requirements ?? [],
       'links': ad.links,
-      'schedules': ad.schedules, // ✅ NEW
+      'schedules': ad.schedules, 
       'createdAt': FieldValue.serverTimestamp(),
     };
 

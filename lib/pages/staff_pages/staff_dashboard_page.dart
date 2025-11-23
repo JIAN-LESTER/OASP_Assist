@@ -1068,24 +1068,31 @@ Widget dashboardContents(
         }
 
         // --- Return widget ---
-     return SingleChildScrollView(
+        return Padding(
           padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(
-                selectedTimeFrame,
-                onTimeFrameChanged,
-                onRefresh,
-                isRefreshing,
-                userName,
-              ),
-              const SizedBox(height: 32),
-              statCards(),
-              const SizedBox(height: 32),
-              cardsSection(),
-            ],
-          ),
+          child: isMobile
+              ? SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(selectedTimeFrame, onTimeFrameChanged, onRefresh, isRefreshing, userName),
+                      const SizedBox(height: 32),
+                      statCards(),
+                      const SizedBox(height: 32),
+                      cardsSection(),
+                    ],
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(selectedTimeFrame, onTimeFrameChanged, onRefresh, isRefreshing, userName),
+                    const SizedBox(height: 32),
+                    statCards(),
+                    const SizedBox(height: 32),
+                    Expanded(child: cardsSection()),
+                  ],
+                ),
         );
       },
     ),

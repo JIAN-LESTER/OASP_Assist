@@ -155,9 +155,9 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
   bool _isUploading = false;
   bool _isProcessingImage = false;
 
-   bool  _isProcessing = true;
-   bool _fileProcessed = false;
-     bool _fileReady = false; 
+  bool _isProcessing = true;
+  bool _fileProcessed = false;
+  bool _fileReady = false;
 
   final List<String> _predefinedCategories = [
     'Admission',
@@ -174,58 +174,59 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
     super.dispose();
   }
 
-Future<void> _pickFile() async {
-  try {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'txt', 'docx', 'doc'],
-      withData: true,
-    );
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'txt', 'docx', 'doc'],
+        withData: true,
+      );
 
-    if (result != null && result.files.single.bytes != null) {
-      final fileName = result.files.single.name;
-      final fileBytes = result.files.single.bytes!;
+      if (result != null && result.files.single.bytes != null) {
+        final fileName = result.files.single.name;
+        final fileBytes = result.files.single.bytes!;
 
-      setState(() {
-        _selectedFileName = fileName;
-        _isProcessing = true;
-        _fileReady = false;
-      });
+        setState(() {
+          _selectedFileName = fileName;
+          _isProcessing = true;
+          _fileReady = false;
+          _extractedText = null; // Clear previous text
+        });
 
-      String extractedText;
-      final extension = fileName.split('.').last.toLowerCase();
+        String extractedText;
+        final extension = fileName.split('.').last.toLowerCase();
 
-      if (extension == 'pdf') {
-        extractedText = await _fileService.extractTextFromPdfBytes(fileBytes);
-      } else if (extension == 'docx' || extension == 'doc') {
-        extractedText = await _fileService.extractTextFromFileBytes(
-          fileBytes,
-          fileName,
-        );
-      } else if (extension == 'txt') {
-        extractedText = utf8.decode(fileBytes);
-      } else {
-        throw UnsupportedError('Unsupported file type: $extension');
+        if (extension == 'pdf') {
+          extractedText = await _fileService.extractTextFromPdfBytes(fileBytes);
+        } else if (extension == 'docx' || extension == 'doc') {
+          extractedText = await _fileService.extractTextFromFileBytes(
+            fileBytes,
+            fileName,
+          );
+        } else if (extension == 'txt') {
+          extractedText = utf8.decode(fileBytes);
+        } else {
+          throw UnsupportedError('Unsupported file type: $extension');
+        }
+
+        setState(() {
+          _extractedText = extractedText;
+          _fileReady = true; // ✅ Set file ready
+          _titleController.text = fileName.split('.').first;
+          _isProcessing = false;
+        });
+
+        _showTopRightAlert('File processed successfully!', AlertType.success);
       }
-
+    } catch (e) {
       setState(() {
-        _extractedText = extractedText;
-        _fileReady = true;
-        // ✅ ALWAYS update title when a new file is uploaded
-        _titleController.text = fileName.split('.').first;
         _isProcessing = false;
+        _fileReady = false;
+        _extractedText = null; // Clear on error
       });
-
-      _showTopRightAlert('File processed successfully!', AlertType.success);
+      _showTopRightAlert('Error processing file: $e', AlertType.error);
     }
-  } catch (e) {
-    setState(() {
-      _isProcessing = false;
-      _fileReady = false;
-    });
-    _showTopRightAlert('Error processing file: $e', AlertType.error);
   }
-}
 
   Future<void> _pickImageFromGallery() async {
     try {
@@ -258,93 +259,121 @@ Future<void> _pickFile() async {
     }
   }
 
- Future<void> _processImage(XFile image) async {
-  setState(() {
-    _isProcessingImage = true;
-  });
+  Future<void> _processImage(XFile image) async {
+    setState(() {
+      _isProcessingImage = true;
+      _fileReady = false;
+      _extractedText = null; // Clear previous text
+    });
 
-  try {
-    final inputImage = InputImage.fromFilePath(image.path);
-    final RecognizedText recognizedText = await _textRecognizer.processImage(
-      inputImage,
-    );
+    try {
+      final inputImage = InputImage.fromFilePath(image.path);
+      final RecognizedText recognizedText = await _textRecognizer.processImage(
+        inputImage,
+      );
 
-    String extractedText = recognizedText.text;
+      String extractedText = recognizedText.text;
 
-    if (extractedText.trim().isEmpty) {
-      _showTopRightAlert('No text found in image', AlertType.warning);
+      if (extractedText.trim().isEmpty) {
+        _showTopRightAlert('No text found in image', AlertType.warning);
+        setState(() {
+          _isProcessingImage = false;
+          _fileReady = false;
+        });
+        return;
+      }
+
+      final fileName = 'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      setState(() {
+        _selectedFile = File(image.path);
+        _selectedFileName = fileName;
+        _extractedText = extractedText; // ✅ Set extracted text
+        _fileReady = true; // ✅ Set file ready
+        _isProcessingImage = false;
+        _titleController.text =
+            'Document from Image ${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year}';
+      });
+
+      _showTopRightAlert(
+        'Text extracted successfully! Found ${extractedText.split(' ').length} words',
+        AlertType.success,
+      );
+    } catch (e) {
       setState(() {
         _isProcessingImage = false;
+        _fileReady = false;
+        _extractedText = null;
       });
-      return;
+      _showTopRightAlert(
+        'Error extracting text from image: $e',
+        AlertType.error,
+      );
     }
-
-    final fileName = 'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-    setState(() {
-      _selectedFile = File(image.path);
-      _selectedFileName = fileName;
-      _extractedText = extractedText;
-      _fileReady = true; // ✅ Add this
-      _isProcessingImage = false;
-      
-      // ✅ ALWAYS update title when a new image is processed
-      _titleController.text = 'Document from Image ${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year}';
-    });
-
-    _showTopRightAlert(
-      'Text extracted successfully! Found ${extractedText.split(' ').length} words',
-      AlertType.success,
-    );
-  } catch (e) {
-    setState(() {
-      _isProcessingImage = false;
-      _fileReady = false; // ✅ Add this
-    });
-    _showTopRightAlert(
-      'Error extracting text from image: $e',
-      AlertType.error,
-    );
   }
-}
 
-  void _showUploadOptionsBottomSheet() {
+ void _showUploadOptionsBottomSheet() {
+  // ✅ MOBILE: Show bottom modal sheet
+  if (widget.isMobile) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: Offset(0, -2),
+              ),
+            ],
           ),
           child: SafeArea(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Container(
-                  width: 40,
-                  height: 4,
+                  width: 48,
+                  height: 5,
                   decoration: BoxDecoration(
                     color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
                 const SizedBox(height: 24),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    'Choose Upload Method',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Choose Upload Method',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1F2937),
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Select how you want to add your document',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
                 _buildUploadOption(
-                  icon: Icons.insert_drive_file,
+                  icon: Icons.insert_drive_file_outlined,
                   title: 'Upload Document',
                   subtitle: 'PDF, TXT, DOC, DOCX',
                   color: const Color(0xFF2E7D32),
@@ -354,27 +383,26 @@ Future<void> _pickFile() async {
                   },
                 ),
                 _buildUploadOption(
-                  icon: Icons.photo_library,
+                  icon: Icons.photo_library_outlined,
                   title: 'Choose from Gallery',
                   subtitle: 'Extract text from image',
-                  color: Colors.blue,
+                  color: Color(0xFF1976D2),
                   onTap: () {
                     Navigator.pop(context);
                     _pickImageFromGallery();
                   },
                 ),
-                if (widget.isMobile)
-                  _buildUploadOption(
-                    icon: Icons.camera_alt,
-                    title: 'Take Photo',
-                    subtitle: 'Capture and extract text',
-                    color: Colors.orange,
-                    onTap: () {
-                      Navigator.pop(context);
-                      _takePhoto();
-                    },
-                  ),
-                const SizedBox(height: 16),
+                _buildUploadOption(
+                  icon: Icons.camera_alt_outlined,
+                  title: 'Take Photo',
+                  subtitle: 'Capture and extract text',
+                  color: Color(0xFFED6C02),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _takePhoto();
+                  },
+                ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -382,64 +410,80 @@ Future<void> _pickFile() async {
       },
     );
   }
+  // ✅ DESKTOP/TABLET: Do nothing (options shown inline in UI)
+  // The bottom sheet won't show, user will interact with inline options
+}
 
-  Widget _buildUploadOption({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: Colors.white, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
-          ],
-        ),
+ Widget _buildUploadOption({
+  required IconData icon,
+  required String title,
+  required String subtitle,
+  required Color color,
+  required VoidCallback onTap,
+}) {
+  return InkWell(
+    onTap: onTap,
+    child: Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.2), width: 1.5),
       ),
-    );
-  }
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2937),
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.arrow_forward_ios_rounded,
+            size: 18,
+            color: Color(0xFF9CA3AF),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Future<void> _uploadDocument() async {
-    if (_selectedFile == null || _extractedText == null) {
+    // ✅ Fixed validation - check _extractedText instead of _selectedFile
+    if (_extractedText == null || _extractedText!.trim().isEmpty) {
       _showTopRightAlert('Please select a file first', AlertType.warning);
       return;
     }
@@ -736,125 +780,283 @@ Future<void> _pickFile() async {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Column(
-        children: [
-          // Header with gradient
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(widget.isMobile ? 20 : 28),
-            decoration: const BoxDecoration(color: Color(0xFF2E7D32)),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.cloud_upload_outlined,
-                    color: Colors.white,
-                    size: widget.isMobile ? 24 : 28,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Upload Document',
-                        style: TextStyle(
-                          fontSize: widget.isMobile ? 20 : 24,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          letterSpacing: -0.5,
-                        ),
+Widget _buildFileUploadArea() {
+  return Container(
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: const Color(0xFFFAFBFC),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: _fileReady
+            ? const Color(0xFF2E7D32).withOpacity(0.4)
+            : const Color(0xFFE5E7EB),
+        width: 2,
+      ),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        // ✅ MOBILE: Show bottom sheet
+        // ✅ DESKTOP/TABLET: Show inline options (do nothing on tap)
+        onTap: _isProcessingImage 
+            ? null 
+            : (widget.isMobile ? _showUploadOptionsBottomSheet : _pickFile),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.isMobile ? 20 : 32,
+            vertical: widget.isMobile ? 24 : 32,
+          ),
+          child: Column(
+            children: [
+              // Processing state
+              if (_isProcessingImage)
+                Column(
+                  children: [
+                    CircularProgressIndicator(color: const Color(0xFF2E7D32)),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Extracting text from image...',
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 14 : 16,
+                        color: const Color(0xFF374151),
+                        fontWeight: FontWeight.w500,
                       ),
-                      const SizedBox(height: 4),
+                    ),
+                  ],
+                )
+              // File ready state
+              else if (_fileReady)
+                Column(
+                  children: [
+                    Container(
+                      width: widget.isMobile ? 56 : 72,
+                      height: widget.isMobile ? 56 : 72,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2E7D32),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.check_circle_outline,
+                        color: Colors.white,
+                        size: widget.isMobile ? 28 : 32,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _selectedFileName ?? 'File ready for upload',
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 15 : 16,
+                        color: const Color(0xFF1F2937),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: Color(0xFF2E7D32),
+                          size: 16,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'File processed successfully',
+                          style: TextStyle(
+                            fontSize: widget.isMobile ? 13 : 14,
+                            color: Color(0xFF2E7D32),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (widget.isMobile) ...[
+                      const SizedBox(height: 12),
                       Text(
-                        'Add new document to knowledge base',
+                        'Tap to upload a different file',
                         style: TextStyle(
-                          fontSize: widget.isMobile ? 14 : 16,
-                          color: Colors.white.withOpacity(0.85),
-                          fontWeight: FontWeight.w400,
+                          fontSize: 12,
+                          color: Color(0xFF9CA3AF),
                         ),
                       ),
                     ],
-                  ),
-                ),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(24),
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      child: Icon(
-                        Icons.close,
-                        color: Colors.white.withOpacity(0.9),
-                        size: 24,
+                  ],
+                )
+              // Default state
+              else
+                Column(
+                  children: [
+                    Container(
+                      width: widget.isMobile ? 56 : 72,
+                      height: widget.isMobile ? 56 : 72,
+                      decoration: BoxDecoration(
+                        color: Color(0xFF2E7D32).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      child: Icon(
+                        Icons.upload_file,
+                        color: const Color(0xFF2E7D32),
+                        size: widget.isMobile ? 28 : 32,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      widget.isMobile
+                          ? 'Tap to upload'
+                          : 'Choose upload method below',
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 15 : 16,
+                        color: const Color(0xFF1F2937),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.isMobile
+                          ? 'Documents or images'
+                          : 'Select an option below to get started',
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 13 : 14,
+                        color: const Color(0xFF9CA3AF),
+                        fontWeight: FontWeight.w400,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+
+     
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.transparent,
+    body: Column(
+      children: [
+        // Header
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(widget.isMobile ? 20 : 28),
+          decoration: const BoxDecoration(color: Color(0xFF2E7D32)),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.cloud_upload_outlined,
+                  color: Colors.white,
+                  size: widget.isMobile ? 24 : 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Upload Document',
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 20 : 24,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Add new document to knowledge base',
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 14 : 16,
+                        color: Colors.white.withOpacity(0.85),
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(24),
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      Icons.close,
+                      color: Colors.white.withOpacity(0.9),
+                      size: 24,
                     ),
                   ),
                 ),
+              ),
+            ],
+          ),
+        ),
+
+        // Content
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.isMobile ? 20 : 28,
+              vertical: widget.isMobile ? 20 : 28,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // File Upload Section
+                _buildSectionHeader('File Selection', Icons.upload_file),
+                const SizedBox(height: 16),
+                _buildFileUploadArea(), // ✅ Updated with inline options
+
+                const SizedBox(height: 24),
+
+                // Document Details Section
+                _buildSectionHeader('Document Details', Icons.description),
+                const SizedBox(height: 16),
+
+                // Title Input
+                buildTextField(
+                  isMobile: false,
+                  controller: _titleController,
+                  label: 'Document Title',
+                  hint: 'Enter a descriptive title',
+                  icon: Icons.title,
+                ),
+
+                const SizedBox(height: 20),
+
+                // Category Selection
+                _buildCategorySection(),
+
+                const SizedBox(height: 32),
+
+                // Action Buttons
+                _buildActionButtons(),
+
+                const SizedBox(height: 16),
               ],
             ),
           ),
-
-          // Content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: widget.isMobile ? 20 : 28,
-                vertical: widget.isMobile ? 20 : 28,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // File Upload Section
-                  _buildSectionHeader('File Selection', Icons.upload_file),
-                  const SizedBox(height: 16),
-                  _buildFileUploadArea(),
-
-                  const SizedBox(height: 24),
-
-                  // Document Details Section
-                  _buildSectionHeader('Document Details', Icons.description),
-                  const SizedBox(height: 16),
-
-                  // Title Input
-                  buildTextField(
-                    isMobile: false,
-                    controller: _titleController,
-                    label: 'Document Title',
-                    hint: 'Enter a descriptive title',
-                    icon: Icons.title,
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Category Selection
-                  _buildCategorySection(),
-
-                  const SizedBox(height: 32),
-
-                  // Action Buttons
-                  _buildActionButtons(),
-
-                  const SizedBox(height: 16),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
@@ -874,102 +1076,7 @@ Future<void> _pickFile() async {
     );
   }
 
- Widget _buildFileUploadArea() {
-  return Container(
-    width: double.infinity,
-    decoration: BoxDecoration(
-      color: const Color(0xFFFAFBFC),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(
-        color:
-            _fileReady // ✅ Use _fileReady instead of _selectedFile
-                ? const Color(0xFF2E7D32).withOpacity(0.4)
-                : const Color(0xFFE5E7EB),
-        width: 2,
-      ),
-    ),
-    child: Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: _isProcessingImage ? null : _showUploadOptionsBottomSheet,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: widget.isMobile ? 20 : 32,
-            vertical: widget.isMobile ? 24 : 32,
-          ),
-          child: Column(
-            children: [
-              if (_isProcessingImage)
-                Column(
-                  children: [
-                    CircularProgressIndicator(color: const Color(0xFF2E7D32)),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Extracting text from image...',
-                      style: TextStyle(
-                        fontSize: widget.isMobile ? 14 : 16,
-                        color: const Color(0xFF374151),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Column(
-                  children: [
-                    Container(
-                      width: widget.isMobile ? 56 : 72,
-                      height: widget.isMobile ? 56 : 72,
-                      decoration: BoxDecoration(
-                        color:
-                            _fileReady // ✅ Use _fileReady
-                                ? const Color(0xFF2E7D32)
-                                : Colors.green,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        _fileReady // ✅ Use _fileReady
-                            ? Icons.insert_drive_file
-                            : Icons.upload_file,
-                        color: Colors.white,
-                        size: widget.isMobile ? 28 : 32,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _fileReady // ✅ Use _fileReady
-                          ? _selectedFileName ?? 'File ready for upload'
-                          : 'Click to upload document or image',
-                      style: TextStyle(
-                        fontSize: widget.isMobile ? 15 : 16,
-                        color: const Color(0xFF1F2937),
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _fileReady // ✅ Use _fileReady
-                          ? 'File ready for upload'
-                          : 'Documents: PDF, TXT, DOC, DOCX • Images: JPG, PNG',
-                      style: TextStyle(
-                        fontSize: widget.isMobile ? 13 : 14,
-                        color: const Color(0xFF9CA3AF),
-                        fontWeight: FontWeight.w400,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
+  
   Widget _buildCategorySection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1059,7 +1166,6 @@ Future<void> _pickFile() async {
 
     return Row(
       children: [
-        // Cancel Button
         Expanded(
           child: SizedBox(
             height: buttonHeight,
@@ -1087,62 +1193,62 @@ Future<void> _pickFile() async {
           ),
         ),
         const SizedBox(width: 12),
-        // Upload Button
-       Expanded(
-  child: SizedBox(
-    height: buttonHeight,
-    child: ElevatedButton(
-      onPressed:
-          (_isUploading || !_fileReady) // ✅ Check _fileReady instead of _selectedFile
-              ? null
-              : _uploadDocument,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF2E7D32),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        disabledBackgroundColor: const Color(0xFFE5E7EB),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(borderRadius),
-        ),
-        padding: EdgeInsets.symmetric(
-          horizontal: widget.isMobile ? 16 : 20,
-        ),
-      ),
-      child:
-          _isUploading
-              ? Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        Colors.white,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Uploading...',
-                    style: TextStyle(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              )
-              : Text(
-                'Upload Document',
-                style: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
+        Expanded(
+          child: SizedBox(
+            height: buttonHeight,
+            child: ElevatedButton(
+              // ✅ Fixed condition - check _fileReady AND _extractedText
+              onPressed:
+                  (_isUploading || !_fileReady || _extractedText == null)
+                      ? null
+                      : _uploadDocument,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E7D32),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                disabledBackgroundColor: const Color(0xFFE5E7EB),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(borderRadius),
+                ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: widget.isMobile ? 16 : 20,
                 ),
               ),
-    ),
-  ),
-),
+              child:
+                  _isUploading
+                      ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Uploading...',
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      )
+                      : Text(
+                        'Upload Document',
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+            ),
+          ),
+        ),
       ],
     );
   }

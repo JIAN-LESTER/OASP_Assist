@@ -864,13 +864,7 @@ Widget _buildIBRow({
                   doc,
                   DeleteConfigs.document,
                   'information_bank',
-                  customDeleteHandler: (context, doc) async {
-                    await handleComplexDocumentDelete(
-                      context,
-                      doc,
-                      'information_bank',
-                    );
-                  },
+                  customDeleteHandler: handleInformationBankDelete
                 );
               }
             },

@@ -86,6 +86,7 @@ List<Map<String, dynamic>> _extractedSchedules = []; // Store extracted schedule
   bool _isProcessing = false;
   String? _selectedFileName;
   File? _selectedFile;
+  bool _fileUploaded = false;
 
   @override
   void initState() {
@@ -176,14 +177,14 @@ void dispose() {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'txt', 'docx', 'doc'],
-      withData: true, // ✅ CRITICAL for web
+      withData: true,
     );
 
     if (result != null) {
       final fileName = result.files.single.name;
       final fileBytes = result.files.single.bytes;
 
-      // ✅ Web platform - use bytes directly
+      // Web platform - use bytes directly
       if (kIsWeb || fileBytes != null) {
         if (fileBytes == null) {
           throw Exception('No file data available');
@@ -192,6 +193,7 @@ void dispose() {
         setState(() {
           _selectedFileName = fileName;
           _isProcessing = true;
+          _fileUploaded = false; // ✅ Reset during processing
         });
 
         String extractedText;
@@ -212,10 +214,13 @@ void dispose() {
 
         await _processExtractedText(extractedText, fileName);
 
-        setState(() => _isProcessing = false);
+        setState(() {
+          _isProcessing = false;
+          _fileUploaded = true; // ✅ Mark as uploaded
+        });
         _showAlert('File processed successfully!', AlertType.success);
       } 
-      // ✅ Mobile/Desktop platform - use file path
+      // Mobile/Desktop platform - use file path
       else if (result.files.single.path != null) {
         final file = File(result.files.single.path!);
 
@@ -223,17 +228,24 @@ void dispose() {
           _selectedFile = file;
           _selectedFileName = fileName;
           _isProcessing = true;
+          _fileUploaded = false; // ✅ Reset during processing
         });
 
         String extractedText = await _fileService.extractTextFromFile(file);
         await _processExtractedText(extractedText, fileName);
 
-        setState(() => _isProcessing = false);
+        setState(() {
+          _isProcessing = false;
+          _fileUploaded = true; // ✅ Mark as uploaded
+        });
         _showAlert('File processed successfully!', AlertType.success);
       }
     }
   } catch (e) {
-    setState(() => _isProcessing = false);
+    setState(() {
+      _isProcessing = false;
+      _fileUploaded = false; // ✅ Reset on error
+    });
     _showAlert('Error processing file: $e', AlertType.error);
   }
 }
@@ -264,44 +276,215 @@ void dispose() {
   }
 
   Future<void> _processImage(XFile image) async {
-    setState(() => _isProcessing = true);
+  setState(() {
+    _isProcessing = true;
+    _fileUploaded = false; // ✅ Reset during processing
+  });
 
-    try {
-      String extractedText;
+  try {
+    String extractedText;
 
-      if (kIsWeb || Platform.isWindows) {
-        extractedText = "OCR not yet implemented for web/windows";
-        _showAlert('Tesseract OCR not yet implemented', AlertType.warning);
-        setState(() => _isProcessing = false);
-        return;
-      } else {
-        final inputImage = InputImage.fromFilePath(image.path);
-        final RecognizedText recognizedText = await _textRecognizer
-            .processImage(inputImage);
-        extractedText = recognizedText.text;
-      }
-
-      if (extractedText.trim().isEmpty) {
-        _showAlert('No text found in image', AlertType.warning);
-        setState(() => _isProcessing = false);
-        return;
-      }
-
+    if (kIsWeb || Platform.isWindows) {
+      extractedText = "OCR not yet implemented for web/windows";
+      _showAlert('Tesseract OCR not yet implemented', AlertType.warning);
       setState(() {
-        _selectedFile = File(image.path);
-        _selectedFileName =
-            'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        _isProcessing = false;
+        _fileUploaded = false;
       });
-
-      await _processExtractedText(extractedText, _selectedFileName!);
-
-      setState(() => _isProcessing = false);
-      _showAlert('Text extracted successfully!', AlertType.success);
-    } catch (e) {
-      setState(() => _isProcessing = false);
-      _showAlert('Error extracting text: $e', AlertType.error);
+      return;
+    } else {
+      final inputImage = InputImage.fromFilePath(image.path);
+      final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+      extractedText = recognizedText.text;
     }
+
+    if (extractedText.trim().isEmpty) {
+      _showAlert('No text found in image', AlertType.warning);
+      setState(() {
+        _isProcessing = false;
+        _fileUploaded = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _selectedFile = File(image.path);
+      _selectedFileName = 'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    });
+
+    await _processExtractedText(extractedText, _selectedFileName!);
+
+    setState(() {
+      _isProcessing = false;
+      _fileUploaded = true; // ✅ Mark as uploaded
+    });
+    _showAlert('Text extracted successfully!', AlertType.success);
+  } catch (e) {
+    setState(() {
+      _isProcessing = false;
+      _fileUploaded = false; // ✅ Reset on error
+    });
+    _showAlert('Error extracting text: $e', AlertType.error);
   }
+}
+
+Widget buildUploadArea(bool isMobile) {
+  // ✅ Check BOTH _selectedFile AND _fileUploaded
+  final hasFile = _selectedFile != null || _fileUploaded;
+  
+  return Container(
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: Color(0xFFFAFBFC),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: hasFile // ✅ Updated condition
+            ? Color(0xFF2E7D32).withOpacity(0.4)
+            : Color(0xFFE5E7EB),
+        width: 2,
+      ),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: _isProcessing ? null : _showUploadOptionsBottomSheet,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 20 : 32,
+            vertical: isMobile ? 24 : 32,
+          ),
+          child: Column(
+            children: [
+              // ✅ Processing state
+              if (_isProcessing)
+                Column(
+                  children: [
+                    SizedBox(
+                      width: isMobile ? 56 : 72,
+                      height: isMobile ? 56 : 72,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Processing...',
+                      style: TextStyle(
+                        fontSize: isMobile ? 15 : 16,
+                        color: Color(0xFF1F2937),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                )
+              // ✅ File uploaded state
+              else if (hasFile)
+                Column(
+                  children: [
+                    Container(
+                      width: isMobile ? 56 : 72,
+                      height: isMobile ? 56 : 72,
+                      decoration: BoxDecoration(
+                        color: Color(0xFF2E7D32),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.check_circle_outline,
+                        color: Colors.white,
+                        size: isMobile ? 28 : 32,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      _selectedFileName ?? 'File uploaded',
+                      style: TextStyle(
+                        fontSize: isMobile ? 15 : 16,
+                        color: Color(0xFF1F2937),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: Color(0xFF2E7D32),
+                          size: 16,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'File processed successfully',
+                          style: TextStyle(
+                            fontSize: isMobile ? 13 : 14,
+                            color: Color(0xFF2E7D32),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'Click to upload a different file',
+                      style: TextStyle(
+                        fontSize: isMobile ? 12 : 13,
+                        color: Color(0xFF9CA3AF),
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                )
+              // ✅ No file state
+              else
+                Column(
+                  children: [
+                    Container(
+                      width: isMobile ? 56 : 72,
+                      height: isMobile ? 56 : 72,
+                      decoration: BoxDecoration(
+                        color: Color(0xFF2E7D32).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.upload_file,
+                        color: Color(0xFF2E7D32),
+                        size: isMobile ? 28 : 32,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Click to upload document or image',
+                      style: TextStyle(
+                        fontSize: isMobile ? 15 : 16,
+                        color: Color(0xFF1F2937),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Documents: PDF, TXT, DOC, DOCX • Images: JPG, PNG',
+                      style: TextStyle(
+                        fontSize: isMobile ? 13 : 14,
+                        color: Color(0xFF9CA3AF),
+                        fontWeight: FontWeight.w400,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
 
  Future<void> _processExtractedText(String text, String fileName) async {
   try {
@@ -870,86 +1053,10 @@ void dispose() {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Upload button
-                    if (!widget.isEdit)
-                      Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Color(0xFFFAFBFC),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color:
-                                _selectedFile != null
-                                    ? Color(0xFF2E7D32).withOpacity(0.4)
-                                    : Color(0xFFE5E7EB),
-                            width: 2,
-                          ),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap:
-                                _isProcessing
-                                    ? null
-                                    : _showUploadOptionsBottomSheet,
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: isMobile ? 20 : 32,
-                                vertical: isMobile ? 24 : 32,
-                              ),
-                              child: Column(
-                                children: [
-                                  Container(
-                                    width: isMobile ? 56 : 72,
-                                    height: isMobile ? 56 : 72,
-                                    decoration: BoxDecoration(
-                                      color:
-                                          _selectedFile != null
-                                              ? Color(0xFF2E7D32)
-                                              : Color(
-                                                0xFF2E7D32,
-                                              ).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(
-                                      _selectedFile != null
-                                          ? Icons.insert_drive_file
-                                          : Icons.upload_file,
-                                      color:
-                                          _selectedFile != null
-                                              ? Colors.white
-                                              : Color(0xFF2E7D32),
-                                      size: isMobile ? 28 : 32,
-                                    ),
-                                  ),
-                                  SizedBox(height: 16),
-                                  Text(
-                                    _selectedFile != null
-                                        ? _selectedFileName ?? 'File selected'
-                                        : 'Click to upload document or image',
-                                    style: TextStyle(
-                                      fontSize: isMobile ? 15 : 16,
-                                      color: Color(0xFF1F2937),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'Documents: PDF, TXT, DOC, DOCX • Images: JPG, PNG',
-                                    style: TextStyle(
-                                      fontSize: isMobile ? 13 : 14,
-                                      color: Color(0xFF9CA3AF),
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                   if (!widget.isEdit) ...[
+  buildUploadArea(isMobile),
+  SizedBox(height: 24),
+],
 
                     if (_isProcessing)
                       Padding(

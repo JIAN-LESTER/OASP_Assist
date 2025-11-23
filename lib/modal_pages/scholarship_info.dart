@@ -497,13 +497,7 @@ Widget _buildActionButtons(
   doc,
   DeleteConfigs.scholarships,
   'scholarships',
-  customDeleteHandler: (context, doc) async {
-    await handleComplexDocumentDelete(
-      context,
-      doc,
-      'scholarships', // ✅ Pass the collection name
-    );
-  },
+  customDeleteHandler: handleScholarshipDelete
 ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(

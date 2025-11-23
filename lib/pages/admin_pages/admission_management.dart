@@ -1024,13 +1024,7 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                       widget.doc,
                       DeleteConfigs.admissions,
                       'admissions',
-                      customDeleteHandler: (context, doc) async {
-                        await handleComplexDocumentDelete(
-                          context,
-                          doc,
-                          'admissions',
-                        );
-                      },
+                      customDeleteHandler: handleAdmissionDelete
                     );
                   }
                 },
@@ -1147,13 +1141,7 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                     widget.doc,
                     DeleteConfigs.admissions,
                     'admissions',
-                    customDeleteHandler: (context, doc) async {
-                      await handleComplexDocumentDelete(
-                        context,
-                        doc,
-                        'admissions',
-                      );
-                    },
+                    customDeleteHandler: handleAdmissionDelete
                   );
                 }
               },
