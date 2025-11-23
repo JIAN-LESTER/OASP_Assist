@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -586,211 +585,6 @@ Future<void> handleUserDelete(
   }
 }
 
-// Future<void> handleComplexDocumentDelete(
-//   BuildContext context,
-//   DocumentSnapshot doc,
-//   String collectionName, {
-//   List<String>? additionalCollections,
-// }) async {
-//   try {
-//     final currentUser = FirebaseAuth.instance.currentUser;
-//     String actorName = 'Unknown';
-
-//     if (currentUser != null) {
-//       final currentUserDoc =
-//           await FirebaseFirestore.instance
-//               .collection('users')
-//               .doc(currentUser.uid)
-//               .get();
-
-//       if (currentUserDoc.exists) {
-//         final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
-//         actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';
-//       }
-//     }
-
-//     final docData = doc.data() as Map<String, dynamic>;
-//     String deletedTitle =
-//         docData['ib_title'] ?? docData['title'] ?? docData['name'] ?? 'Unknown';
-//     final pineconeNamespace = docData['pinecone_namespace'];
-
-//     final firestore = FirebaseFirestore.instance;
-
-//     // Determine what to delete based on collection
-//     if (collectionName == 'information_bank') {
-//       // Delete related scholarships
-//       final scholarshipsSnap =
-//           await firestore
-//               .collection('scholarships')
-//               .where('sourceId', isEqualTo: doc.id)
-//               .get();
-
-//       List<String> failedScholarshipDeletes = [];
-//       for (final scholarshipDoc in scholarshipsSnap.docs) {
-//         try {
-//           await firestore
-//               .collection('scholarships')
-//               .doc(scholarshipDoc.id)
-//               .delete();
-//           print("✅ Deleted scholarship ${scholarshipDoc.id}");
-//         } catch (e) {
-//           print("❌ Failed to delete scholarship ${scholarshipDoc.id}: $e");
-//           failedScholarshipDeletes.add(scholarshipDoc.id);
-//         }
-//       }
-
-//       // Delete related admissions
-//       final admissionsSnap =
-//           await firestore
-//               .collection('admissions')
-//               .where('sourceId', isEqualTo: doc.id)
-//               .get();
-
-//       List<String> failedAdmissionDeletes = [];
-//       for (final admissionDoc in admissionsSnap.docs) {
-//         try {
-//           await firestore
-//               .collection('admissions')
-//               .doc(admissionDoc.id)
-//               .delete();
-//           print("✅ Deleted admission ${admissionDoc.id}");
-//         } catch (e) {
-//           print("❌ Failed to delete admission ${admissionDoc.id}: $e");
-//           failedAdmissionDeletes.add(admissionDoc.id);
-//         }
-//       }
-
-//       // Delete related placements
-//       final placementsSnap =
-//           await firestore
-//               .collection('placements')
-//               .where('sourceId', isEqualTo: doc.id)
-//               .get();
-
-//       List<String> failedPlacementDeletes = [];
-//       for (final placementDoc in placementsSnap.docs) {
-//         try {
-//           await firestore
-//               .collection('placements')
-//               .doc(placementDoc.id)
-//               .delete();
-//           print("✅ Deleted placement ${placementDoc.id}");
-//         } catch (e) {
-//           print("❌ Failed to delete placement ${placementDoc.id}: $e");
-//           failedPlacementDeletes.add(placementDoc.id);
-//         }
-//       }
-
-//       // Delete the main information_bank doc
-//       await firestore.collection('information_bank').doc(doc.id).delete();
-//       print("✅ Deleted information_bank document");
-
-//       // Delete vectors in Pinecone in the background
-//       _deleteFromPineconeInBackground(docData, pineconeNamespace);
-
-//       // Close dialogs and show feedback
-//       if (context.mounted) {
-//         Navigator.of(context).pop(); // Close loading
-//         Navigator.of(context).pop(); // Close confirmation
-
-//         int totalFailures =
-//             failedScholarshipDeletes.length +
-//             failedAdmissionDeletes.length +
-//             failedPlacementDeletes.length;
-
-//         if (totalFailures == 0) {
-//           SnackbarUtil.showSuccess(context, 'Document deleted successfully');
-//         } else {
-//           SnackbarUtil.showWarning(
-//             context,
-//             'Document deleted successfully ($totalFailures related docs could not be deleted)',
-//           );
-//         }
-//       }
-
-//       // Log the action
-//       try {
-//         final logRef = firestore.collection('logs').doc();
-//         await logRef.set({
-//           'logId': logRef.id,
-//           'user': actorName,
-//           'action': 'Deleted document: $deletedTitle',
-//           'time': Timestamp.now(),
-//           'scholarships_deleted':
-//               scholarshipsSnap.docs.length - failedScholarshipDeletes.length,
-//           'scholarships_failed': failedScholarshipDeletes.length,
-//           'admissions_deleted':
-//               admissionsSnap.docs.length - failedAdmissionDeletes.length,
-//           'admissions_failed': failedAdmissionDeletes.length,
-//           'placements_deleted':
-//               placementsSnap.docs.length - failedPlacementDeletes.length,
-//           'placements_failed': failedPlacementDeletes.length,
-//         });
-//       } catch (e) {
-//         print("⚠️ Failed to log action: $e");
-//       }
-//     } else if (collectionName == 'admissions') {
-//       final docId = doc.id;
-
-//       // Delete from information_bank if exists
-//       try {
-//         final ibDoc =
-//             await firestore.collection('information_bank').doc(docId).get();
-
-//         if (ibDoc.exists) {
-//           final ibData = ibDoc.data() as Map<String, dynamic>;
-
-//           // Delete from Pinecone
-//           _deleteFromPineconeInBackground(ibData, ibData['pinecone_namespace']);
-
-//           // Delete from information_bank
-//           await firestore.collection('information_bank').doc(docId).delete();
-//           print('✅ Deleted from information_bank');
-//         }
-//       } catch (e) {
-//         print('⚠️ Error deleting from information_bank: $e');
-//       }
-
-//       // Delete from admissions collection
-//       await firestore.collection('admissions').doc(docId).delete();
-//       print('✅ Deleted from admissions');
-
-//       // Close dialogs and show feedback
-//       if (context.mounted) {
-//         Navigator.of(context).pop(); // Close loading
-//         Navigator.of(context).pop(); // Close confirmation or info modal
-
-//         SnackbarUtil.showSuccess(context, 'Admission deleted successfully');
-//       }
-
-//       // Log the action
-//       try {
-//         final logRef = firestore.collection('logs').doc();
-//         await logRef.set({
-//           'logId': logRef.id,
-//           'user': actorName,
-//           'action': 'Deleted admission: $deletedTitle',
-//           'time': Timestamp.now(),
-//         });
-//       } catch (e) {
-//         print("⚠️ Failed to log action: $e");
-//       }
-//     } else {
-//       throw Exception(
-//         'Unsupported collection type for complex delete: $collectionName',
-//       );
-//     }
-//   } catch (error) {
-//     print("❌ Delete operation failed: $error");
-
-//     if (context.mounted) {
-//       Navigator.of(context).pop(); // Close loading
-
-//       SnackbarUtil.showError(context, 'Delete failed: $error');
-//     }
-//   }
-// }
-
 Future<void> handleInformationBankDelete(
   BuildContext context,
   DocumentSnapshot doc,
@@ -800,10 +594,11 @@ Future<void> handleInformationBankDelete(
     String actorName = 'Unknown';
 
     if (currentUser != null) {
-      final currentUserDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      final currentUserDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
 
       if (currentUserDoc.exists) {
         final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
@@ -813,7 +608,7 @@ Future<void> handleInformationBankDelete(
 
     final docData = doc.data() as Map<String, dynamic>;
     String deletedTitle = docData['ib_title'] ?? docData['title'] ?? 'Unknown';
-    
+
     // Get chunk IDs and Pinecone namespace
     final chunkIds = List<String>.from(docData['chunkIds'] ?? []);
     final pineconeNamespace = docData['pinecone_namespace'];
@@ -821,15 +616,19 @@ Future<void> handleInformationBankDelete(
     final firestore = FirebaseFirestore.instance;
 
     // Delete related scholarships
-    final scholarshipsSnap = await firestore
-        .collection('scholarships')
-        .where('sourceId', isEqualTo: doc.id)
-        .get();
+    final scholarshipsSnap =
+        await firestore
+            .collection('scholarships')
+            .where('sourceId', isEqualTo: doc.id)
+            .get();
 
     List<String> failedScholarshipDeletes = [];
     for (final scholarshipDoc in scholarshipsSnap.docs) {
       try {
-        await firestore.collection('scholarships').doc(scholarshipDoc.id).delete();
+        await firestore
+            .collection('scholarships')
+            .doc(scholarshipDoc.id)
+            .delete();
         print("✅ Deleted scholarship ${scholarshipDoc.id}");
       } catch (e) {
         print("❌ Failed to delete scholarship ${scholarshipDoc.id}: $e");
@@ -838,10 +637,11 @@ Future<void> handleInformationBankDelete(
     }
 
     // Delete related admissions
-    final admissionsSnap = await firestore
-        .collection('admissions')
-        .where('sourceId', isEqualTo: doc.id)
-        .get();
+    final admissionsSnap =
+        await firestore
+            .collection('admissions')
+            .where('sourceId', isEqualTo: doc.id)
+            .get();
 
     List<String> failedAdmissionDeletes = [];
     for (final admissionDoc in admissionsSnap.docs) {
@@ -855,10 +655,11 @@ Future<void> handleInformationBankDelete(
     }
 
     // Delete related placements
-    final placementsSnap = await firestore
-        .collection('placements')
-        .where('sourceId', isEqualTo: doc.id)
-        .get();
+    final placementsSnap =
+        await firestore
+            .collection('placements')
+            .where('sourceId', isEqualTo: doc.id)
+            .get();
 
     List<String> failedPlacementDeletes = [];
     for (final placementDoc in placementsSnap.docs) {
@@ -922,9 +723,12 @@ Future<void> handleInformationBankDelete(
         'user': actorName,
         'action': 'Deleted document: $deletedTitle',
         'time': Timestamp.now(),
-        'scholarships_deleted': scholarshipsSnap.docs.length - failedScholarshipDeletes.length,
-        'admissions_deleted': admissionsSnap.docs.length - failedAdmissionDeletes.length,
-        'placements_deleted': placementsSnap.docs.length - failedPlacementDeletes.length,
+        'scholarships_deleted':
+            scholarshipsSnap.docs.length - failedScholarshipDeletes.length,
+        'admissions_deleted':
+            admissionsSnap.docs.length - failedAdmissionDeletes.length,
+        'placements_deleted':
+            placementsSnap.docs.length - failedPlacementDeletes.length,
       });
     } catch (e) {
       print("⚠️ Failed to log action: $e");
@@ -951,10 +755,11 @@ Future<void> handleAdmissionDelete(
     String actorName = 'Unknown';
 
     if (currentUser != null) {
-      final currentUserDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      final currentUserDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
 
       if (currentUserDoc.exists) {
         final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
@@ -968,7 +773,8 @@ Future<void> handleAdmissionDelete(
     final firestore = FirebaseFirestore.instance;
 
     // Check if there's a corresponding information_bank document
-    final ibDoc = await firestore.collection('information_bank').doc(docId).get();
+    final ibDoc =
+        await firestore.collection('information_bank').doc(docId).get();
 
     if (ibDoc.exists) {
       final ibData = ibDoc.data() as Map<String, dynamic>;
@@ -998,7 +804,7 @@ Future<void> handleAdmissionDelete(
 
     // Close dialogs and show feedback
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
+      Navigator.of(context).pop(); // Close loading (from _handleReusableDelete)
       Navigator.of(context).pop(); // Close confirmation
 
       SnackbarUtil.showSuccess(context, 'Admission deleted successfully');
@@ -1021,6 +827,7 @@ Future<void> handleAdmissionDelete(
 
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
+
       SnackbarUtil.showError(context, 'Delete failed: $error');
     }
   }
@@ -1038,10 +845,11 @@ Future<void> handleScholarshipDelete(
     String actorName = 'Unknown';
 
     if (currentUser != null) {
-      final currentUserDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      final currentUserDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
 
       if (currentUserDoc.exists) {
         final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
@@ -1061,30 +869,34 @@ Future<void> handleScholarshipDelete(
     // Check if we should also delete the source document
     // (Only if this is the last scholarship from that source)
     if (sourceId != null) {
-      final remainingScholarships = await firestore
-          .collection('scholarships')
-          .where('sourceId', isEqualTo: sourceId)
-          .get();
+      final remainingScholarships =
+          await firestore
+              .collection('scholarships')
+              .where('sourceId', isEqualTo: sourceId)
+              .get();
 
       if (remainingScholarships.docs.isEmpty) {
         // This was the last scholarship, check if we should delete the source
-        final ibDoc = await firestore.collection('information_bank').doc(sourceId).get();
-        
+        final ibDoc =
+            await firestore.collection('information_bank').doc(sourceId).get();
+
         if (ibDoc.exists) {
           final ibData = ibDoc.data() as Map<String, dynamic>;
-          
+
           // Only delete if there are no other related documents
-          final hasAdmissions = await firestore
-              .collection('admissions')
-              .where('sourceId', isEqualTo: sourceId)
-              .limit(1)
-              .get();
-              
-          final hasPlacements = await firestore
-              .collection('placements')
-              .where('sourceId', isEqualTo: sourceId)
-              .limit(1)
-              .get();
+          final hasAdmissions =
+              await firestore
+                  .collection('admissions')
+                  .where('sourceId', isEqualTo: sourceId)
+                  .limit(1)
+                  .get();
+
+          final hasPlacements =
+              await firestore
+                  .collection('placements')
+                  .where('sourceId', isEqualTo: sourceId)
+                  .limit(1)
+                  .get();
 
           if (hasAdmissions.docs.isEmpty && hasPlacements.docs.isEmpty) {
             final chunkIds = List<String>.from(ibData['chunkIds'] ?? []);
@@ -1093,7 +905,9 @@ Future<void> handleScholarshipDelete(
             // Delete from Pinecone FIRST
             if (chunkIds.isNotEmpty) {
               try {
-                print("🗑️ Deleting ${chunkIds.length} orphaned vectors from Pinecone...");
+                print(
+                  "🗑️ Deleting ${chunkIds.length} orphaned vectors from Pinecone...",
+                );
                 await _deleteFromPinecone(chunkIds, pineconeNamespace);
                 print("✅ Orphaned Pinecone vectors deleted");
               } catch (e) {
@@ -1103,7 +917,10 @@ Future<void> handleScholarshipDelete(
             }
 
             // Delete the information_bank document
-            await firestore.collection('information_bank').doc(sourceId).delete();
+            await firestore
+                .collection('information_bank')
+                .doc(sourceId)
+                .delete();
             print('✅ Deleted orphaned information_bank document');
           }
         }
@@ -1112,7 +929,7 @@ Future<void> handleScholarshipDelete(
 
     // Close dialogs and show feedback
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
+      Navigator.of(context).pop(); // Close loading (from _handleReusableDelete)
       Navigator.of(context).pop(); // Close confirmation
 
       SnackbarUtil.showSuccess(context, 'Scholarship deleted successfully');
@@ -1135,6 +952,7 @@ Future<void> handleScholarshipDelete(
 
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
+
       SnackbarUtil.showError(context, 'Delete failed: $error');
     }
   }
@@ -1152,10 +970,11 @@ Future<void> handlePlacementDelete(
     String actorName = 'Unknown';
 
     if (currentUser != null) {
-      final currentUserDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      final currentUserDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
 
       if (currentUserDoc.exists) {
         final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
@@ -1174,29 +993,33 @@ Future<void> handlePlacementDelete(
 
     // Check if we should also delete the source document
     if (sourceId != null) {
-      final remainingPlacements = await firestore
-          .collection('placements')
-          .where('sourceId', isEqualTo: sourceId)
-          .get();
+      final remainingPlacements =
+          await firestore
+              .collection('placements')
+              .where('sourceId', isEqualTo: sourceId)
+              .get();
 
       if (remainingPlacements.docs.isEmpty) {
-        final ibDoc = await firestore.collection('information_bank').doc(sourceId).get();
-        
+        final ibDoc =
+            await firestore.collection('information_bank').doc(sourceId).get();
+
         if (ibDoc.exists) {
           final ibData = ibDoc.data() as Map<String, dynamic>;
-          
+
           // Only delete if there are no other related documents
-          final hasAdmissions = await firestore
-              .collection('admissions')
-              .where('sourceId', isEqualTo: sourceId)
-              .limit(1)
-              .get();
-              
-          final hasScholarships = await firestore
-              .collection('scholarships')
-              .where('sourceId', isEqualTo: sourceId)
-              .limit(1)
-              .get();
+          final hasAdmissions =
+              await firestore
+                  .collection('admissions')
+                  .where('sourceId', isEqualTo: sourceId)
+                  .limit(1)
+                  .get();
+
+          final hasScholarships =
+              await firestore
+                  .collection('scholarships')
+                  .where('sourceId', isEqualTo: sourceId)
+                  .limit(1)
+                  .get();
 
           if (hasAdmissions.docs.isEmpty && hasScholarships.docs.isEmpty) {
             final chunkIds = List<String>.from(ibData['chunkIds'] ?? []);
@@ -1205,7 +1028,9 @@ Future<void> handlePlacementDelete(
             // Delete from Pinecone FIRST
             if (chunkIds.isNotEmpty) {
               try {
-                print("🗑️ Deleting ${chunkIds.length} orphaned vectors from Pinecone...");
+                print(
+                  "🗑️ Deleting ${chunkIds.length} orphaned vectors from Pinecone...",
+                );
                 await _deleteFromPinecone(chunkIds, pineconeNamespace);
                 print("✅ Orphaned Pinecone vectors deleted");
               } catch (e) {
@@ -1215,7 +1040,10 @@ Future<void> handlePlacementDelete(
             }
 
             // Delete the information_bank document
-            await firestore.collection('information_bank').doc(sourceId).delete();
+            await firestore
+                .collection('information_bank')
+                .doc(sourceId)
+                .delete();
             print('✅ Deleted orphaned information_bank document');
           }
         }
@@ -1224,7 +1052,7 @@ Future<void> handlePlacementDelete(
 
     // Close dialogs and show feedback
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
+      Navigator.of(context).pop(); // Close loading (from _handleReusableDelete)
       Navigator.of(context).pop(); // Close confirmation
 
       SnackbarUtil.showSuccess(context, 'Placement deleted successfully');
@@ -1247,23 +1075,26 @@ Future<void> handlePlacementDelete(
 
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
+
       SnackbarUtil.showError(context, 'Delete failed: $error');
     }
   }
 }
 
+// ============================================================================
+// Pinecone Delete Functions
+// ============================================================================
 Future<void> _deleteFromPinecone(
   List<String> chunkIds,
   String? pineconeNamespace,
 ) async {
   try {
-    final apiKey = 'pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa';
-    final indexHost = 'https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io';
+    final apiKey =
+        'pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa';
+    final indexHost =
+        'https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io';
 
-    final authHeader = {
-      'Content-Type': 'application/json',
-      'Api-Key': apiKey,
-    };
+    final authHeader = {'Content-Type': 'application/json', 'Api-Key': apiKey};
 
     int successfulDeletes = 0;
     int failedDeletes = 0;
@@ -1274,8 +1105,10 @@ Future<void> _deleteFromPinecone(
     }
 
     try {
-      print("🗑️ Attempting to delete ${chunkIds.length} vectors from Pinecone...");
-      
+      print(
+        "🗑️ Attempting to delete ${chunkIds.length} vectors from Pinecone...",
+      );
+
       final deleteUrl = Uri.parse('$indexHost/vectors/delete');
       final body = jsonEncode({
         'ids': chunkIds,
@@ -1296,9 +1129,13 @@ Future<void> _deleteFromPinecone(
         print("✅ Pinecone vectors deleted successfully");
         successfulDeletes = chunkIds.length;
       } else {
-        print("⚠️ Failed to delete Pinecone vectors: ${res.statusCode} - ${res.body}");
+        print(
+          "⚠️ Failed to delete Pinecone vectors: ${res.statusCode} - ${res.body}",
+        );
         failedDeletes = chunkIds.length;
-        throw Exception("Pinecone deletion failed with status ${res.statusCode}");
+        throw Exception(
+          "Pinecone deletion failed with status ${res.statusCode}",
+        );
       }
     } catch (e) {
       print("❌ Error deleting vectors from Pinecone: $e");
