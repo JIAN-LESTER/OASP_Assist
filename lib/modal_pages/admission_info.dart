@@ -208,13 +208,14 @@ void showADInfoModal(
                               Icons.article_outlined,
                             ),
                             TextButton.icon(
-                              onPressed: () => _showFullContentModal(
-                                context,
-                                data,
-                                isMobile,
-                                isTablet,
-                                doc,
-                              ),
+                              onPressed:
+                                  () => _showFullContentModal(
+                                    context,
+                                    data,
+                                    isMobile,
+                                    isTablet,
+                                    doc,
+                                  ),
                               icon: const Icon(
                                 Icons.open_in_full,
                                 size: 16,
@@ -284,104 +285,138 @@ void showADInfoModal(
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: schedules.map((schedule) {
-                                final date = schedule['date']?.toString() ?? '';
-                                final dayOfWeek = schedule['dayOfWeek']?.toString() ?? '';
-                                final locations = schedule['locations'] as List<dynamic>? ?? [];
+                              children:
+                                  schedules.map((schedule) {
+                                    final date =
+                                        schedule['date']?.toString() ?? '';
+                                    final dayOfWeek =
+                                        schedule['dayOfWeek']?.toString() ?? '';
+                                    final locations =
+                                        schedule['locations']
+                                            as List<dynamic>? ??
+                                        [];
 
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 16),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: const Color(0xFF2E7D32).withOpacity(0.2),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(6),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF2E7D32),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: const Icon(
-                                              Icons.calendar_today,
-                                              color: Colors.white,
-                                              size: 14,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  date,
-                                                  style: const TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: Color(0xFF1F2937),
-                                                  ),
-                                                ),
-                                                if (dayOfWeek.isNotEmpty)
-                                                  Text(
-                                                    dayOfWeek,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.w500,
-                                                      color: Color(0xFF6B7280),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 16),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: const Color(
+                                            0xFF2E7D32,
+                                          ).withOpacity(0.2),
+                                          width: 1,
+                                        ),
                                       ),
-                                      if (locations.isNotEmpty) ...[
-                                        const SizedBox(height: 12),
-                                        const Divider(height: 1),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Icon(
-                                              Icons.location_on,
-                                              size: 14,
-                                              color: Color(0xFF2E7D32),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: locations.map((location) {
-                                                  return Padding(
-                                                    padding: const EdgeInsets.only(bottom: 4),
-                                                    child: Text(
-                                                      '• ${location.toString()}',
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  6,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xFF2E7D32,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.calendar_today,
+                                                  color: Colors.white,
+                                                  size: 14,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      date,
                                                       style: const TextStyle(
-                                                        fontSize: 13,
-                                                        color: Color(0xFF475569),
-                                                        height: 1.5,
+                                                        fontSize: 14,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: Color(
+                                                          0xFF1F2937,
+                                                        ),
                                                       ),
                                                     ),
-                                                  );
-                                                }).toList(),
+                                                    if (dayOfWeek.isNotEmpty)
+                                                      Text(
+                                                        dayOfWeek,
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: Color(
+                                                            0xFF6B7280,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
                                               ),
+                                            ],
+                                          ),
+                                          if (locations.isNotEmpty) ...[
+                                            const SizedBox(height: 12),
+                                            const Divider(height: 1),
+                                            const SizedBox(height: 12),
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                const Icon(
+                                                  Icons.location_on,
+                                                  size: 14,
+                                                  color: Color(0xFF2E7D32),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children:
+                                                        locations.map((
+                                                          location,
+                                                        ) {
+                                                          return Padding(
+                                                            padding:
+                                                                const EdgeInsets.only(
+                                                                  bottom: 4,
+                                                                ),
+                                                            child: Text(
+                                                              '• ${location.toString()}',
+                                                              style:
+                                                                  const TextStyle(
+                                                                    fontSize:
+                                                                        13,
+                                                                    color: Color(
+                                                                      0xFF475569,
+                                                                    ),
+                                                                    height: 1.5,
+                                                                  ),
+                                                            ),
+                                                          );
+                                                        }).toList(),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ],
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -406,55 +441,57 @@ void showADInfoModal(
                             child: SingleChildScrollView(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: steps.asMap().entries.map((entry) {
-                                  int index = entry.key;
-                                  String step = entry.value;
-                                  return Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: index < steps.length - 1 ? 12 : 0,
-                                    ),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Container(
-                                          width: 24,
-                                          height: 24,
-                                          margin: const EdgeInsets.only(
-                                            right: 12,
-                                            top: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF2E7D32),
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                          ),
-                                          child: Center(
-                                            child: Text(
-                                              '${index + 1}',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
+                                children:
+                                    steps.asMap().entries.map((entry) {
+                                      int index = entry.key;
+                                      String step = entry.value;
+                                      return Padding(
+                                        padding: EdgeInsets.only(
+                                          bottom:
+                                              index < steps.length - 1 ? 12 : 0,
+                                        ),
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              width: 24,
+                                              height: 24,
+                                              margin: const EdgeInsets.only(
+                                                right: 12,
+                                                top: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF2E7D32),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  '${index + 1}',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Text(
-                                            step,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Color(0xFF475569),
-                                              height: 1.5,
-                                              fontWeight: FontWeight.w400,
+                                            Expanded(
+                                              child: Text(
+                                                step,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: Color(0xFF475569),
+                                                  height: 1.5,
+                                                  fontWeight: FontWeight.w400,
+                                                ),
+                                              ),
                                             ),
-                                          ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
+                                      );
+                                    }).toList(),
                               ),
                             ),
                           ),
@@ -463,7 +500,10 @@ void showADInfoModal(
 
                         // ✅ NEW: Requirements Section
                         if (requirements.isNotEmpty) ...[
-                          buildSectionHeader('Requirements', Icons.checklist_outlined),
+                          buildSectionHeader(
+                            'Requirements',
+                            Icons.checklist_outlined,
+                          ),
                           const SizedBox(height: 12),
                           Container(
                             width: double.infinity,
@@ -478,36 +518,40 @@ void showADInfoModal(
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: requirements.map((requirement) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        margin: const EdgeInsets.only(top: 6),
-                                        width: 6,
-                                        height: 6,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFF2E7D32),
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          requirement,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Color(0xFF475569),
-                                            height: 1.5,
+                              children:
+                                  requirements.map((requirement) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                              top: 6,
+                                            ),
+                                            width: 6,
+                                            height: 6,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF2E7D32),
+                                              shape: BoxShape.circle,
+                                            ),
                                           ),
-                                        ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              requirement,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: Color(0xFF475569),
+                                                height: 1.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
+                                    );
+                                  }).toList(),
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -515,7 +559,10 @@ void showADInfoModal(
 
                         // ✅ NEW: Links Section
                         if (links.isNotEmpty) ...[
-                          buildSectionHeader('Related Links', Icons.link_outlined),
+                          buildSectionHeader(
+                            'Related Links',
+                            Icons.link_outlined,
+                          ),
                           const SizedBox(height: 12),
                           Container(
                             width: double.infinity,
@@ -530,39 +577,41 @@ void showADInfoModal(
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: links.map((link) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: InkWell(
-                                    onTap: () async {
-                                      // Handle link click - you can use url_launcher here
-                                      print('Link clicked: $link');
-                                    },
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.open_in_new,
-                                          size: 14,
-                                          color: Color(0xFF2E7D32),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            link,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Color(0xFF2563EB),
-                                              decoration: TextDecoration.underline,
-                                              height: 1.5,
+                              children:
+                                  links.map((link) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: InkWell(
+                                        onTap: () async {
+                                          // Handle link click - you can use url_launcher here
+                                          print('Link clicked: $link');
+                                        },
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.open_in_new,
+                                              size: 14,
+                                              color: Color(0xFF2E7D32),
                                             ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                link,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: Color(0xFF2563EB),
+                                                  decoration:
+                                                      TextDecoration.underline,
+                                                  height: 1.5,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
+                                      ),
+                                    );
+                                  }).toList(),
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -628,18 +677,10 @@ void showADInfoModal(
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     border: Border(
-                      top: BorderSide(
-                        color: Color(0xFFE2E8F0),
-                        width: 1,
-                      ),
+                      top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
                     ),
                   ),
-                  child: _buildActionButtons(
-                    context,
-                    doc,
-                    isMobile,
-                    isTablet,
-                  ),
+                  child: _buildActionButtons(context, doc, isMobile, isTablet),
                 ),
               ],
             ),
@@ -667,11 +708,11 @@ void showADInfoModal(
 // ✅ NEW: Helper function to format academic year
 String _formatAcademicYear(dynamic academicYear) {
   if (academicYear == null) return 'Not specified';
-  
+
   if (academicYear is Map) {
     final start = academicYear['start'];
     final end = academicYear['end'];
-    
+
     if (start != null && end != null) {
       return '$start-$end';
     } else if (start != null) {
@@ -680,7 +721,7 @@ String _formatAcademicYear(dynamic academicYear) {
   } else if (academicYear is String) {
     return academicYear;
   }
-  
+
   return 'Not specified';
 }
 
@@ -700,13 +741,14 @@ Widget _buildActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: OutlinedButton.icon(
-            onPressed: () => showDeleteConfirmation(
-              context,
-              doc,
-              DeleteConfigs.admissions,
-              'admissions',
-              customDeleteHandler: handleAdmissionDelete
-            ),
+            onPressed:
+                () => showDeleteConfirmation(
+                  context,
+                  doc,
+                  DeleteConfigs.admissions,
+                  'admissions',
+                  customDeleteHandler: handleAdmissionDelete,
+                ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
               'Delete',
@@ -734,10 +776,8 @@ Widget _buildActionButtons(
                 const Duration(milliseconds: 200),
                 () => showDialog(
                   context: context,
-                  builder: (context) => AdmissionFormDialog(
-                    doc: doc,
-                    isEdit: true,
-                  ),
+                  builder:
+                      (context) => AdmissionFormDialog(doc: doc, isEdit: true),
                 ),
               );
             },
@@ -1015,13 +1055,14 @@ Widget _buildFullContentActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: OutlinedButton.icon(
-            onPressed: () => showDeleteConfirmation(
-              context,
-              doc,
-              DeleteConfigs.admissions,
-              'admissions',
-              customDeleteHandler: handleAdmissionDelete
-            ),
+            onPressed:
+                () => showDeleteConfirmation(
+                  context,
+                  doc,
+                  DeleteConfigs.admissions,
+                  'admissions',
+                  customDeleteHandler: handleAdmissionDelete,
+                ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
               'Delete',
@@ -1049,10 +1090,8 @@ Widget _buildFullContentActionButtons(
                 const Duration(milliseconds: 1),
                 () => showDialog(
                   context: context,
-                  builder: (context) => AdmissionFormDialog(
-                    doc: doc,
-                    isEdit: true,
-                  ),
+                  builder:
+                      (context) => AdmissionFormDialog(doc: doc, isEdit: true),
                 ),
               );
             },

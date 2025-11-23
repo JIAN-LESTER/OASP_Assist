@@ -12,7 +12,7 @@ import 'package:capstone_project/pages/admin_pages/widgets/pagination.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/provider_dropdown.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/search_field.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
-import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:flutter/material.dart';
 
 class ScholarshipManagementPage extends StatefulWidget {
@@ -880,7 +880,6 @@ Widget _buildExpandableList({
   );
 }
 
-
 class _ScholarshipRowWidget extends StatefulWidget {
   final BuildContext context;
   final DocumentSnapshot doc;
@@ -989,13 +988,13 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                           ),
                     );
                   } else if (value == 'delete') {
-             showDeleteConfirmation(
-  context,
-  doc,
-  DeleteConfigs.scholarships,
-  'scholarships',
-  customDeleteHandler: handleScholarshipDelete,
-);
+                    showDeleteConfirmation(
+                      context,
+                      doc,
+                      DeleteConfigs.scholarships,
+                      'scholarships',
+                      customDeleteHandler: handleScholarshipDelete,
+                    );
                   }
                 },
                 itemBuilder:
@@ -1121,13 +1120,13 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                         ),
                   );
                 } else if (value == 'delete') {
-showDeleteConfirmation(
-  context,
-  doc,
-  DeleteConfigs.scholarships,
-  'scholarships',
-  customDeleteHandler: handleScholarshipDelete,
-);
+                  showDeleteConfirmation(
+                    context,
+                    doc,
+                    DeleteConfigs.scholarships,
+                    'scholarships',
+                    customDeleteHandler: handleScholarshipDelete,
+                  );
                 }
               },
               itemBuilder:

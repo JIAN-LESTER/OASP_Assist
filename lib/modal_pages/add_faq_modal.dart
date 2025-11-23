@@ -1,9 +1,10 @@
+import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
-import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
+
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -191,42 +192,18 @@ class _AddFaqContentState extends State<AddFaqContent> {
     super.dispose();
   }
 
-  void _showTopRightAlert(String message, AlertType type) {
-    if (!context.mounted) return;
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final isTablet = screenWidth >= 600 && screenWidth < 1024;
-
-    overlayEntry = OverlayEntry(
-      builder:
-          (context) => TopRightAlert(
-            message: message,
-            type: type,
-            onDismiss: () => overlayEntry.remove(),
-            isMobile: isMobile,
-            isTablet: isTablet,
-          ),
-    );
-    overlay.insert(overlayEntry);
-    Future.delayed(const Duration(seconds: 4), () {
-      if (overlayEntry.mounted) overlayEntry.remove();
-    });
-  }
-
   Future<void> _saveFaq() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
     if (_questionController.text.trim().isEmpty) {
-      _showTopRightAlert('Please enter a question', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Please enter a question');
       return;
     }
 
     if (_answerController.text.trim().isEmpty) {
-      _showTopRightAlert('Please enter an answer', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Please enter an answer');
       return;
     }
 
@@ -274,20 +251,20 @@ class _AddFaqContentState extends State<AddFaqContent> {
         Navigator.of(context).pop(true);
       }
 
-      // Show success message
+      // Show success message using SnackbarUtil
       if (embedding != null) {
-        _showTopRightAlert(
+        SnackbarUtil.showSuccess(
+          context,
           'FAQ created with embedding (${embedding.length} dims)!',
-          AlertType.success,
         );
       } else {
-        _showTopRightAlert(
+        SnackbarUtil.showWarning(
+          context,
           'FAQ created without embedding - will be generated on first use',
-          AlertType.warning,
         );
       }
     } catch (e) {
-      _showTopRightAlert('Failed to create FAQ: $e', AlertType.error);
+      SnackbarUtil.showError(context, 'Failed to create FAQ: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

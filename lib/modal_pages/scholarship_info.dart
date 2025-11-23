@@ -1,12 +1,11 @@
 import 'package:capstone_project/modal_pages/add_edit_scholarship.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/modal_pages/scholarship_edit.dart';
-
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 void showSCInfoModal(
   BuildContext context,
@@ -19,11 +18,13 @@ void showSCInfoModal(
   final description = data['description'] ?? 'No description available';
   final scholarshipProvider = data['scholarshipProvider'] ?? 'Unknown Provider';
 
-  final deadline = data['deadline'] != null
-      ? (data['deadline'] is Timestamp
-          ? (data['deadline'] as Timestamp).toDate()
-          : DateTime.tryParse(data['deadline'].toString()) ?? DateTime.now())
-      : DateTime.now();
+  final deadline =
+      data['deadline'] != null
+          ? (data['deadline'] is Timestamp
+              ? (data['deadline'] as Timestamp).toDate()
+              : DateTime.tryParse(data['deadline'].toString()) ??
+                  DateTime.now())
+          : DateTime.now();
 
   final applicationLink = data['applicationLink'] ?? '';
 
@@ -47,7 +48,8 @@ void showSCInfoModal(
       [];
 
   // Parse privileges list
-  final List<String> privileges = (data['privileges'] as List<dynamic>?)
+  final List<String> privileges =
+      (data['privileges'] as List<dynamic>?)
           ?.map((s) => s.toString().trim())
           .where((s) => s.isNotEmpty)
           .toList() ??
@@ -195,13 +197,14 @@ void showSCInfoModal(
                               Icons.description_outlined,
                             ),
                             TextButton.icon(
-                              onPressed: () => _showFullDescriptionModal(
-                                context,
-                                data,
-                                isMobile,
-                                isTablet,
-                                doc,
-                              ),
+                              onPressed:
+                                  () => _showFullDescriptionModal(
+                                    context,
+                                    data,
+                                    isMobile,
+                                    isTablet,
+                                    doc,
+                                  ),
                               icon: const Icon(
                                 Icons.open_in_full,
                                 size: 16,
@@ -256,7 +259,10 @@ void showSCInfoModal(
 
                         // Eligibility Requirements Section
                         if (eligibilityRequirements.isNotEmpty) ...[
-                          buildSectionHeader('Eligibility Requirements', Icons.checklist_outlined),
+                          buildSectionHeader(
+                            'Eligibility Requirements',
+                            Icons.checklist_outlined,
+                          ),
                           const SizedBox(height: 12),
                           Container(
                             width: double.infinity,
@@ -273,43 +279,56 @@ void showSCInfoModal(
                             child: SingleChildScrollView(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: eligibilityRequirements.asMap().entries.map((entry) {
-                                  int index = entry.key;
-                                  String requirement = entry.value;
-                                  return Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: index < eligibilityRequirements.length - 1 ? 12 : 0,
-                                    ),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Container(
-                                          width: 6,
-                                          height: 6,
-                                          margin: const EdgeInsets.only(
-                                            right: 12,
-                                            top: 6,
+                                children:
+                                    eligibilityRequirements.asMap().entries.map(
+                                      (entry) {
+                                        int index = entry.key;
+                                        String requirement = entry.value;
+                                        return Padding(
+                                          padding: EdgeInsets.only(
+                                            bottom:
+                                                index <
+                                                        eligibilityRequirements
+                                                                .length -
+                                                            1
+                                                    ? 12
+                                                    : 0,
                                           ),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF2E7D32),
-                                            borderRadius: BorderRadius.circular(3),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Container(
+                                                width: 6,
+                                                height: 6,
+                                                margin: const EdgeInsets.only(
+                                                  right: 12,
+                                                  top: 6,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xFF2E7D32,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(3),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                child: Text(
+                                                  requirement,
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    color: Color(0xFF475569),
+                                                    height: 1.5,
+                                                    fontWeight: FontWeight.w400,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ),
-                                        Expanded(
-                                          child: Text(
-                                            requirement,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Color(0xFF475569),
-                                              height: 1.5,
-                                              fontWeight: FontWeight.w400,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
+                                        );
+                                      },
+                                    ).toList(),
                               ),
                             ),
                           ),
@@ -318,7 +337,10 @@ void showSCInfoModal(
 
                         // Privileges Section
                         if (privileges.isNotEmpty) ...[
-                          buildSectionHeader('Privileges', Icons.star_border_outlined),
+                          buildSectionHeader(
+                            'Privileges',
+                            Icons.star_border_outlined,
+                          ),
                           const SizedBox(height: 12),
                           Container(
                             width: double.infinity,
@@ -335,37 +357,42 @@ void showSCInfoModal(
                             child: SingleChildScrollView(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: privileges.asMap().entries.map((entry) {
-                                  int index = entry.key;
-                                  String privilege = entry.value;
-                                  return Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: index < privileges.length - 1 ? 12 : 0,
-                                    ),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Icon(
-                                          Icons.star,
-                                          size: 16,
-                                          color: const Color(0xFF2E7D32),
+                                children:
+                                    privileges.asMap().entries.map((entry) {
+                                      int index = entry.key;
+                                      String privilege = entry.value;
+                                      return Padding(
+                                        padding: EdgeInsets.only(
+                                          bottom:
+                                              index < privileges.length - 1
+                                                  ? 12
+                                                  : 0,
                                         ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            privilege,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Color(0xFF475569),
-                                              height: 1.5,
-                                              fontWeight: FontWeight.w400,
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Icon(
+                                              Icons.star,
+                                              size: 16,
+                                              color: const Color(0xFF2E7D32),
                                             ),
-                                          ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                privilege,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: Color(0xFF475569),
+                                                  height: 1.5,
+                                                  fontWeight: FontWeight.w400,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
+                                      );
+                                    }).toList(),
                               ),
                             ),
                           ),
@@ -438,18 +465,10 @@ void showSCInfoModal(
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     border: Border(
-                      top: BorderSide(
-                        color: Color(0xFFE2E8F0),
-                        width: 1,
-                      ),
+                      top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
                     ),
                   ),
-                  child: _buildActionButtons(
-                    context,
-                    doc,
-                    isMobile,
-                    isTablet,
-                  ),
+                  child: _buildActionButtons(context, doc, isMobile, isTablet),
                 ),
               ],
             ),
@@ -492,13 +511,14 @@ Widget _buildActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: OutlinedButton.icon(
-            onPressed: () => showDeleteConfirmation(
-  context,
-  doc,
-  DeleteConfigs.scholarships,
-  'scholarships',
-  customDeleteHandler: handleScholarshipDelete
-),
+            onPressed:
+                () => showDeleteConfirmation(
+                  context,
+                  doc,
+                  DeleteConfigs.scholarships,
+                  'scholarships',
+                  customDeleteHandler: handleScholarshipDelete,
+                ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
               'Delete',
@@ -517,7 +537,7 @@ Widget _buildActionButtons(
       ),
       const SizedBox(width: 12),
       // Edit Button
-     Expanded(
+      Expanded(
         child: SizedBox(
           height: buttonHeight,
           child: ElevatedButton.icon(
@@ -527,10 +547,9 @@ Widget _buildActionButtons(
                 const Duration(milliseconds: 200),
                 () => showDialog(
                   context: context,
-                  builder: (context) => ScholarshipFormDialog(
-                    doc: doc,
-                    isEdit: true,
-                  ),
+                  builder:
+                      (context) =>
+                          ScholarshipFormDialog(doc: doc, isEdit: true),
                 ),
               );
             },
@@ -743,7 +762,8 @@ void _showFullDescriptionModal(
                               ),
                               child: SingleChildScrollView(
                                 child: SelectableText(
-                                  data['description'] ?? 'No description available.',
+                                  data['description'] ??
+                                      'No description available.',
                                   style: TextStyle(
                                     fontSize: isMobile ? 14 : 16,
                                     color: const Color(0xFF334155),
@@ -810,13 +830,14 @@ Widget _buildFullDescriptionActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: OutlinedButton.icon(
-            onPressed: () => showDeleteConfirmation(
-              context,
-              doc,
-              DeleteConfigs.scholarships,
-              'scholarships',
- 
-            ),
+            onPressed:
+                () => showDeleteConfirmation(
+                  context,
+                  doc,
+                  DeleteConfigs.scholarships,
+                  'scholarships',
+                  customDeleteHandler: handleScholarshipDelete,
+                ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
               'Delete',
@@ -843,7 +864,12 @@ Widget _buildFullDescriptionActionButtons(
               Navigator.of(context).pop();
               Future.delayed(
                 const Duration(milliseconds: 200),
-                () => ScholarshipFormDialog(),
+                () => showDialog(
+                  context: context,
+                  builder:
+                      (context) =>
+                          ScholarshipFormDialog(doc: doc, isEdit: true),
+                ),
               );
             },
             icon: const Icon(Icons.edit_outlined, size: 18),

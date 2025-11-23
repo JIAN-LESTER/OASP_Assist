@@ -60,10 +60,9 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     'Incoming Freshman Applicant',
     'Parent',
     'Faculty',
-    'CMU Staff'
+    'CMU Staff',
     'Employer',
     'Alumni',
-
   ];
 
   List<String> _scholarships = [];
@@ -165,7 +164,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
 
       setState(() {
         _programs = [...futures[0]];
-        _scholarships = [...futures[1], 'Others']; 
+        _scholarships = [...futures[1], 'Others'];
       });
     } catch (e) {
       print('Error loading dropdown data: $e');
@@ -221,63 +220,68 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     }
   }
 
- void _finishOnboarding() async {
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('User session expired');
-    }
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false,
-        child: const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-          ),
-        ),
-      ),
-    );
-
-    await _saveUserProfile();
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get(const GetOptions(source: Source.server));
-
-    if (!doc.exists || doc.data()?['onboardingCompleted'] != true) {
-      throw Exception('Failed to verify onboarding completion');
-    }
-
-    // ✅ FIX: Create a conversation BEFORE navigating to chat
-    String? newConversationId;
+  void _finishOnboarding() async {
     try {
-      newConversationId = await UserConstant.createNewConversation(user.uid);
-      print('✅ Created initial conversation after onboarding: $newConversationId');
-    } catch (e) {
-      print('⚠️ Could not create conversation: $e');
-      // Continue anyway - chat page will handle it
-    }
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User session expired');
+      }
 
-    if (mounted) Navigator.of(context).pop();
-    await Future.delayed(const Duration(milliseconds: 200));
-
-    if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (context) => UserMainPage(
-            initialTabIndex: 1,
-            conversationId: newConversationId, // ✅ Pass the conversation ID
-          ),
-        ),
-        (route) => false,
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => WillPopScope(
+              onWillPop: () async => false,
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                ),
+              ),
+            ),
       );
-    }
-  } catch (e) {
+
+      await _saveUserProfile();
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get(const GetOptions(source: Source.server));
+
+      if (!doc.exists || doc.data()?['onboardingCompleted'] != true) {
+        throw Exception('Failed to verify onboarding completion');
+      }
+
+      // ✅ FIX: Create a conversation BEFORE navigating to chat
+      String? newConversationId;
+      try {
+        newConversationId = await UserConstant.createNewConversation(user.uid);
+        print(
+          '✅ Created initial conversation after onboarding: $newConversationId',
+        );
+      } catch (e) {
+        print('⚠️ Could not create conversation: $e');
+        // Continue anyway - chat page will handle it
+      }
+
+      if (mounted) Navigator.of(context).pop();
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder:
+                (context) => UserMainPage(
+                  initialTabIndex: 1,
+                  conversationId:
+                      newConversationId, // ✅ Pass the conversation ID
+                ),
+          ),
+          (route) => false,
+        );
+      }
+    } catch (e) {
       if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
@@ -349,9 +353,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
         updateData['isEnrolled'] = _enrollmentStatus == 'enrolled';
 
         if (_enrollmentStatus == 'not_enrolled') {
-         
           String finalAffiliation = _selectedAffiliation ?? '';
-   
 
           updateData.addAll({
             'affiliation': finalAffiliation,
@@ -411,7 +413,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
               return false;
             }
             // If "Others" is selected, must have custom input
-         
+
             return true;
           } else {
             // ENROLLED: Need year, program, and scholarship
@@ -790,9 +792,8 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
         // NOT ENROLLED: Only check affiliation
         if (_selectedAffiliation != null && _selectedAffiliation!.isNotEmpty) {
           // If "Others" is selected, check custom input
-         
-            allFieldsCompleted = true;
-    
+
+          allFieldsCompleted = true;
         }
       } else {
         // ENROLLED: Check year, program, and scholarship
@@ -923,7 +924,6 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                   onChanged: (value) {
                     setState(() {
                       _selectedAffiliation = value;
-                     
                     });
                   },
                   hint: 'Select your association',
@@ -932,8 +932,6 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                 ),
 
                 // Show custom input field if "Others" is selected
-                
-
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -1102,7 +1100,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
   }
   // ALSO update the _buildProfileSummary to have a proper "Edit" button that goes back:
 
- Widget _buildProfileSummary(double fontSize) {
+  Widget _buildProfileSummary(double fontSize) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -1188,9 +1186,10 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                     icon: Icons.people_outline,
                     label: 'Organizational Affiliation',
                     // FIX: Check _selectedAffiliation instead of _hasAffiliation
-                    value: _selectedAffiliation == 'Others'
-                        ? _customAffiliationController.text.trim()
-                        : (_selectedAffiliation ?? 'None'),
+                    value:
+                        _selectedAffiliation == 'Others'
+                            ? _customAffiliationController.text.trim()
+                            : (_selectedAffiliation ?? 'None'),
                     fontSize: fontSize,
                   ),
                 ],

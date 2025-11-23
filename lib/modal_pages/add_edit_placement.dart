@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -8,7 +9,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
-import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 import 'package:capstone_project/models/placement.dart';
 import 'package:capstone_project/services/cohere_service.dart';
 import 'package:capstone_project/services/file_service2.dart';
@@ -143,7 +143,7 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
           setState(() {
             _selectedFileName = fileName;
             _isProcessing = true;
-            _fileUploaded = false; // ✅ Reset during processing
+            _fileUploaded = false;
           });
 
           String extractedText;
@@ -168,9 +168,12 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
 
           setState(() {
             _isProcessing = false;
-            _fileUploaded = true; // ✅ Mark as uploaded
+            _fileUploaded = true;
           });
-          _showAlert('File processed successfully!', AlertType.success);
+
+          if (mounted) {
+            SnackbarUtil.showSuccess(context, 'File processed successfully!');
+          }
         }
         // Mobile/Desktop platform - use file path
         else if (result.files.single.path != null) {
@@ -180,7 +183,7 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
             _selectedFile = file;
             _selectedFileName = fileName;
             _isProcessing = true;
-            _fileUploaded = false; // ✅ Reset during processing
+            _fileUploaded = false;
           });
 
           String extractedText = await _fileService.extractTextFromFile(file);
@@ -188,17 +191,23 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
 
           setState(() {
             _isProcessing = false;
-            _fileUploaded = true; // ✅ Mark as uploaded
+            _fileUploaded = true;
           });
-          _showAlert('File processed successfully!', AlertType.success);
+
+          if (mounted) {
+            SnackbarUtil.showSuccess(context, 'File processed successfully!');
+          }
         }
       }
     } catch (e) {
       setState(() {
         _isProcessing = false;
-        _fileUploaded = false; // ✅ Reset on error
+        _fileUploaded = false;
       });
-      _showAlert('Error processing file: $e', AlertType.error);
+
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Error processing file: $e');
+      }
     }
   }
 
@@ -210,7 +219,9 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
       );
       if (image != null) await _processImage(image);
     } catch (e) {
-      _showAlert('Error picking image: $e', AlertType.error);
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Error picking image: $e');
+      }
     }
   }
 
@@ -223,22 +234,28 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
       );
       if (photo != null) await _processImage(photo);
     } catch (e) {
-      _showAlert('Error taking photo: $e', AlertType.error);
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Error taking photo: $e');
+      }
     }
   }
 
   Future<void> _processImage(XFile image) async {
     setState(() {
       _isProcessing = true;
-      _fileUploaded = false; // ✅ Reset during processing
+      _fileUploaded = false;
     });
 
     try {
       String extractedText;
 
       if (kIsWeb || Platform.isWindows) {
-        extractedText = "OCR not yet implemented for web/windows";
-        _showAlert('Tesseract OCR not yet implemented', AlertType.warning);
+        if (mounted) {
+          SnackbarUtil.showWarning(
+            context,
+            'OCR not yet implemented for web/windows',
+          );
+        }
         setState(() {
           _isProcessing = false;
           _fileUploaded = false;
@@ -252,7 +269,9 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
       }
 
       if (extractedText.trim().isEmpty) {
-        _showAlert('No text found in image', AlertType.warning);
+        if (mounted) {
+          SnackbarUtil.showWarning(context, 'No text found in image');
+        }
         setState(() {
           _isProcessing = false;
           _fileUploaded = false;
@@ -270,20 +289,25 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
 
       setState(() {
         _isProcessing = false;
-        _fileUploaded = true; // ✅ Mark as uploaded
+        _fileUploaded = true;
       });
-      _showAlert('Text extracted successfully!', AlertType.success);
+
+      if (mounted) {
+        SnackbarUtil.showSuccess(context, 'Text extracted successfully!');
+      }
     } catch (e) {
       setState(() {
         _isProcessing = false;
-        _fileUploaded = false; // ✅ Reset on error
+        _fileUploaded = false;
       });
-      _showAlert('Error extracting text: $e', AlertType.error);
+
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Error extracting text: $e');
+      }
     }
   }
 
   Widget buildUploadArea(bool isMobile) {
-    // ✅ Check BOTH _selectedFile AND _fileUploaded
     final hasFile = _selectedFile != null || _fileUploaded;
 
     return Container(
@@ -293,9 +317,7 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color:
-              hasFile // ✅ Updated condition
-                  ? Color(0xFF2E7D32).withOpacity(0.4)
-                  : Color(0xFFE5E7EB),
+              hasFile ? Color(0xFF2E7D32).withOpacity(0.4) : Color(0xFFE5E7EB),
           width: 2,
         ),
       ),
@@ -311,7 +333,7 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
             ),
             child: Column(
               children: [
-                // ✅ Processing state
+                // Processing state
                 if (_isProcessing)
                   Column(
                     children: [
@@ -336,7 +358,7 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
                       ),
                     ],
                   )
-                // ✅ File uploaded state
+                // File uploaded state
                 else if (hasFile)
                   Column(
                     children: [
@@ -394,7 +416,7 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
                       ),
                     ],
                   )
-                // ✅ No file state
+                // No file state
                 else
                   Column(
                     children: [
@@ -469,6 +491,9 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
       }
     } catch (e) {
       print('Error analyzing placement: $e');
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Error analyzing document: $e');
+      }
     }
   }
 
@@ -540,28 +565,34 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
                     _pickFile();
                   },
                 ),
-               if (!kIsWeb && !(Platform.isWindows || Platform.isLinux || Platform.isMacOS))
-                _buildUploadOption(
-                  icon: Icons.photo_library_outlined,
-                  title: 'Choose from Gallery',
-                  subtitle: 'Extract text from image',
-                  color: Color(0xFF1976D2),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImageFromGallery();
-                  },
-                ),
-              if (!kIsWeb && !(Platform.isWindows || Platform.isLinux || Platform.isMacOS))
-                _buildUploadOption(
-                  icon: Icons.camera_alt_outlined,
-                  title: 'Take Photo',
-                  subtitle: 'Capture and extract text',
-                  color: Color(0xFFED6C02),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _takePhoto();
-                  },
-                ),
+                if (!kIsWeb &&
+                    !(Platform.isWindows ||
+                        Platform.isLinux ||
+                        Platform.isMacOS))
+                  _buildUploadOption(
+                    icon: Icons.photo_library_outlined,
+                    title: 'Choose from Gallery',
+                    subtitle: 'Extract text from image',
+                    color: Color(0xFF1976D2),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickImageFromGallery();
+                    },
+                  ),
+                if (!kIsWeb &&
+                    !(Platform.isWindows ||
+                        Platform.isLinux ||
+                        Platform.isMacOS))
+                  _buildUploadOption(
+                    icon: Icons.camera_alt_outlined,
+                    title: 'Take Photo',
+                    subtitle: 'Capture and extract text',
+                    color: Color(0xFFED6C02),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _takePhoto();
+                    },
+                  ),
                 _buildUploadOption(
                   icon: Icons.edit_outlined,
                   title: 'Manual Entry',
@@ -672,7 +703,9 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
 
   Future<void> _submitForm() async {
     if (_companyController.text.trim().isEmpty) {
-      _showAlert('Please enter company name', AlertType.warning);
+      if (mounted) {
+        SnackbarUtil.showWarning(context, 'Please enter company name');
+      }
       return;
     }
 
@@ -696,7 +729,7 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
                 .where((t) => t.isNotEmpty)
                 .toList(),
         isRecruiting: _isRecruiting,
-        deadline: _selectedDeadline, // ✅ ADDED
+        deadline: _selectedDeadline,
         createdAt: DateTime.now(),
       );
 
@@ -721,14 +754,17 @@ Status: ${_isRecruiting ? 'Currently Vacant' : 'Not Vacant'}
 
       await _logAction(widget.isEdit ? 'Updated' : 'Added');
 
-      _showAlert(
-        'Placement ${widget.isEdit ? 'updated' : 'added'} successfully!',
-        AlertType.success,
-      );
-
-      Navigator.of(context).pop(true);
+      if (mounted) {
+        SnackbarUtil.showSuccess(
+          context,
+          'Placement ${widget.isEdit ? 'updated' : 'added'} successfully!',
+        );
+        Navigator.of(context).pop(true);
+      }
     } catch (e) {
-      _showAlert('Error: $e', AlertType.error);
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Error: $e');
+      }
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -763,30 +799,6 @@ Status: ${_isRecruiting ? 'Currently Vacant' : 'Not Vacant'}
     } catch (e) {
       print('⚠️ Failed to log action: $e');
     }
-  }
-
-  void _showAlert(String message, AlertType type) {
-    if (!mounted) return;
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
-
-    overlayEntry = OverlayEntry(
-      builder:
-          (context) => TopRightAlert(
-            message: message,
-            type: type,
-            onDismiss: () => overlayEntry.remove(),
-            isMobile: MediaQuery.of(context).size.width < 600,
-            isTablet:
-                MediaQuery.of(context).size.width >= 600 &&
-                MediaQuery.of(context).size.width < 1100,
-          ),
-    );
-
-    overlay.insert(overlayEntry);
-    Future.delayed(Duration(seconds: 4), () {
-      if (overlayEntry.mounted) overlayEntry.remove();
-    });
   }
 
   @override

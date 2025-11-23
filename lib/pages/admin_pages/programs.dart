@@ -1,5 +1,7 @@
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:capstone_project/pages/data/statcard_management.dart';
+import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:capstone_project/pages/admin_pages/widgets/pagination.dart';
@@ -8,7 +10,6 @@ import 'package:capstone_project/pages/admin_pages/widgets/empty_state.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
-import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 import 'package:flutter/material.dart';
 
 class ProgramManagementPage extends StatefulWidget {
@@ -47,6 +48,7 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
       print("Error loading program data: $e");
       if (!mounted) return;
       setState(() => isLoading = false);
+      SnackbarUtil.showError(context, "Failed to load program data");
     }
   }
 
@@ -231,6 +233,12 @@ class MobileProgramManagement extends StatelessWidget {
                             );
                           }
                           if (snapshot.hasError) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              SnackbarUtil.showError(
+                                context,
+                                'Error loading programs: ${snapshot.error}',
+                              );
+                            });
                             return Center(
                               child: Text('Error: ${snapshot.error}'),
                             );
@@ -314,6 +322,12 @@ Widget mainContent(
                           );
                         }
                         if (snapshot.hasError) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            SnackbarUtil.showError(
+                              context,
+                              'Error loading programs: ${snapshot.error}',
+                            );
+                          });
                           return Center(
                             child: Text('Error: ${snapshot.error}'),
                           );
@@ -919,7 +933,6 @@ class ProgramInfoModal extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Program Information Section
                     buildSectionHeader(
                       'Program Information',
                       Icons.info_outline,
@@ -938,10 +951,7 @@ class ProgramInfoModal extends StatelessWidget {
                           ? data['description']
                           : 'No description provided',
                     ),
-
                     const SizedBox(height: 24),
-
-                    // Metadata Section
                     buildSectionHeader('Metadata', Icons.access_time),
                     const SizedBox(height: 12),
                     if (data['createdAt'] != null)
@@ -962,7 +972,7 @@ class ProgramInfoModal extends StatelessWidget {
                 ),
               ),
             ),
-            // Actions - Delete (outlined red) left, Edit (filled green) right
+            // Actions
             Container(
               padding: EdgeInsets.all(isMobile ? 20 : 24),
               child: Row(
@@ -1094,30 +1104,6 @@ class DeleteProgramModal extends StatefulWidget {
 class _DeleteProgramModalState extends State<DeleteProgramModal> {
   bool _isDeleting = false;
 
-  void _showTopRightAlert(String message, AlertType type) {
-    if (!mounted) return;
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final isTablet = screenWidth >= 600 && screenWidth < 1024;
-
-    overlayEntry = OverlayEntry(
-      builder:
-          (context) => TopRightAlert(
-            message: message,
-            type: type,
-            onDismiss: () => overlayEntry.remove(),
-            isMobile: isMobile,
-            isTablet: isTablet,
-          ),
-    );
-    overlay.insert(overlayEntry);
-    Future.delayed(const Duration(seconds: 4), () {
-      if (overlayEntry.mounted) overlayEntry.remove();
-    });
-  }
-
   Future<void> _deleteProgram() async {
     setState(() => _isDeleting = true);
     final data = widget.programDoc.data() as Map<String, dynamic>;
@@ -1152,12 +1138,12 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
 
       if (mounted) {
         Navigator.of(context).pop();
-        _showTopRightAlert('Program deleted successfully!', AlertType.success);
+        SnackbarUtil.showSuccess(context, 'Program deleted successfully!');
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isDeleting = false);
-        _showTopRightAlert('Failed to delete program: $e', AlertType.error);
+        SnackbarUtil.showError(context, 'Failed to delete program: $e');
       }
     }
   }
@@ -1187,7 +1173,6 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header with pink background
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
@@ -1225,7 +1210,6 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
                 ],
               ),
             ),
-            // Content
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -1240,7 +1224,6 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
-                  // Program Info Box
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -1275,7 +1258,6 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  // Action Buttons
                   _buildDeleteActionButtons(isMobile),
                 ],
               ),
@@ -1432,33 +1414,9 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     super.dispose();
   }
 
-  void _showTopRightAlert(String message, AlertType type) {
-    if (!mounted) return;
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final isTablet = screenWidth >= 600 && screenWidth < 1024;
-
-    overlayEntry = OverlayEntry(
-      builder:
-          (context) => TopRightAlert(
-            message: message,
-            type: type,
-            onDismiss: () => overlayEntry.remove(),
-            isMobile: isMobile,
-            isTablet: isTablet,
-          ),
-    );
-    overlay.insert(overlayEntry);
-    Future.delayed(const Duration(seconds: 4), () {
-      if (overlayEntry.mounted) overlayEntry.remove();
-    });
-  }
-
   Future<void> _saveProgram() async {
     if (_nameController.text.trim().isEmpty) {
-      _showTopRightAlert('Please enter a program name', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Please enter a program name');
       return;
     }
 
@@ -1507,9 +1465,9 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
       });
 
       if (mounted) {
-        _showTopRightAlert(
+        SnackbarUtil.showSuccess(
+          context,
           'Program ${isEditing ? 'updated' : 'created'} successfully!',
-          AlertType.success,
         );
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) Navigator.of(context).pop();
@@ -1518,9 +1476,9 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        _showTopRightAlert(
+        SnackbarUtil.showError(
+          context,
           'Failed to ${isEditing ? 'update' : 'create'} program: $e',
-          AlertType.error,
         );
       }
     }
@@ -1750,9 +1708,9 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        _isSubmitting ? 'Saving...' : '',
-                                        style: const TextStyle(
+                                      const Text(
+                                        'Saving...',
+                                        style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
                                         ),
