@@ -61,7 +61,7 @@ class ChatProvider extends ChangeNotifier {
   bool _isCreatingMessage = false;
 
 
-
+  final String _geminiApiKey = "AIzaSyDE7SHxChtDHtJ8j932YSh_2lNCAXVgH8g";
   VoidCallback? _onMessageAdded;
 
   ChatProvider(this._retriever);
@@ -1494,37 +1494,78 @@ $question
     }
   }
 
- Future<List<double>> generateEmbedding(String question) async {
-  try {
-    final response = await http.post(
-      Uri.parse("https://api.cohere.ai/v1/embed"),
-      headers: {
-        'Authorization': 'Bearer $_apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        "texts": [question],
-        "model": "embed-multilingual-v3.0",  // ✅ Changed to v3
-        "input_type": "search_query",         // ✅ Required for v3 - queries
-      }),
-    );
+//  Future<List<double>> generateEmbedding(String question) async {
+//   try {
+//     final response = await http.post(
+//       Uri.parse("https://api.cohere.ai/v1/embed"),
+//       headers: {
+//         'Authorization': 'Bearer $_apiKey',
+//         'Content-Type': 'application/json',
+//       },
+//       body: jsonEncode({
+//         "texts": [question],
+//         "model": "embed-multilingual-v3.0",  // ✅ Changed to v3
+//         "input_type": "search_query",         // ✅ Required for v3 - queries
+//       }),
+//     );
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to generate embedding: ${response.statusCode}');
-    }
+//     if (response.statusCode != 200) {
+//       throw Exception('Failed to generate embedding: ${response.statusCode}');
+//     }
 
-    final data = jsonDecode(response.body);
-    final embedding = (data['embeddings'][0] as List)
-        .map((e) => (e as num).toDouble())
-        .toList();
+//     final data = jsonDecode(response.body);
+//     final embedding = (data['embeddings'][0] as List)
+//         .map((e) => (e as num).toDouble())
+//         .toList();
     
-    print('✅ Generated v3 embedding: ${embedding.length} dimensions');
-    return embedding;
-  } catch (e) {
-    print('Error generating embedding: $e');
-    rethrow;
+//     print('✅ Generated v3 embedding: ${embedding.length} dimensions');
+//     return embedding;
+//   } catch (e) {
+//     print('Error generating embedding: $e');
+//     rethrow;
+//   }
+// }
+
+ Future<List<double>> generateEmbedding(String question) async {
+    try {
+      print('🔧 Generating Gemini embedding for: "${question.substring(0, min(50, question.length))}..."');
+      
+      final response = await http.post(
+        Uri.parse(
+          "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=$_geminiApiKey"
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          "model": "models/text-embedding-004",
+          "content": {
+            "parts": [
+              {"text": question}
+            ]
+          }
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        print('❌ Gemini API error: ${response.statusCode}');
+        print('   Response: ${response.body}');
+        throw Exception('Failed to generate embedding: ${response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body);
+      final embedding = (data['embedding']['values'] as List)
+          .map((e) => (e as num).toDouble())
+          .toList();
+      
+      print('✅ Generated Gemini embedding: ${embedding.length} dimensions');
+      return embedding;
+    } catch (e) {
+      print('❌ Error generating Gemini embedding: $e');
+      rethrow;
+    }
   }
-}
+
   Future<void> rateMessage(
     String messageId,
     bool isLiked,

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math';
 
+import 'package:capstone_project/services/gemini_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -21,6 +22,7 @@ import 'package:capstone_project/services/cohere_service.dart';
 class FileService {
   final firestore = FirebaseFirestore.instance;
   final CohereService _cohereService = CohereService();
+  // final GeminiService _cohereService = GeminiService();
   final PineconeCloudService _pineconeService =
       PineconeCloudService(); // Updated to Pinecone
   final Uuid _uuid = Uuid();
@@ -485,7 +487,7 @@ Future<void> updateInfoBankFromAdmission(Admissions admission) async {
       final chunk = chunks[i];
       final embedding = await _cohereService.embedText(
         chunk.text,
-        inputType: 'search_document',
+       
       );
 
       final chunkTitle = chunks.length > 1

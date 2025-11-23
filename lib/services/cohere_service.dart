@@ -6,9 +6,17 @@ import 'package:http/http.dart' as http;
 
 class CohereService {
   // 🔐 Use environment variable in production
-  final String apiKey ="IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
+  // final String apiKey ="IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
+  final String apiKey ="jGVDZpXJocGrUpJkP2YAMrQAIkcCQu7YITqcRr5h";
+  // final String apiKey ="AIzaSyBEsKofC_0dTYRNwFhjnnY8jzuhmQqbHQI";
   final embedUrl = Uri.parse('https://api.cohere.ai/v1/embed');
   final chatUrl = Uri.parse('https://api.cohere.ai/v1/chat'); 
+
+//     final String embedModel = "models/text-embedding-004";
+//   final String chatModel = "gemini-1.5-flash";
+
+//   String get embedUrl => "https://generativelanguage.googleapis.com/v1beta/$embedModel:embedContent?key=$apiKey";
+// String get chatUrl => "https://generativelanguage.googleapis.com/v1beta/models/$chatModel:generateContent?key=$apiKey";
 
   Future<List<double>> embedText(
     String text, {
@@ -36,6 +44,44 @@ class CohereService {
     return List<double>.from(data['embeddings'][0]);
   }
 
+  // Future<List<double>> embedText(
+  //   String text, {
+  //   String taskType = 'RETRIEVAL_DOCUMENT',
+  // }) async {
+  //   try {
+  //     final response = await http.post(
+  //       Uri.parse(embedUrl),
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: jsonEncode({
+  //         'model': embedModel,
+  //         'content': {
+  //           'parts': [
+  //             {'text': text}
+  //           ]
+  //         },
+  //         'taskType': taskType, // RETRIEVAL_DOCUMENT or RETRIEVAL_QUERY
+  //       }),
+  //     );
+
+  //     if (response.statusCode != 200) {
+  //       print('❌ Gemini Embed API error: ${response.body}');
+  //       throw Exception('Failed to generate embedding: ${response.body}');
+  //     }
+
+  //     final data = jsonDecode(response.body);
+  //     final embedding = data['embedding']['values'] as List;
+  //     final embeddingList = embedding.map((e) => (e as num).toDouble()).toList();
+      
+  //     return embeddingList;
+  //   } catch (e) {
+  //     print('❌ Error generating Gemini embedding: $e');
+  //     rethrow;
+  //   }
+  // }
+
+
   Future<String> generateResponse(String prompt) async {
     final res = await http.post(
       chatUrl, // Using Chat API instead of deprecated Generate API
@@ -59,6 +105,41 @@ class CohereService {
     final data = jsonDecode(res.body);
     return data['text'] ?? '';
   }
+
+  //   Future<String> generateResponse(String prompt) async {
+  //   try {
+  //     final response = await http.post(
+  //       Uri.parse(chatUrl),
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: jsonEncode({
+  //         'contents': [
+  //           {
+  //             'parts': [
+  //               {'text': prompt}
+  //             ]
+  //           }
+  //         ],
+  //         'generationConfig': {
+  //           'temperature': 0.3,
+  //           'maxOutputTokens': 1024,
+  //         }
+  //       }),
+  //     );
+
+  //     if (response.statusCode != 200) {
+  //       print('❌ Gemini Chat API error: ${response.body}');
+  //       throw Exception('Failed to generate response: ${response.body}');
+  //     }
+
+  //     final data = jsonDecode(response.body);
+  //     return data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+  //   } catch (e) {
+  //     print('❌ Error generating Gemini response: $e');
+  //     rethrow;
+  //   }
+  // }
 
 Future<Map<String, dynamic>> analyzeAdmission(String message) async {
   Map<String, int>? parseAcademicYear(String? yearStr, String fallbackText) {
@@ -161,6 +242,27 @@ If no schedules are found, return an empty schedules array.
         'temperature': 0.0,
       }),
     );
+
+    
+      // final response = await http.post(
+      //   Uri.parse(chatUrl),
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: jsonEncode({
+      //     'contents': [
+      //       {
+      //         'parts': [
+      //           {'text': prompt}
+      //         ]
+      //       }
+      //     ],
+      //     'generationConfig': {
+      //       'temperature': 0.0,
+      //       'maxOutputTokens': 3500,
+      //     }
+      //   }),
+      // );
 
     print("📡 Cohere API Response Status: ${response.statusCode}");
 
@@ -606,6 +708,8 @@ Respond in valid JSON format only:
 Extract every scholarship mentioned. Use null for missing deadline.
 ''';
 
+
+      
     final response = await http.post(
       chatUrl,
       headers: {
@@ -615,11 +719,10 @@ Extract every scholarship mentioned. Use null for missing deadline.
       body: jsonEncode({
         'model': 'command-r-08-2024',
         'message': prompt,
-        'max_tokens': 4000,
-        'temperature': 0.1,
+        'max_tokens': 3500, // Increased for schedules
+        'temperature': 0.0,
       }),
     );
-
     print("📡 Cohere Scholarship API Response Status: ${response.statusCode}");
 
     if (response.statusCode == 200) {
@@ -727,6 +830,8 @@ Respond in valid JSON format only:
 }
 ''';
 
+
+     
     final response = await http.post(
       chatUrl,
       headers: {
@@ -736,11 +841,10 @@ Respond in valid JSON format only:
       body: jsonEncode({
         'model': 'command-r-08-2024',
         'message': prompt,
-        'max_tokens': 1500,
-        'temperature': 0.1,
+        'max_tokens': 3500, // Increased for schedules
+        'temperature': 0.0,
       }),
     );
-
     print("📡 Cohere Placement API Response Status: ${response.statusCode}");
 
     if (response.statusCode == 200) {

@@ -25,6 +25,17 @@ const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
     permalink_url?: string;
     attachments?: any;
 }
+
+// interface PostFilterConfig {
+//   /** Fetch posts from this month only */
+//   thisMonthOnly?: boolean;
+  
+//   /** Fetch posts from a specific date */
+//   startDate?: Date;
+  
+//   /** Maximum number of posts to fetch */
+//   maxPosts?: number;
+// }
   
 interface CategoryToInfoBankConfig {
   includeInSearch: boolean;
@@ -473,64 +484,225 @@ function extractAllImagesFromPost(post: FacebookPost): string[] {
     }
   }
 
-  async function fetchFacebookPosts(): Promise<FacebookPost[]> {
-    try {
-      console.log("🔍 Fetching Facebook posts...");
-      console.log("📍 Page ID:", PAGE_ID);
-      console.log("📍 API Version:", FB_API_VERSION);
+async function fetchFacebookPosts(): Promise<FacebookPost[]> {
+  try {
+    console.log("🔍 Fetching Facebook posts...");
+    console.log("📍 Page ID:", PAGE_ID);
+    console.log("📍 API Version:", FB_API_VERSION);
+    
+    const accessToken = await getAccessToken();
+    console.log("✅ Access token retrieved");
+    
+    // ✅ Calculate start of current month (midnight on the 1st)
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    
+    // Convert to Unix timestamp (seconds since epoch)
+    const sinceTimestamp = Math.floor(startOfMonth.getTime() / 1000);
+    
+    console.log("📅 Filtering posts:");
+    console.log(`   Start date: ${startOfMonth.toISOString()}`);
+    console.log(`   Unix timestamp: ${sinceTimestamp}`);
+    console.log(`   Current time: ${now.toISOString()}`);
+    
+    const url = `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}/posts`;
+    const params = {
+      fields: "message,created_time,full_picture,permalink_url,attachments",
+      since: sinceTimestamp.toString(), // ✅ Only posts since start of this month
+      limit: 100, // ✅ Increased limit to get more posts
+      access_token: accessToken,
+    };
+    
+    console.log("📡 Making request to:", url);
+    console.log("📡 Request params:", { 
+      ...params, 
+      access_token: "***",
+      since: `${params.since} (${startOfMonth.toISOString()})`
+    });
+    
+    const response = await axios.get<{ data: FacebookPost[] }>(url, { 
+      params,
+      timeout: 30000,
+    });
+    
+    console.log("✅ Facebook API response status:", response.status);
+    console.log("✅ Posts received:", response.data.data?.length || 0);
+    
+    // ✅ Filter out posts before this month (double-check on our side)
+    const filteredPosts = (response.data.data || []).filter(post => {
+      const postDate = new Date(post.created_time);
+      const isThisMonth = postDate >= startOfMonth;
       
-      const accessToken = await getAccessToken();
-      console.log("✅ Access token retrieved");
-      
-      const url = `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}/posts`;
-      const params = {
-        fields: "message,created_time,full_picture,permalink_url,attachments",
-        limit: 20,
-        access_token: accessToken,
-      };
-      
-      console.log("📡 Making request to:", url);
-      console.log("📡 Request params:", { ...params, access_token: "***" });
-      
-      const response = await axios.get<{ data: FacebookPost[] }>(url, { 
-        params,
-        timeout: 30000,
-      });
-      
-      console.log("✅ Facebook API response status:", response.status);
-      console.log("✅ Posts received:", response.data.data?.length || 0);
-      
-      return response.data.data || [];
-      
-    } catch (error: any) {
-      console.error("❌ Error fetching Facebook posts:");
-      console.error("Error message:", error.message);
-      
-      if (error.response) {
-        console.error("Response status:", error.response.status);
-        console.error("Response data:", JSON.stringify(error.response.data, null, 2));
-        
-        const errorData = error.response.data;
-        
-        if (error.response.status === 400) {
-          if (errorData?.error?.message) {
-            throw new Error(`Facebook API Error: ${errorData.error.message}`);
-          }
-          throw new Error("Invalid request to Facebook API. Check your PAGE_ID and token.");
-        }
-        
-        if (error.response.status === 190 || errorData?.error?.code === 190) {
-          throw new Error("Facebook Access Token is invalid or expired. Please refresh your token.");
-        }
-        
-        if (error.response.status === 403) {
-          throw new Error("Access denied. Check if the token has permission to read page posts.");
-        }
+      if (!isThisMonth) {
+        console.log(`⏭️ Skipping post ${post.id} from ${postDate.toISOString()} (before this month)`);
       }
       
-      throw error;
+      return isThisMonth;
+    });
+    
+    console.log(`✅ Posts from this month: ${filteredPosts.length}/${response.data.data?.length || 0}`);
+    
+    // ✅ Log date range of fetched posts
+    if (filteredPosts.length > 0) {
+      const dates = filteredPosts.map(p => new Date(p.created_time));
+      const oldest = new Date(Math.min(...dates.map(d => d.getTime())));
+      const newest = new Date(Math.max(...dates.map(d => d.getTime())));
+      
+      console.log(`📊 Post date range:`);
+      console.log(`   Oldest: ${oldest.toISOString()}`);
+      console.log(`   Newest: ${newest.toISOString()}`);
     }
+    
+    return filteredPosts;
+    
+  } catch (error: any) {
+    console.error("❌ Error fetching Facebook posts:");
+    console.error("Error message:", error.message);
+    
+    if (error.response) {
+      console.error("Response status:", error.response.status);
+      console.error("Response data:", JSON.stringify(error.response.data, null, 2));
+      
+      const errorData = error.response.data;
+      
+      if (error.response.status === 400) {
+        if (errorData?.error?.message) {
+          throw new Error(`Facebook API Error: ${errorData.error.message}`);
+        }
+        throw new Error("Invalid request to Facebook API. Check your PAGE_ID and token.");
+      }
+      
+      if (error.response.status === 190 || errorData?.error?.code === 190) {
+        throw new Error("Facebook Access Token is invalid or expired. Please refresh your token.");
+      }
+      
+      if (error.response.status === 403) {
+        throw new Error("Access denied. Check if the token has permission to read page posts.");
+      }
+    }
+    
+    throw error;
   }
+}
+
+// async function fetchFacebookPostsSince(startDate?: Date): Promise<FacebookPost[]> {
+//   try {
+//     console.log("🔍 Fetching Facebook posts with custom date filter...");
+    
+//     const accessToken = await getAccessToken();
+    
+//     // ✅ Use provided date or default to start of current month
+//     const filterDate = startDate || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+//     filterDate.setHours(0, 0, 0, 0);
+    
+//     const sinceTimestamp = Math.floor(filterDate.getTime() / 1000);
+    
+//     console.log("📅 Fetching posts since:", filterDate.toISOString());
+//     console.log("📅 Unix timestamp:", sinceTimestamp);
+    
+//     const url = `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}/posts`;
+//     const params = {
+//       fields: "message,created_time,full_picture,permalink_url,attachments",
+//       since: sinceTimestamp.toString(),
+//       limit: 100,
+//       access_token: accessToken,
+//     };
+    
+//     const response = await axios.get<{ data: FacebookPost[] }>(url, { 
+//       params,
+//       timeout: 30000,
+//     });
+    
+//     const posts = response.data.data || [];
+    
+//     console.log(`✅ Fetched ${posts.length} posts since ${filterDate.toISOString()}`);
+    
+//     return posts;
+    
+//   } catch (error: any) {
+//     console.error("❌ Error fetching Facebook posts:", error.message);
+//     throw error;
+//   }
+// }
+
+// async function fetchFacebookPostsWithFilter(config: PostFilterConfig = {}): Promise<FacebookPost[]> {
+//   const {
+//     thisMonthOnly = true, // Default: this month only
+//     startDate,
+//     maxPosts = 100,
+//   } = config;
+  
+//   try {
+//     console.log("🔍 Fetching Facebook posts with custom filters...");
+//     console.log("📊 Config:", {
+//       thisMonthOnly,
+//       startDate: startDate?.toISOString(),
+//       maxPosts,
+//     });
+    
+//     const accessToken = await getAccessToken();
+    
+//     // Determine the start date
+//     let filterDate: Date;
+    
+//     if (startDate) {
+//       // Use provided start date
+//       filterDate = new Date(startDate);
+//     } else if (thisMonthOnly) {
+//       // Use start of current month
+//       const now = new Date();
+//       filterDate = new Date(now.getFullYear(), now.getMonth(), 1);
+//     } else {
+//       // No filter - fetch all posts (last 100 by default)
+//       filterDate = new Date(0); // Unix epoch (won't filter)
+//     }
+    
+//     filterDate.setHours(0, 0, 0, 0);
+    
+//     const params: any = {
+//       fields: "message,created_time,full_picture,permalink_url,attachments",
+//       limit: maxPosts,
+//       access_token: accessToken,
+//     };
+    
+//     // Only add 'since' parameter if we have a meaningful filter date
+//     if (filterDate.getTime() > 0) {
+//       params.since = Math.floor(filterDate.getTime() / 1000).toString();
+//       console.log(`📅 Filtering posts since: ${filterDate.toISOString()}`);
+//     } else {
+//       console.log(`📅 No date filter - fetching recent ${maxPosts} posts`);
+//     }
+    
+//     const url = `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}/posts`;
+    
+//     const response = await axios.get<{ data: FacebookPost[] }>(url, { 
+//       params,
+//       timeout: 30000,
+//     });
+    
+//     const posts = response.data.data || [];
+    
+//     console.log(`✅ Fetched ${posts.length} posts`);
+    
+//     if (posts.length > 0) {
+//       const dates = posts.map(p => new Date(p.created_time));
+//       const oldest = new Date(Math.min(...dates.map(d => d.getTime())));
+//       const newest = new Date(Math.max(...dates.map(d => d.getTime())));
+      
+//       console.log(`📊 Date range: ${oldest.toISOString()} to ${newest.toISOString()}`);
+//     }
+    
+//     return posts;
+    
+//   } catch (error: any) {
+//     console.error("❌ Error fetching Facebook posts:", error.message);
+//     throw error;
+//   }
+// }
+
+
+
 
   function parseDeadlineToTimestamp(deadline: string | null): admin.firestore.Timestamp | null {
     if (!deadline || deadline.trim() === '') return null;
@@ -2416,58 +2588,62 @@ function combineOcrResults(ocrResults: string[]): string {
 
 
   async function syncFacebookPostsLogic(): Promise<any> {
-    try {
-      console.log("📡 Starting Facebook sync...");
-      
-      console.log("📡 Fetching Facebook posts...");
-      const posts = await fetchFacebookPosts();
-      console.log(`✅ Fetched ${posts.length} posts from Facebook`);
-      
-      let processed = 0;
-      let failed = 0;
-      let withOCR = 0;
-      
-      for (const post of posts) {
-        try {
-          console.log(`📝 Processing post: ${post.id}`);
-          
-          const hasImage = !!post.full_picture;
-          await processPost(post, COHERE_API_KEY.value());
-          
-          if (hasImage) {
-            const postDoc = await db.collection("announcements").doc(post.id).get();
-            if (postDoc.exists && postDoc.data()?.has_image_text) {
-              withOCR++;
-            }
+  try {
+    console.log("📡 Starting Facebook sync...");
+    
+    // ✅ Use the updated function that filters by this month
+    console.log("📡 Fetching Facebook posts from this month onwards...");
+    const posts = await fetchFacebookPosts(); // Now filters by this month
+    
+    console.log(`✅ Fetched ${posts.length} posts from this month`);
+    
+    let processed = 0;
+    let failed = 0;
+    let withOCR = 0;
+    
+    for (const post of posts) {
+      try {
+        console.log(`📝 Processing post: ${post.id}`);
+        
+        const hasImage = !!post.full_picture;
+        await processPost(post, COHERE_API_KEY.value());
+        
+        if (hasImage) {
+          const postDoc = await db.collection("announcements").doc(post.id).get();
+          if (postDoc.exists && postDoc.data()?.has_image_text) {
+            withOCR++;
           }
-          
-          processed++;
-        } catch (postError: any) {
-          console.error(`❌ Error processing post ${post.id}:`, postError.message);
-          failed++;
         }
+        
+        processed++;
+      } catch (postError: any) {
+        console.error(`❌ Error processing post ${post.id}:`, postError.message);
+        failed++;
       }
-      
-      console.log(`✅ Sync complete: ${processed} processed, ${failed} failed, ${withOCR} with OCR`);
-      
-      return {
-        success: true,
-        message: `Successfully synced ${processed} posts (${withOCR} with image text extraction)` + (failed > 0 ? ` (${failed} failed)` : ''),
-        count: processed,
-        failed: failed,
-        withOCR: withOCR,
-        total: posts.length,
-      };
-    } catch (error: any) {
-      console.error("❌ syncFacebookPostsLogic error:", error);
-      
-      return {
-        success: false,
-        error: error.message,
-        message: error.message,
-      };
     }
+    
+    console.log(`✅ Sync complete: ${processed} processed, ${failed} failed, ${withOCR} with OCR`);
+    
+    return {
+      success: true,
+      message: `Successfully synced ${processed} posts from this month (${withOCR} with image text extraction)` + (failed > 0 ? ` (${failed} failed)` : ''),
+      count: processed,
+      failed: failed,
+      withOCR: withOCR,
+      total: posts.length,
+      dateFilter: "This month onwards",
+    };
+  } catch (error: any) {
+    console.error("❌ syncFacebookPostsLogic error:", error);
+    
+    return {
+      success: false,
+      error: error.message,
+      message: error.message,
+    };
   }
+}
+
 
  export const manualSyncFacebookPosts = onCall(
   {

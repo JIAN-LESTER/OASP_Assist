@@ -8,8 +8,8 @@ if (!admin.apps.length) {
 // RAG Chatbot Functions
 export {
   generateAnswer,
-  generateCohereEmbedding,
   generateCohereResponse,
+  generateCohereEmbedding,
 } from "./ragChat";
 
 // User Management Functions
