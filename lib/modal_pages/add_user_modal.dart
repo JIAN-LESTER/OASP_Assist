@@ -8,8 +8,7 @@ import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 import 'package:capstone_project/modal_pages/programs.modal.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:capstone_project/services/admin_functions.dart';
-
-import 'modal_widget/top_right_alert.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 void showAddUserModal(BuildContext context, {Function(int)? onNavigateToPage}) {
   showGeneralDialog(
@@ -282,39 +281,37 @@ class _AddUserContentState extends State<AddUserContent> {
 
     if (_firstNameController.text.trim().isEmpty ||
         _lastNameController.text.trim().isEmpty) {
-      _showTopRightAlert(
+      SnackbarUtil.showWarning(
+        context,
         'Please enter both first and last name',
-        AlertType.warning,
       );
       return;
     }
 
     if (_emailController.text.trim().isEmpty) {
-      _showTopRightAlert('Please enter email address', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Please enter email address');
       return;
     }
 
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
 
     if (!emailRegex.hasMatch(_emailController.text.trim())) {
-      _showTopRightAlert(
-        'Please enter a valid email address',
-        AlertType.warning,
-      );
+      SnackbarUtil.showWarning(context, 'Please enter a valid email address');
       return;
     }
 
     if (_passwordController.text.trim().isEmpty) {
-      _showTopRightAlert('Please enter password', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Please enter password');
       return;
     }
 
     if (_passwordController.text.length < 6) {
-      _showTopRightAlert('Password must be 6 characters', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Password must be 6 characters');
+      return;
     }
 
     if (_passwordController.text != _confirmPasswordController.text) {
-      _showTopRightAlert('Passwords do not match', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Passwords do not match');
       return;
     }
 
@@ -344,9 +341,9 @@ class _AddUserContentState extends State<AddUserContent> {
         print('✅ User created in Authentication with UID: $uid');
       } catch (e) {
         print('❌ Failed to create user in Authentication: $e');
-        _showTopRightAlert(
+        SnackbarUtil.showError(
+          context,
           'Failed to create user account: ${e.toString()}',
-          AlertType.error,
         );
         setState(() {
           _isSubmitting = false;
@@ -376,9 +373,9 @@ class _AddUserContentState extends State<AddUserContent> {
           print('⚠️ Could not clean up auth user: $cleanupError');
         }
 
-        _showTopRightAlert(
+        SnackbarUtil.showError(
+          context,
           'Failed to create user document: ${e.toString()}',
-          AlertType.error,
         );
         setState(() {
           _isSubmitting = false;
@@ -388,11 +385,11 @@ class _AddUserContentState extends State<AddUserContent> {
 
       await _logCreateAction(fullName);
 
-      _showTopRightAlert('User created successfully!', AlertType.success);
+      SnackbarUtil.showSuccess(context, 'User created successfully!');
       Navigator.of(context).pop(true);
     } catch (e) {
       print('❌ Unexpected error: $e');
-      _showTopRightAlert('Failed to create user: $e', AlertType.error);
+      SnackbarUtil.showError(context, 'Failed to create user: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -430,32 +427,6 @@ class _AddUserContentState extends State<AddUserContent> {
     } catch (e) {
       print('⚠️ Failed to log action: $e');
     }
-  }
-
-  void _showTopRightAlert(String message, AlertType type) {
-    if (!mounted) return;
-
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
-
-    overlayEntry = OverlayEntry(
-      builder:
-          (context) => TopRightAlert(
-            message: message,
-            type: type,
-            onDismiss: () => overlayEntry.remove(),
-            isMobile: widget.isMobile,
-            isTablet: widget.isTablet,
-          ),
-    );
-
-    overlay.insert(overlayEntry);
-
-    Future.delayed(const Duration(seconds: 4), () {
-      if (overlayEntry.mounted) {
-        overlayEntry.remove();
-      }
-    });
   }
 
   @override

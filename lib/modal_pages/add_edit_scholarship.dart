@@ -8,7 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
-import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:capstone_project/models/scholarships.dart';
 import 'package:capstone_project/services/cohere_service.dart';
 import 'package:capstone_project/services/file_service2.dart';
@@ -51,7 +51,7 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
   String? _selectedFileName;
   File? _selectedFile;
   bool _fileUploaded = false;
-    String? _extractedContent;
+  String? _extractedContent;
 
   @override
   void initState() {
@@ -127,7 +127,7 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
           setState(() {
             _selectedFileName = fileName;
             _isProcessing = true;
-            _fileUploaded = false; // ✅ Reset during processing
+            _fileUploaded = false;
           });
 
           String extractedText;
@@ -152,9 +152,12 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
 
           setState(() {
             _isProcessing = false;
-            _fileUploaded = true; // ✅ Mark as uploaded
+            _fileUploaded = true;
           });
-          _showAlert('File processed successfully!', AlertType.success);
+
+          if (mounted) {
+            SnackbarUtil.showSuccess(context, 'File processed successfully!');
+          }
         }
         // Mobile/Desktop platform - use file path
         else if (result.files.single.path != null) {
@@ -164,7 +167,7 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
             _selectedFile = file;
             _selectedFileName = fileName;
             _isProcessing = true;
-            _fileUploaded = false; // ✅ Reset during processing
+            _fileUploaded = false;
           });
 
           String extractedText = await _fileService.extractTextFromFile(file);
@@ -172,17 +175,23 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
 
           setState(() {
             _isProcessing = false;
-            _fileUploaded = true; // ✅ Mark as uploaded
+            _fileUploaded = true;
           });
-          _showAlert('File processed successfully!', AlertType.success);
+
+          if (mounted) {
+            SnackbarUtil.showSuccess(context, 'File processed successfully!');
+          }
         }
       }
     } catch (e) {
       setState(() {
         _isProcessing = false;
-        _fileUploaded = false; // ✅ Reset on error
+        _fileUploaded = false;
       });
-      _showAlert('Error processing file: $e', AlertType.error);
+
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Error processing file: $e');
+      }
     }
   }
 
@@ -194,7 +203,9 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
       );
       if (image != null) await _processImage(image);
     } catch (e) {
-      _showAlert('Error picking image: $e', AlertType.error);
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Error picking image: $e');
+      }
     }
   }
 
@@ -207,14 +218,16 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
       );
       if (photo != null) await _processImage(photo);
     } catch (e) {
-      _showAlert('Error taking photo: $e', AlertType.error);
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Error taking photo: $e');
+      }
     }
   }
 
   Future<void> _processImage(XFile image) async {
     setState(() {
       _isProcessing = true;
-      _fileUploaded = false; // ✅ Reset during processing
+      _fileUploaded = false;
     });
 
     try {
@@ -222,7 +235,12 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
 
       if (kIsWeb || Platform.isWindows) {
         extractedText = "OCR not yet implemented for web/windows";
-        _showAlert('Tesseract OCR not yet implemented', AlertType.warning);
+        if (mounted) {
+          SnackbarUtil.showWarning(
+            context,
+            'Tesseract OCR not yet implemented',
+          );
+        }
         setState(() {
           _isProcessing = false;
           _fileUploaded = false;
@@ -236,7 +254,9 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
       }
 
       if (extractedText.trim().isEmpty) {
-        _showAlert('No text found in image', AlertType.warning);
+        if (mounted) {
+          SnackbarUtil.showWarning(context, 'No text found in image');
+        }
         setState(() {
           _isProcessing = false;
           _fileUploaded = false;
@@ -254,59 +274,71 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
 
       setState(() {
         _isProcessing = false;
-        _fileUploaded = true; // ✅ Mark as uploaded
+        _fileUploaded = true;
       });
-      _showAlert('Text extracted successfully!', AlertType.success);
+
+      if (mounted) {
+        SnackbarUtil.showSuccess(context, 'Text extracted successfully!');
+      }
     } catch (e) {
       setState(() {
         _isProcessing = false;
-        _fileUploaded = false; // ✅ Reset on error
+        _fileUploaded = false;
       });
-      _showAlert('Error extracting text: $e', AlertType.error);
+
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Error extracting text: $e');
+      }
     }
   }
 
- Future<void> _processExtractedText(String text, String fileName) async {
-  try {
-    // ✅ SAVE THE EXTRACTED TEXT
-    _extractedContent = text;
-    
-    final analysisResult = await _cohereService.analyzeScholarship(text);
+  Future<void> _processExtractedText(String text, String fileName) async {
+    try {
+      // Save the extracted text
+      _extractedContent = text;
 
-    if (analysisResult['scholarships'] is List && 
-        (analysisResult['scholarships'] as List).isNotEmpty) {
-      final scholarshipData = (analysisResult['scholarships'] as List).first;
+      final analysisResult = await _cohereService.analyzeScholarship(text);
 
-      setState(() {
-        _nameController.text = scholarshipData['name'] ?? '';
-        _descriptionController.text = scholarshipData['description'] ?? '';
-        _providerController.text = scholarshipData['scholarshipProvider'] ?? '';
-        _applicationLinkController.text = scholarshipData['application_link'] ?? '';
+      if (analysisResult['scholarships'] is List &&
+          (analysisResult['scholarships'] as List).isNotEmpty) {
+        final scholarshipData = (analysisResult['scholarships'] as List).first;
 
-        if (analysisResult['deadline'] != null) {
-          _selectedDeadline = analysisResult['deadline'] as DateTime?;
-          if (_selectedDeadline != null) {
-            _deadlineController.text = DateFormat('yyyy-MM-dd').format(_selectedDeadline!);
+        setState(() {
+          _nameController.text = scholarshipData['name'] ?? '';
+          _descriptionController.text = scholarshipData['description'] ?? '';
+          _providerController.text =
+              scholarshipData['scholarshipProvider'] ?? '';
+          _applicationLinkController.text =
+              scholarshipData['application_link'] ?? '';
+
+          if (analysisResult['deadline'] != null) {
+            _selectedDeadline = analysisResult['deadline'] as DateTime?;
+            if (_selectedDeadline != null) {
+              _deadlineController.text = DateFormat(
+                'yyyy-MM-dd',
+              ).format(_selectedDeadline!);
+            }
           }
-        }
 
-        if (scholarshipData['eligibilityRequirements'] is List) {
-          _eligibilityControllers = (scholarshipData['eligibilityRequirements'] as List)
-              .map((e) => TextEditingController(text: e.toString()))
-              .toList();
-        }
+          if (scholarshipData['eligibilityRequirements'] is List) {
+            _eligibilityControllers =
+                (scholarshipData['eligibilityRequirements'] as List)
+                    .map((e) => TextEditingController(text: e.toString()))
+                    .toList();
+          }
 
-        if (scholarshipData['privileges'] is List) {
-          _privilegeControllers = (scholarshipData['privileges'] as List)
-              .map((p) => TextEditingController(text: p.toString()))
-              .toList();
-        }
-      });
+          if (scholarshipData['privileges'] is List) {
+            _privilegeControllers =
+                (scholarshipData['privileges'] as List)
+                    .map((p) => TextEditingController(text: p.toString()))
+                    .toList();
+          }
+        });
+      }
+    } catch (e) {
+      print('Error analyzing scholarship: $e');
     }
-  } catch (e) {
-    print('Error analyzing scholarship: $e');
   }
-}
 
   void _showUploadOptionsBottomSheet() {
     showModalBottomSheet(
@@ -376,28 +408,34 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
                     _pickFile();
                   },
                 ),
-                if (!kIsWeb && !(Platform.isWindows || Platform.isLinux || Platform.isMacOS))
-                _buildUploadOption(
-                  icon: Icons.photo_library_outlined,
-                  title: 'Choose from Gallery',
-                  subtitle: 'Extract text from image',
-                  color: Color(0xFF1976D2),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImageFromGallery();
-                  },
-                ),
-              if (!kIsWeb && !(Platform.isWindows || Platform.isLinux || Platform.isMacOS))
-                _buildUploadOption(
-                  icon: Icons.camera_alt_outlined,
-                  title: 'Take Photo',
-                  subtitle: 'Capture and extract text',
-                  color: Color(0xFFED6C02),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _takePhoto();
-                  },
-                ),
+                if (!kIsWeb &&
+                    !(Platform.isWindows ||
+                        Platform.isLinux ||
+                        Platform.isMacOS))
+                  _buildUploadOption(
+                    icon: Icons.photo_library_outlined,
+                    title: 'Choose from Gallery',
+                    subtitle: 'Extract text from image',
+                    color: Color(0xFF1976D2),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickImageFromGallery();
+                    },
+                  ),
+                if (!kIsWeb &&
+                    !(Platform.isWindows ||
+                        Platform.isLinux ||
+                        Platform.isMacOS))
+                  _buildUploadOption(
+                    icon: Icons.camera_alt_outlined,
+                    title: 'Take Photo',
+                    subtitle: 'Capture and extract text',
+                    color: Color(0xFFED6C02),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _takePhoto();
+                    },
+                  ),
                 _buildUploadOption(
                   icon: Icons.edit_outlined,
                   title: 'Manual Entry',
@@ -509,86 +547,94 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
     }
   }
 
-Future<void> _submitForm() async {
-  if (_nameController.text.trim().isEmpty) {
-    _showAlert('Please enter scholarship name', AlertType.warning);
-    return;
-  }
-
-  setState(() => _isSubmitting = true);
-
-  try {
-    final uuid = Uuid();
-    final docId = widget.isEdit ? widget.doc!.id : uuid.v4();
-
-    final scholarship = Scholarship(
-      scholarshipID: docId,
-      sourceId: docId,
-      name: _nameController.text.trim(),
-      description: _descriptionController.text.trim(),
-      scholarshipProvider: _providerController.text.trim(),
-      eligibilityRequirements:
-          _eligibilityControllers
-              .map((c) => c.text.trim())
-              .where((t) => t.isNotEmpty)
-              .toList(),
-      privileges:
-          _privilegeControllers
-              .map((p) => p.text.trim())
-              .where((t) => t.isNotEmpty)
-              .toList(),
-      deadline: _selectedDeadline,
-      applicationLink: _applicationLinkController.text.trim(),
-      createdAt: DateTime.now(),
-    );
-
-    await _fileService.saveMultipleScholarships([scholarship]);
-
-    // ✅ FIXED: Use extracted content instead of description
-    // Only save to information bank if we have extracted content from a file
-    if (_extractedContent != null && _extractedContent!.trim().isNotEmpty) {
-      final informationBank = InformationBank(
-        id: docId,
-        title: _nameController.text.trim(),
-        content: _extractedContent!, // ✅ Use raw extracted text
-        embedding: [],
-        source: _selectedFileName ?? 'Manual Entry',
-        category: 'Scholarship',
-      );
-      await _fileService.saveToInformationBank(informationBank);
-      
-      print('✅ Saved to information bank with ${_extractedContent!.length} characters');
-    } else if (_descriptionController.text.trim().isNotEmpty) {
-      // Fallback: If no file was uploaded but description was manually entered
-      final informationBank = InformationBank(
-        id: docId,
-        title: _nameController.text.trim(),
-        content: _descriptionController.text.trim(),
-        embedding: [],
-        source: 'Manual Entry',
-        category: 'Scholarship',
-      );
-      await _fileService.saveToInformationBank(informationBank);
-      
-      print('✅ Saved to information bank from manual description');
+  Future<void> _submitForm() async {
+    if (_nameController.text.trim().isEmpty) {
+      if (mounted) {
+        SnackbarUtil.showWarning(context, 'Please enter scholarship name');
+      }
+      return;
     }
 
-    await _logAction(widget.isEdit ? 'Updated' : 'Added');
+    setState(() => _isSubmitting = true);
 
-    _showAlert(
-      'Scholarship ${widget.isEdit ? 'updated' : 'added'} successfully!',
-      AlertType.success,
-    );
+    try {
+      final uuid = Uuid();
+      final docId = widget.isEdit ? widget.doc!.id : uuid.v4();
 
-    Navigator.of(context).pop(true);
-  } catch (e) {
-    _showAlert('Error: $e', AlertType.error);
-  } finally {
-    if (mounted) {
-      setState(() => _isSubmitting = false);
+      final scholarship = Scholarship(
+        scholarshipID: docId,
+        sourceId: docId,
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        scholarshipProvider: _providerController.text.trim(),
+        eligibilityRequirements:
+            _eligibilityControllers
+                .map((c) => c.text.trim())
+                .where((t) => t.isNotEmpty)
+                .toList(),
+        privileges:
+            _privilegeControllers
+                .map((p) => p.text.trim())
+                .where((t) => t.isNotEmpty)
+                .toList(),
+        deadline: _selectedDeadline,
+        applicationLink: _applicationLinkController.text.trim(),
+        createdAt: DateTime.now(),
+      );
+
+      await _fileService.saveMultipleScholarships([scholarship]);
+
+      // Save to information bank if we have extracted content from a file
+      if (_extractedContent != null && _extractedContent!.trim().isNotEmpty) {
+        final informationBank = InformationBank(
+          id: docId,
+          title: _nameController.text.trim(),
+          content: _extractedContent!,
+          embedding: [],
+          source: _selectedFileName ?? 'Manual Entry',
+          category: 'Scholarship',
+        );
+        await _fileService.saveToInformationBank(informationBank);
+
+        print(
+          '✅ Saved to information bank with ${_extractedContent!.length} characters',
+        );
+      } else if (_descriptionController.text.trim().isNotEmpty) {
+        // Fallback: If no file was uploaded but description was manually entered
+        final informationBank = InformationBank(
+          id: docId,
+          title: _nameController.text.trim(),
+          content: _descriptionController.text.trim(),
+          embedding: [],
+          source: 'Manual Entry',
+          category: 'Scholarship',
+        );
+        await _fileService.saveToInformationBank(informationBank);
+
+        print('✅ Saved to information bank from manual description');
+      }
+
+      await _logAction(widget.isEdit ? 'Updated' : 'Added');
+
+      if (mounted) {
+        SnackbarUtil.showSuccess(
+          context,
+          'Scholarship ${widget.isEdit ? 'updated' : 'added'} successfully!',
+        );
+      }
+
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Error: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
-}
+
   Future<void> _logAction(String action) async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -616,30 +662,6 @@ Future<void> _submitForm() async {
     } catch (e) {
       print('⚠️ Failed to log action: $e');
     }
-  }
-
-  void _showAlert(String message, AlertType type) {
-    if (!mounted) return;
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
-
-    overlayEntry = OverlayEntry(
-      builder:
-          (context) => TopRightAlert(
-            message: message,
-            type: type,
-            onDismiss: () => overlayEntry.remove(),
-            isMobile: MediaQuery.of(context).size.width < 600,
-            isTablet:
-                MediaQuery.of(context).size.width >= 600 &&
-                MediaQuery.of(context).size.width < 1100,
-          ),
-    );
-
-    overlay.insert(overlayEntry);
-    Future.delayed(Duration(seconds: 4), () {
-      if (overlayEntry.mounted) overlayEntry.remove();
-    });
   }
 
   @override
@@ -975,7 +997,6 @@ Future<void> _submitForm() async {
   }
 
   Widget buildUploadArea(bool isMobile) {
-    // ✅ Check BOTH _selectedFile AND _fileUploaded
     final hasFile = _selectedFile != null || _fileUploaded;
 
     return Container(
@@ -985,9 +1006,7 @@ Future<void> _submitForm() async {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color:
-              hasFile // ✅ Updated condition
-                  ? Color(0xFF2E7D32).withOpacity(0.4)
-                  : Color(0xFFE5E7EB),
+              hasFile ? Color(0xFF2E7D32).withOpacity(0.4) : Color(0xFFE5E7EB),
           width: 2,
         ),
       ),
@@ -1003,7 +1022,7 @@ Future<void> _submitForm() async {
             ),
             child: Column(
               children: [
-                // ✅ Processing state
+                // Processing state
                 if (_isProcessing)
                   Column(
                     children: [
@@ -1028,7 +1047,7 @@ Future<void> _submitForm() async {
                       ),
                     ],
                   )
-                // ✅ File uploaded state
+                // File uploaded state
                 else if (hasFile)
                   Column(
                     children: [
@@ -1086,7 +1105,7 @@ Future<void> _submitForm() async {
                       ),
                     ],
                   )
-                // ✅ No file state
+                // No file state
                 else
                   Column(
                     children: [

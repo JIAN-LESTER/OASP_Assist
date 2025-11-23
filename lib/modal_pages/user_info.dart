@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:capstone_project/modal_pages/edit_user_modal.dart';
 import 'package:capstone_project/services/admin_functions.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 void showUserInfoModal(
   BuildContext context,
@@ -599,20 +600,7 @@ Future<void> _handleDeleteUser(
       // Close info modal
       Navigator.of(context).pop();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              const Text('User deleted successfully'),
-            ],
-          ),
-          backgroundColor: const Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      SnackbarUtil.showSuccess(context, 'User deleted successfully');
     }
   } catch (error) {
     print('❌ Error deleting user: $error');
@@ -620,20 +608,7 @@ Future<void> _handleDeleteUser(
       // Close loading dialog
       Navigator.of(context).pop();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Flexible(child: Text('Delete failed: $error')),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      SnackbarUtil.showError(context, 'Delete failed: $error');
     }
   }
 }

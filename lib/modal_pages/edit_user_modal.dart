@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
-import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:capstone_project/modal_pages/programs.modal.dart';
 import 'package:capstone_project/pages/admin_pages/affiliation.dart';
 import 'package:capstone_project/pages/admin_pages/scholarship_management.dart';
@@ -230,36 +230,6 @@ class _EditUserModalState extends State<EditUserModal> {
       role[0].toUpperCase() + role.substring(1);
 
   String getOriginalRole(String displayRole) => displayRole.toLowerCase();
-
-  void _showTopRightAlert(String message, AlertType type) {
-    if (!mounted) return;
-
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final isTablet = screenWidth >= 600 && screenWidth < 1024;
-
-    overlayEntry = OverlayEntry(
-      builder:
-          (context) => TopRightAlert(
-            message: message,
-            type: type,
-            onDismiss: () => overlayEntry.remove(),
-            isMobile: isMobile,
-            isTablet: isTablet,
-          ),
-    );
-
-    overlay.insert(overlayEntry);
-
-    Future.delayed(const Duration(seconds: 4), () {
-      if (overlayEntry.mounted) {
-        overlayEntry.remove();
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -909,22 +879,22 @@ class _EditUserModalState extends State<EditUserModal> {
 
   Future<void> _saveChanges() async {
     if (firstNameController.text.trim().isEmpty) {
-      _showTopRightAlert('Please enter a first name', AlertType.warning);
+      SnackbarUtil.showWarning(context, 'Please enter a first name');
       return;
     }
 
     // Validate password if entered
     if (passwordController.text.isNotEmpty) {
       if (passwordController.text.length < 6) {
-        _showTopRightAlert(
+        SnackbarUtil.showWarning(
+          context,
           'Password must be at least 6 characters',
-          AlertType.warning,
         );
         return;
       }
 
       if (passwordController.text != confirmPasswordController.text) {
-        _showTopRightAlert('Passwords do not match', AlertType.warning);
+        SnackbarUtil.showWarning(context, 'Passwords do not match');
         return;
       }
     }
@@ -959,9 +929,9 @@ class _EditUserModalState extends State<EditUserModal> {
           setState(() {
             _isSubmitting = false;
           });
-          _showTopRightAlert(
+          SnackbarUtil.showError(
+            context,
             'Failed to update authentication: ${e.toString()}',
-            AlertType.error,
           );
           return;
         }
@@ -1016,7 +986,7 @@ class _EditUserModalState extends State<EditUserModal> {
           _isSubmitting = false;
         });
 
-        _showTopRightAlert('User updated successfully!', AlertType.success);
+        SnackbarUtil.showSuccess(context, 'User updated successfully!');
 
         // Close modal after short delay to show success message
         Future.delayed(const Duration(milliseconds: 500), () {
@@ -1031,10 +1001,7 @@ class _EditUserModalState extends State<EditUserModal> {
         setState(() {
           _isSubmitting = false;
         });
-        _showTopRightAlert(
-          'Failed to update: ${e.toString()}',
-          AlertType.error,
-        );
+        SnackbarUtil.showError(context, 'Failed to update: ${e.toString()}');
       }
     }
   }
