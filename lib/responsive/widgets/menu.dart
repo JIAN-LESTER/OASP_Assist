@@ -6,6 +6,7 @@ import 'package:capstone_project/responsive/user_constant.dart';
 import 'package:capstone_project/responsive/widgets/logout.dart';
 import 'package:capstone_project/responsive/widgets/persistent_drawer_group.dart';
 import 'package:capstone_project/responsive/widgets/persistent_drawer_item.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -1237,53 +1238,193 @@ class UniversalUIComponents {
 static Future<void> _deleteConversation(
   BuildContext context,
   String conversationId,
+  {String? conversationTitle}
 ) async {
-  // ✅ Store context validity check
   if (!context.mounted) return;
 
-  final confirmed = await showDialog<bool>(
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isMobile = screenWidth < 600;
+
+  await showGeneralDialog(
     context: context,
-    barrierDismissible: false, // Prevent accidental dismiss
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Delete Conversation'),
-      content: const Text(
-        'Are you sure you want to delete this conversation?',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext, false),
-          child: const Text('Cancel'),
+    barrierDismissible: true,
+    barrierLabel: 'Delete Conversation Confirmation',
+    barrierColor: Colors.black.withOpacity(0.5),
+    transitionDuration: const Duration(milliseconds: 200),
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header with icon
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.fromLTRB(
+                  isMobile ? 24 : 32,
+                  isMobile ? 32 : 40,
+                  isMobile ? 24 : 32,
+                  isMobile ? 16 : 20,
+                ),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEE2E2),
+                        borderRadius: BorderRadius.circular(32),
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline,
+                        color: Color(0xFFEF4444),
+                        size: 32,
+                      ),
+                    ),
+                    SizedBox(height: isMobile ? 16 : 20),
+                    const Text(
+                      'Delete Conversation',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Content
+              Padding(
+                padding: EdgeInsets.all(isMobile ? 24 : 32),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Are you sure you want to delete this conversation?',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF6B7280),
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (conversationTitle != null) ...[
+                      const SizedBox(height: 20),
+                      // Conversation preview card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF9FAFB),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(0xFFE5E7EB),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          conversationTitle,
+                          style: TextStyle(
+                            fontSize: isMobile ? 14 : 15,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF111827),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+
+                    // Action Buttons
+                    _buildDeleteActionButtons(context, conversationId, isMobile),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext, true),
-          style: TextButton.styleFrom(foregroundColor: Colors.red),
-          child: const Text('Delete'),
+      );
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+          ),
+          child: child,
         ),
-      ],
-    ),
+      );
+    },
   );
+}
 
-  if (confirmed != true || !context.mounted) return;
+// Separate method to build action buttons with your style
+static Widget _buildDeleteActionButtons(
+  BuildContext context,
+  String conversationId,
+  bool isMobile,
+) {
+  double buttonHeight = 48;
+  double fontSize = isMobile ? 15 : 16;
+  double borderRadius = 8;
 
+  return Row(
+    children: [
+      Expanded(
+        child: SizedBox(
+          height: buttonHeight,
+          child: OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF6B7280),
+              backgroundColor: Colors.white,
+              side: const BorderSide(color: Color(0xFFD1D5DB), width: 1),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(borderRadius),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: SizedBox(
+          height: buttonHeight,
+          child: ElevatedButton(
+          onPressed: () async {
   try {
-    final wasSelected = UserConstant.selectedConversationId == conversationId;
-
-    // ✅ Clear state FIRST before deleting
-    if (wasSelected) {
-      await UserConstant.setSelectedConversation('');
-      UserConstant.shouldShowFAQs = true;
-
-      if (context.mounted) {
-        try {
-          final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-          chatProvider.clearMessages();
-        } catch (e) {
-          print('Could not clear ChatProvider: $e');
-        }
-      }
-    }
-
-    // ✅ Then delete from Firestore
     final firestore = FirebaseFirestore.instance;
     final batch = firestore.batch();
 
@@ -1301,16 +1442,12 @@ static Future<void> _deleteConversation(
     await batch.commit();
 
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Conversation deleted'),
-          backgroundColor: primaryGreen,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      SnackbarUtil.showSuccess(context, 'Conversation Deleted');
+   if (context.mounted) Navigator.of(context).pop();
+      // delay closing the dialog so snackbar attaches properly
+   
     }
   } catch (e) {
-    print('❌ Delete error: $e');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1320,7 +1457,30 @@ static Future<void> _deleteConversation(
       );
     }
   }
+},
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(borderRadius),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            child: Text(
+              'Delete',
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
 }
+
 
 
   static Widget _buildLogoutSection(BuildContext context) {
