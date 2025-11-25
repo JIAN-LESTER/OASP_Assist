@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -58,16 +59,24 @@ class _OnboardingGuideState extends State<OnboardingGuide>
     _animationController.repeat(reverse: true);
     _checkFirstTime();
   }
-
-  Future<void> _checkFirstTime() async {
-  // ✅ FIX: Check per-user instead of global
+Future<void> _checkFirstTime() async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
-  
-  final prefs = await SharedPreferences.getInstance();
-  final hasSeenOnboarding = prefs.getBool('hasSeenOnboarding_${user.uid}') ?? false;
 
-  if (!hasSeenOnboarding) {
+  final prefs = await SharedPreferences.getInstance();
+  final hasSeenLocal =
+      prefs.getBool('hasSeenOnboarding_${user.uid}') ?? false;
+
+  // ✅ Fetch the user's field from Firestore
+  final userDoc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .get();
+
+  final dbHasSeenOnboarding =
+      userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
+
+  if (!hasSeenLocal || dbHasSeenOnboarding) {
     await Future.delayed(const Duration(milliseconds: 800));
     if (mounted) {
       setState(() {
@@ -192,30 +201,29 @@ class _OnboardingGuideState extends State<OnboardingGuide>
     await _finishOnboarding();
   }
 
-Future<void> _finishOnboarding() async {
-  // ✅ FIX: Save per-user
-  final user = FirebaseAuth.instance.currentUser;
-  if (user != null) {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('hasSeenOnboarding_${user.uid}', true);
-  }
+  Future<void> _finishOnboarding() async {
+    // ✅ FIX: Save per-user
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('hasSeenOnboarding_${user.uid}', true);
+    }
 
-  _removeOverlay();
-  setState(() {
-    _showOnboarding = false;
-  });
-}
-
-void showGuide() {
-  if (!_showOnboarding) {
+    _removeOverlay();
     setState(() {
-      _showOnboarding = true;
-      _currentStep = OnboardingStep.sidebar;
+      _showOnboarding = false;
     });
-    _showOverlay();
   }
-}
 
+  void showGuide() {
+    if (!_showOnboarding) {
+      setState(() {
+        _showOnboarding = true;
+        _currentStep = OnboardingStep.sidebar;
+      });
+      _showOverlay();
+    }
+  }
 
   // void restartOnboarding() {
   //   setState(() {

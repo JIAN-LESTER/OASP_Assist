@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 class CohereService {
   // 🔐 Use environment variable in production
   // final String apiKey ="IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
-  // final String apiKey ="jGVDZpXJocGrUpJkP2YAMrQAIkcCQu7YITqcRr5h";
+  final String apiKey1 ="jGVDZpXJocGrUpJkP2YAMrQAIkcCQu7YITqcRr5h";
   final String apiKey ="AIzaSyBEsKofC_0dTYRNwFhjnnY8jzuhmQqbHQI";
   // final embedUrl = Uri.parse('https://api.cohere.ai/v1/embed');
   final chatUrl1 = Uri.parse('https://api.cohere.ai/v1/chat'); 
@@ -82,7 +82,7 @@ class CohereService {
     final res = await http.post(
       chatUrl1, // Using Chat API instead of deprecated Generate API
       headers: {
-        'Authorization': 'Bearer $apiKey',
+        'Authorization': 'Bearer $apiKey1',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
@@ -228,7 +228,7 @@ If no schedules are found, return an empty schedules array.
     final response = await http.post(
       chatUrl1,
       headers: {
-        'Authorization': 'Bearer $apiKey',
+        'Authorization': 'Bearer $apiKey1',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
@@ -639,7 +639,7 @@ Extract every scholarship mentioned. Use null for missing deadline.
     final response = await http.post(
       chatUrl1,
       headers: {
-        'Authorization': 'Bearer $apiKey',
+        'Authorization': 'Bearer $apiKey1',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
@@ -764,7 +764,7 @@ Respond in valid JSON format only:
     final response = await http.post(
       chatUrl1,
       headers: {
-        'Authorization': 'Bearer $apiKey',
+        'Authorization': 'Bearer $apiKey1',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({

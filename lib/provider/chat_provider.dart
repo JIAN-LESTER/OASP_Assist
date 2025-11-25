@@ -557,6 +557,22 @@ class ChatProvider extends ChangeNotifier {
       print('Error saving user message: $e');
     });
 
+       bool shouldUpdateTitle = false;
+    
+    if (currentConversation != null) {
+      final title = currentConversation!.title.toLowerCase();
+      shouldUpdateTitle = (title.contains('new conversation') ||
+              title == 'untitled' ||
+              title.trim().isEmpty) &&
+          _messages.where((m) => m.sender == 'user').length <= 1;
+    }
+
+    if (shouldUpdateTitle) {
+      // ✅ Do this synchronously, not in background
+      await _updateConversationTitleNow(question);
+    }
+
+
     // Limit history to last 5 messages
     final history = _messages.where((m) => m.conversationId == conversationId).toList();
     history.sort((a, b) => a.sentAt.compareTo(b.sentAt));
@@ -691,6 +707,61 @@ class ChatProvider extends ChangeNotifier {
   }
 }
 
+Future<void> _updateConversationTitleNow(String question) async {
+  if (conversationId == null) return;
+
+  try {
+    print('🔄 Updating conversation title for first message...');
+
+    final titlePrompt = '''
+Generate a short, descriptive title (max 5 words) for the following user question:
+
+Question:
+$question
+''';
+
+    final newTitle = await _cohere!.generateResponse(titlePrompt);
+    print('Generated title from Cohere: "$newTitle"');
+
+    if (newTitle != null && newTitle.trim().isNotEmpty) {
+      final updatedTitle = newTitle.trim();
+
+      // ✅ Update Firestore
+      await _firestore
+          .collection('conversations')
+          .doc(conversationId!)
+          .update({'title': updatedTitle});
+
+      print('✅ Updated conversation title to: "$updatedTitle"');
+
+      // ✅ Update local state
+      if (currentConversation != null) {
+        currentConversation = Conversation(
+          id: currentConversation!.id,
+          userId: currentConversation!.userId,
+          title: updatedTitle,
+          status: currentConversation!.status,
+          createdAt: currentConversation!.createdAt,
+        );
+      }
+
+      // ✅ Update UserConstant cache
+      final convIndex = UserConstant.recentConversations
+          .indexWhere((c) => c['id'] == conversationId);
+      if (convIndex != -1) {
+        UserConstant.recentConversations[convIndex]['title'] = updatedTitle;
+      }
+
+      // ✅ Force UI update
+      notifyListeners();
+      
+      print('✅ Title update complete and UI notified');
+    }
+  } catch (titleError) {
+    print('❌ Error updating conversation title: $titleError');
+  }
+}
+
   Map<String, dynamic>? _findBestFAQMatch(
     String question,
     List<double> questionEmbedding,
@@ -808,7 +879,7 @@ class ChatProvider extends ChangeNotifier {
           '''Classify this question into ONE category: Admission, Scholarship, Placement, or General.
 
 Categories:
-- Admission: enrollment, application process, requirements, eligibility
+- Admission: enrollment, application process, requirements, eligibility, cmucat, 
 - Scholarship: financial aid, grants, scholarships, tuition assistance
 - Placement: jobs, internships, career services, OJT, employment
 - General: anything else
