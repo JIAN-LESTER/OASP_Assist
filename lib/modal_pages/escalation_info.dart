@@ -1,9 +1,7 @@
-// Fixed escalation_info.dart
-
+// Enhanced escalation_info.dart with improved UI design
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:capstone_project/models/notification.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class EscalationDetailModal extends StatefulWidget {
@@ -24,20 +22,34 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
     with SingleTickerProviderStateMixin {
   final TextEditingController _replyController = TextEditingController();
   bool _isSending = false;
+  Map<String, dynamic>? _userData;
   late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+  bool _showFullBotResponse = false;
 
   @override
   void initState() {
     super.initState();
+    _loadUserData();
+
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 350),
       vsync: this,
     );
-    _scaleAnimation = CurvedAnimation(
+
+    _fadeAnimation = CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeInOut,
     );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.03),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    );
+
     _animationController.forward();
   }
 
@@ -48,21 +60,42 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
     super.dispose();
   }
 
+  Future<void> _loadUserData() async {
+    try {
+      final userId = widget.escalationData['userId'];
+      if (userId != null) {
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(userId)
+                .get();
+
+        if (userDoc.exists && mounted) {
+          setState(() {
+            _userData = userDoc.data();
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+    }
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return Colors.orange;
+        return const Color(0xFFF59E0B);
       case 'resolved':
-        return Colors.green;
+        return const Color(0xFF2E7D32);
       default:
-        return Colors.grey;
+        return const Color(0xFF6B7280);
     }
   }
 
   IconData _getStatusIcon(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return Icons.pending_actions;
+        return Icons.schedule;
       case 'resolved':
         return Icons.check_circle;
       default:
@@ -76,514 +109,761 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
     return '${date.day}/${date.month}/${date.year} at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
- Future<void> _sendReply() async {
-  if (_replyController.text.trim().isEmpty) {
-    _showSnackBar('Please enter a response', Colors.red);
-    return;
-  }
+  Future<void> _sendReply() async {
+    if (_replyController.text.trim().isEmpty) {
+      _showSnackBar('Please enter a response', isError: true);
+      return;
+    }
 
-  final data = widget.escalationData;
-  final question = data['question']?.toString() ?? 'unknown';
-  final userId = data['userId'] as String?;
-  final conversationId = data['conversationId'] as String?;
+    final data = widget.escalationData;
+    final question = data['question']?.toString() ?? 'unknown';
+    final userId = data['userId'] as String?;
+    final conversationId = data['conversationId'] as String?;
 
-  if (conversationId == null || conversationId.isEmpty) {
-    _showSnackBar('Invalid conversation ID', Colors.red);
-    return;
-  }
+    if (conversationId == null || conversationId.isEmpty) {
+      _showSnackBar('Invalid conversation ID', isError: true);
+      return;
+    }
 
-  setState(() => _isSending = true);
+    setState(() => _isSending = true);
 
-  try {
-    // Get current staff info
-    final currentUser = FirebaseAuth.instance.currentUser;
-    final staffDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(currentUser?.uid)
-        .get();
-    
-    final staffName = staffDoc.data()?['name'] ?? 'Staff';
-    final staffResponse = _replyController.text.trim();
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final staffDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser?.uid)
+              .get();
 
-    // ✅ FIX: Create a batch write to ensure atomicity
-    final batch = FirebaseFirestore.instance.batch();
+      final staffName = staffDoc.data()?['name'] ?? 'Staff';
+      final staffResponse = _replyController.text.trim();
 
-    // Step 1: Update escalation status
-    final escalationRef = FirebaseFirestore.instance
-        .collection('escalations')
-        .doc(widget.escalationId);
-    
-    batch.update(escalationRef, {
-      'staffResponse': staffResponse,
-      'status': 'resolved',
-      'respondedBy': staffName,
-      'respondedAt': Timestamp.now(),
-    });
+      final batch = FirebaseFirestore.instance.batch();
 
-    // ✅ Step 2: Create staff message in the conversation
-    final staffMessageRef = FirebaseFirestore.instance
-        .collection('conversations')
-        .doc(conversationId)
-        .collection('messages')
-        .doc();
+      final escalationRef = FirebaseFirestore.instance
+          .collection('escalations')
+          .doc(widget.escalationId);
 
-    final staffMessageContent = '**Staff Response from $staffName:**\n\n$staffResponse';
-
-    batch.set(staffMessageRef, {
-      'messageID': staffMessageRef.id,
-      'conversationID': conversationId,
-      'content': staffMessageContent,
-      'sender': 'staff',
-      'userID': userId ?? '',
-      'message_status': 'sent',
-      'message_type': 'text',
-      'sent_at': Timestamp.now(),
-      'responded_at': Timestamp.now(),
-      'isAnswered': true,
-      'category': 'Escalation Response',
-    });
-
-    // Step 3: Create notification for the user
-    if (userId != null && userId.isNotEmpty) {
-      final notificationRef = FirebaseFirestore.instance
-          .collection('notifications')
-          .doc();
-      
-      batch.set(notificationRef, {
-        'notificationId': notificationRef.id,
-        'userId': userId,
-        'title': 'Staff Response Received',
-        'body': 'A staff member has responded to your escalated question: "$question"',
-        'type': 'escalation_response',
-        'relatedId': widget.escalationId,
-        'targetRole': 'user',
-        'read': false,
-        'createdAt': Timestamp.now(),
-        'data': {
-          'escalationId': widget.escalationId,
-          'conversationId': conversationId,
-          'staffResponse': staffResponse,
-          'respondedBy': staffName,
-        },
+      batch.update(escalationRef, {
+        'staffResponse': staffResponse,
+        'status': 'resolved',
+        'respondedBy': staffName,
+        'respondedAt': Timestamp.now(),
       });
-    }
 
-    // ✅ Commit all changes at once
-    await batch.commit();
+      final staffMessageRef =
+          FirebaseFirestore.instance
+              .collection('conversations')
+              .doc(conversationId)
+              .collection('messages')
+              .doc();
 
-    print('✅ Escalation resolved and message created');
-    print('   - Escalation ID: ${widget.escalationId}');
-    print('   - Conversation ID: $conversationId');
-    print('   - Staff Message ID: ${staffMessageRef.id}');
+      final staffMessageContent =
+          '**Staff Response from $staffName:**\n\n$staffResponse';
 
-    if (mounted) {
-      _showSnackBar('Response sent successfully!', Colors.green);
-      HapticFeedback.lightImpact();
-    }
+      batch.set(staffMessageRef, {
+        'messageID': staffMessageRef.id,
+        'conversationID': conversationId,
+        'content': staffMessageContent,
+        'sender': 'staff',
+        'userID': userId ?? '',
+        'message_status': 'sent',
+        'message_type': 'text',
+        'sent_at': Timestamp.now(),
+        'responded_at': Timestamp.now(),
+        'isAnswered': true,
+        'category': 'Escalation Response',
+      });
 
-    await Future.delayed(const Duration(milliseconds: 800));
+      if (userId != null && userId.isNotEmpty) {
+        final notificationRef =
+            FirebaseFirestore.instance.collection('notifications').doc();
 
-    if (mounted) {
-      await _animationController.reverse();
+        batch.set(notificationRef, {
+          'notificationId': notificationRef.id,
+          'userId': userId,
+          'title': 'Staff Response Received',
+          'body':
+              'A staff member has responded to your escalated question: "$question"',
+          'type': 'escalation_response',
+          'relatedId': widget.escalationId,
+          'targetRole': 'user',
+          'read': false,
+          'createdAt': Timestamp.now(),
+          'data': {
+            'escalationId': widget.escalationId,
+            'conversationId': conversationId,
+            'staffResponse': staffResponse,
+            'respondedBy': staffName,
+          },
+        });
+      }
+
+      await batch.commit();
+
       if (mounted) {
-        Navigator.of(context).pop(true);
+        _showSnackBar('Response sent successfully!');
+        HapticFeedback.lightImpact();
+      }
+
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      if (mounted) {
+        await _animationController.reverse();
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
+      }
+    } catch (e) {
+      print('❌ Error sending response: $e');
+      if (mounted) {
+        _showSnackBar(
+          'Failed to send response: ${e.toString()}',
+          isError: true,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
       }
     }
-  } catch (e, stackTrace) {
-    print('❌ Error sending response: $e');
-    print('Stack trace: $stackTrace');
-    
-    if (mounted) {
-      _showSnackBar('Failed to send response: ${e.toString()}', Colors.red);
-    }
-  } finally {
-    if (mounted) {
-      setState(() => _isSending = false);
-    }
   }
-}
-  void _showSnackBar(String message, Color color) {
+
+  void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: color,
+        backgroundColor:
+            isError ? Colors.red.shade600 : const Color(0xFF2E7D32),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  Future<void> _closeModal() async {
+    await _animationController.reverse();
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final data = widget.escalationData;
     final status = data['status']?.toString() ?? 'unknown';
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(16),
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.9,
-            maxWidth: 500,
-          ),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+    return WillPopScope(
+      onWillPop: () async {
+        await _closeModal();
+        return false;
+      },
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.all(isMobile ? 16 : 24),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: isMobile ? double.infinity : 700,
+                maxHeight: MediaQuery.of(context).size.height * 0.88,
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [const Color(0xFF2E7D32), const Color(0xFF388E3C)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 40,
+                    offset: const Offset(0, 20),
                   ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
-                  ),
-                ),
-                child: Row(
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Header with Gradient
                     Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.support_agent,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Escalation Details",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            "Review and respond to user escalation",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(status).withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _getStatusIcon(status),
-                            size: 16,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            status.toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Content
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Question Section
-                      _buildDetailCard(
-                        title: "User Question",
-                        content: data['question'] ?? 'N/A',
-                        icon: Icons.help_outline,
-                        iconColor: Colors.blue,
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Bot Answer Section
-                      _buildDetailCard(
-                        title: "Bot Response",
-                        content: data['botAnswer'] ?? 'N/A',
-                        icon: Icons.smart_toy,
-                        iconColor: Colors.purple,
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Reason and Timestamp Row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildInfoChip(
-                              title: "Escalation Reason",
-                              content: data['reason'] ?? 'N/A',
-                              icon: Icons.report_problem,
-                              color: Colors.orange,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildInfoChip(
-                              title: "Created At",
-                              content: _formatDate(data['createdAt'] as Timestamp?),
-                              icon: Icons.access_time,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Staff Response Section
-                      if (data['staffResponse'] != null) ...[
-                        _buildDetailCard(
-                          title: "Staff Response",
-                          content: data['staffResponse'],
-                          icon: Icons.person,
-                          iconColor: Colors.green,
+                      padding: EdgeInsets.all(isMobile ? 20 : 28),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
                         ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Reply Section (only show if not resolved)
-                      if (status != 'resolved') ...[
-                        const Divider(thickness: 1, color: Colors.grey),
-                        const SizedBox(height: 20),
-                        
-                        Row(
-                          children: [
-                            Container(
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Icon(
+                              Icons.support_agent,
+                              color: Colors.white,
+                              size: isMobile ? 26 : 32,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Escalation Details',
+                                  style: TextStyle(
+                                    fontSize: isMobile ? 20 : 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _getStatusColor(
+                                      status,
+                                    ).withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        _getStatusIcon(status),
+                                        size: 14,
+                                        color: Colors.white,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        status.toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: _isSending ? null : _closeModal,
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              color: Colors.white,
+                              size: 26,
+                            ),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.white.withOpacity(0.2),
                               padding: const EdgeInsets.all(8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Content Area
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.all(isMobile ? 20 : 28),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // User Information Card
+                            Container(
+                              padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF2E7D32).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
+                                color: Colors.grey.shade50,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.grey.shade200,
+                                  width: 1,
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.reply,
-                                color: Color(0xFF2E7D32),
-                                size: 20,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.person,
+                                        color: Color(0xFF2E7D32),
+                                        // Colors.grey.shade700,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'User Information',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey.shade800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _buildUserInfoRow(
+                                    icon: Icons.person_outline,
+                                    label: 'Name',
+                                    value: _userData?['name'] ?? 'Loading...',
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildUserInfoRow(
+                                    icon: Icons.email_outlined,
+                                    label: 'Email',
+                                    value: _userData?['email'] ?? 'Loading...',
+                                  ),
+                                  if (_userData?['affiliation'] != null) ...[
+                                    const SizedBox(height: 16),
+                                    _buildUserInfoRow(
+                                      icon: Icons.business,
+                                      label: 'Affiliation',
+                                      value: _userData!['affiliation'],
+                                    ),
+                                  ],
+                                  if (_userData?['program'] != null) ...[
+                                    const SizedBox(height: 16),
+                                    _buildUserInfoRow(
+                                      icon: Icons.school_outlined,
+                                      label: 'Program',
+                                      value: _userData!['program'],
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
+
+                            const SizedBox(height: 24),
+
+                            // Question Section
+                            _buildSection(
+                              title: 'Question',
+                              icon: Icons.help_outline,
+                              iconColor: const Color(0xFF2E7D32),
+                              child: Text(
+                                data['question'] ?? 'No question provided',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  height: 1.6,
+                                  color: Color(0xFF1F2937),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // Bot Response Section with See More/Less
+                            _buildSection(
+                              title: 'Bot Response',
+                              icon: Icons.smart_toy,
+                              iconColor: const Color(0xFF2E7D32),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    data['botAnswer'] ??
+                                        'No bot response available',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      height: 1.6,
+                                      color: Color(0xFF1F2937),
+                                    ),
+                                    maxLines:
+                                        _showFullBotResponse
+                                            ? null
+                                            : 3, // Max line niya ipakita
+                                    overflow:
+                                        _showFullBotResponse
+                                            ? null
+                                            : TextOverflow.ellipsis,
+                                  ),
+                                  if ((data['botAnswer'] ?? '').length > 200)
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(top: 8),
+                                        child: InkWell(
+                                          onTap: () {
+                                            setState(() {
+                                              _showFullBotResponse =
+                                                  !_showFullBotResponse;
+                                            });
+                                          },
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  _showFullBotResponse
+                                                      ? 'See less'
+                                                      : 'See more',
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Color(0xFF1976D2),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Icon(
+                                                  _showFullBotResponse
+                                                      ? Icons.keyboard_arrow_up
+                                                      : Icons
+                                                          .keyboard_arrow_down,
+                                                  size: 18,
+                                                  color: const Color(
+                                                    0xFF2E7D32,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // Reason and Date Row
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildInfoChip(
+                                    title: 'Reason',
+                                    content: data['reason'] ?? 'N/A',
+                                    icon: Icons.report_problem,
+                                    color: const Color(0xFFF59E0B),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildInfoChip(
+                                    title: 'Submitted',
+                                    content: _formatDate(
+                                      data['createdAt'] as Timestamp?,
+                                    ),
+                                    icon: Icons.schedule,
+                                    color: const Color(0xFF6B7280),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            if (data['staffResponse'] != null) ...[
+                              const SizedBox(height: 24),
+                              _buildSection(
+                                title: 'Staff Response',
+                                icon: Icons.admin_panel_settings,
+                                iconColor: const Color(0xFF2E7D32),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      data['staffResponse'],
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        height: 1.6,
+                                        color: Color(0xFF1F2937),
+                                      ),
+                                    ),
+                                    if (data['respondedBy'] != null) ...[
+                                      const SizedBox(height: 12),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(
+                                            0xFF2E7D32,
+                                          ).withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'Responded by: ${data['respondedBy']}',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF2E7D32),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+
+                            if (status != 'resolved') ...[
+                              const SizedBox(height: 24),
+                              const Divider(height: 32),
+
+                              // Response Field
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(
+                                        0xFF2E7D32,
+                                      ).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                      Icons.reply,
+                                      color: Color(0xFF2E7D32),
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'Your Response',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1F2937),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              TextField(
+                                controller: _replyController,
+                                maxLines: 5,
+                                enabled: !_isSending,
+                                decoration: InputDecoration(
+                                  hintText:
+                                      'Type your response to help resolve this escalation...',
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey.shade50,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: BorderSide(
+                                      color: Colors.grey.shade300,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: BorderSide(
+                                      color: Colors.grey.shade300,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFF2E7D32),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  contentPadding: const EdgeInsets.all(16),
+                                ),
+                                style: const TextStyle(fontSize: 15),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Action Buttons
+                    Container(
+                      padding: EdgeInsets.all(isMobile ? 20 : 28),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFAFAFA),
+                        border: Border(
+                          top: BorderSide(color: Colors.grey.shade200),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 46,
+                              child: OutlinedButton(
+                                onPressed: _isSending ? null : _closeModal,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF6B7280),
+                                  side: BorderSide(
+                                    color: Colors.grey.shade300,
+                                    width: 1.5,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (status != 'resolved') ...[
                             const SizedBox(width: 12),
-                            const Text(
-                              "Your Response",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
+                            Expanded(
+                              child: SizedBox(
+                                height: 46,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isSending ? null : _sendReply,
+                                  icon:
+                                      _isSending
+                                          ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.5,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                          : const Icon(
+                                            Icons.send_rounded,
+                                            size: 18,
+                                          ),
+                                  label: Text(
+                                    _isSending ? 'Sending...' : 'Send Response',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2E7D32),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ],
-                        ),
-                        
-                        const SizedBox(height: 16),
-
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(12),
-                            color: Colors.grey.shade50,
-                          ),
-                          child: TextField(
-                            controller: _replyController,
-                            maxLines: 5,
-                            enabled: !_isSending,
-                            decoration: InputDecoration(
-                              hintText: "Type your response to help resolve this escalation...",
-                              hintStyle: TextStyle(color: Colors.grey.shade600),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.all(16),
-                            ),
-                            style: const TextStyle(fontSize: 15),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-
-              // Action Buttons
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(24),
-                    bottomRight: Radius.circular(24),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: _isSending ? null : () async {
-                        await _animationController.reverse();
-                        if (mounted) {
-                          Navigator.pop(context);
-                        }
-                      },
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      ),
-                      child: const Text(
-                        "Cancel",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        ],
                       ),
                     ),
-                    
-                    if (status != 'resolved') ...[
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        onPressed: _isSending ? null : _sendReply,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E7D32),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 2,
-                        ),
-                        icon: _isSending
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : const Icon(Icons.send, size: 18),
-                        label: Text(
-                          _isSending ? "Sending..." : "Send Response",
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildDetailCard({
+  Widget _buildUserInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF2E7D32)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade900,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSection({
     required String title,
-    required String content,
     required IconData icon,
     required Color iconColor,
+    required Widget child,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-              const SizedBox(width: 12),
+              Icon(icon, size: 20, color: iconColor),
+              const SizedBox(width: 10),
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: Color(0xFF1B5E20),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Text(
-              content,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.black87,
-                height: 1.4,
-              ),
-            ),
-          ),
+          const SizedBox(height: 14),
+          child,
         ],
       ),
     );
@@ -596,11 +876,11 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withOpacity(0.25), width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -615,19 +895,19 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: color.withOpacity(0.8),
+                    color: color,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             content,
             style: const TextStyle(
               fontSize: 13,
-              color: Colors.black87,
-              fontWeight: FontWeight.w500,
+              color: Color(0xFF1F2937),
+              fontWeight: FontWeight.w600,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
