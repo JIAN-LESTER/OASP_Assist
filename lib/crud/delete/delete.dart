@@ -520,67 +520,48 @@ Future<void> handleUserDelete(
   DocumentSnapshot doc,
 ) async {
   try {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    String actorName = 'Unknown';
 
-    if (currentUser != null) {
-      final currentUserDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(currentUser.uid)
-              .get();
-
-      if (currentUserDoc.exists) {
-        final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
-        actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';
-      }
-    }
-
-    final docData = doc.data() as Map<String, dynamic>;
-    String deletedUserName = docData['name'] ?? 'Unknown User';
-    String deletedUserEmail = docData['email'] ?? '';
-
-    // Step 1: Delete from Firebase Authentication using Cloud Function
     final functionsService = FirebaseFunctionsService();
+    
     try {
+      print('🔄 Calling deleteUser Cloud Function for: ${doc.id}');
       await functionsService.deleteUserAuth(doc.id);
-      print('✅ User deleted from Firebase Authentication');
+      print('✅ Cloud Function completed successfully');
     } catch (e) {
-      print('⚠️ Failed to delete from Authentication: $e');
+      print('❌ Cloud Function failed: $e');
+      throw e; // Re-throw to be caught by outer try-catch
     }
 
-    // Step 2: Delete user document from Firestore
-    await FirebaseFirestore.instance.collection('users').doc(doc.id).delete();
-    print('✅ User document deleted from Firestore');
-
-    // Close dialogs
+    // Close dialogs and show success
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
       Navigator.of(context).pop(); // Close confirmation dialog
 
-      SnackbarUtil.showSuccess(context, 'User deleted successfully');
+      SnackbarUtil.showSuccess(
+        context, 
+        'User and all related data deleted successfully'
+      );
     }
 
-    // Step 3: Log the action
-    try {
-      final logRef = FirebaseFirestore.instance.collection('logs').doc();
-      await logRef.set({
-        'logId': logRef.id,
-        'user': actorName,
-        'action': 'Deleted User: $deletedUserName ($deletedUserEmail)',
-        'time': Timestamp.now(),
-      });
-      print('✅ Deletion logged successfully');
-    } catch (e) {
-      print("⚠️ Failed to log action: $e");
-    }
   } catch (error) {
     print("❌ Delete operation failed: $error");
 
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
 
-      SnackbarUtil.showError(context, 'Delete failed: $error');
+      // Show more specific error message
+      String errorMessage = 'Delete failed: ';
+      if (error.toString().contains('permission-denied')) {
+        errorMessage += 'You do not have permission to delete users';
+      } else if (error.toString().contains('unauthenticated')) {
+        errorMessage += 'Please log in as an admin';
+      } else if (error.toString().contains('not-found')) {
+        errorMessage += 'User not found';
+      } else {
+        errorMessage += error.toString();
+      }
+      
+      SnackbarUtil.showError(context, errorMessage);
     }
   }
 }

@@ -59,8 +59,6 @@ class ChatProvider extends ChangeNotifier {
   bool isNowAddedToFAQ = false;
   int count = 1;
 
-
-
   final String _geminiApiKey = "AIzaSyBEsKofC_0dTYRNwFhjnnY8jzuhmQqbHQI";
   VoidCallback? _onMessageAdded;
 
@@ -136,7 +134,6 @@ class ChatProvider extends ChangeNotifier {
 
       // Reset loading flags
       _isLoading = false;
- 
 
       // Set new conversation ID
       conversationId = id;
@@ -172,29 +169,40 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadConversationInfo() async {
-    if (conversationId == null) return;
+ Future<void> loadConversationInfo() async {
+  if (conversationId == null) return;
 
-    try {
-      final doc =
-          await _firestore
-              .collection('conversations')
-              .doc(conversationId!)
-              .get();
-      if (doc.exists) {
-        currentConversation = Conversation.fromJson(doc.data()!);
-      } else {
-        currentConversation = null;
-      }
-
-      // ✅ CRITICAL FIX: Schedule notification after build completes
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        notifyListeners();
-      });
-    } catch (e) {
-      print('Error loading conversation info: $e');
+  try {
+    final doc = await _firestore
+        .collection('conversations')
+        .doc(conversationId!)
+        .get();
+        
+    if (doc.exists) {
+      final data = doc.data()!;
+      // ✅ Make sure you're creating a proper Conversation object
+      currentConversation = Conversation(
+        id: doc.id,
+        userId: data['userId'] ?? '',
+        title: data['title'] ?? 'Untitled',
+        status: data['status'] ?? 'active',
+        createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+ 
+      );
+      print('✅ Loaded conversation: ${currentConversation!.title}');
+    } else {
+      currentConversation = null;
+      print('⚠️ Conversation document does not exist');
     }
+
+    // Notify listeners after build completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
+  } catch (e) {
+    print('❌ Error loading conversation info: $e');
   }
+}
 
   Map<String, dynamic> _messageToMap(Message message) {
     return {
@@ -366,7 +374,7 @@ class ChatProvider extends ChangeNotifier {
         );
   }
 
- void listenToMessages() {
+  void listenToMessages() {
   if (conversationId == null) return;
 
   print('👂 Starting message listener for conversation: $conversationId');
@@ -378,68 +386,70 @@ class ChatProvider extends ChangeNotifier {
       .orderBy('sent_at', descending: false)
       .snapshots()
       .listen(
-    (snapshot) {
-      if (_isLoading) {
-        print('⏭️ Skipping listener update - message creation in progress');
-        return;
-      }
-      
-      bool changed = false;
-
-      print('📩 Message snapshot received: ${snapshot.docs.length} total messages');
-      print('   Changes: ${snapshot.docChanges.length}');
-
-      for (var change in snapshot.docChanges) {
-        final data = change.doc.data();
-        if (data == null) continue;
-
-        final message = Message.fromJson(data);
-        final index = _messages.indexWhere((m) => m.id == message.id);
-
-        if (change.type == DocumentChangeType.added) {
-          final isCurrentlyStreaming = _streamingContent.containsKey(message.id);
-          
-          if (index == -1 && !_processedMessages.contains(message.id) && !isCurrentlyStreaming) {
-            print('➕ Adding message: ${message.id}');
-            print('   Sender: ${message.sender}');
-            print('   Content: ${message.content.substring(0, min(50, message.content.length))}...');
-            
-            _messages.add(message);
-            _processedMessages.add(message.id);
-            changed = true;
-          } else {
-            print('⏭️ Skipping duplicate/streaming: ${message.id}');
+        (snapshot) {
+          // ✅ Skip if we're actively creating messages
+          if (_isLoading) {
+            print('⏭️ Skipping listener update - message creation in progress');
+            return;
           }
-        } else if (change.type == DocumentChangeType.modified) {
-          if (index != -1 && !_streamingContent.containsKey(message.id)) {
-            print('✏️ Updating message: ${message.id}');
-            _messages[index] = message;
-            changed = true;
-          }
-        } else if (change.type == DocumentChangeType.removed) {
-          if (index != -1) {
-            print('🗑️ Removing message: ${message.id}');
-            _messages.removeAt(index);
-            _processedMessages.remove(message.id);
-            changed = true;
-          }
-        }
-      } 
 
-      if (changed) {
-        _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
-        
-        print('✅ Messages updated. Total count: ${_messages.length}');
-        
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          notifyListeners();
-        });
-      }
-    },
-    onError: (error) {
-      print('❌ Error listening to messages: $error');
-    },
-  );
+          bool changed = false;
+
+          print('📩 Message snapshot received: ${snapshot.docs.length} total messages');
+          print('   Changes: ${snapshot.docChanges.length}');
+
+          for (var change in snapshot.docChanges) {
+            final data = change.doc.data();
+            if (data == null) continue;
+
+            final message = Message.fromJson(data);
+            final index = _messages.indexWhere((m) => m.id == message.id);
+
+            if (change.type == DocumentChangeType.added) {
+              // ✅ FIX: Only add if not already in local state
+              final isAlreadyLocal = _messages.any((m) => m.id == message.id);
+              final isCurrentlyStreaming = _streamingContent.containsKey(message.id);
+
+              if (!isAlreadyLocal && !isCurrentlyStreaming) {
+                print('➕ Adding message from Firestore: ${message.id}');
+                print('   Sender: ${message.sender}');
+                print('   Content: ${message.content.substring(0, min(50, message.content.length))}...');
+
+                _messages.add(message);
+                _processedMessages.add(message.id);
+                changed = true;
+              } else {
+                print('⏭️ Skipping duplicate/local message: ${message.id}');
+              }
+            } else if (change.type == DocumentChangeType.modified) {
+              if (index != -1 && !_streamingContent.containsKey(message.id)) {
+                print('✏️ Updating message: ${message.id}');
+                _messages[index] = message;
+                changed = true;
+              }
+            } else if (change.type == DocumentChangeType.removed) {
+              if (index != -1) {
+                print('🗑️ Removing message: ${message.id}');
+                _messages.removeAt(index);
+                _processedMessages.remove(message.id);
+                changed = true;
+              }
+            }
+          }
+
+          if (changed) {
+            _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+            print('✅ Messages updated. Total count: ${_messages.length}');
+
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              notifyListeners();
+            });
+          }
+        },
+        onError: (error) {
+          print('❌ Error listening to messages: $error');
+        },
+      );
 }
 
   void debugPrintMessageState(String context) {
@@ -458,31 +468,21 @@ class ChatProvider extends ChangeNotifier {
 
   String? getStreamingContent(String messageId) => _streamingContent[messageId];
 
-Future<void> askQuestionWithStreaming(
+  Future<void> askQuestionWithStreaming(
   BuildContext context,
   String question,
 ) async {
   if (_isLoading) return;
 
-  // ✅ FIX: Create conversation if none exists
+  // Create conversation if needed
   if (conversationId == null || conversationId!.isEmpty) {
     print('⚠️ No conversation ID - creating new conversation');
-    
     final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) {
-      return;
-    }
+    if (userId == null) return;
 
     try {
-      // Create new conversation
       final newConversationId = await UserConstant.createNewConversation(userId);
-      
-      // Set it in the provider
       await setConversationId(newConversationId);
-      
-      print('✅ Created new conversation: $newConversationId');
-      
-      // Small delay to ensure setup completes
       await Future.delayed(Duration(milliseconds: 300));
     } catch (e) {
       print('❌ Error creating conversation: $e');
@@ -490,7 +490,6 @@ Future<void> askQuestionWithStreaming(
     }
   }
 
-  // ✅ Double-check conversation exists
   if (conversationId == null || conversationId!.isEmpty) {
     print('❌ Still no conversation ID after creation attempt');
     return;
@@ -505,9 +504,7 @@ Future<void> askQuestionWithStreaming(
     _cohere ??= CohereService();
     final userId = FirebaseAuth.instance.currentUser?.uid;
 
-    // ───────────────────────────────────────────────
-    //  ⚡ 1. Run embedding + FAQ load in parallel (NO classification yet)
-    // ───────────────────────────────────────────────
+    // Run embedding + FAQ load in parallel
     final results = await Future.wait([
       _generateEmbeddingCached(question),
       _ensureFAQCacheLoaded(),
@@ -516,37 +513,29 @@ Future<void> askQuestionWithStreaming(
     final currentEmbedding = results[0] as List<double>;
     final existingFAQ = _findBestFAQMatch(question, currentEmbedding);
 
-    // ───────────────────────────────────────────────
-    //  ✅ 2. Determine category: Use FAQ category FIRST, then classify
-    // ───────────────────────────────────────────────
+    // Determine category
     String questionCategory;
-    
     if (existingFAQ != null && existingFAQ['category'] != null) {
-      // ✅ PRIORITY 1: Use FAQ category if match found
       questionCategory = existingFAQ['category'] as String;
       print('✅ Using FAQ category: $questionCategory');
     } else {
-      // ✅ PRIORITY 2: Classify only if no FAQ match
       questionCategory = await _classifyQuestionCategoryFast(question);
       print('✅ Classified category: $questionCategory');
     }
 
-    // ───────────────────────────────────────────────
-    //  ✅ 3. Create user message with CORRECT category
-    // ───────────────────────────────────────────────
-    final userMessageRef =
-        _firestore
-            .collection('conversations')
-            .doc(conversationId!)
-            .collection('messages')
-            .doc();
+    // ✅ FIX: Create user message and add to UI IMMEDIATELY
+    final userMessageRef = _firestore
+        .collection('conversations')
+        .doc(conversationId!)
+        .collection('messages')
+        .doc();
 
     final userMsg = Message(
       id: userMessageRef.id,
       conversationId: conversationId!,
       content: question,
       userID: userId,
-      category: questionCategory,  // ✅ USE DETERMINED CATEGORY (not hardcoded!)
+      category: questionCategory,
       sender: 'user',
       status: 'sent',
       isAnswered: false,
@@ -555,28 +544,25 @@ Future<void> askQuestionWithStreaming(
       count: count,
     );
 
+    // ✅ Add to local state FIRST (immediate UI update)
     _messages.add(userMsg);
     _processedMessages.add(userMsg.id);
+    
+    // ✅ Notify listeners immediately so message appears
     notifyListeners();
     _onMessageAdded?.call();
 
-    // Save user message in background (no await)
-    unawaited(userMessageRef.set(_messageToMap(userMsg)));
+    // ✅ Save to Firestore in background (don't await)
+    userMessageRef.set(_messageToMap(userMsg)).catchError((e) {
+      print('Error saving user message: $e');
+    });
 
-    // ───────────────────────────────────────────────
-    //  ⚡ 4. Limit history to last 5 messages only
-    // ───────────────────────────────────────────────
-    final history =
-        _messages.where((m) => m.conversationId == conversationId).toList();
-
+    // Limit history to last 5 messages
+    final history = _messages.where((m) => m.conversationId == conversationId).toList();
     history.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    final recentHistory = history.length > 5 ? history.sublist(history.length - 5) : history;
 
-    final recentHistory =
-        history.length > 5 ? history.sublist(history.length - 5) : history;
-
-    // ───────────────────────────────────────────────
-    //  ⚡ 5. Prepare bot message placeholder immediately
-    // ───────────────────────────────────────────────
+    // ✅ Create bot message placeholder IMMEDIATELY
     final botMessageId = "bot_${userMsg.id}";
     final botMessage = Message(
       id: botMessageId,
@@ -589,6 +575,7 @@ Future<void> askQuestionWithStreaming(
       count: count,
     );
 
+    // ✅ Add bot message to UI immediately
     _messages.add(botMessage);
     _streamingContent[botMessageId] = "";
     notifyListeners();
@@ -596,12 +583,10 @@ Future<void> askQuestionWithStreaming(
 
     String finalAnswer = "";
 
-    // ───────────────────────────────────────────────
-    //  ⚡ 6. FAST PATH: FAQ answer (no RAG, no LLM)
-    // ───────────────────────────────────────────────
+    // Fast path: FAQ answer
     if (existingFAQ != null) {
       final String answer = existingFAQ["answer"];
-      final int chunkSize = 20; // faster streaming
+      final int chunkSize = 20;
 
       for (int i = 0; i < answer.length; i += chunkSize) {
         final chunk = answer.substring(
@@ -609,10 +594,8 @@ Future<void> askQuestionWithStreaming(
           (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
         );
 
-        _streamingContent[botMessageId] =
-            _streamingContent[botMessageId]! + chunk;
+        _streamingContent[botMessageId] = _streamingContent[botMessageId]! + chunk;
 
-        // Update UI only every 3 chunks (fast!)
         if (i % (chunkSize * 3) == 0) {
           notifyListeners();
           _onMessageAdded?.call();
@@ -622,9 +605,7 @@ Future<void> askQuestionWithStreaming(
       finalAnswer = answer;
       unawaited(_incrementFAQSimilarityCountAsync(existingFAQ["question"]));
     } else {
-      // ───────────────────────────────────────────────
-      //  ⚡ 7. RAG STREAMING (optimized UI updates)
-      // ───────────────────────────────────────────────
+      // RAG streaming
       int chunkCounter = 0;
 
       await for (final streamedText in _retriever.generateAnswerStream(
@@ -633,10 +614,8 @@ Future<void> askQuestionWithStreaming(
         conversationId: conversationId!,
       )) {
         chunkCounter++;
-
         _streamingContent[botMessageId] = streamedText;
 
-        // Update UI only every 3–5 chunks instead of every chunk
         if (chunkCounter % 4 == 0) {
           notifyListeners();
           _onMessageAdded?.call();
@@ -646,12 +625,10 @@ Future<void> askQuestionWithStreaming(
       }
     }
 
-    // Remove temporary streaming content
+    // Remove streaming content
     _streamingContent.remove(botMessageId);
 
-    // ───────────────────────────────────────────────
-    //  ⚡ 8. Remove duplication only if VERY long
-    // ───────────────────────────────────────────────
+    // Remove duplication
     String verified = finalAnswer;
     if (verified.length > 300) {
       final half = verified.length ~/ 2;
@@ -660,7 +637,7 @@ Future<void> askQuestionWithStreaming(
       }
     }
 
-    // Update bot message locally
+    // ✅ Update bot message locally
     final idx = _messages.indexWhere((m) => m.id == botMessageId);
     if (idx >= 0) {
       _messages[idx] = botMessage.copyWith(content: verified);
@@ -669,16 +646,10 @@ Future<void> askQuestionWithStreaming(
     notifyListeners();
     _onMessageAdded?.call();
 
-    // ───────────────────────────────────────────────
-    //  ⚡ 9. Compute response time (ms)
-    // ───────────────────────────────────────────────
     final totalMs = DateTime.now().difference(startTime).inMilliseconds;
-    print("⚡ Optimized total response time: ${totalMs}ms");
+    print("⚡ Total response time: ${totalMs}ms");
 
-    // ───────────────────────────────────────────────
-    //  ⚡ 10. Save bot message + update user message (async)
-    //      This removes 400–900ms from critical path!
-    // ───────────────────────────────────────────────
+    // ✅ Save bot message to Firestore (background)
     unawaited(() async {
       final batch = _firestore.batch();
 
@@ -699,16 +670,17 @@ Future<void> askQuestionWithStreaming(
       await batch.commit();
     }());
 
-    // ───────────────────────────────────────────────
-    //  ⚡ 11. Background tasks (not blocking) - USE CORRECT CATEGORY
-    // ───────────────────────────────────────────────
+    // ✅ FIX 2: Update title and reload conversation info
+    await _updateConversationTitleIfNeeded(question);
+
+    // Background tasks
     unawaited(
       _handlePostResponseTasks(
         context,
         question,
         verified,
         currentEmbedding,
-        questionCategory,  // ✅ PASS CORRECT CATEGORY (not classifiedCategory!)
+        questionCategory,
         userId,
       ),
     );
@@ -719,108 +691,121 @@ Future<void> askQuestionWithStreaming(
   }
 }
 
+  Map<String, dynamic>? _findBestFAQMatch(
+    String question,
+    List<double> questionEmbedding,
+  ) {
+    try {
+      double highestSimilarity = 0.0;
+      Map<String, dynamic>? bestMatch;
 
+      print('🔍 Checking ${FAQCache.cache.length} FAQs for match');
+      print('🔍 Question: "$question"');
 
- Map<String, dynamic>? _findBestFAQMatch(
-  String question,
-  List<double> questionEmbedding,
-) {
-  try {
-    double highestSimilarity = 0.0;
-    Map<String, dynamic>? bestMatch;
+      for (var entry in FAQCache.cache.entries) {
+        final data = entry.value;
 
-    print('🔍 Checking ${FAQCache.cache.length} FAQs for match');
-    print('🔍 Question: "$question"');
+        // ✅ CRITICAL: Validate embedding exists
+        if (!data.containsKey('embedding') || data['embedding'] == null) {
+          print('⚠️ FAQ missing embedding: ${data['question']}');
+          continue;
+        }
 
-    for (var entry in FAQCache.cache.entries) {
-      final data = entry.value;
+        // ✅ CRITICAL: Validate answer exists and is not empty
+        final answer = data['answer'] as String?;
+        if (answer == null || answer.trim().isEmpty) {
+          print('⚠️ FAQ has empty answer: ${data['question']}');
+          continue;
+        }
 
-      // ✅ CRITICAL: Validate embedding exists
-      if (!data.containsKey('embedding') || data['embedding'] == null) {
-        print('⚠️ FAQ missing embedding: ${data['question']}');
-        continue;
+        List<double> faqEmbedding;
+        try {
+          faqEmbedding = List<double>.from(data['embedding']);
+        } catch (e) {
+          print('⚠️ Invalid embedding format for: ${data['question']}');
+          continue;
+        }
+
+        // ✅ Validate embedding dimensions match
+        if (faqEmbedding.length != questionEmbedding.length) {
+          print(
+            '⚠️ Embedding dimension mismatch: FAQ=${faqEmbedding.length}, Query=${questionEmbedding.length}',
+          );
+          continue;
+        }
+
+        final similarity = cosineSimilarity(questionEmbedding, faqEmbedding);
+
+        print(
+          '📊 FAQ: "${(data['question'] as String).substring(0, min(50, (data['question'] as String).length))}..."',
+        );
+        print('   Answer length: ${answer.length} chars');
+        print('   Category: ${data['category'] ?? 'N/A'}'); // ✅ ADDED
+        print('   Similarity: ${similarity.toStringAsFixed(4)}');
+
+        // ✅ LOWERED THRESHOLD: Changed from 0.85 to 0.75 for better matching
+        if (similarity > 0.75 && similarity > highestSimilarity) {
+          highestSimilarity = similarity;
+          bestMatch = {
+            'question': data['question'],
+            'answer': answer,
+            'category': data['category'] ?? 'General', // ✅ INCLUDE CATEGORY
+            'similarity': similarity,
+          };
+          print('   🎯 NEW BEST MATCH!');
+        }
       }
 
-      // ✅ CRITICAL: Validate answer exists and is not empty
-      final answer = data['answer'] as String?;
-      if (answer == null || answer.trim().isEmpty) {
-        print('⚠️ FAQ has empty answer: ${data['question']}');
-        continue;
+      if (bestMatch != null) {
+        print('✅ Found FAQ match:');
+        print('   Question: ${bestMatch['question']}');
+        print('   Category: ${bestMatch['category']}'); // ✅ ADDED
+        print('   Similarity: ${highestSimilarity.toStringAsFixed(4)}');
+        print(
+          '   Answer length: ${(bestMatch['answer'] as String).length} chars',
+        );
+      } else {
+        print(
+          '❌ No FAQ match found (best similarity: ${highestSimilarity.toStringAsFixed(4)})',
+        );
       }
 
-      List<double> faqEmbedding;
-      try {
-        faqEmbedding = List<double>.from(data['embedding']);
-      } catch (e) {
-        print('⚠️ Invalid embedding format for: ${data['question']}');
-        continue;
-      }
+      return bestMatch;
+    } catch (e) {
+      print('❌ Error finding FAQ match: $e');
+      return null;
+    }
+  }
 
-      // ✅ Validate embedding dimensions match
-      if (faqEmbedding.length != questionEmbedding.length) {
-        print('⚠️ Embedding dimension mismatch: FAQ=${faqEmbedding.length}, Query=${questionEmbedding.length}');
-        continue;
-      }
+  // ✅ SIMPLIFIED: Only Admission, Scholarship, Placement, or General
+  Future<String> _classifyQuestionCategoryFast(String question) async {
+    final q = question.toLowerCase();
 
-      final similarity = cosineSimilarity(questionEmbedding, faqEmbedding);
-
-      print('📊 FAQ: "${(data['question'] as String).substring(0, min(50, (data['question'] as String).length))}..."');
-      print('   Answer length: ${answer.length} chars');
-      print('   Category: ${data['category'] ?? 'N/A'}');  // ✅ ADDED
-      print('   Similarity: ${similarity.toStringAsFixed(4)}');
-
-      // ✅ LOWERED THRESHOLD: Changed from 0.85 to 0.75 for better matching
-      if (similarity > 0.75 && similarity > highestSimilarity) {
-        highestSimilarity = similarity;
-        bestMatch = {
-          'question': data['question'],
-          'answer': answer,
-          'category': data['category'] ?? 'General',  // ✅ INCLUDE CATEGORY
-          'similarity': similarity,
-        };
-        print('   🎯 NEW BEST MATCH!');
-      }
+    // ✅ Admission keywords
+    if (RegExp(
+      r'\b(admission|admit|admitted|enroll|enrollment|application|apply|applying|entrance|entry|requirement|requirements|eligibility|qualify|acceptance|accepted|applicant)\b',
+    ).hasMatch(q)) {
+      return 'Admission';
     }
 
-    if (bestMatch != null) {
-      print('✅ Found FAQ match:');
-      print('   Question: ${bestMatch['question']}');
-      print('   Category: ${bestMatch['category']}');  // ✅ ADDED
-      print('   Similarity: ${highestSimilarity.toStringAsFixed(4)}');
-      print('   Answer length: ${(bestMatch['answer'] as String).length} chars');
-    } else {
-      print('❌ No FAQ match found (best similarity: ${highestSimilarity.toStringAsFixed(4)})');
+    // ✅ Scholarship keywords
+    if (RegExp(
+      r'\b(scholarship|scholarships|scholar|grant|grants|financial\s*aid|funding|stipend|allowance|tuition\s*fee\s*discount|free\s*tuition|financial\s*support)\b',
+    ).hasMatch(q)) {
+      return 'Scholarship';
     }
 
-    return bestMatch;
-  } catch (e) {
-    print('❌ Error finding FAQ match: $e');
-    return null;
-  }
-}
+    // ✅ Placement keywords
+    if (RegExp(
+      r'\b(placement|job|jobs|career|careers|internship|intern|employment|work|hiring|vacancy|vacancies|position|positions|ojt|practicum|on[- ]the[- ]job|training)\b',
+    ).hasMatch(q)) {
+      return 'Placement';
+    }
 
-// ✅ SIMPLIFIED: Only Admission, Scholarship, Placement, or General
-Future<String> _classifyQuestionCategoryFast(String question) async {
-  final q = question.toLowerCase();
-
-  // ✅ Admission keywords
-  if (RegExp(r'\b(admission|admit|admitted|enroll|enrollment|application|apply|applying|entrance|entry|requirement|requirements|eligibility|qualify|acceptance|accepted|applicant)\b').hasMatch(q)) {
-    return 'Admission';
-  }
-  
-  // ✅ Scholarship keywords
-  if (RegExp(r'\b(scholarship|scholarships|scholar|grant|grants|financial\s*aid|funding|stipend|allowance|tuition\s*fee\s*discount|free\s*tuition|financial\s*support)\b').hasMatch(q)) {
-    return 'Scholarship';
-  }
-  
-  // ✅ Placement keywords
-  if (RegExp(r'\b(placement|job|jobs|career|careers|internship|intern|employment|work|hiring|vacancy|vacancies|position|positions|ojt|practicum|on[- ]the[- ]job|training)\b').hasMatch(q)) {
-    return 'Placement';
-  }
-
-  // ✅ SIMPLIFIED: Fall back to LLM classification (only 3 categories + General)
-  try {
-    final prompt = '''Classify this question into ONE category: Admission, Scholarship, Placement, or General.
+    // ✅ SIMPLIFIED: Fall back to LLM classification (only 3 categories + General)
+    try {
+      final prompt =
+          '''Classify this question into ONE category: Admission, Scholarship, Placement, or General.
 
 Categories:
 - Admission: enrollment, application process, requirements, eligibility
@@ -831,90 +816,98 @@ Categories:
 Question: "$question"
 
 Return ONLY the category name (Admission, Scholarship, Placement, or General):''';
-    
-    final category = await _cohere?.generateResponse(prompt);
-    
-    if (category != null && category.trim().isNotEmpty) {
-      final normalized = category.trim().replaceAll(RegExp(r'[^a-zA-Z]'), '');
-      
-      // ✅ Check if response contains any of the 3 main categories
-      if (normalized.toLowerCase().contains('admission')) return 'Admission';
-      if (normalized.toLowerCase().contains('scholarship')) return 'Scholarship';
-      if (normalized.toLowerCase().contains('placement')) return 'Placement';
-      
-      print('⚠️ LLM returned: "$category", using General');
-    }
-  } catch (e) {
-    print('❌ Classification error: $e');
-  }
-  
-  print('ℹ️ No specific category matched, using General');
-  return 'General';
-}
-// ✅ ALSO UPDATE: _ensureFAQCacheLoaded to validate data
-Future<void> _ensureFAQCacheLoaded() async {
-  if (FAQCache.isExpired || FAQCache.cache.isEmpty) {
-    try {
-      print('🔄 Refreshing FAQ cache...');
-      
-      // ✅ CRITICAL: Only fetch FAQs with non-empty answers AND embeddings
-      final faqSnapshot = await _firestore
-          .collection('faqs')
-          .where('answer', isNotEqualTo: "")
-          .get();
 
-      print('📚 Found ${faqSnapshot.docs.length} FAQs in Firestore');
+      final category = await _cohere?.generateResponse(prompt);
 
-      // ✅ Filter and validate before caching
-      Map<String, Map<String, dynamic>> validFAQs = {};
-      int skippedCount = 0;
+      if (category != null && category.trim().isNotEmpty) {
+        final normalized = category.trim().replaceAll(RegExp(r'[^a-zA-Z]'), '');
 
-      for (var doc in faqSnapshot.docs) {
-        final data = doc.data();
-        final question = data['question'] as String?;
-        final answer = data['answer'] as String?;
-        final embedding = data['embedding'];
+        // ✅ Check if response contains any of the 3 main categories
+        if (normalized.toLowerCase().contains('admission')) return 'Admission';
+        if (normalized.toLowerCase().contains('scholarship'))
+          return 'Scholarship';
+        if (normalized.toLowerCase().contains('placement')) return 'Placement';
 
-        // Validate all required fields
-        if (question == null || question.isEmpty) {
-          print('⚠️ Skipping FAQ ${doc.id}: No question');
-          skippedCount++;
-          continue;
-        }
-
-        if (answer == null || answer.trim().isEmpty) {
-          print('⚠️ Skipping FAQ ${doc.id}: Empty answer');
-          skippedCount++;
-          continue;
-        }
-
-        if (embedding == null || !(embedding is List) || (embedding as List).isEmpty) {
-          print('⚠️ Skipping FAQ ${doc.id}: No embedding - "${question.substring(0, min(50, question.length))}"');
-          skippedCount++;
-          continue;
-        }
-
-        // ✅ Only add valid FAQs to cache
-        validFAQs[doc.id] = data;
-        print('✅ Cached FAQ: "${question.substring(0, min(50, question.length))}" (${answer.length} chars)');
+        print('⚠️ LLM returned: "$category", using General');
       }
-
-      FAQCache.cache.clear();
-      FAQCache.cache.addAll(validFAQs);
-      FAQCache.lastCacheUpdate = DateTime.now();
-      
-      print('✅ FAQ Cache updated:');
-      print('   Valid FAQs: ${validFAQs.length}');
-      print('   Skipped: $skippedCount');
-      print('   Total in cache: ${FAQCache.cache.length}');
     } catch (e) {
-      print('❌ Error loading FAQ cache: $e');
+      print('❌ Classification error: $e');
     }
-  } else {
-    print('ℹ️ Using cached FAQs (${FAQCache.cache.length} entries)');
-  }
-}
 
+    print('ℹ️ No specific category matched, using General');
+    return 'General';
+  }
+
+  // ✅ ALSO UPDATE: _ensureFAQCacheLoaded to validate data
+  Future<void> _ensureFAQCacheLoaded() async {
+    if (FAQCache.isExpired || FAQCache.cache.isEmpty) {
+      try {
+        print('🔄 Refreshing FAQ cache...');
+
+        // ✅ CRITICAL: Only fetch FAQs with non-empty answers AND embeddings
+        final faqSnapshot =
+            await _firestore
+                .collection('faqs')
+                .where('answer', isNotEqualTo: "")
+                .get();
+
+        print('📚 Found ${faqSnapshot.docs.length} FAQs in Firestore');
+
+        // ✅ Filter and validate before caching
+        Map<String, Map<String, dynamic>> validFAQs = {};
+        int skippedCount = 0;
+
+        for (var doc in faqSnapshot.docs) {
+          final data = doc.data();
+          final question = data['question'] as String?;
+          final answer = data['answer'] as String?;
+          final embedding = data['embedding'];
+
+          // Validate all required fields
+          if (question == null || question.isEmpty) {
+            print('⚠️ Skipping FAQ ${doc.id}: No question');
+            skippedCount++;
+            continue;
+          }
+
+          if (answer == null || answer.trim().isEmpty) {
+            print('⚠️ Skipping FAQ ${doc.id}: Empty answer');
+            skippedCount++;
+            continue;
+          }
+
+          if (embedding == null ||
+              !(embedding is List) ||
+              (embedding as List).isEmpty) {
+            print(
+              '⚠️ Skipping FAQ ${doc.id}: No embedding - "${question.substring(0, min(50, question.length))}"',
+            );
+            skippedCount++;
+            continue;
+          }
+
+          // ✅ Only add valid FAQs to cache
+          validFAQs[doc.id] = data;
+          print(
+            '✅ Cached FAQ: "${question.substring(0, min(50, question.length))}" (${answer.length} chars)',
+          );
+        }
+
+        FAQCache.cache.clear();
+        FAQCache.cache.addAll(validFAQs);
+        FAQCache.lastCacheUpdate = DateTime.now();
+
+        print('✅ FAQ Cache updated:');
+        print('   Valid FAQs: ${validFAQs.length}');
+        print('   Skipped: $skippedCount');
+        print('   Total in cache: ${FAQCache.cache.length}');
+      } catch (e) {
+        print('❌ Error loading FAQ cache: $e');
+      }
+    } else {
+      print('ℹ️ Using cached FAQs (${FAQCache.cache.length} entries)');
+    }
+  }
 
   Future<List<double>> _generateEmbeddingCached(String text) async {
     final cached = EmbeddingCache.get(text);
@@ -926,7 +919,6 @@ Future<void> _ensureFAQCacheLoaded() async {
     EmbeddingCache.put(text, embedding);
     return embedding;
   }
-
 
   Future<void> _handlePostResponseTasks(
     BuildContext context,
@@ -946,7 +938,7 @@ Future<void> _ensureFAQCacheLoaded() async {
           answerText,
           category,
         ),
-        _updateConversationTitleIfNeeded(question), // ✅ ADD THIS LINE
+        _updateConversationTitleIfNeeded(question),
       ]);
     } catch (e) {
       print('Error in post-response tasks: $e');
@@ -1129,127 +1121,134 @@ Future<void> _ensureFAQCacheLoaded() async {
   }
 
   Future<void> _checkAndPromoteToFAQOptimized(
-  String question,
-  List<double> currentEmbedding,
-  String botAnswer,
-  String category,
-) async {
-  try {
-    // Only process if answer and question are worthy
-    if (!_isAnswerWorthyOfFAQ(botAnswer) ||
-        !_isQuestionWorthyOfFAQ(question)) {
-      return;
-    }
+    String question,
+    List<double> currentEmbedding,
+    String botAnswer,
+    String category,
+  ) async {
+    try {
+      // Only process if answer and question are worthy
+      if (!_isAnswerWorthyOfFAQ(botAnswer) ||
+          !_isQuestionWorthyOfFAQ(question)) {
+        return;
+      }
 
-    // ✅ NEW: Calculate date 30 days ago
-    final oneMonthAgo = DateTime.now().subtract(Duration(days: 30));
-    final oneMonthAgoTimestamp = Timestamp.fromDate(oneMonthAgo);
+      // ✅ NEW: Calculate date 30 days ago
+      final oneMonthAgo = DateTime.now().subtract(Duration(days: 30));
+      final oneMonthAgoTimestamp = Timestamp.fromDate(oneMonthAgo);
 
-    // ✅ UPDATED: Query messages from the last 30 days only
-    final querySnapshot = await _firestore
-        .collectionGroup('messages')
-        .where('sender', isEqualTo: 'user')
-        .where('isAnswered', isEqualTo: true)
-        .where('category', isEqualTo: category)
-        .where('sent_at', isGreaterThanOrEqualTo: oneMonthAgoTimestamp)
-        .orderBy('sent_at', descending: true)
-        .limit(100) // Increased limit to capture more data
-        .get();
+      // ✅ UPDATED: Query messages from the last 30 days only
+      final querySnapshot =
+          await _firestore
+              .collectionGroup('messages')
+              .where('sender', isEqualTo: 'user')
+              .where('isAnswered', isEqualTo: true)
+              .where('category', isEqualTo: category)
+              .where('sent_at', isGreaterThanOrEqualTo: oneMonthAgoTimestamp)
+              .orderBy('sent_at', descending: true)
+              .limit(100) // Increased limit to capture more data
+              .get();
 
-    Map<String, QuestionGroup> questionGroups = {};
+      Map<String, QuestionGroup> questionGroups = {};
 
-    for (var doc in querySnapshot.docs) {
-      final data = doc.data();
-      final pastQuestion = data['content'] as String?;
-      final pastEmbeddingData = data['embedding'];
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        final pastQuestion = data['content'] as String?;
+        final pastEmbeddingData = data['embedding'];
 
-      if (pastQuestion == null || pastEmbeddingData == null) continue;
-      if (!_isQuestionWorthyOfFAQ(pastQuestion)) continue;
+        if (pastQuestion == null || pastEmbeddingData == null) continue;
+        if (!_isQuestionWorthyOfFAQ(pastQuestion)) continue;
 
-      try {
-        final pastEmbedding = (pastEmbeddingData as List)
-            .map((e) => (e as num).toDouble())
-            .toList();
+        try {
+          final pastEmbedding =
+              (pastEmbeddingData as List)
+                  .map((e) => (e as num).toDouble())
+                  .toList();
 
-        if (pastEmbedding.length != currentEmbedding.length) continue;
+          if (pastEmbedding.length != currentEmbedding.length) continue;
 
-        final similarity = cosineSimilarity(currentEmbedding, pastEmbedding);
+          final similarity = cosineSimilarity(currentEmbedding, pastEmbedding);
 
-        // ✅ Slightly lower similarity threshold to capture more variations
-        if (similarity > 0.88) {
-          final contextKey = _extractContextualKey(pastQuestion);
-          final groupKey = '${category}_$contextKey';
+          // ✅ Slightly lower similarity threshold to capture more variations
+          if (similarity > 0.88) {
+            final contextKey = _extractContextualKey(pastQuestion);
+            final groupKey = '${category}_$contextKey';
 
-          questionGroups.putIfAbsent(groupKey, () => QuestionGroup());
-          questionGroups[groupKey]!.addQuestion(
-            pastQuestion,
-            data,
-            similarity,
+            questionGroups.putIfAbsent(groupKey, () => QuestionGroup());
+            questionGroups[groupKey]!.addQuestion(
+              pastQuestion,
+              data,
+              similarity,
+            );
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      // ✅ UPDATED: Promote groups with more than 10 questions in the last month
+      final batch = _firestore.batch();
+      bool hasBatchOperations = false;
+
+      for (var group in questionGroups.values) {
+        // ✅ NEW THRESHOLD: More than 10 questions with avg similarity > 0.90
+        if (group.questionCount > 10 && group.averageSimilarity > 0.90) {
+          final representativeQuestion = group.getMostRepresentativeQuestion();
+
+          final existing =
+              await _firestore
+                  .collection('faqs')
+                  .where('question', isEqualTo: representativeQuestion)
+                  .limit(1)
+                  .get();
+
+          if (existing.docs.isEmpty) {
+            final faqRef = _firestore.collection('faqs').doc();
+            final faqData = {
+              'question': representativeQuestion,
+              'answer': botAnswer,
+              'category': category,
+              'isPredefined': false,
+              'createdAt': Timestamp.now(),
+              'embedding': currentEmbedding,
+              'promotionReason':
+                  'Auto-promoted: ${group.questionCount} similar questions in last 30 days',
+              'similarityCount': group.questionCount,
+              'averageSimilarity': group.averageSimilarity,
+              'promotionPeriod': '30_days',
+              'promotionDate': Timestamp.now(),
+            };
+
+            batch.set(faqRef, faqData);
+            hasBatchOperations = true;
+
+            print('🎯 Auto-adding FAQ: $representativeQuestion');
+            print('   Questions in group: ${group.questionCount}');
+            print(
+              '   Average similarity: ${group.averageSimilarity.toStringAsFixed(3)}',
+            );
+            print('   Category: $category');
+          }
+        } else if (group.questionCount > 5) {
+          // ✅ Log near-threshold groups for monitoring
+          print('📊 Question group approaching threshold:');
+          print('   Context: ${_extractContextualKey(group.questions.first)}');
+          print('   Count: ${group.questionCount}/11 (need >10)');
+          print(
+            '   Avg similarity: ${group.averageSimilarity.toStringAsFixed(3)}',
           );
         }
-      } catch (e) {
-        continue;
       }
-    }
 
-    // ✅ UPDATED: Promote groups with more than 10 questions in the last month
-    final batch = _firestore.batch();
-    bool hasBatchOperations = false;
-
-    for (var group in questionGroups.values) {
-      // ✅ NEW THRESHOLD: More than 10 questions with avg similarity > 0.90
-      if (group.questionCount > 10 && group.averageSimilarity > 0.90) {
-        final representativeQuestion = group.getMostRepresentativeQuestion();
-
-        final existing = await _firestore
-            .collection('faqs')
-            .where('question', isEqualTo: representativeQuestion)
-            .limit(1)
-            .get();
-
-        if (existing.docs.isEmpty) {
-          final faqRef = _firestore.collection('faqs').doc();
-          final faqData = {
-            'question': representativeQuestion,
-            'answer': botAnswer,
-            'category': category,
-            'isPredefined': false,
-            'createdAt': Timestamp.now(),
-            'embedding': currentEmbedding,
-            'promotionReason':
-                'Auto-promoted: ${group.questionCount} similar questions in last 30 days',
-            'similarityCount': group.questionCount,
-            'averageSimilarity': group.averageSimilarity,
-            'promotionPeriod': '30_days',
-            'promotionDate': Timestamp.now(),
-          };
-
-          batch.set(faqRef, faqData);
-          hasBatchOperations = true;
-
-          print('🎯 Auto-adding FAQ: $representativeQuestion');
-          print('   Questions in group: ${group.questionCount}');
-          print('   Average similarity: ${group.averageSimilarity.toStringAsFixed(3)}');
-          print('   Category: $category');
-        }
-      } else if (group.questionCount > 5) {
-        // ✅ Log near-threshold groups for monitoring
-        print('📊 Question group approaching threshold:');
-        print('   Context: ${_extractContextualKey(group.questions.first)}');
-        print('   Count: ${group.questionCount}/11 (need >10)');
-        print('   Avg similarity: ${group.averageSimilarity.toStringAsFixed(3)}');
+      if (hasBatchOperations) {
+        await batch.commit();
+        FAQCache.lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(0);
+        print('✅ FAQ promotion batch committed successfully');
       }
+    } catch (e) {
+      print('❌ Error in FAQ promotion: $e');
     }
-
-    if (hasBatchOperations) {
-      await batch.commit();
-      FAQCache.lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(0);
-      print('✅ FAQ promotion batch committed successfully');
-    }
-  } catch (e) {
-    print('❌ Error in FAQ promotion: $e');
   }
-}
 
   String _extractContextualKey(String question) {
     final lowercaseQuestion = question.toLowerCase();
@@ -1433,113 +1432,128 @@ Future<void> _ensureFAQCacheLoaded() async {
     }
   }
 
-  Future<void> _updateConversationTitleIfNeeded(String question) async {
-    if (conversationId == null) return;
+ Future<void> _updateConversationTitleIfNeeded(String question) async {
+  if (conversationId == null) return;
 
-    bool shouldUpdateTitle = false;
+  bool shouldUpdateTitle = false;
 
-    if (currentConversation == null) {
-      await loadConversationInfo();
-    }
+  if (currentConversation == null) {
+    await loadConversationInfo();
+  }
 
-    if (currentConversation != null) {
-      final title = currentConversation!.title.toLowerCase();
-      shouldUpdateTitle =
-          (title.contains('new conversation') ||
-              title == 'untitled' ||
-              title.trim().isEmpty) &&
-          _messages.where((m) => m.sender == 'user').length <= 1;
-    }
+  if (currentConversation != null) {
+    final title = currentConversation!.title.toLowerCase();
+    shouldUpdateTitle = (title.contains('new conversation') ||
+            title == 'untitled' ||
+            title.trim().isEmpty) &&
+        _messages.where((m) => m.sender == 'user').length <= 1;
+  }
 
-    if (shouldUpdateTitle) {
-      try {
-        final titlePrompt = '''
+  if (shouldUpdateTitle) {
+    try {
+      final titlePrompt = '''
 Generate a short, descriptive title (max 5 words) for the following user question:
 
 Question:
 $question
 ''';
 
-        final newTitle = await _cohere!.generateResponse(titlePrompt);
-        print('Generated title from Cohere: "$newTitle"');
+      final newTitle = await _cohere!.generateResponse(titlePrompt);
+      print('Generated title from Cohere: "$newTitle"');
 
-        if (newTitle != null && newTitle.trim().isNotEmpty) {
-          final updatedTitle = newTitle.trim();
+      if (newTitle != null && newTitle.trim().isNotEmpty) {
+        final updatedTitle = newTitle.trim();
 
-          await _firestore
-              .collection('conversations')
-              .doc(conversationId!)
-              .update({'title': updatedTitle});
+        // ✅ Update Firestore first
+        await _firestore
+            .collection('conversations')
+            .doc(conversationId!)
+            .update({'title': updatedTitle});
 
-          print('Updated conversation title to: "$updatedTitle"');
+        print('Updated conversation title to: "$updatedTitle"');
 
-          if (currentConversation != null) {
-            currentConversation = Conversation(
-              id: currentConversation!.id,
-              title: updatedTitle,
-              userId: currentConversation!.userId,
-              status: currentConversation!.status,
-              createdAt: currentConversation!.createdAt,
-            );
-            notifyListeners();
-          }
+        // ✅ Update local state immediately
+        if (currentConversation != null) {
+          currentConversation = Conversation(
+            id: currentConversation!.id,
+            userId: currentConversation!.userId,
+            title: updatedTitle, // New title
+            status: currentConversation!.status,
+            createdAt: currentConversation!.createdAt,
+
+          );
         }
-      } catch (titleError) {
-        print('Error updating conversation title: $titleError');
+
+        // ✅ Update UserConstant cache
+        final convIndex = UserConstant.recentConversations
+            .indexWhere((c) => c['id'] == conversationId);
+        if (convIndex != -1) {
+          UserConstant.recentConversations[convIndex]['title'] = updatedTitle;
+        }
+
+        // ✅ Force UI update
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+        
+        print('✅ Title update complete and UI notified');
       }
+    } catch (titleError) {
+      print('Error updating conversation title: $titleError');
     }
   }
+}
 
-//  Future<List<double>> generateEmbedding(String question) async {
-//   try {
-//     final response = await http.post(
-//       Uri.parse("https://api.cohere.ai/v1/embed"),
-//       headers: {
-//         'Authorization': 'Bearer $_apiKey',
-//         'Content-Type': 'application/json',
-//       },
-//       body: jsonEncode({
-//         "texts": [question],
-//         "model": "embed-multilingual-v3.0",  // ✅ Changed to v3
-//         "input_type": "search_query",         // ✅ Required for v3 - queries
-//       }),
-//     );
+  //  Future<List<double>> generateEmbedding(String question) async {
+  //   try {
+  //     final response = await http.post(
+  //       Uri.parse("https://api.cohere.ai/v1/embed"),
+  //       headers: {
+  //         'Authorization': 'Bearer $_apiKey',
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: jsonEncode({
+  //         "texts": [question],
+  //         "model": "embed-multilingual-v3.0",  // ✅ Changed to v3
+  //         "input_type": "search_query",         // ✅ Required for v3 - queries
+  //       }),
+  //     );
 
-//     if (response.statusCode != 200) {
-//       throw Exception('Failed to generate embedding: ${response.statusCode}');
-//     }
+  //     if (response.statusCode != 200) {
+  //       throw Exception('Failed to generate embedding: ${response.statusCode}');
+  //     }
 
-//     final data = jsonDecode(response.body);
-//     final embedding = (data['embeddings'][0] as List)
-//         .map((e) => (e as num).toDouble())
-//         .toList();
-    
-//     print('✅ Generated v3 embedding: ${embedding.length} dimensions');
-//     return embedding;
-//   } catch (e) {
-//     print('Error generating embedding: $e');
-//     rethrow;
-//   }
-// }
+  //     final data = jsonDecode(response.body);
+  //     final embedding = (data['embeddings'][0] as List)
+  //         .map((e) => (e as num).toDouble())
+  //         .toList();
 
- Future<List<double>> generateEmbedding(String question) async {
+  //     print('✅ Generated v3 embedding: ${embedding.length} dimensions');
+  //     return embedding;
+  //   } catch (e) {
+  //     print('Error generating embedding: $e');
+  //     rethrow;
+  //   }
+  // }
+
+  Future<List<double>> generateEmbedding(String question) async {
     try {
-      print('🔧 Generating Gemini embedding for: "${question.substring(0, min(50, question.length))}..."');
-      
+      print(
+        '🔧 Generating Gemini embedding for: "${question.substring(0, min(50, question.length))}..."',
+      );
+
       final response = await http.post(
         Uri.parse(
-          "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=$_geminiApiKey"
+          "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=$_geminiApiKey",
         ),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           "model": "models/text-embedding-004",
           "content": {
             "parts": [
-              {"text": question}
-            ]
-          }
+              {"text": question},
+            ],
+          },
         }),
       );
 
@@ -1550,10 +1564,11 @@ $question
       }
 
       final data = jsonDecode(response.body);
-      final embedding = (data['embedding']['values'] as List)
-          .map((e) => (e as num).toDouble())
-          .toList();
-      
+      final embedding =
+          (data['embedding']['values'] as List)
+              .map((e) => (e as num).toDouble())
+              .toList();
+
       print('✅ Generated Gemini embedding: ${embedding.length} dimensions');
       return embedding;
     } catch (e) {
@@ -1654,7 +1669,6 @@ $question
 
     // Reset all flags
     _isLoading = false;
-  
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
@@ -1747,7 +1761,6 @@ double _calculateQuestionQuality(String question) {
 
   return score.clamp(0.0, 5.0);
 }
-
 
 extension DoubleExtension on double {
   String toFixed(int decimals) {

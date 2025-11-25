@@ -245,8 +245,7 @@ class _HomeDashboardState extends State<HomeDashboard>
                     sliver: _buildServicesGrid(),
                   ),
 
-                  // Quick Actions
-                  SliverToBoxAdapter(child: _buildQuickActions()),
+                
 
                   // Bottom spacing
                   SliverToBoxAdapter(
@@ -1407,80 +1406,8 @@ class _HomeDashboardState extends State<HomeDashboard>
     );
   }
 
-  Widget _buildQuickActions() {
-    final isMobile = _isMobile(context);
 
-    return Padding(
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Contact & Support',
-            style: TextStyle(
-              fontSize: isMobile ? 18 : 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          SizedBox(height: isMobile ? 12 : 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildQuickActionButton(
-                  'Contact Us',
-                  Icons.phone,
-                  const Color(0xFF2E7D32),
-                  () => _showContactInfo(context),
-                  isMobile,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionButton(
-    String label,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-    bool isMobile,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.all(isMobile ? 14 : 16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: isMobile ? 18 : 20),
-            SizedBox(width: isMobile ? 6 : 8),
-            Flexible(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: isMobile ? 13 : 14,
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  
 
   void _navigateToTab(BuildContext context, int tabIndex) {
     Navigator.of(context).pushReplacement(
@@ -1510,109 +1437,7 @@ class _HomeDashboardState extends State<HomeDashboard>
     }
   }
 
-  void _showContactInfo(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          backgroundColor: Colors.white,
-          titlePadding: const EdgeInsets.only(top: 20, left: 24, right: 24),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 16,
-          ),
-          title: Row(
-            children: [
-              Icon(
-                Icons.support_agent,
-                color: const Color(0xFF2E7D32),
-                size: 26,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'Contact Information',
-                style: TextStyle(
-                  fontSize: isMobile ? 18 : 20,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF2E7D32),
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildContactRow(
-                Icons.access_time,
-                'Office Hours',
-                '7:00 AM - 5:00 PM',
-              ),
-              const SizedBox(height: 10),
-              _buildContactRow(
-                Icons.email_outlined,
-                'Email',
-                'oasp@cmu.edu.ph',
-              ),
-              const SizedBox(height: 10),
-              _buildContactRow(
-                Icons.email_outlined,
-                'Website',
-                'http://www.cmu.edu.ph',
-              ),
-              const SizedBox(height: 10),
-              _buildContactRow(
-                Icons.location_on_outlined,
-                'Address',
-                'Musuan, Maramag, Philippines, 8714',
-              ),
-            ],
-          ),
-          actionsPadding: const EdgeInsets.only(bottom: 12, right: 16),
-          actions: [
-            TextButton.icon(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close, color: Colors.grey),
-              label: const Text('Close', style: TextStyle(color: Colors.grey)),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
-  Widget _buildContactRow(IconData icon, String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: const Color(0xFF2E7D32), size: 22),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(color: Colors.black54, fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  
 }

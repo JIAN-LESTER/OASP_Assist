@@ -1,7 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
+import 'dart:ui' as ui;
 
 import 'package:capstone_project/pages/data/reports.dart';
 // import 'package:capstone_project/pages/data/reports.dart';
@@ -58,18 +58,41 @@ Widget buildStatCard(String title, String value, Color color, IconData icon) {
                   child: Icon(icon, color: color, size: iconSize),
                 ),
                 SizedBox(width: isMobile ? 6 : 8),
-                Expanded(
-                  child: Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: valueFontSize,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 2,
-                  ),
-                ),
+              Expanded(
+  child: LayoutBuilder(
+    builder: (context, innerConstraints) {
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: value,
+          style: TextStyle(
+            fontSize: valueFontSize,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        textDirection: ui.TextDirection.ltr,
+        maxLines: 2,
+      )..layout(maxWidth: innerConstraints.maxWidth);
+
+      bool isTwoLines = textPainter.didExceedMaxLines;
+
+      final adjustedFontSize = isTwoLines
+          ? (valueFontSize - 2) // shrink slightly
+          : valueFontSize;
+
+      return Text(
+        value,
+        style: TextStyle(
+          fontSize: adjustedFontSize,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      );
+    },
+  ),
+),
               ],
             ),
             SizedBox(height: spacing),

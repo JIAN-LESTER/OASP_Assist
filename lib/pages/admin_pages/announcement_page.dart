@@ -1,7 +1,7 @@
 
 
 import 'package:capstone_project/icon_and_color.dart';
-import 'package:capstone_project/pages/admin_pages/testAnnouncement.dart';
+
 import 'package:capstone_project/services/fb_sync.dart';
 
 import 'package:flutter/foundation.dart';
@@ -731,7 +731,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                   foregroundColor: Colors.white,
                 ),
               ),
-              InfoBankTestWidget(),
+     
             ],
           ),
     );

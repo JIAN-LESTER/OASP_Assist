@@ -16,7 +16,7 @@ const db = admin.firestore();
 // GEMINI FUNCTIONS
 // ============================================================================
 
-const GEMINI_MODEL = "gemini-2.5-pro";
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 export async function generateGeminiEmbedding(
   text: string,
@@ -506,7 +506,7 @@ export const generateAnswer = onRequest(
           if (streamSucceeded) {
             res.write(`data: ${JSON.stringify({ 
               type: "message-end", 
-              metadata: { source: "knowledge_base", confidence, documentsUsed: contexts.length } 
+              metadata: { source: "information_bank", confidence, documentsUsed: contexts.length } 
             })}\n\n`);
             res.write("data: [DONE]\n\n");
             res.end();
@@ -533,7 +533,7 @@ export const generateAnswer = onRequest(
 
           res.write(`data: ${JSON.stringify({ 
             type: "message-end", 
-            metadata: { source: "knowledge_base", confidence } 
+            metadata: { source: "information_bank", confidence } 
           })}\n\n`);
           res.write("data: [DONE]\n\n");
           res.end();
@@ -549,11 +549,13 @@ export const generateAnswer = onRequest(
         const answer = await generateGeminiResponse(prompt, geminiKey);
         res.json({ 
           answer: answer.trim(), 
-          source: "knowledge_base",
+          source: "information_bank",
           confidence,
           documentsFound: results.length
         });
       }
+
+      
 
     } catch (error: any) {
       console.error("❌ Error:", error);
@@ -563,7 +565,10 @@ export const generateAnswer = onRequest(
         source: "error" 
       });
     }
+
+    
   }
+  
 );
 
 // Quick fix with multiple model fallbacks

@@ -1076,7 +1076,7 @@ Widget dashboardContents(
           }
         }
 
-        // --- ALWAYS SCROLLABLE: SingleChildScrollView wrapper ---
+
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
           child: Column(

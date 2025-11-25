@@ -351,6 +351,7 @@ class _RegisterPageState extends State<RegisterPage> {
         'isActive': true,
         'profileCompleted': false,
         'onboardingCompleted': false,
+        'hasSeenOnboardingGuide': false,
         'isVerified': false,
         'linkedProviders': ['password'],
       };

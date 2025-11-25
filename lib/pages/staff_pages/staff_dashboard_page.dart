@@ -904,20 +904,77 @@ Widget dashboardContents(
 ) {
   final totalMessages = quickStats?['totalMessages'] ?? inq?.totalMessages ?? 0;
   final answeredMessages = quickStats?['answered'] ?? inq?.answeredMessages ?? 0;
-  final escalatedMessages = inq?.escalatedMessages ?? 0;
+  final totalUsers = quickStats?['totalUsers'] ?? ud?.totalUsers ?? 0;
 
   return Scaffold(
     backgroundColor: Colors.grey[100],
     body: LayoutBuilder(
       builder: (context, constraints) {
-        final screenWidth = MediaQuery.of(context).size.width;
-        final isMobile = screenWidth < 600;
-        final isTablet = screenWidth >= 600 && screenWidth < 1100;
+        final width = constraints.maxWidth;
+        final isMobile = width < 600;
+        final isTablet = width >= 600 && width < 1100;
 
-        Widget statCards() {
-          if (isMobile) {
-            return Column(
-              children: [
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ===========================
+              // HEADER SECTION
+              // ===========================
+              _buildHeader(
+                selectedTimeFrame,
+                onTimeFrameChanged,
+                onRefresh,
+                isRefreshing,
+                userName,
+              ),
+
+              const SizedBox(height: 32),
+
+              // ===========================
+              // QUICK STATS CARDS
+              // ===========================
+              if (isMobile) ...[
+                Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: buildStatCard(
+                            'Total Messages',
+                            '$totalMessages',
+                            Colors.blue,
+                            Icons.message,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: buildStatCard(
+                            'Answered',
+                            '$answeredMessages',
+                            Colors.green,
+                            Icons.check_circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: buildStatCard(
+                            'Total Users',
+                            '$totalUsers',
+                            Colors.red,
+                            Icons.people,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ] else ...[
                 Row(
                   children: [
                     Expanded(
@@ -928,24 +985,20 @@ Widget dashboardContents(
                         Icons.message,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: isTablet ? 12 : 20),
                     Expanded(
                       child: buildStatCard(
-                        'Escalated Messages',
-                        '$escalatedMessages',
+                        'Answered',
+                        '$answeredMessages',
                         Colors.green,
                         Icons.check_circle,
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
+                    SizedBox(width: isTablet ? 12 : 20),
                     Expanded(
                       child: buildStatCard(
-                        'Resolved Escalated Messages',
-                        '${inq?.resolvedEscalatedMessages ?? 0}',
+                        'Total Users',
+                        '$totalUsers',
                         Colors.red,
                         Icons.people,
                       ),
@@ -953,151 +1006,117 @@ Widget dashboardContents(
                   ],
                 ),
               ],
-            );
-          } else {
-            return Row(
-              children: [
-                Expanded(
-                  child: buildStatCard(
-                    'Total Messages',
-                    '$totalMessages',
-                    Colors.blue,
-                    Icons.message,
-                  ),
-                ),
-                SizedBox(width: isTablet ? 12 : 20),
-                Expanded(
-                  child: buildStatCard(
-                        'Escalated Messages',
-                        '$escalatedMessages',
-                        Colors.green,
-                        Icons.check_circle,
-                      ),
-                ),
-                SizedBox(width: isTablet ? 12 : 20),
-                Expanded(
-                  child: buildStatCard(
-                        'Resolved Escalated Messages',
-                        '${inq?.resolvedEscalatedMessages ?? 0}',
-                        Colors.red,
-                        Icons.people,
-                      ),
-                ),
-              ],
-            );
-          }
-        }
 
-        Widget cardsSection() {
-          if (isMobile) {
-            return Column(
-              children: [
-                SizedBox(
-                  height: 400,
-                  child: LazyLoadWidget(
-                    delay: const Duration(milliseconds: 100),
-                    builder: (context) => buildCategoryDistributionCard(inq?.categoryDistribution ?? {}),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 400,
-                  child: LazyLoadWidget(
-                    delay: const Duration(milliseconds: 200),
-                    builder: (context) => buildInquiryTrendCard(inq?.inquiryTrend ?? [], selectedTimeFrame),
-                  ),
-                ),
-              
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 350,
-                  child: LazyLoadWidget(
-                    delay: const Duration(milliseconds: 400),
-                    builder: (context) => buildMessageLogsCard(inq?.msgLogs ?? []),
-                  ),
-                ),
-              ],
-            );
-            } else {
-              // Web/Desktop: fixed layout with Expanded
-              return Column(
-                children: [
-                        SizedBox(
-      height: 400, // set your desired fixed height
-      child: Row(
-        children: [
-          Expanded(
-            child: LazyLoadWidget(
-              delay: const Duration(milliseconds: 100),
-              builder: (context) => buildCategoryDistributionCard(
-                inq?.categoryDistribution ?? {},
-              ),
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: LazyLoadWidget(
-              delay: const Duration(milliseconds: 200),
-              builder: (context) => buildInquiryTrendCard(
-                inq?.inquiryTrend ?? [],
-                selectedTimeFrame,
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: Row(
-                    children: [
-                     
-                      Expanded(
-                        flex: 2,
-                        child: LazyLoadWidget(
-                          delay: const Duration(milliseconds: 400),
-                          builder: (context) => buildMessageLogsCard(inq?.msgLogs ?? []),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          }
-        }
+              const SizedBox(height: 32),
 
-        // --- Return widget ---
-        return Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: isMobile
-              ? SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(selectedTimeFrame, onTimeFrameChanged, onRefresh, isRefreshing, userName),
-                      const SizedBox(height: 32),
-                      statCards(),
-                      const SizedBox(height: 32),
-                      cardsSection(),
-                    ],
-                  ),
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(selectedTimeFrame, onTimeFrameChanged, onRefresh, isRefreshing, userName),
-                    const SizedBox(height: 32),
-                    statCards(),
-                    const SizedBox(height: 32),
-                    Expanded(child: cardsSection()),
-                  ],
-                ),
+
+              if (isMobile) ...[
+                _mobileCardsSection(inq, selectedTimeFrame),
+              ] else ...[
+                _desktopCardsSection(inq, selectedTimeFrame),
+              ],
+            ],
+          ),
         );
       },
     ),
   );
 }
+
+// ===============================
+// MOBILE VERSION OF CARDS
+// ===============================
+Widget _mobileCardsSection(InquiryReportsData? inq, String timeFrame) {
+  return Column(
+    children: [
+      SizedBox(
+        height: 400,
+        child: LazyLoadWidget(
+          delay: const Duration(milliseconds: 100),
+          builder: (_) => buildCategoryDistributionCard(
+            inq?.categoryDistribution ?? {},
+          ),
+        ),
+      ),
+      const SizedBox(height: 20),
+      SizedBox(
+        height: 400,
+        child: LazyLoadWidget(
+          delay: const Duration(milliseconds: 200),
+          builder: (_) => buildInquiryTrendCard(
+            inq?.inquiryTrend ?? [],
+            timeFrame,
+          ),
+        ),
+      ),
+     
+      const SizedBox(height: 20),
+      SizedBox(
+        height: 350,
+        child: LazyLoadWidget(
+          delay: const Duration(milliseconds: 400),
+          builder: (_) => buildMessageLogsCard(
+            inq?.msgLogs ?? [],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+// ===============================
+// DESKTOP/TABLET VERSION OF CARDS
+// ===============================
+Widget _desktopCardsSection(InquiryReportsData? inq, String timeFrame) {
+  return Column(
+    children: [
+      SizedBox(
+        height: 400,
+        child: Row(
+          children: [
+            Expanded(
+              child: LazyLoadWidget(
+                delay: const Duration(milliseconds: 100),
+                builder: (_) => buildCategoryDistributionCard(
+                  inq?.categoryDistribution ?? {},
+                ),
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: LazyLoadWidget(
+                delay: const Duration(milliseconds: 200),
+                builder: (_) => buildInquiryTrendCard(
+                  inq?.inquiryTrend ?? [],
+                  timeFrame,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 20),
+      SizedBox(
+        height: 350,
+        child: Row(
+          children: [
+          
+            Expanded(
+              flex: 2,
+              child: LazyLoadWidget(
+                delay: const Duration(milliseconds: 400),
+                builder: (_) => buildMessageLogsCard(
+                  inq?.msgLogs ?? [],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
 
 Widget _buildHeader(
   String selectedTimeFrame,
