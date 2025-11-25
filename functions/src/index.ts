@@ -8,9 +8,9 @@ if (!admin.apps.length) {
 // RAG Chatbot Functions
 export {
   generateAnswer,
-  generateCohereResponse,
+  generateGeminiEmbedding,
 
-  generateCohereEmbedding,
+  generateGeminiResponse,
 } from "./ragChat";
 
 // User Management Functions
@@ -28,13 +28,10 @@ export {
   manualSyncFacebookPostsHttp,
   reprocessExistingAnnouncements,
   cleanupDeletedAnnouncement,
-  // ✅ Information Bank diagnostic and sync functions
-  debugInfoBank,
+  
   batchSyncCategoriesToInfoBank,
-  // ✅ Test and debugging functions
-  testCreateInfoBank,
-  listInfoBankEntries,
-  deleteInfoBankEntry,
+
+
 } from "./announcement";
 
 // Facebook Token Management Functions

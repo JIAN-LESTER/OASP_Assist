@@ -5,9 +5,9 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class PineconeCloudService {
-  final String baseUrl = "https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io";
+  // final String baseUrl = "https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io";
   // final String apiKey = "pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa";
-  // final String baseUrl = "https://oasp-assist-gemini-tpewr0x.svc.aped-4627-b74a.pinecone.io";
+  final String baseUrl = "https://oasp-assist-gemini-tpewr0x.svc.aped-4627-b74a.pinecone.io";
   final String apiKey = "pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa";
 
   Map<String, String> get headers => {

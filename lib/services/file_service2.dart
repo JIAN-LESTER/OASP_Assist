@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:math';
+
 
 import 'package:capstone_project/services/gemini_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,13 +16,13 @@ import 'package:uuid/uuid.dart';
 import 'package:docx_to_text/docx_to_text.dart';
 
 import 'package:capstone_project/models/info_bank.dart';
-import 'package:capstone_project/services/cohere_service.dart';
+
 
 /// Service for handling file operations, document processing, and knowledge base management
 class FileService {
   final firestore = FirebaseFirestore.instance;
-  final CohereService _cohereService = CohereService();
-  // final GeminiService _cohereService = GeminiService();
+  // final CohereService _cohereService = CohereService();
+  final GeminiService _geminiService = GeminiService();
   final PineconeCloudService _pineconeService =
       PineconeCloudService(); // Updated to Pinecone
   final Uuid _uuid = Uuid();
@@ -75,9 +75,9 @@ Future<void> saveToInformationBank(InformationBank ib) async {
       final chunk = chunks[i];
 
       // Generate embedding for the chunk
-      final embedding = await _cohereService.embedText(
+      final embedding = await _geminiService.embedText(
         chunk.text,
-        inputType: 'search_document',
+       
       );
 
       // Create chunk title that includes context
@@ -194,9 +194,9 @@ Future<void> batchUploadToInformationBank(List<InformationBank> documents) async
       for (int i = 0; i < chunks.length; i++) {
         final chunk = chunks[i];
 
-        final embedding = await _cohereService.embedText(
+        final embedding = await _geminiService.embedText(
           chunk.text,
-          inputType: 'search_document',
+         
         );
 
         final chunkTitle = chunks.length > 1
@@ -485,7 +485,7 @@ Future<void> updateInfoBankFromAdmission(Admissions admission) async {
 
     for (int i = 0; i < chunks.length; i++) {
       final chunk = chunks[i];
-      final embedding = await _cohereService.embedText(
+      final embedding = await _geminiService.embedText(
         chunk.text,
        
       );
@@ -600,9 +600,9 @@ Future<void> updateInfoBankFromScholarship(Scholarship scholarship) async {
 
     for (int i = 0; i < chunks.length; i++) {
       final chunk = chunks[i];
-      final embedding = await _cohereService.embedText(
+      final embedding = await _geminiService.embedText(
         chunk.text,
-        inputType: 'search_document',
+       
       );
 
       final chunkTitle = chunks.length > 1
@@ -711,9 +711,9 @@ Future<void> updateInfoBankFromPlacement(Placement placement) async {
 
     for (int i = 0; i < chunks.length; i++) {
       final chunk = chunks[i];
-      final embedding = await _cohereService.embedText(
+      final embedding = await _geminiService.embedText(
         chunk.text,
-        inputType: 'search_document',
+       
       );
 
       final chunkTitle = chunks.length > 1
@@ -801,9 +801,9 @@ Future<void> _createInfoBankFromAdmission(Admissions admission) async {
 
     for (int i = 0; i < chunks.length; i++) {
       final chunk = chunks[i];
-      final embedding = await _cohereService.embedText(
+      final embedding = await _geminiService.embedText(
         chunk.text,
-        inputType: 'search_document',
+       
       );
 
       final chunkTitle = chunks.length > 1
@@ -908,9 +908,9 @@ Future<void> _createInfoBankFromScholarship(Scholarship scholarship) async {
 
     for (int i = 0; i < chunks.length; i++) {
       final chunk = chunks[i];
-      final embedding = await _cohereService.embedText(
+      final embedding = await _geminiService.embedText(
         chunk.text,
-        inputType: 'search_document',
+       
       );
 
       final chunkTitle = chunks.length > 1
@@ -1012,9 +1012,9 @@ Future<void> _createInfoBankFromPlacement(Placement placement) async {
 
     for (int i = 0; i < chunks.length; i++) {
       final chunk = chunks[i];
-      final embedding = await _cohereService.embedText(
+      final embedding = await _geminiService.embedText(
         chunk.text,
-        inputType: 'search_document',
+       
       );
 
       final chunkTitle = chunks.length > 1
@@ -1116,10 +1116,10 @@ String _formatAdmissionAsText(Admissions admission) {
     buffer.writeln('\n');
   }
 
-  if (admission.steps != null && admission.steps!.isNotEmpty) {
+  if (admission.steps.isNotEmpty) {
     buffer.writeln('Steps:');
     for (int i = 0; i < admission.steps!.length; i++) {
-      buffer.writeln('${i + 1}. ${admission.steps![i]}');
+      buffer.writeln('${i + 1}. ${admission.steps[i]}');
     }
     buffer.writeln();
   }

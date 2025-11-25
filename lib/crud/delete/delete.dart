@@ -1091,11 +1091,11 @@ Future<void> _deleteFromPinecone(
   try {
     // final apiKey = 'pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa';
     // // final indexHost = 'https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io';
-    // final indexHost = 'https://oasp-assist-gemini-tpewr0x.svc.aped-4627-b74a.pinecone.io';
+    final indexHost = 'https://oasp-assist-gemini-tpewr0x.svc.aped-4627-b74a.pinecone.io';
     final apiKey =
         'pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa';
-    final indexHost =
-        'https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io';
+    // final indexHost =
+    //     'https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io';
 
     final authHeader = {'Content-Type': 'application/json', 'Api-Key': apiKey};
 

@@ -4,6 +4,7 @@ import 'package:capstone_project/pages/user_pages/user_main_page.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class UserOnboardingScreen extends StatefulWidget {
   final String userId;
@@ -221,119 +222,121 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
   }
 
   void _finishOnboarding() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception('User session expired');
-      }
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User session expired');
+    }
 
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder:
-            (context) => WillPopScope(
-              onWillPop: () async => false,
-              child: const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false,
+        child: const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+          ),
+        ),
+      ),
+    );
+
+    await _saveUserProfile();
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get(const GetOptions(source: Source.server));
+
+    if (!doc.exists || doc.data()?['onboardingCompleted'] != true) {
+      throw Exception('Failed to verify onboarding completion');
+    }
+
+    // ✅ NEW: Mark user onboarding as completed
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('user_onboarding_completed_${user.uid}', true);
+    
+    // ✅ NEW: Mark that OnboardingGuide should be shown on next app open
+    await prefs.setBool('should_show_guide', true);
+
+    String? newConversationId;
+    try {
+      newConversationId = await UserConstant.createNewConversation(user.uid);
+      print('✅ Created initial conversation after onboarding: $newConversationId');
+    } catch (e) {
+      print('⚠️ Could not create conversation: $e');
+    }
+
+    if (mounted) Navigator.of(context).pop();
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    if (mounted) {
+      // ✅ Navigate with flag to trigger guide
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => UserMainPage(
+            initialTabIndex: 1,
+            conversationId: newConversationId,
+            shouldShowGuide: true, // ✅ NEW PARAMETER
+          ),
+        ),
+        (route) => false,
+      );
+    }
+  } catch (e) {
+    if (mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Failed to complete onboarding',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Please check your connection and try again',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
+            ],
+          ),
+          backgroundColor: Colors.red.shade600,
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          action: SnackBarAction(
+            label: 'RETRY',
+            textColor: Colors.white,
+            onPressed: _finishOnboarding,
+          ),
+        ),
       );
-
-      await _saveUserProfile();
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get(const GetOptions(source: Source.server));
-
-      if (!doc.exists || doc.data()?['onboardingCompleted'] != true) {
-        throw Exception('Failed to verify onboarding completion');
-      }
-
-      // ✅ FIX: Create a conversation BEFORE navigating to chat
-      String? newConversationId;
-      try {
-        newConversationId = await UserConstant.createNewConversation(user.uid);
-        print(
-          '✅ Created initial conversation after onboarding: $newConversationId',
-        );
-      } catch (e) {
-        print('⚠️ Could not create conversation: $e');
-        // Continue anyway - chat page will handle it
-      }
-
-      if (mounted) Navigator.of(context).pop();
-      await Future.delayed(const Duration(milliseconds: 200));
-
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder:
-                (context) => UserMainPage(
-                  initialTabIndex: 1,
-                  conversationId:
-                      newConversationId, // ✅ Pass the conversation ID
-                ),
-          ),
-          (route) => false,
-        );
-      }
-    } catch (e) {
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'Failed to complete onboarding',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Please check your connection and try again',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red.shade600,
-            duration: const Duration(seconds: 5),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            action: SnackBarAction(
-              label: 'RETRY',
-              textColor: Colors.white,
-              onPressed: _finishOnboarding,
-            ),
-          ),
-        );
-      }
     }
   }
+}
 
   Future<void> _saveUserProfile() async {
     try {

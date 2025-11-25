@@ -1078,12 +1078,3 @@ Color _getAffiliationColor(String affiliation) {
   }
 }
 
-String _shortenAffiliation(String affiliation) {
-  final words = affiliation.split(' ');
-  if (words.length > 1) {
-    return words.map((word) => word[0].toUpperCase()).join();
-  }
-  return affiliation.length > 8
-      ? '${affiliation.substring(0, 8)}...'
-      : affiliation;
-}

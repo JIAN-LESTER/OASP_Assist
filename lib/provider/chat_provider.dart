@@ -58,8 +58,10 @@ class ChatProvider extends ChangeNotifier {
   CohereService? _cohere;
   bool isNowAddedToFAQ = false;
   int count = 1;
-  bool _isCreatingMessage = false;
 
+
+
+  final String _geminiApiKey = "AIzaSyBEsKofC_0dTYRNwFhjnnY8jzuhmQqbHQI";
   VoidCallback? _onMessageAdded;
 
   ChatProvider(this._retriever);
@@ -101,11 +103,6 @@ class ChatProvider extends ChangeNotifier {
   }
 
   StreamSubscription<QuerySnapshot>? _messagesSubscription;
-
-  // final String _apiKey = "IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
-
-    final String _apiKey = "jGVDZpXJocGrUpJkP2YAMrQAIkcCQu7YITqcRr5h";
-
   bool _isSettingConversation = false;
 
   Future<void> setConversationId(String id) async {
@@ -139,7 +136,7 @@ class ChatProvider extends ChangeNotifier {
 
       // Reset loading flags
       _isLoading = false;
-      _isCreatingMessage = false;
+ 
 
       // Set new conversation ID
       conversationId = id;
@@ -296,13 +293,12 @@ class ChatProvider extends ChangeNotifier {
             for (var change in snapshot.docChanges) {
               if (change.type == DocumentChangeType.added ||
                   change.type == DocumentChangeType.modified) {
-                final escalation = change.doc.data() as Map<String, dynamic>?;
+                final escalation = change.doc.data();
                 if (escalation == null) continue;
 
                 final staffResponse = escalation['staffResponse'] as String?;
                 final respondedBy =
                     escalation['respondedBy'] as String? ?? 'Staff';
-                final escalationId = change.doc.id;
 
                 if (staffResponse == null || staffResponse.isEmpty) continue;
 
@@ -394,7 +390,7 @@ class ChatProvider extends ChangeNotifier {
       print('   Changes: ${snapshot.docChanges.length}');
 
       for (var change in snapshot.docChanges) {
-        final data = change.doc.data() as Map<String, dynamic>?;
+        final data = change.doc.data();
         if (data == null) continue;
 
         final message = Message.fromJson(data);
@@ -1494,37 +1490,78 @@ $question
     }
   }
 
- Future<List<double>> generateEmbedding(String question) async {
-  try {
-    final response = await http.post(
-      Uri.parse("https://api.cohere.ai/v1/embed"),
-      headers: {
-        'Authorization': 'Bearer $_apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        "texts": [question],
-        "model": "embed-multilingual-v3.0",  // ✅ Changed to v3
-        "input_type": "search_query",         // ✅ Required for v3 - queries
-      }),
-    );
+//  Future<List<double>> generateEmbedding(String question) async {
+//   try {
+//     final response = await http.post(
+//       Uri.parse("https://api.cohere.ai/v1/embed"),
+//       headers: {
+//         'Authorization': 'Bearer $_apiKey',
+//         'Content-Type': 'application/json',
+//       },
+//       body: jsonEncode({
+//         "texts": [question],
+//         "model": "embed-multilingual-v3.0",  // ✅ Changed to v3
+//         "input_type": "search_query",         // ✅ Required for v3 - queries
+//       }),
+//     );
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to generate embedding: ${response.statusCode}');
-    }
+//     if (response.statusCode != 200) {
+//       throw Exception('Failed to generate embedding: ${response.statusCode}');
+//     }
 
-    final data = jsonDecode(response.body);
-    final embedding = (data['embeddings'][0] as List)
-        .map((e) => (e as num).toDouble())
-        .toList();
+//     final data = jsonDecode(response.body);
+//     final embedding = (data['embeddings'][0] as List)
+//         .map((e) => (e as num).toDouble())
+//         .toList();
     
-    print('✅ Generated v3 embedding: ${embedding.length} dimensions');
-    return embedding;
-  } catch (e) {
-    print('Error generating embedding: $e');
-    rethrow;
+//     print('✅ Generated v3 embedding: ${embedding.length} dimensions');
+//     return embedding;
+//   } catch (e) {
+//     print('Error generating embedding: $e');
+//     rethrow;
+//   }
+// }
+
+ Future<List<double>> generateEmbedding(String question) async {
+    try {
+      print('🔧 Generating Gemini embedding for: "${question.substring(0, min(50, question.length))}..."');
+      
+      final response = await http.post(
+        Uri.parse(
+          "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=$_geminiApiKey"
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          "model": "models/text-embedding-004",
+          "content": {
+            "parts": [
+              {"text": question}
+            ]
+          }
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        print('❌ Gemini API error: ${response.statusCode}');
+        print('   Response: ${response.body}');
+        throw Exception('Failed to generate embedding: ${response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body);
+      final embedding = (data['embedding']['values'] as List)
+          .map((e) => (e as num).toDouble())
+          .toList();
+      
+      print('✅ Generated Gemini embedding: ${embedding.length} dimensions');
+      return embedding;
+    } catch (e) {
+      print('❌ Error generating Gemini embedding: $e');
+      rethrow;
+    }
   }
-}
+
   Future<void> rateMessage(
     String messageId,
     bool isLiked,
@@ -1617,7 +1654,7 @@ $question
 
     // Reset all flags
     _isLoading = false;
-    _isCreatingMessage = false;
+  
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();

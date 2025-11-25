@@ -1,90 +1,86 @@
 import 'dart:convert';
-import 'dart:math' as math;
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'package:http/http.dart' as http;
 
 class CohereService {
   // 🔐 Use environment variable in production
   // final String apiKey ="IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
-  final String apiKey ="jGVDZpXJocGrUpJkP2YAMrQAIkcCQu7YITqcRr5h";
-  // final String apiKey ="AIzaSyBEsKofC_0dTYRNwFhjnnY8jzuhmQqbHQI";
-  final embedUrl = Uri.parse('https://api.cohere.ai/v1/embed');
-  final chatUrl = Uri.parse('https://api.cohere.ai/v1/chat'); 
+  // final String apiKey ="jGVDZpXJocGrUpJkP2YAMrQAIkcCQu7YITqcRr5h";
+  final String apiKey ="AIzaSyBEsKofC_0dTYRNwFhjnnY8jzuhmQqbHQI";
+  // final embedUrl = Uri.parse('https://api.cohere.ai/v1/embed');
+  final chatUrl1 = Uri.parse('https://api.cohere.ai/v1/chat'); 
 
-//     final String embedModel = "models/text-embedding-004";
-//   final String chatModel = "gemini-1.5-flash";
+    final String embedModel = "models/text-embedding-004";
 
-//   String get embedUrl => "https://generativelanguage.googleapis.com/v1beta/$embedModel:embedContent?key=$apiKey";
-// String get chatUrl => "https://generativelanguage.googleapis.com/v1beta/models/$chatModel:generateContent?key=$apiKey";
+
+  String get embedUrl => "https://generativelanguage.googleapis.com/v1beta/$embedModel:embedContent?key=$apiKey";
+  // Future<List<double>> embedText(
+  //   String text, {
+  //   String inputType = 'search_document',
+  // }) async {
+  //   final res = await http.post(
+  //     embedUrl,
+  //     headers: {
+  //       'Authorization': 'Bearer $apiKey',
+  //       'Content-Type': 'application/json',
+  //     },
+  //     body: jsonEncode({
+  //       'texts': [text],
+  //       'model': 'embed-multilingual-v3.0',
+  //       'input_type': inputType,
+  //     }),
+  //   );
+
+  //   if (res.statusCode != 200) {
+  //     print('Embed API error response: ${res.body}');
+  //     throw Exception('Failed to embed text: ${res.body}');
+  //   }
+
+  //   final data = jsonDecode(res.body);
+  //   return List<double>.from(data['embeddings'][0]);
+  // }
 
   Future<List<double>> embedText(
     String text, {
-    String inputType = 'search_document',
+    String taskType = 'RETRIEVAL_DOCUMENT',
   }) async {
-    final res = await http.post(
-      embedUrl,
-      headers: {
-        'Authorization': 'Bearer $apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'texts': [text],
-        'model': 'embed-multilingual-v3.0',
-        'input_type': inputType,
-      }),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse(embedUrl),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'model': embedModel,
+          'content': {
+            'parts': [
+              {'text': text}
+            ]
+          },
+          'taskType': taskType, // RETRIEVAL_DOCUMENT or RETRIEVAL_QUERY
+        }),
+      );
 
-    if (res.statusCode != 200) {
-      print('Embed API error response: ${res.body}');
-      throw Exception('Failed to embed text: ${res.body}');
-    }
+      if (response.statusCode != 200) {
+        print('❌ Gemini Embed API error: ${response.body}');
+        throw Exception('Failed to generate embedding: ${response.body}');
+      }
 
-    final data = jsonDecode(res.body);
-    return List<double>.from(data['embeddings'][0]);
-  }
-
-  // Future<List<double>> embedText(
-  //   String text, {
-  //   String taskType = 'RETRIEVAL_DOCUMENT',
-  // }) async {
-  //   try {
-  //     final response = await http.post(
-  //       Uri.parse(embedUrl),
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: jsonEncode({
-  //         'model': embedModel,
-  //         'content': {
-  //           'parts': [
-  //             {'text': text}
-  //           ]
-  //         },
-  //         'taskType': taskType, // RETRIEVAL_DOCUMENT or RETRIEVAL_QUERY
-  //       }),
-  //     );
-
-  //     if (response.statusCode != 200) {
-  //       print('❌ Gemini Embed API error: ${response.body}');
-  //       throw Exception('Failed to generate embedding: ${response.body}');
-  //     }
-
-  //     final data = jsonDecode(response.body);
-  //     final embedding = data['embedding']['values'] as List;
-  //     final embeddingList = embedding.map((e) => (e as num).toDouble()).toList();
+      final data = jsonDecode(response.body);
+      final embedding = data['embedding']['values'] as List;
+      final embeddingList = embedding.map((e) => (e as num).toDouble()).toList();
       
-  //     return embeddingList;
-  //   } catch (e) {
-  //     print('❌ Error generating Gemini embedding: $e');
-  //     rethrow;
-  //   }
-  // }
+      return embeddingList;
+    } catch (e) {
+      print('❌ Error generating Gemini embedding: $e');
+      rethrow;
+    }
+  }
 
 
   Future<String> generateResponse(String prompt) async {
     final res = await http.post(
-      chatUrl, // Using Chat API instead of deprecated Generate API
+      chatUrl1, // Using Chat API instead of deprecated Generate API
       headers: {
         'Authorization': 'Bearer $apiKey',
         'Content-Type': 'application/json',
@@ -230,7 +226,7 @@ If no schedules are found, return an empty schedules array.
 ''';
 
     final response = await http.post(
-      chatUrl,
+      chatUrl1,
       headers: {
         'Authorization': 'Bearer $apiKey',
         'Content-Type': 'application/json',
@@ -594,78 +590,6 @@ Map<String, dynamic> _fallbackAdmissionExtraction(String text) {
     return steps;
   }
 
-  String _extractAcademicYear(dynamic yearData, String originalText) {
-    String academicYear = '';
-    
-    if (yearData != null && yearData.toString().trim().isNotEmpty) {
-      academicYear = yearData.toString().trim();
-    }
-    
-    // Fallback: search in original text
-    if (academicYear.isEmpty) {
-      final regex = RegExp(r'S\.Y\.\s*(20\d{2}\s*[-–]\s*20\d{2})', caseSensitive: false);
-      final match = regex.firstMatch(originalText);
-      if (match != null) {
-        academicYear = match.group(1)?.replaceAll(RegExp(r'\s+'), ' ').trim() ?? '';
-      }
-    }
-    
-    return academicYear;
-  }
-
-
-Map<String, dynamic> _fallbackStepExtraction(String text) {
-  print("🔧 Using fallback step extraction");
-
-  List<String> steps = <String>[];
-  List<Map<String, dynamic>> contacts = <Map<String, dynamic>>[];
-  List<String> links = <String>[];
-  String academicYear = '';
-
-
-
-  // Extract contacts
-  final emailRegex = RegExp(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b');
-  final phoneRegex = RegExp(r'(?<!\d)(?:\+63|63|0)?[89]\d{9}(?!\d)');
-  final websiteRegex = RegExp(r'https?:\/\/[\w\.-]+\.[\w]{2,}(?:\/[\w\.-]*)*');
-
-  for (RegExpMatch match in emailRegex.allMatches(text)) {
-    String email = match.group(0) ?? '';
-    if (_isValidContact('email', email)) {
-      contacts.add({'type': 'email', 'value': email});
-    }
-  }
-
-  for (RegExpMatch match in phoneRegex.allMatches(text)) {
-    String phone = match.group(0) ?? '';
-    if (_isValidContact('phone', phone)) {
-      contacts.add({'type': 'phone', 'value': phone});
-    }
-  }
-
-  for (RegExpMatch match in websiteRegex.allMatches(text)) {
-    String website = match.group(0) ?? '';
-    if (_isValidContact('website', website)) {
-      links.add(website);
-    }
-  }
-
-  // Extract academic year
-  final yearRegex = RegExp(r'S\.Y\.\s*(20\d{2}\s*[-–]\s*20\d{2})', caseSensitive: false);
-  final yearMatch = yearRegex.firstMatch(text);
-  if (yearMatch != null) {
-    academicYear = yearMatch.group(1)?.replaceAll(RegExp(r'\s+'), ' ').trim() ?? '';
-  }
-
-  print("🔧 Fallback extracted ${steps.length} steps, ${contacts.length} contacts, ${links.length} links, academicYear: '$academicYear'");
-
-  return {
-    'contacts': contacts,
-    'steps': steps,
-    'academicYear': academicYear,
-    'links': links,
-  };
-}
 
   Future<Map<String, dynamic>> analyzeScholarship(String message) async {
   try {
@@ -710,8 +634,10 @@ Extract every scholarship mentioned. Use null for missing deadline.
 
 
       
+
+
     final response = await http.post(
-      chatUrl,
+      chatUrl1,
       headers: {
         'Authorization': 'Bearer $apiKey',
         'Content-Type': 'application/json',
@@ -723,6 +649,8 @@ Extract every scholarship mentioned. Use null for missing deadline.
         'temperature': 0.0,
       }),
     );
+
+
     print("📡 Cohere Scholarship API Response Status: ${response.statusCode}");
 
     if (response.statusCode == 200) {
@@ -832,8 +760,9 @@ Respond in valid JSON format only:
 
 
      
+
     final response = await http.post(
-      chatUrl,
+      chatUrl1,
       headers: {
         'Authorization': 'Bearer $apiKey',
         'Content-Type': 'application/json',
@@ -845,6 +774,8 @@ Respond in valid JSON format only:
         'temperature': 0.0,
       }),
     );
+
+
     print("📡 Cohere Placement API Response Status: ${response.statusCode}");
 
     if (response.statusCode == 200) {
@@ -896,89 +827,6 @@ Respond in valid JSON format only:
     return {"placements": []};
   }
 }
-  
-
-  String _cleanCategory(String category) {
-    final cleanedCategory = category.toLowerCase().trim();
-    if (cleanedCategory.contains('admission') || cleanedCategory.contains('enroll')) {
-      return 'Admission';
-    } else if (cleanedCategory.contains('scholarship') || cleanedCategory.contains('financial aid')) {
-      return 'Scholarship';
-    } else if (cleanedCategory.contains('placement') || cleanedCategory.contains('job') || cleanedCategory.contains('career')) {
-      return 'Placement';
-    }
-    return 'General';
-  }
-
-  Map<String, dynamic> _fallbackAnalysis(String message) {
-    final messageLower = message.toLowerCase();
-    String category = 'General';
-    String? deadline;
-
-    // Category detection
-    if (messageLower.contains('enrollment') ||
-        messageLower.contains('registration') ||
-        messageLower.contains('application') ||
-        messageLower.contains('requirements') ||
-        messageLower.contains('class schedule') ||
-        messageLower.contains('semester') ||
-        messageLower.contains('subject') ||
-        messageLower.contains('program') ||
-        messageLower.contains('exam schedule') ||
-        messageLower.contains('clearance') ||
-        messageLower.contains('admission')) {
-      category = 'Admission';
-    } else if (messageLower.contains('scholarship') ||
-        messageLower.contains('stipend') ||
-        messageLower.contains('allowance') ||
-        messageLower.contains('grantee') ||
-        messageLower.contains('renewal') ||
-        messageLower.contains('eligibility') ||
-        messageLower.contains('screening') ||
-        messageLower.contains('shortlisted') ||
-        messageLower.contains('beneficiary') ||
-        messageLower.contains('grant')) {
-      category = 'Scholarship';
-    } else if (messageLower.contains('placement') ||
-        messageLower.contains('hiring') ||
-        messageLower.contains('job') ||
-        messageLower.contains('employment') ||
-        messageLower.contains('employer') ||
-        messageLower.contains('resume') ||
-        messageLower.contains('cv') ||
-        messageLower.contains('interview') ||
-        messageLower.contains('company') ||
-        messageLower.contains('opportunity') ||
-        messageLower.contains('deployment')) {
-      category = 'Placement';
-    }
-
-    deadline = _extractDeadlines(message);
-    return {'category': category, 'deadline': deadline};
-  }
-
-  String? _extractDeadlines(String message) {
-    final deadlinePatterns = [
-      RegExp(r'(?<date>(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}(?:,?\s+at\s+\d{1,2}:\d{2}\s?(?:AM|PM|am|pm))?)', caseSensitive: false),
-      RegExp(r'(?<date>\d{1,2}:\d{2}\s?(?:AM|PM|am|pm))', caseSensitive: false),
-      RegExp(r'by\s+(?<date>(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})', caseSensitive: false),
-    ];
-
-    final List<String> extractedDates = [];
-
-    for (final pattern in deadlinePatterns) {
-      final matches = pattern.allMatches(message);
-      for (final match in matches) {
-        final found = match.namedGroup('date')?.trim();
-        if (found != null && found.isNotEmpty) {
-          extractedDates.add(found);
-        }
-      }
-    }
-
-    if (extractedDates.isEmpty) return null;
-    return extractedDates.length == 1 ? extractedDates.first : extractedDates.join(' & ');
-  }
 
   
 }

@@ -4,16 +4,15 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/services.dart';
+
 import 'package:google_sign_in/google_sign_in.dart';
 
-import 'package:capstone_project/notifications.dart';
+
 import 'package:capstone_project/pages/user_pages/chat_page.dart';
-import 'package:capstone_project/profile.dart' show ProfileModal;
+
 import 'package:capstone_project/provider/chat_provider.dart';
 import 'package:capstone_project/responsive/widgets/logout.dart';
-import 'package:capstone_project/responsive/widgets/persistent_drawer_group.dart';
-import 'package:capstone_project/responsive/widgets/persistent_drawer_item.dart';
+
 
 import 'package:provider/provider.dart';
 
@@ -35,7 +34,7 @@ class UserConstant {
   static DateTime? _faqCacheTime;
   static const Duration _faqCacheExpiry = Duration(hours: 1);
 
-  static bool _isServicesExpanded = false;
+
    static bool shouldShowFAQs = false;
 
   // Fixed logout method that handles both Firebase Auth and Google Sign In
@@ -304,7 +303,7 @@ class UserConstant {
 
             final conversations =
                 querySnapshot.docs.map((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
+                  final data = doc.data();
                   print(
                     'DEBUG: Found conversation - ID: ${doc.id}, Title: ${data['title']}, Status: ${data['status']}',
                   );
@@ -520,7 +519,7 @@ static Future<void> deleteConversation(String conversationId) async {
         final now = DateTime.now();
 
         for (var doc in activeQuery.docs) {
-          final data = doc.data() as Map<String, dynamic>;
+          final data = doc.data();
           final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
 
           if (createdAt != null) {
@@ -541,7 +540,7 @@ static Future<void> deleteConversation(String conversationId) async {
 
         // Return the most recent non-expired conversation
         for (var doc in activeQuery.docs) {
-          final data = doc.data() as Map<String, dynamic>;
+          final data = doc.data();
           final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
 
           if (createdAt != null) {

@@ -655,9 +655,6 @@ class UniversalUIComponents {
     StateSetter setDrawerState,
     UserRole userRole,
   ) {
-    final bool isAnySubItemSelected =
-        item.subItems?.any((subItem) => subItem.index == selectedIndex) ??
-        false;
 
     // Get expansion state from the shared map
     bool isExpanded = _expandedState[item.title] ?? false;
@@ -874,7 +871,7 @@ class UniversalUIComponents {
                     if (context.mounted) {
                       final parentState =
                           context.findAncestorStateOfType<State>();
-                      if (parentState != null && parentState is dynamic) {
+                      if (parentState != null) {
                         if (parentState.widget.runtimeType.toString() ==
                             '_UserMainPageState') {
                           await (parentState as dynamic)._onNewChatPressed();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({Key? key}) : super(key: key);
@@ -119,8 +120,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  void _finishOnboarding() {
-    Navigator.of(context).pushReplacementNamed('/auth');
+ void _finishOnboarding() async {
+    // Set app onboarding as completed
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('app_onboarding_completed', true);
+    
+    if (mounted) {
+      Navigator.of(context).pushReplacementNamed('/auth');
+    }
   }
 
   Widget _buildContent({

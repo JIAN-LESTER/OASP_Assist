@@ -1,10 +1,9 @@
-import 'dart:convert';
+
 
 import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/pages/admin_pages/testAnnouncement.dart';
 import 'package:capstone_project/services/fb_sync.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -592,27 +591,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildPermissionItem(String permission) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 16),
-          const SizedBox(width: 8),
-          Text(
-            permission,
-            style: const TextStyle(
-              fontSize: 13,
-              fontFamily: 'monospace',
-              color: Color(0xFF0D47A1),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

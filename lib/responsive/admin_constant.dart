@@ -1,38 +1,27 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
+
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:capstone_project/auth_pages/login_page.dart';
+
 import 'package:capstone_project/notifications.dart';
-import 'package:capstone_project/pages/user_pages/chat_page.dart';
+
 import 'package:capstone_project/profile.dart'
-    show ProfileModal, ProfilePage;
-import 'package:capstone_project/provider/chat_provider.dart';
-import 'package:capstone_project/services/cohere_service.dart';
-import 'package:capstone_project/models/message.dart';
-import 'package:provider/provider.dart';
+    show ProfileModal;
 
 class AdminConstant {
-  static final TextEditingController _controller = TextEditingController();
-  static final ScrollController _scrollController = ScrollController();
 
-  static bool _isOASPAassistExpanded = false;
-  static String _selectedMenuItem = 'OASP Assist';
-  static String? _expandedCategory;
 
-  static List<Map<String, dynamic>> _recentConversations = [];
-  static String? _selectedConversationId;
-  static StreamSubscription<QuerySnapshot>? _conversationsSubscription;
+
+
+
   static bool _isServicesExpanded = false;
   static bool _isLogsExpanded = false;
 
-  static bool _isInitializing = false;
-  static bool _isInitialized = false;
 
   static var myDefaultBackground = Colors.grey[50];
 

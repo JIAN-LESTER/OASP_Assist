@@ -127,13 +127,12 @@ class StatDataManagement {
   static final Map<String, InformationBankData> _ibCache = {};
   static final Map<String, FAQsData> _faqCache = {};
   static final Map<String, UserData> _userCache = {};
-  static final Map<String, AffiliationData> _affiliationCache = {};
+
   static final Map<String, ProgramData> _programCache = {};
   static final Map<String, AdmissionData> _admissionCache = {};
   static final Map<String, ScholarshipData> _scholarshipCache = {};
   static final Map<String, PlacementData> _placementCache = {};
-  static final Map<String, ChatbotUsageReportsData> _chatbotCache = {};
-  static final Map<String, UserDemographicsReportsData> _demographicsCache = {};
+
   static final Map<String, DateTime> _cacheTimestamps = {};
 
   static const int _cacheDurationMinutes = 5;

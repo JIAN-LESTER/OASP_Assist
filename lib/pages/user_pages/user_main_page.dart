@@ -23,13 +23,15 @@
   import 'package:capstone_project/responsive/responsive_layout.dart';
   import 'package:flutter/material.dart';
   import 'package:capstone_project/responsive/widgets/menu.dart';
-  import 'package:capstone_project/services/cohere_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
   class UserMainPage extends StatefulWidget {
     final int? initialTabIndex;
     final String? conversationId;
     final bool? loadExisting;
     final bool? fromNotification;
+      final bool? shouldShowGuide;
 
     const UserMainPage({
       Key? key,
@@ -37,6 +39,7 @@
       this.conversationId,
       this.loadExisting,
       this.fromNotification,
+      this.shouldShowGuide,
     }) : super(key: key);
 
     @override
@@ -48,7 +51,7 @@
     int _selectedIndex = 0;
     int _currentIndex = 0;
     late TabController _tabController;
-    bool _isChatSidebarExpanded = true;
+
     bool _isBottomNavExpanded = true;
     String? _pendingConversationId;
     bool? loadExistingConversation;
@@ -61,7 +64,6 @@
     final GlobalKey _profileKey = GlobalKey();
     final GlobalKey _bottomNavKey = GlobalKey();
 
-    final CohereService _cohere = CohereService();
     final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
     String? _conversationId;
@@ -130,35 +132,43 @@
       _initFuture = _initializeConversationOrShowFAQs(); // ✅ NEW method
     }
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        UserConstant.initializeChatSession(context, setState);
+       WidgetsBinding.instance.addPostFrameCallback((_) async {
+    UserConstant.initializeChatSession(context, setState);
 
-        // ✅ FIX: Don't create new conversation on navigation
-        // Only handle chat navigation if we're on chat tab and have a conversation
-        if (_selectedIndex == 1 && _conversationId != null) {
-          print('📱 Already on chat tab with conversation: $_conversationId');
+    if (_selectedIndex == 1 && _conversationId != null) {
+      print('📱 Already on chat tab with conversation: $_conversationId');
+    }
+
+    // ✅ NEW: Check if we should trigger the OnboardingGuide
+    if (widget.shouldShowGuide == true) {
+      await _checkAndShowOnboardingGuide();
+    }
+  });
+}
+
+Future<void> _checkAndShowOnboardingGuide() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final shouldShow = prefs.getBool('should_show_guide') ?? false;
+    
+    if (shouldShow && mounted) {
+      // Clear the flag so it doesn't show again
+      await prefs.setBool('should_show_guide', false);
+      
+      // Wait a bit for the UI to settle
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Trigger the OnboardingGuide
+      if (mounted) {
+        final onboardingGuide = OnboardingGuide.of(context);
+        if (onboardingGuide != null) {
+          // The guide will start automatically since hasSeenOnboarding will be false
+          print('✅ Triggering OnboardingGuide after user onboarding');
         }
-      });
+      }
     }
-
-    void _onConversationDeleted(String conversationId) {
-  print('🗑️ Conversation deleted: $conversationId');
-  
-  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-  
-  // Clear if this was the active conversation
-  if (_conversationId == conversationId || 
-      chatProvider.conversationId == conversationId) {
-    
-    chatProvider.clearMessages();
-    
-    if (mounted) {
-      setState(() {
-        _conversationId = null;
-        _pendingConversationId = null;
-        _showFAQs = true;
-      });
-    }
+  } catch (e) {
+    print('❌ Error checking onboarding guide: $e');
   }
 }
 
@@ -283,18 +293,6 @@
       }
     }
 
-    bool _isValidTabIndex(int index) {
-      return index >= 0 && index < _tabController.length;
-    }
-
-    void _safeNavigateToTab(int index) {
-      if (!_isValidTabIndex(index)) {
-        print('⚠️ Invalid tab index: $index, clamping to valid range');
-        index = index.clamp(0, _tabController.length - 1);
-      }
-
-      _onNavigationItemTap(index);
-    }
 
     Future<void> _loadExistingConversation(String conversationId) async {
       try {

@@ -1,4 +1,4 @@
-import 'package:cloud_functions/cloud_functions.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -51,24 +51,6 @@ class _FacebookTokenPageState extends State<FacebookTokenPage> {
       setState(() => _isLoading = false);
     }
   }
-
-   static Future<Map<String, dynamic>> testConnection() async {
-  print('🧪 Testing Facebook connection...');
-  
-  try {
-    final callable = FirebaseFunctions.instance
-        .httpsCallable('testFacebookConnection');
-    
-    final result = await callable.call(<String, dynamic>{})
-        .timeout(Duration(seconds: 30));
-    
-    print('📦 Test result: ${json.encode(result.data)}');
-    return result.data as Map<String, dynamic>;
-  } catch (e) {
-    print('❌ Test failed: $e');
-    rethrow;
-  }
-}
 
   Future<void> _exchangeToken() async {
     final token = _tokenController.text.trim();
