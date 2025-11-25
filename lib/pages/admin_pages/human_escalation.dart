@@ -407,7 +407,7 @@ class _HumanEscalationState extends State<HumanEscalation>
 
                     // Enhanced Stats Row - Responsive
                     StreamBuilder<QuerySnapshot>(
-                      key: const ValueKey('escalations_stats'),
+                      // key: const ValueKey('escalations_stats'),  ==> atong e remove kay cgeg rebuild ang widget/UI kung mag open/click ang Filter button
                       stream:
                           FirebaseFirestore.instance
                               .collection('escalations')
@@ -506,7 +506,7 @@ class _HumanEscalationState extends State<HumanEscalation>
             // Enhanced List - Responsive
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                key: const ValueKey('escalations_list'),
+                // key: const ValueKey('escalations_list'),  ==> atong e remove kay cgeg rebuild ang widget/UI kung mag open/click ang Filter button
                 stream:
                     FirebaseFirestore.instance
                         .collection('escalations')
