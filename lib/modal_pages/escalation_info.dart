@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 class EscalationDetailModal extends StatefulWidget {
   final String escalationId;
@@ -111,7 +112,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
 
   Future<void> _sendReply() async {
     if (_replyController.text.trim().isEmpty) {
-      _showSnackBar('Please enter a response', isError: true);
+      SnackbarUtil.showError(context, 'Please enter a response');
       return;
     }
 
@@ -121,7 +122,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
     final conversationId = data['conversationId'] as String?;
 
     if (conversationId == null || conversationId.isEmpty) {
-      _showSnackBar('Invalid conversation ID', isError: true);
+      SnackbarUtil.showError(context, 'Invalid conversation ID');
       return;
     }
 
@@ -202,7 +203,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
       await batch.commit();
 
       if (mounted) {
-        _showSnackBar('Response sent successfully!');
+        SnackbarUtil.showSuccess(context, 'Response sent successfully!');
         HapticFeedback.lightImpact();
       }
 
@@ -217,9 +218,9 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
     } catch (e) {
       print('❌ Error sending response: $e');
       if (mounted) {
-        _showSnackBar(
+        SnackbarUtil.showError(
+          context,
           'Failed to send response: ${e.toString()}',
-          isError: true,
         );
       }
     } finally {
@@ -227,22 +228,6 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
         setState(() => _isSending = false);
       }
     }
-  }
-
-  void _showSnackBar(String message, {bool isError = false}) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor:
-            isError ? Colors.red.shade600 : const Color(0xFF2E7D32),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   Future<void> _closeModal() async {
@@ -409,9 +394,8 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                                   Row(
                                     children: [
                                       Icon(
-                                        Icons.person,
-                                        color: Color(0xFF2E7D32),
-                                        // Colors.grey.shade700,
+                                        Icons.person_outline,
+                                        color: Colors.grey.shade700,
                                         size: 20,
                                       ),
                                       const SizedBox(width: 8),
@@ -427,7 +411,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                                   ),
                                   const SizedBox(height: 20),
                                   _buildUserInfoRow(
-                                    icon: Icons.person_outline,
+                                    icon: Icons.person,
                                     label: 'Name',
                                     value: _userData?['name'] ?? 'Loading...',
                                   ),
@@ -448,7 +432,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                                   if (_userData?['program'] != null) ...[
                                     const SizedBox(height: 16),
                                     _buildUserInfoRow(
-                                      icon: Icons.school_outlined,
+                                      icon: Icons.school,
                                       label: 'Program',
                                       value: _userData!['program'],
                                     ),
@@ -492,10 +476,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                                       height: 1.6,
                                       color: Color(0xFF1F2937),
                                     ),
-                                    maxLines:
-                                        _showFullBotResponse
-                                            ? null
-                                            : 3, // Max line niya ipakita
+                                    maxLines: _showFullBotResponse ? null : 3,
                                     overflow:
                                         _showFullBotResponse
                                             ? null
@@ -531,7 +512,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                                                   style: const TextStyle(
                                                     fontSize: 14,
                                                     fontWeight: FontWeight.w600,
-                                                    color: Color(0xFF1976D2),
+                                                    color: Color(0xFF2E7D32),
                                                   ),
                                                 ),
                                                 const SizedBox(width: 4),
