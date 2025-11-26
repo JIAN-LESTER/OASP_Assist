@@ -394,8 +394,8 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                                   Row(
                                     children: [
                                       Icon(
-                                        Icons.person_outline,
-                                        color: Colors.grey.shade700,
+                                        Icons.person,
+                                        color: Color(0xFF2E7D32),
                                         size: 20,
                                       ),
                                       const SizedBox(width: 8),
@@ -411,7 +411,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                                   ),
                                   const SizedBox(height: 20),
                                   _buildUserInfoRow(
-                                    icon: Icons.person,
+                                    icon: Icons.person_outline,
                                     label: 'Name',
                                     value: _userData?['name'] ?? 'Loading...',
                                   ),
@@ -432,7 +432,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                                   if (_userData?['program'] != null) ...[
                                     const SizedBox(height: 16),
                                     _buildUserInfoRow(
-                                      icon: Icons.school,
+                                      icon: Icons.school_outlined,
                                       label: 'Program',
                                       value: _userData!['program'],
                                     ),
@@ -512,7 +512,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                                                   style: const TextStyle(
                                                     fontSize: 14,
                                                     fontWeight: FontWeight.w600,
-                                                    color: Color(0xFF2E7D32),
+                                                    color: Color(0xFF1976D2),
                                                   ),
                                                 ),
                                                 const SizedBox(width: 4),

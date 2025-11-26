@@ -803,7 +803,6 @@ class DesktopDashboard extends StatelessWidget {
   }
 }
 
-
 class TabletDashboard extends StatelessWidget {
   final String selectedTimeFrame;
   final ValueChanged<String> onTimeFrameChanged;
@@ -983,9 +982,10 @@ Widget dashboardContents(
                   height: 400,
                   child: LazyLoadWidget(
                     delay: const Duration(milliseconds: 100),
-                    builder: (context) => buildCategoryDistributionCard(
-                      inq?.categoryDistribution ?? {},
-                    ),
+                    builder:
+                        (context) => buildCategoryDistributionCard(
+                          inq?.categoryDistribution ?? {},
+                        ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -993,10 +993,11 @@ Widget dashboardContents(
                   height: 400,
                   child: LazyLoadWidget(
                     delay: const Duration(milliseconds: 200),
-                    builder: (context) => buildInquiryTrendCard(
-                      inq?.inquiryTrend ?? [],
-                      selectedTimeFrame,
-                    ),
+                    builder:
+                        (context) => buildInquiryTrendCard(
+                          inq?.inquiryTrend ?? [],
+                          selectedTimeFrame,
+                        ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -1004,7 +1005,8 @@ Widget dashboardContents(
                   height: 350,
                   child: LazyLoadWidget(
                     delay: const Duration(milliseconds: 300),
-                    builder: (context) => buildSystemLogsCard(inq?.recentLogs ?? []),
+                    builder:
+                        (context) => buildSystemLogsCard(inq?.recentLogs ?? []),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -1012,7 +1014,8 @@ Widget dashboardContents(
                   height: 350,
                   child: LazyLoadWidget(
                     delay: const Duration(milliseconds: 400),
-                    builder: (context) => buildMessageLogsCard(inq?.msgLogs ?? []),
+                    builder:
+                        (context) => buildMessageLogsCard(inq?.msgLogs ?? []),
                   ),
                 ),
               ],
@@ -1028,19 +1031,21 @@ Widget dashboardContents(
                       Expanded(
                         child: LazyLoadWidget(
                           delay: const Duration(milliseconds: 100),
-                          builder: (context) => buildCategoryDistributionCard(
-                            inq?.categoryDistribution ?? {},
-                          ),
+                          builder:
+                              (context) => buildCategoryDistributionCard(
+                                inq?.categoryDistribution ?? {},
+                              ),
                         ),
                       ),
                       const SizedBox(width: 20),
                       Expanded(
                         child: LazyLoadWidget(
                           delay: const Duration(milliseconds: 200),
-                          builder: (context) => buildInquiryTrendCard(
-                            inq?.inquiryTrend ?? [],
-                            selectedTimeFrame,
-                          ),
+                          builder:
+                              (context) => buildInquiryTrendCard(
+                                inq?.inquiryTrend ?? [],
+                                selectedTimeFrame,
+                              ),
                         ),
                       ),
                     ],
@@ -1055,8 +1060,9 @@ Widget dashboardContents(
                         flex: 1,
                         child: LazyLoadWidget(
                           delay: const Duration(milliseconds: 300),
-                          builder: (context) =>
-                              buildSystemLogsCard(inq?.recentLogs ?? []),
+                          builder:
+                              (context) =>
+                                  buildSystemLogsCard(inq?.recentLogs ?? []),
                         ),
                       ),
                       const SizedBox(width: 20),
@@ -1064,8 +1070,9 @@ Widget dashboardContents(
                         flex: 2,
                         child: LazyLoadWidget(
                           delay: const Duration(milliseconds: 400),
-                          builder: (context) =>
-                              buildMessageLogsCard(inq?.msgLogs ?? []),
+                          builder:
+                              (context) =>
+                                  buildMessageLogsCard(inq?.msgLogs ?? []),
                         ),
                       ),
                     ],
@@ -1075,7 +1082,6 @@ Widget dashboardContents(
             );
           }
         }
-
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
@@ -1142,11 +1148,6 @@ Widget _buildHeader(
                         initialValue: selectedTimeFrame,
                         onChanged: onTimeFrameChanged,
                       ),
-                      const SizedBox(width: 12),
-                      RefreshButton(
-                        onRefresh: onRefresh,
-                        isRefreshing: isRefreshing,
-                      ),
                     ],
                   ),
                 ],
@@ -1174,11 +1175,6 @@ Widget _buildHeader(
                         ],
                         initialValue: selectedTimeFrame,
                         onChanged: onTimeFrameChanged,
-                      ),
-                      const SizedBox(width: 12),
-                      RefreshButton(
-                        onRefresh: onRefresh,
-                        isRefreshing: isRefreshing,
                       ),
                     ],
                   ),

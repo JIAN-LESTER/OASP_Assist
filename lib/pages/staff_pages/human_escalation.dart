@@ -270,7 +270,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                             ],
                           ),
                           child: PopupMenuButton<String>(
-                            offset: const Offset(0, 50),
+                            offset: Offset(0, 50),
                             onSelected: (String value) {
                               setState(() {
                                 _selectedFilter = value;

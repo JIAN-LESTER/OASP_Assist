@@ -939,7 +939,6 @@ List<Widget> buildInquiryTrendsReport(
               Icons.help,
             ),
           ),
-      
         ],
       ),
     ),
@@ -1380,11 +1379,6 @@ Widget buildHeader(
                           onChanged: onReportTypeChanged,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      RefreshButton(
-                        onRefresh: onRefresh,
-                        isRefreshing: isRefreshing,
-                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -1431,11 +1425,6 @@ Widget buildHeader(
                         ],
                         initialValue: selectedTimeFrame,
                         onChanged: onTimeFrameChanged,
-                      ),
-                      const SizedBox(width: 12),
-                      RefreshButton(
-                        onRefresh: onRefresh,
-                        isRefreshing: isRefreshing,
                       ),
                     ],
                   ),
