@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:capstone_project/responsive/user_constant.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/pages/user_pages/user_main_page.dart';
@@ -28,7 +30,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
   late Animation<Offset> _slideAnimation;
   int _currentPage = 0;
 
-  // Color scheme - matching first onboarding
+  // Color scheme
   static const Color primaryColor = Color.fromARGB(255, 8, 121, 11);
   static const Color backgroundColor = Colors.white;
   static final Color textPrimaryColor = Colors.grey[800]!;
@@ -39,36 +41,47 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
 
   // User profile data
   String? _role;
-  String _selectedCourse = '';
-  String _selectedYear = '';
   String? _enrollmentStatus;
 
-  bool? _hasScholarship;
-  bool? _hasAffiliation;
-  String? _selectedAffiliation;
+  // For enrolled students
+  String _studentId = '';
+  bool _studentIdConfirmed = false;
+  String _selectedYear = '';
+  String _selectedDepartment = '';
+  String _selectedCollege = '';
+  String? _selectedCollegeId;
   String _selectedProgram = '';
+  bool? _hasScholarship;
   String? _selectedScholarship;
-  // Add flag to track if summary should be shown
-  bool _showSummary = false;
 
-  // Data lists
-  final _customAffiliationController = TextEditingController();
-  bool _showCustomAffiliationField = false;
+  // For not enrolled students
+  bool? _isIncomingFreshman;
+  String _lrn = '';
+  bool _lrnConfirmed = false;
+  String? _selectedAffiliation;
+  bool _isLoading = false;
 
-  // Data lists
-  List<String> _programs = [];
+  // Add to state variables section
+  String? _studentIdError;
+  String? _lrnError;
+  Timer? _studentIdErrorTimer;
+  Timer? _lrnErrorTimer;
+
+  // Data lists from Firestore
+  Map<String, String> _colleges = {}; // college name → college ID
+  Map<String, List<String>> _programsByCollege =
+      {}; // collegeId → programs list
+  List<String> _scholarships = [];
+
+  final List<String> years = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+
   final List<String> _affiliations = [
-    'Incoming Freshman Applicant',
     'Parent',
     'Faculty',
     'CMU Staff',
     'Employer',
     'Alumni',
   ];
-
-  List<String> _scholarships = [];
-
-  final List<String> years = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
 
   final List<UserOnboardingPage> _pages = [
     UserOnboardingPage(
@@ -132,7 +145,9 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     _pageController.dispose();
     _animationController.dispose();
     _nameController.dispose();
-    _customAffiliationController.dispose();
+    _studentIdErrorTimer?.cancel();
+    _lrnErrorTimer?.cancel();
+
     super.dispose();
   }
 
@@ -158,14 +173,52 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
 
   Future<void> _loadDropdownData() async {
     try {
-      final futures = await Future.wait([
-        _getDropdownItems('programs'),
-        _getDropdownItems('scholarships'),
-      ]);
+      // Load colleges
+      final collegesSnapshot =
+          await FirebaseFirestore.instance.collection('colleges').get();
+      Map<String, String> collegesMap = {};
+      for (var doc in collegesSnapshot.docs) {
+        final name = doc.data()['name']?.toString().trim();
+        if (name != null && name.isNotEmpty) {
+          collegesMap[name] = doc.id;
+        }
+      }
+
+      // Load programs with college references
+      final programsSnapshot =
+          await FirebaseFirestore.instance.collection('programs').get();
+      Map<String, List<String>> programsByCollegeMap = {};
+      for (var doc in programsSnapshot.docs) {
+        final programName = doc.data()['name']?.toString().trim();
+        final collegeId = doc.data()['collegeId']?.toString();
+
+        if (programName != null &&
+            programName.isNotEmpty &&
+            collegeId != null) {
+          if (!programsByCollegeMap.containsKey(collegeId)) {
+            programsByCollegeMap[collegeId] = [];
+          }
+          programsByCollegeMap[collegeId]!.add(programName);
+        }
+      }
+
+      // Load scholarships
+      final scholarshipsSnapshot =
+          await FirebaseFirestore.instance.collection('scholarships').get();
+      List<String> scholarshipsList =
+          scholarshipsSnapshot.docs
+              .map((doc) {
+                final name = doc.data()['name'];
+                return name?.toString().trim() ?? '';
+              })
+              .where((name) => name.isNotEmpty)
+              .toSet()
+              .toList();
 
       setState(() {
-        _programs = [...futures[0]];
-        _scholarships = [...futures[1], 'Others'];
+        _colleges = collegesMap;
+        _programsByCollege = programsByCollegeMap;
+        _scholarships = [...scholarshipsList, 'Others'];
       });
     } catch (e) {
       print('Error loading dropdown data: $e');
@@ -222,121 +275,194 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
   }
 
   void _finishOnboarding() async {
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('User session expired');
-    }
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false,
-        child: const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-          ),
-        ),
-      ),
-    );
-
-    await _saveUserProfile();
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get(const GetOptions(source: Source.server));
-
-    if (!doc.exists || doc.data()?['onboardingCompleted'] != true) {
-      throw Exception('Failed to verify onboarding completion');
-    }
-
-    // ✅ NEW: Mark user onboarding as completed
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('user_onboarding_completed_${user.uid}', true);
-    
-    // ✅ NEW: Mark that OnboardingGuide should be shown on next app open
-    await prefs.setBool('should_show_guide', true);
-
-    String? newConversationId;
     try {
-      newConversationId = await UserConstant.createNewConversation(user.uid);
-      print('✅ Created initial conversation after onboarding: $newConversationId');
-    } catch (e) {
-      print('⚠️ Could not create conversation: $e');
-    }
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User session expired');
+      }
 
-    if (mounted) Navigator.of(context).pop();
-    await Future.delayed(const Duration(milliseconds: 200));
-
-    if (mounted) {
-      // ✅ Navigate with flag to trigger guide
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (context) => UserMainPage(
-            initialTabIndex: 1,
-            conversationId: newConversationId,
-            shouldShowGuide: true, // ✅ NEW PARAMETER
-          ),
-        ),
-        (route) => false,
-      );
-    }
-  } catch (e) {
-    if (mounted && Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Failed to complete onboarding',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Please check your connection and try again',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.9),
-                      ),
-                    ),
-                  ],
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => WillPopScope(
+              onWillPop: () async => false,
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
                 ),
               ),
-            ],
-          ),
-          backgroundColor: Colors.red.shade600,
-          duration: const Duration(seconds: 5),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          action: SnackBarAction(
-            label: 'RETRY',
-            textColor: Colors.white,
-            onPressed: _finishOnboarding,
-          ),
-        ),
+            ),
       );
+
+      await _saveUserProfile();
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get(const GetOptions(source: Source.server));
+
+      if (!doc.exists || doc.data()?['onboardingCompleted'] != true) {
+        throw Exception('Failed to verify onboarding completion');
+      }
+
+      // ✅ NEW: Mark user onboarding as completed
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('user_onboarding_completed_${user.uid}', true);
+
+      // ✅ NEW: Mark that OnboardingGuide should be shown on next app open
+      await prefs.setBool('should_show_guide', true);
+
+      String? newConversationId;
+      try {
+        newConversationId = await UserConstant.createNewConversation(user.uid);
+        print(
+          '✅ Created initial conversation after onboarding: $newConversationId',
+        );
+      } catch (e) {
+        print('⚠️ Could not create conversation: $e');
+      }
+
+      if (mounted) Navigator.of(context).pop();
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      if (mounted) {
+        // ✅ Navigate with flag to trigger guide
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder:
+                (context) => UserMainPage(
+                  initialTabIndex: 1,
+                  conversationId: newConversationId,
+                  shouldShowGuide: true, // ✅ NEW PARAMETER
+                ),
+          ),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Failed to complete onboarding',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Please check your connection and try again',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red.shade600,
+            duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            action: SnackBarAction(
+              label: 'RETRY',
+              textColor: Colors.white,
+              onPressed: _finishOnboarding,
+            ),
+          ),
+        );
+      }
     }
   }
-}
+
+  void _setStudentIdError(String error) {
+    _studentIdErrorTimer?.cancel();
+    setState(() => _studentIdError = error);
+    _studentIdErrorTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted) {
+        setState(() => _studentIdError = null);
+      }
+    });
+  }
+
+  void _setLrnError(String error) {
+    _lrnErrorTimer?.cancel();
+    setState(() => _lrnError = error);
+    _lrnErrorTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted) {
+        setState(() => _lrnError = null);
+      }
+    });
+  }
+
+  // Build error text widget (similar to login page)
+  Widget _buildInlineError(String? error, double fontSize) {
+    if (error == null) return const SizedBox.shrink();
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      margin: const EdgeInsets.only(left: 12, top: 8, right: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.red[400]!.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red[400]!.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: Colors.red[400], size: 16),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              error,
+              style: TextStyle(
+                fontSize: fontSize * 0.8,
+                fontWeight: FontWeight.w500,
+                color: Colors.red[400],
+                height: 1.4,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              if (error == _studentIdError) {
+                _studentIdErrorTimer?.cancel();
+                setState(() => _studentIdError = null);
+              } else if (error == _lrnError) {
+                _lrnErrorTimer?.cancel();
+                setState(() => _lrnError = null);
+              }
+            },
+            child: Icon(
+              Icons.close,
+              color: Colors.red[400]!.withOpacity(0.7),
+              size: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _saveUserProfile() async {
     try {
@@ -356,26 +482,43 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
         updateData['isEnrolled'] = _enrollmentStatus == 'enrolled';
 
         if (_enrollmentStatus == 'not_enrolled') {
-          String finalAffiliation = _selectedAffiliation ?? '';
-
-          updateData.addAll({
-            'affiliation': finalAffiliation,
-            'year': null,
-            'program': null,
-            'scholarship': null,
-          });
+          if (_isIncomingFreshman == true) {
+            // ✅ Incoming freshman: Save LRN and set affiliation
+            updateData.addAll({
+              'affiliation': 'Incoming Freshman Applicant',
+              'lrn': _lrn,
+              'year': null,
+              'college': null,
+              'program': null,
+              'scholarship': null,
+              'studentId': null,
+            });
+          } else {
+            // ✅ Not incoming freshman: Use selected affiliation
+            updateData.addAll({
+              'affiliation': _selectedAffiliation ?? '',
+              'lrn': null,
+              'year': null,
+              'college': null,
+              'program': null,
+              'scholarship': null,
+              'studentId': null,
+            });
+          }
         } else {
-          // ENROLLED: Save year, program, scholarship, and auto-set affiliation as "Student"
+          // ENROLLED: Save year, college, program, scholarship, and auto-set affiliation as "Student"
           updateData.addAll({
             'year': _selectedYear,
+            'college': _selectedCollege,
             'program':
                 (_selectedYear == 'Incoming' || _selectedYear == 'Graduate')
                     ? null
-                    : _selectedCourse,
+                    : _selectedProgram,
             'scholarship':
                 _hasScholarship == true ? _selectedScholarship : null,
-            'affiliation':
-                'Student', // Automatically set to "Student" for enrolled users
+            'affiliation': 'CMU Student',
+            'studentId': _studentId,
+            'lrn': null,
           });
         }
       }
@@ -400,6 +543,39 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     }
   }
 
+  Future<bool> _isStudentIdTaken(String studentId) async {
+    try {
+      final querySnapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('studentId', isEqualTo: studentId.trim())
+              .limit(1)
+              .get();
+
+      return querySnapshot.docs.isNotEmpty;
+    } catch (e) {
+      print('Error checking student ID: $e');
+      return false;
+    }
+  }
+
+  // Validate if LRN already exists
+  Future<bool> _isLrnTaken(String lrn) async {
+    try {
+      final querySnapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('lrn', isEqualTo: lrn.trim())
+              .limit(1)
+              .get();
+
+      return querySnapshot.docs.isNotEmpty;
+    } catch (e) {
+      print('Error checking LRN: $e');
+      return false;
+    }
+  }
+
   bool _canProceed() {
     switch (_pages[_currentPage].type) {
       case UserOnboardingType.welcome:
@@ -407,29 +583,32 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
 
       case UserOnboardingType.profile:
         if (_role == 'user') {
-          // Must have enrollment status
           if (_enrollmentStatus == null) return false;
 
           if (_enrollmentStatus == 'not_enrolled') {
-            // NOT ENROLLED: Only need affiliation
-            if (_selectedAffiliation == null || _selectedAffiliation!.isEmpty) {
-              return false;
+            if (_isIncomingFreshman == null) return false;
+
+            if (_isIncomingFreshman == true) {
+              // ✅ FIXED: Need LRN with exactly 12 digits AND confirmed
+              return _lrn.trim().length == 12 && _lrnConfirmed;
+            } else {
+              return _selectedAffiliation != null &&
+                  _selectedAffiliation!.isNotEmpty;
             }
-            // If "Others" is selected, must have custom input
-
-            return true;
           } else {
-            // ENROLLED: Need year, program, and scholarship
+            // ENROLLED checks
+            if (_studentId.trim().length < 5 || !_studentIdConfirmed)
+              return false;
             if (_selectedYear.isEmpty) return false;
+            // ✅ REMOVE: if (_selectedDepartment.isEmpty) return false;
+            if (_selectedCollege.isEmpty) return false;
 
-            // Check if program is required based on year
             if (_selectedYear != 'Incoming' &&
                 _selectedYear != 'Graduate' &&
-                _selectedCourse.isEmpty) {
+                _selectedProgram.isEmpty) {
               return false;
             }
 
-            // Must answer scholarship question
             if (_hasScholarship == null) return false;
             if (_hasScholarship == true &&
                 (_selectedScholarship == null ||
@@ -787,23 +966,27 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     double descriptionFontSize,
     double maxWidth,
   ) {
-    // Check if all required fields are completed
+    // Check if all required fields are completed for summary
     bool allFieldsCompleted = false;
 
     if (_role == 'user' && _enrollmentStatus != null) {
       if (_enrollmentStatus == 'not_enrolled') {
-        // NOT ENROLLED: Only check affiliation
-        if (_selectedAffiliation != null && _selectedAffiliation!.isNotEmpty) {
-          // If "Others" is selected, check custom input
-
-          allFieldsCompleted = true;
+        if (_isIncomingFreshman == true) {
+          // ✅ FIXED: Check both length AND confirmation
+          allFieldsCompleted = _lrn.trim().length == 12 && _lrnConfirmed;
+        } else if (_isIncomingFreshman == false) {
+          allFieldsCompleted =
+              _selectedAffiliation != null && _selectedAffiliation!.isNotEmpty;
         }
       } else {
-        // ENROLLED: Check year, program, and scholarship
+        // ENROLLED: Check all fields (NO DEPARTMENT)
+        bool studentIdComplete =
+            _studentId.trim().isNotEmpty && _studentIdConfirmed;
         bool yearComplete = _selectedYear.isNotEmpty;
+        bool collegeComplete = _selectedCollege.isNotEmpty;
         bool programComplete =
             (_selectedYear == 'Incoming' || _selectedYear == 'Graduate') ||
-            _selectedCourse.isNotEmpty;
+            _selectedProgram.isNotEmpty;
         bool scholarshipComplete =
             _hasScholarship != null &&
             (_hasScholarship == false ||
@@ -813,7 +996,11 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                     _selectedScholarship!.isNotEmpty));
 
         allFieldsCompleted =
-            yearComplete && programComplete && scholarshipComplete;
+            studentIdComplete &&
+            yearComplete &&
+            collegeComplete &&
+            programComplete &&
+            scholarshipComplete;
       }
     }
 
@@ -885,12 +1072,19 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                 onChanged:
                     (value) => setState(() {
                       _enrollmentStatus = value;
+                      // Clear all other fields
+                      _studentId = '';
+                      _studentIdConfirmed = false;
                       _selectedYear = '';
-                      _selectedCourse = '';
-                      // Clear fields not needed for enrolled
+                      _selectedCollege = '';
+                      _selectedCollegeId = null;
+                      _selectedProgram = '';
+                      _hasScholarship = null;
+                      _selectedScholarship = null;
+                      _isIncomingFreshman = null;
+                      _lrn = '';
+                      _lrnConfirmed = false;
                       _selectedAffiliation = null;
-                      _customAffiliationController.clear();
-                      _showCustomAffiliationField = false;
                     }),
                 fontSize: descriptionFontSize,
               ),
@@ -902,19 +1096,264 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                 onChanged:
                     (value) => setState(() {
                       _enrollmentStatus = value;
-                      // Clear fields not needed for not enrolled
+                      // Clear enrolled-specific fields
+                      _studentId = '';
+                      _studentIdConfirmed = false;
                       _selectedYear = '';
-                      _selectedCourse = '';
+                      _selectedCollege = '';
+                      _selectedCollegeId = null;
+                      _selectedProgram = '';
                       _hasScholarship = null;
                       _selectedScholarship = null;
                     }),
                 fontSize: descriptionFontSize,
               ),
             ]
-            // FOR NOT ENROLLED: Show affiliation dropdown
+            // === NOT ENROLLED FLOW ===
             else if (_enrollmentStatus == 'not_enrolled') ...[
-              if (_selectedAffiliation == null ||
-                  _selectedAffiliation!.isEmpty) ...[
+              // Ask if incoming freshman for CMUCAT
+              if (_isIncomingFreshman == null) ...[
+                const SizedBox(height: 24),
+                _buildSectionTitle(
+                  'Are you an incoming freshman applicant for CMUCAT?',
+                  descriptionFontSize,
+                ),
+                const SizedBox(height: 12),
+                _buildRadioOption(
+                  title: 'Yes',
+                  value: 'yes',
+                  groupValue:
+                      _isIncomingFreshman == null
+                          ? null
+                          : (_isIncomingFreshman! ? 'yes' : 'no'),
+                  onChanged:
+                      (value) => setState(() {
+                        _isIncomingFreshman = value == 'yes';
+                        if (_isIncomingFreshman!) {
+                          _selectedAffiliation = null;
+                        } else {
+                          _lrn = '';
+                          _lrnConfirmed = false;
+                        }
+                      }),
+                  fontSize: descriptionFontSize,
+                ),
+                const SizedBox(height: 12),
+                _buildRadioOption(
+                  title: 'No',
+                  value: 'no',
+                  groupValue:
+                      _isIncomingFreshman == null
+                          ? null
+                          : (_isIncomingFreshman! ? 'yes' : 'no'),
+                  onChanged:
+                      (value) => setState(() {
+                        _isIncomingFreshman = value == 'yes';
+                        if (_isIncomingFreshman!) {
+                          _selectedAffiliation = null;
+                        } else {
+                          _lrn = '';
+                          _lrnConfirmed = false;
+                        }
+                      }),
+                  fontSize: descriptionFontSize,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _enrollmentStatus = null;
+                          _isIncomingFreshman = null;
+                        });
+                      },
+                      icon: const Icon(Icons.arrow_back, size: 18),
+                      label: Text(
+                        'Previous',
+                        style: TextStyle(fontSize: descriptionFontSize * 0.85),
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: primaryColor,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ]
+              // If YES to incoming freshman - ask for LRN
+             // If YES to incoming freshman - ask for LRN
+else if (_isIncomingFreshman == true && !_lrnConfirmed) ...[
+  const SizedBox(height: 24),
+  _buildSectionTitle(
+    'Enter your Learner Reference Number (LRN)',
+    descriptionFontSize,
+  ),
+  const SizedBox(height: 12),
+  TextFormField(
+    initialValue: _lrn,
+    decoration: InputDecoration(
+      labelText: 'LRN',
+      hintText: 'Enter your 12-digit LRN',
+      labelStyle: TextStyle(
+        color: primaryColor,
+        fontSize: descriptionFontSize * 0.9,
+      ),
+      hintStyle: TextStyle(
+        color: textSecondaryColor.withOpacity(0.6),
+        fontSize: descriptionFontSize * 0.85,
+      ),
+      prefixIcon: const Icon(Icons.badge_outlined, color: primaryColor),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: primaryColor, width: 2),
+      ),
+      filled: true,
+      fillColor: Colors.grey[50],
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 16,
+      ),
+    ),
+    style: TextStyle(
+      fontSize: descriptionFontSize,
+      fontWeight: FontWeight.w500,
+    ),
+    keyboardType: TextInputType.number,
+    maxLength: 12,
+    onChanged: (value) {
+      setState(() {
+        _lrn = value;
+        _lrnConfirmed = false;
+        _lrnError = null; // Clear error when typing
+        _lrnErrorTimer?.cancel();
+      });
+    },
+  ),
+  
+  // Show length validation error
+  if (_lrn.isNotEmpty && _lrn.trim().length < 12) ...[
+    const SizedBox(height: 8),
+    Padding(
+      padding: const EdgeInsets.only(left: 12),
+      child: Text(
+        'LRN must be exactly 12 digits (${_lrn.trim().length}/12)',
+        style: TextStyle(
+          fontSize: descriptionFontSize * 0.8,
+          color: Colors.red[700],
+        ),
+      ),
+    ),
+  ],
+  
+  // Show "already taken" error
+  _buildInlineError(_lrnError, descriptionFontSize),
+  
+  const SizedBox(height: 16),
+  SizedBox(
+    width: double.infinity,
+    child: ElevatedButton(
+      onPressed: _lrn.trim().length == 12
+          ? () async {
+              // Clear previous error
+              _lrnErrorTimer?.cancel();
+              setState(() => _lrnError = null);
+
+              // Show loading state
+              setState(() => _isLoading = true);
+
+              // Check if LRN is already taken
+              final isTaken = await _isLrnTaken(_lrn);
+              
+              setState(() => _isLoading = false);
+
+              if (isTaken) {
+                _setLrnError(
+                  'This LRN is already registered. Please check your LRN or contact support.',
+                );
+              } else {
+                // LRN is unique, confirm it
+                setState(() {
+                  _lrnConfirmed = true;
+                });
+              }
+            }
+          : null,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: primaryColor,
+        foregroundColor: backgroundColor,
+        disabledBackgroundColor: Colors.grey[300],
+        elevation: 2,
+        shadowColor: primaryColor.withOpacity(0.3),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+      ),
+      child: _isLoading
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2.0,
+              ),
+            )
+          : Text(
+              'Confirm LRN',
+              style: TextStyle(
+                fontSize: descriptionFontSize * 0.9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+    ),
+  ),
+  const SizedBox(height: 16),
+  Row(
+    mainAxisAlignment: MainAxisAlignment.start,
+    children: [
+      TextButton.icon(
+        onPressed: () {
+          setState(() {
+            _isIncomingFreshman = null;
+            _lrn = '';
+            _lrnConfirmed = false;
+            _lrnError = null;
+            _lrnErrorTimer?.cancel();
+          });
+        },
+        icon: const Icon(Icons.arrow_back, size: 18),
+        label: Text(
+          'Previous',
+          style: TextStyle(fontSize: descriptionFontSize * 0.85),
+        ),
+        style: TextButton.styleFrom(
+          foregroundColor: primaryColor,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+        ),
+      ),
+    ],
+  ),
+]
+              // If NO to incoming freshman - ask for affiliation
+              else if (_isIncomingFreshman == false &&
+                  (_selectedAffiliation == null ||
+                      _selectedAffiliation!.isEmpty)) ...[
                 const SizedBox(height: 24),
                 _buildSectionTitle(
                   'How are you associated with the school?',
@@ -933,8 +1372,6 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                   icon: Icons.people_outline,
                   fontSize: descriptionFontSize,
                 ),
-
-                // Show custom input field if "Others" is selected
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -942,10 +1379,8 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                     TextButton.icon(
                       onPressed: () {
                         setState(() {
+                          _isIncomingFreshman = null;
                           _selectedAffiliation = null;
-                          _customAffiliationController.clear();
-                          _showCustomAffiliationField = false;
-                          _enrollmentStatus = null;
                         });
                       },
                       icon: const Icon(Icons.arrow_back, size: 18),
@@ -965,65 +1400,150 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                 ),
               ],
             ]
-            // FOR ENROLLED: Show year, program, scholarship
+            // === ENROLLED FLOW ===
             else if (_enrollmentStatus == 'enrolled') ...[
-              // Step 2: Year and Program
-              if (_selectedYear.isEmpty ||
-                  (_selectedYear.isNotEmpty &&
-                      _selectedYear != 'Incoming' &&
-                      _selectedYear != 'Graduate' &&
-                      _selectedCourse.isEmpty)) ...[
+              // Step 1: Student ID
+              if (_studentId.trim().length < 5 || !_studentIdConfirmed) ...[
                 const SizedBox(height: 24),
                 _buildSectionTitle(
-                  'What year are you in?',
+                  'Enter your Student ID',
                   descriptionFontSize,
                 ),
                 const SizedBox(height: 12),
-                _buildDropdownField(
-                  value:
-                      _selectedYear.isEmpty || !years.contains(_selectedYear)
-                          ? null
-                          : _selectedYear,
-                  items: years,
-                  onChanged:
-                      (value) => setState(() {
-                        _selectedYear = value ?? '';
-                        if (value == 'Incoming' || value == 'Graduate') {
-                          _selectedCourse = 'N/A';
-                        } else {
-                          _selectedCourse = '';
-                        }
-                      }),
-                  hint: 'Select your year level',
-                  icon: Icons.school_outlined,
-                  fontSize: descriptionFontSize,
+                TextFormField(
+                  initialValue: _studentId,
+                  decoration: InputDecoration(
+                    labelText: 'Student ID',
+                    hintText: 'Enter your student ID (minimum 5 characters)',
+                    labelStyle: TextStyle(
+                      color: primaryColor,
+                      fontSize: descriptionFontSize * 0.9,
+                    ),
+                    hintStyle: TextStyle(
+                      color: textSecondaryColor.withOpacity(0.6),
+                      fontSize: descriptionFontSize * 0.85,
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.badge_outlined,
+                      color: primaryColor,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: primaryColor,
+                        width: 2,
+                      ),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                  ),
+                  style: TextStyle(
+                    fontSize: descriptionFontSize,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _studentId = value;
+                      _studentIdConfirmed = false;
+                      _studentIdError = null; // Clear error when typing
+                      _studentIdErrorTimer?.cancel();
+                    });
+                  },
                 ),
 
-                if (_selectedYear.isNotEmpty &&
-                    _selectedYear != 'Incoming' &&
-                    _selectedYear != 'Graduate') ...[
-                  const SizedBox(height: 16),
-                  _buildSectionTitle(
-                    'What program are you taking?',
-                    descriptionFontSize,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDropdownField(
-                    value:
-                        _selectedCourse.isEmpty ||
-                                !_programs.contains(_selectedCourse)
-                            ? null
-                            : _selectedCourse,
-                    items: _programs,
-                    onChanged:
-                        (value) =>
-                            setState(() => _selectedCourse = value ?? ''),
-                    hint: 'Select your program',
-                    icon: Icons.book_outlined,
-                    fontSize: descriptionFontSize,
+                // Show length validation error
+                if (_studentId.isNotEmpty && _studentId.trim().length < 5) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: Text(
+                      'Student ID must be at least 5 characters',
+                      style: TextStyle(
+                        fontSize: descriptionFontSize * 0.8,
+                        color: Colors.red[700],
+                      ),
+                    ),
                   ),
                 ],
 
+                // Show "already taken" error
+                _buildInlineError(_studentIdError, descriptionFontSize),
+
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed:
+                        _studentId.trim().length >= 5
+                            ? () async {
+                              // Clear previous error
+                              _studentIdErrorTimer?.cancel();
+                              setState(() => _studentIdError = null);
+
+                              // Show loading state
+                              setState(() => _isLoading = true);
+
+                              // Check if Student ID is already taken
+                              final isTaken = await _isStudentIdTaken(
+                                _studentId,
+                              );
+
+                              setState(() => _isLoading = false);
+
+                              if (isTaken) {
+                                _setStudentIdError(
+                                  'This Student ID is already registered. Please check your ID or contact support.',
+                                );
+                              } else {
+                                // Student ID is unique, confirm it
+                                setState(() {
+                                  _studentIdConfirmed = true;
+                                });
+                              }
+                            }
+                            : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: backgroundColor,
+                      disabledBackgroundColor: Colors.grey[300],
+                      elevation: 2,
+                      shadowColor: primaryColor.withOpacity(0.3),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child:
+                        _isLoading
+                            ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.0,
+                              ),
+                            )
+                            : Text(
+                              'Confirm Student ID',
+                              style: TextStyle(
+                                fontSize: descriptionFontSize * 0.9,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -1031,9 +1551,11 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                     TextButton.icon(
                       onPressed: () {
                         setState(() {
-                          _selectedYear = '';
-                          _selectedCourse = '';
                           _enrollmentStatus = null;
+                          _studentId = '';
+                          _studentIdConfirmed = false;
+                          _studentIdError = null;
+                          _studentIdErrorTimer?.cancel();
                         });
                       },
                       icon: const Icon(Icons.arrow_back, size: 18),
@@ -1052,10 +1574,143 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                   ],
                 ),
               ]
-              // Step 3: Scholarship (only for enrolled)
+              // Step 2: Year Level, College, and Program (all on same screen)
+              else if (_selectedYear.isEmpty ||
+                  _selectedCollege.isEmpty ||
+                  ((_selectedYear != 'Incoming' &&
+                          _selectedYear != 'Graduate') &&
+                      _selectedProgram.isEmpty)) ...[
+                const SizedBox(height: 24),
+
+                // Year Level
+                _buildSectionTitle(
+                  'What year are you in?',
+                  descriptionFontSize,
+                ),
+                const SizedBox(height: 12),
+                _buildDropdownField(
+                  value:
+                      _selectedYear.isEmpty || !years.contains(_selectedYear)
+                          ? null
+                          : _selectedYear,
+                  items: years.toSet().toList(),
+                  onChanged:
+                      (value) => setState(() {
+                        _selectedYear = value ?? '';
+                        if (value == 'Incoming' || value == 'Graduate') {
+                          _selectedProgram = 'N/A';
+                        } else {
+                          _selectedProgram = '';
+                        }
+                      }),
+                  hint: 'Select your year level',
+                  icon: Icons.school_outlined,
+                  fontSize: descriptionFontSize,
+                ),
+
+                // Show College only if Year is selected
+                if (_selectedYear.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _buildSectionTitle(
+                    'Select your College',
+                    descriptionFontSize,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildDropdownField(
+                    value:
+                        _selectedCollege.isEmpty ||
+                                !_colleges.keys.contains(_selectedCollege)
+                            ? null
+                            : _selectedCollege,
+                    items: _colleges.keys.toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedCollege = value ?? '';
+                        _selectedCollegeId = _colleges[value];
+                        _selectedProgram =
+                            ''; // Reset program when college changes
+                      });
+                    },
+                    hint: 'Select your college',
+                    icon: Icons.account_balance_outlined,
+                    fontSize: descriptionFontSize,
+                  ),
+                ],
+
+                // Show Program only if College is selected AND not Incoming/Graduate
+                if (_selectedCollege.isNotEmpty &&
+                    _selectedYear != 'Incoming' &&
+                    _selectedYear != 'Graduate') ...[
+                  const SizedBox(height: 24),
+                  _buildSectionTitle(
+                    'Select your Program',
+                    descriptionFontSize,
+                  ),
+                  const SizedBox(height: 12),
+                  () {
+                    final availablePrograms =
+                        _selectedCollegeId != null &&
+                                _programsByCollege.containsKey(
+                                  _selectedCollegeId,
+                                )
+                            ? _programsByCollege[_selectedCollegeId]!
+                            : <String>[];
+
+                    return _buildDropdownField(
+                      value:
+                          _selectedProgram.isEmpty ||
+                                  !availablePrograms.contains(_selectedProgram)
+                              ? null
+                              : _selectedProgram,
+                      items: availablePrograms,
+                      onChanged:
+                          (value) =>
+                              setState(() => _selectedProgram = value ?? ''),
+                      hint:
+                          availablePrograms.isEmpty
+                              ? 'No programs available for this college'
+                              : 'Select your program',
+                      icon: Icons.book_outlined,
+                      fontSize: descriptionFontSize,
+                    );
+                  }(),
+                ],
+
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _selectedYear = '';
+                          _selectedCollege = '';
+                          _selectedCollegeId = null;
+                          _selectedProgram = '';
+                          _studentIdConfirmed = false;
+                          _studentId = '';
+                        });
+                      },
+                      icon: const Icon(Icons.arrow_back, size: 18),
+                      label: Text(
+                        'Previous',
+                        style: TextStyle(fontSize: descriptionFontSize * 0.85),
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: primaryColor,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ]
+              // Step 3: Scholarship
               else if ((_selectedYear == 'Incoming' ||
                       _selectedYear == 'Graduate' ||
-                      _selectedCourse.isNotEmpty) &&
+                      _selectedProgram.isNotEmpty) &&
                   (_hasScholarship == null ||
                       (_hasScholarship == true &&
                           (_selectedScholarship == null ||
@@ -1087,8 +1742,13 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                     setState(() {
                       _hasScholarship = null;
                       _selectedScholarship = null;
-                      _selectedYear = '';
-                      _selectedCourse = '';
+                      if (_selectedYear == 'Incoming' ||
+                          _selectedYear == 'Graduate') {
+                        _selectedCollege = '';
+                        _selectedCollegeId = null;
+                      } else {
+                        _selectedProgram = '';
+                      }
                     });
                   },
                   isLast: true,
@@ -1101,8 +1761,8 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
       ),
     );
   }
-  // ALSO update the _buildProfileSummary to have a proper "Edit" button that goes back:
 
+  // Updated _buildProfileSummary to show new fields
   Widget _buildProfileSummary(double fontSize) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1180,7 +1840,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                   fontSize: fontSize,
                 ),
 
-                // NOT ENROLLED: Show only Name + Affiliation
+                // NOT ENROLLED: Show affiliation and LRN (if incoming freshman)
                 if (_enrollmentStatus == 'not_enrolled') ...[
                   const SizedBox(height: 16),
                   const Divider(height: 1),
@@ -1188,16 +1848,26 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                   _buildSummaryItem(
                     icon: Icons.people_outline,
                     label: 'Organizational Affiliation',
-                    // FIX: Check _selectedAffiliation instead of _hasAffiliation
                     value:
-                        _selectedAffiliation == 'Others'
-                            ? _customAffiliationController.text.trim()
+                        _isIncomingFreshman == true
+                            ? 'Incoming Freshman Applicant'
                             : (_selectedAffiliation ?? 'None'),
                     fontSize: fontSize,
                   ),
+                  if (_isIncomingFreshman == true) ...[
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    _buildSummaryItem(
+                      icon: Icons.badge_outlined,
+                      label: 'LRN',
+                      value: _lrn,
+                      fontSize: fontSize,
+                    ),
+                  ],
                 ],
 
-                // ENROLLED: Show Name + Affiliation (CMU Student) + Year + Program + Scholarship
+                // ENROLLED: Show all details
                 if (_enrollmentStatus == 'enrolled') ...[
                   const SizedBox(height: 16),
                   const Divider(height: 1),
@@ -1212,9 +1882,28 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                   const Divider(height: 1),
                   const SizedBox(height: 16),
                   _buildSummaryItem(
+                    icon: Icons.badge_outlined,
+                    label: 'Student ID',
+                    value: _studentId,
+                    fontSize: fontSize,
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
+                  _buildSummaryItem(
                     icon: Icons.calendar_today_outlined,
                     label: 'Year Level',
                     value: _selectedYear,
+                    fontSize: fontSize,
+                  ),
+
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
+                  _buildSummaryItem(
+                    icon: Icons.account_balance_outlined,
+                    label: 'College',
+                    value: _selectedCollege,
                     fontSize: fontSize,
                   ),
                   if (_selectedYear != 'Incoming' &&
@@ -1225,7 +1914,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                     _buildSummaryItem(
                       icon: Icons.book_outlined,
                       label: 'Program',
-                      value: _selectedCourse,
+                      value: _selectedProgram,
                       fontSize: fontSize,
                     ),
                   ],
@@ -1255,10 +1944,12 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
               onPressed: () {
                 setState(() {
                   if (_enrollmentStatus == 'not_enrolled') {
-                    // FIX: Reset the correct variables
-                    _selectedAffiliation = null;
-                    _customAffiliationController.clear();
-                    _showCustomAffiliationField = false;
+                    if (_isIncomingFreshman == true) {
+                      _lrn = '';
+                      _lrnConfirmed = false; // ✅ This is important
+                    } else {
+                      _selectedAffiliation = null;
+                    }
                   } else {
                     _hasScholarship = null;
                     _selectedScholarship = null;

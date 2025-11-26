@@ -12,14 +12,14 @@ import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 import 'package:flutter/material.dart';
 
-class ProgramManagementPage extends StatefulWidget {
-  const ProgramManagementPage({super.key});
+class CollegeManagementPage extends StatefulWidget {
+  const CollegeManagementPage({super.key});
 
   @override
-  State<ProgramManagementPage> createState() => _ProgramManagementPageState();
+  State<CollegeManagementPage> createState() => _CollegeManagementPageState();
 }
 
-class _ProgramManagementPageState extends State<ProgramManagementPage> {
+class _CollegeManagementPageState extends State<CollegeManagementPage> {
   final TextEditingController _searchController = TextEditingController();
   int currentPage = 1;
   int itemsPerPage = 10;
@@ -74,7 +74,7 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return ResponsiveLayout(
-      mobileBody: MobileProgramManagement(
+      mobileBody: MobileCollegeManagement(
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
@@ -82,7 +82,7 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
         onItemsPerPageChanged: _changeItemsPerPage,
         program: program,
       ),
-      tabletBody: TabletProgramManagement(
+      tabletBody: TabletCollegeManagement(
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
@@ -90,7 +90,7 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
         onItemsPerPageChanged: _changeItemsPerPage,
         program: program,
       ),
-      desktopBody: DesktopProgramManagement(
+      desktopBody: DesktopCollegeManagement(
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
@@ -102,7 +102,7 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
   }
 }
 
-class DesktopProgramManagement extends StatelessWidget {
+class DesktopCollegeManagement extends StatelessWidget {
   final TextEditingController searchController;
   final int currentPage;
   final int itemsPerPage;
@@ -110,7 +110,7 @@ class DesktopProgramManagement extends StatelessWidget {
   final ValueChanged<int> onItemsPerPageChanged;
   final ProgramData? program;
 
-  const DesktopProgramManagement({
+  const DesktopCollegeManagement({
     super.key,
     required this.searchController,
     required this.currentPage,
@@ -135,7 +135,7 @@ class DesktopProgramManagement extends StatelessWidget {
   }
 }
 
-class TabletProgramManagement extends StatelessWidget {
+class TabletCollegeManagement extends StatelessWidget {
   final TextEditingController searchController;
   final int currentPage;
   final int itemsPerPage;
@@ -143,7 +143,7 @@ class TabletProgramManagement extends StatelessWidget {
   final ValueChanged<int> onItemsPerPageChanged;
   final ProgramData? program;
 
-  const TabletProgramManagement({
+  const TabletCollegeManagement({
     super.key,
     required this.searchController,
     required this.currentPage,
@@ -168,7 +168,7 @@ class TabletProgramManagement extends StatelessWidget {
   }
 }
 
-class MobileProgramManagement extends StatelessWidget {
+class MobileCollegeManagement extends StatelessWidget {
   final TextEditingController searchController;
   final int currentPage;
   final int itemsPerPage;
@@ -176,7 +176,7 @@ class MobileProgramManagement extends StatelessWidget {
   final ValueChanged<int> onItemsPerPageChanged;
   final ProgramData? program;
 
-  const MobileProgramManagement({
+  const MobileCollegeManagement({
     super.key,
     required this.searchController,
     required this.currentPage,
@@ -221,7 +221,7 @@ class MobileProgramManagement extends StatelessWidget {
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance
-                            .collection('programs')
+                            .collection('colleges')
                             .orderBy('name')
                             .snapshots(),
                         builder: (context, snapshot) {
@@ -235,7 +235,7 @@ class MobileProgramManagement extends StatelessWidget {
                             WidgetsBinding.instance.addPostFrameCallback((_) {
                               SnackbarUtil.showError(
                                 context,
-                                'Error loading programs: ${snapshot.error}',
+                                'Error loading colleges: ${snapshot.error}',
                               );
                             });
                             return Center(
@@ -244,10 +244,10 @@ class MobileProgramManagement extends StatelessWidget {
                           }
                           if (!snapshot.hasData ||
                               snapshot.data!.docs.isEmpty) {
-                            return buildEmptyState(false, false, "programs");
+                            return buildEmptyState(false, false, "colleges");
                           }
-                          return _buildProgramList(
-                            allPrograms: snapshot.data!.docs,
+                          return _buildCollegeList(
+                            allColleges: snapshot.data!.docs,
                             searchQuery: searchController.text,
                             currentPage: currentPage,
                             itemsPerPage: itemsPerPage,
@@ -309,7 +309,7 @@ Widget mainContent(
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
-                          .collection('programs')
+                          .collection('colleges')
                           .orderBy('name')
                           .snapshots(),
                       builder: (context, snapshot) {
@@ -323,7 +323,7 @@ Widget mainContent(
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             SnackbarUtil.showError(
                               context,
-                              'Error loading programs: ${snapshot.error}',
+                              'Error loading colleges: ${snapshot.error}',
                             );
                           });
                           return Center(
@@ -331,10 +331,10 @@ Widget mainContent(
                           );
                         }
                         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                          return buildEmptyState(false, false, "programs");
+                          return buildEmptyState(false, false, "colleges");
                         }
-                        return _buildProgramList(
-                          allPrograms: snapshot.data!.docs,
+                        return _buildCollegeList(
+                          allColleges: snapshot.data!.docs,
                           searchQuery: searchController.text,
                           currentPage: currentPage,
                           itemsPerPage: itemsPerPage,
@@ -369,7 +369,7 @@ Widget _buildMobileHeader(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Programs Management',
+                'Colleges Management',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -378,31 +378,31 @@ Widget _buildMobileHeader(
               ),
               const SizedBox(height: 4),
               Text(
-                'Manage academic programs',
+                'Manage academic colleges',
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
           ),
-          AddProgramButton(
-            onPressed: () => showAddEditProgramModal(context, null),
+          AddCollegeButton(
+            onPressed: () => showAddEditCollegeModal(context, null),
           ),
         ],
       ),
       const SizedBox(height: 16),
-      buildSearchField('Search programs by name', searchController),
+      buildSearchField('Search colleges by name', searchController),
     ],
   );
 }
 
-Widget _buildProgramList({
-  required List<DocumentSnapshot> allPrograms,
+Widget _buildCollegeList({
+  required List<DocumentSnapshot> allColleges,
   required String searchQuery,
   required int currentPage,
   required int itemsPerPage,
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  final filtered = allPrograms.where((doc) {
+  final filtered = allColleges.where((doc) {
     final data = doc.data() as Map<String, dynamic>;
     final name = (data['name'] ?? '').toString().toLowerCase();
     return searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
@@ -413,7 +413,7 @@ Widget _buildProgramList({
   final safeCurrentPage = currentPage.clamp(1, totalPages);
   final startIndex = (safeCurrentPage - 1) * itemsPerPage;
   final endIndex = (startIndex + itemsPerPage).clamp(0, filtered.length);
-  final currentPagePrograms = filtered.sublist(
+  final currentPageColleges = filtered.sublist(
     startIndex >= filtered.length ? 0 : startIndex,
     startIndex >= filtered.length ? 0 : endIndex,
   );
@@ -421,21 +421,20 @@ Widget _buildProgramList({
   return Column(
     children: [
       Expanded(
-        child: currentPagePrograms.isEmpty
+        child: currentPageColleges.isEmpty
             ? const Center(
-                child: Text('No programs match your search criteria.'),
+                child: Text('No colleges match your search criteria.'),
               )
             : ListView.separated(
-                itemCount: currentPagePrograms.length,
+                itemCount: currentPageColleges.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
-                  final doc = currentPagePrograms[index];
+                  final doc = currentPageColleges[index];
                   final data = doc.data() as Map<String, dynamic>;
-                  return _buildProgramRow(
+                  return _buildCollegeRow(
                     context: context,
                     doc: doc,
                     name: data['name'] ?? 'N/A',
-                    collegeId: data['collegeId'] ?? '',
                   );
                 },
               ),
@@ -448,17 +447,16 @@ Widget _buildProgramList({
           itemsPerPage: itemsPerPage,
           onPageChanged: onPageChanged,
           onItemsPerPageChanged: onItemsPerPageChanged,
-          item: 'programs',
+          item: 'colleges',
         ),
     ],
   );
 }
 
-Widget _buildProgramRow({
+Widget _buildCollegeRow({
   required BuildContext context,
   required DocumentSnapshot doc,
   required String name,
-  required String collegeId,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
   bool isMobile = screenWidth < 600;
@@ -472,7 +470,7 @@ Widget _buildProgramRow({
       borderRadius: BorderRadius.circular(6),
     ),
     child: InkWell(
-      onTap: () => showProgramInfoModal(context, doc),
+      onTap: () => showCollegeInfoModal(context, doc),
       child: Row(
         children: [
           Container(
@@ -482,47 +480,20 @@ Widget _buildProgramRow({
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
-              Icons.school,
+              Icons.account_balance,
               color: const Color(0xFF2E7D32),
               size: isMobile ? 20 : 24,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (!isMobile && collegeId.isNotEmpty)
-                  FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseFirestore.instance
-                        .collection('colleges')
-                        .doc(collegeId)
-                        .get(),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasData && snapshot.data!.exists) {
-                        final collegeData =
-                            snapshot.data!.data() as Map<String, dynamic>;
-                        return Text(
-                          collegeData['name'] ?? 'Unknown College',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-              ],
+            child: Text(
+              name,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           SizedBox(width: isTablet ? 60 : 80),
@@ -530,9 +501,9 @@ Widget _buildProgramRow({
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {
               if (value == 'edit') {
-                showAddEditProgramModal(context, doc);
+                showAddEditCollegeModal(context, doc);
               } else if (value == 'delete') {
-                showDeleteProgramModal(context, doc);
+                showDeleteCollegeModal(context, doc);
               }
             },
             itemBuilder: (_) => [
@@ -585,7 +556,7 @@ Widget _buildHeader(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Programs Management',
+                    'Colleges Management',
                     style: TextStyle(
                       fontSize: isMobile ? 20 : (isTablet ? 22 : 24),
                       fontWeight: FontWeight.bold,
@@ -594,7 +565,7 @@ Widget _buildHeader(
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Manage academic programs',
+                    'Manage academic colleges',
                     style: TextStyle(
                       fontSize: isMobile ? 12 : 14,
                       color: Colors.grey[600],
@@ -602,8 +573,8 @@ Widget _buildHeader(
                   ),
                 ],
               ),
-              AddProgramButton(
-                onPressed: () => showAddEditProgramModal(context, null),
+              AddCollegeButton(
+                onPressed: () => showAddEditCollegeModal(context, null),
               ),
             ],
           ),
@@ -615,13 +586,13 @@ Widget _buildHeader(
                     runSpacing: 16,
                     children: [
                       buildStatCard(
-                        'Total Programs',
+                        'Total Colleges',
                         '${program?.totalProgram}',
                         Colors.blue,
-                        Icons.school,
+                        Icons.account_balance,
                       ),
                       buildStatCard(
-                        'Program with Most Students',
+                        'College with Most Programs',
                         '${program?.dominantProgram}',
                         Colors.green,
                         Icons.check_circle,
@@ -632,16 +603,16 @@ Widget _buildHeader(
                     children: [
                       Expanded(
                         child: buildStatCard(
-                          'Total Programs',
+                          'Total Colleges',
                           '${program?.totalProgram}',
                           Colors.blue,
-                          Icons.school,
+                          Icons.account_balance,
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: buildStatCard(
-                          'Program with Most Students',
+                          'College with Most Programs',
                           '${program?.dominantProgram}',
                           Colors.green,
                           Icons.check_circle,
@@ -650,7 +621,7 @@ Widget _buildHeader(
                     ],
                   ),
           ),
-          buildSearchField('Search programs by name', searchController),
+          buildSearchField('Search colleges by name', searchController),
         ],
       );
     },
@@ -676,7 +647,7 @@ Widget _buildTableHeader() {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Program Name',
+                  'College Name',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
@@ -703,14 +674,14 @@ Widget _buildTableHeader() {
           children: [
             const SizedBox(width: 8),
             Icon(
-              Icons.school,
+              Icons.account_balance,
               color: Colors.grey[600],
               size: isMobile ? 20 : 24,
             ),
             const SizedBox(width: 20),
             Expanded(
               child: Text(
-                'Program Name',
+                'College Name',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
@@ -726,10 +697,10 @@ Widget _buildTableHeader() {
   );
 }
 
-// ==================== ADD PROGRAM BUTTON ====================
-class AddProgramButton extends StatelessWidget {
+// ==================== ADD COLLEGE BUTTON ====================
+class AddCollegeButton extends StatelessWidget {
   final VoidCallback? onPressed;
-  const AddProgramButton({Key? key, this.onPressed}) : super(key: key);
+  const AddCollegeButton({Key? key, this.onPressed}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -771,7 +742,7 @@ class AddProgramButton extends StatelessWidget {
                     Icon(Icons.add, color: Colors.white, size: iconSize),
                     const SizedBox(width: 8),
                     Text(
-                      isMobile ? 'Add' : 'Add Program',
+                      isMobile ? 'Add' : 'Add College',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: fontSize,
@@ -789,16 +760,16 @@ class AddProgramButton extends StatelessWidget {
   }
 }
 
-// ==================== PROGRAM INFO MODAL ====================
-void showProgramInfoModal(BuildContext context, DocumentSnapshot programDoc) {
+// ==================== COLLEGE INFO MODAL ====================
+void showCollegeInfoModal(BuildContext context, DocumentSnapshot collegeDoc) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
-    barrierLabel: 'Program Info',
+    barrierLabel: 'College Info',
     barrierColor: Colors.black.withOpacity(0.5),
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return ProgramInfoModal(programDoc: programDoc);
+      return CollegeInfoModal(collegeDoc: collegeDoc);
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       return SlideTransition(
@@ -817,9 +788,9 @@ void showProgramInfoModal(BuildContext context, DocumentSnapshot programDoc) {
   );
 }
 
-class ProgramInfoModal extends StatelessWidget {
-  final DocumentSnapshot programDoc;
-  const ProgramInfoModal({super.key, required this.programDoc});
+class CollegeInfoModal extends StatelessWidget {
+  final DocumentSnapshot collegeDoc;
+  const CollegeInfoModal({super.key, required this.collegeDoc});
 
   String _formatTimestamp(Timestamp timestamp) {
     final date = timestamp.toDate();
@@ -845,16 +816,15 @@ class ProgramInfoModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = programDoc.data() as Map<String, dynamic>;
+    final data = collegeDoc.data() as Map<String, dynamic>;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final collegeId = data['collegeId'] ?? '';
 
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 520),
+        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 450),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -889,7 +859,7 @@ class ProgramInfoModal extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
-                      Icons.school,
+                      Icons.account_balance,
                       color: Colors.white,
                       size: 24,
                     ),
@@ -900,7 +870,7 @@ class ProgramInfoModal extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Program Details',
+                          'College Details',
                           style: TextStyle(
                             fontSize: isMobile ? 18 : 20,
                             fontWeight: FontWeight.w700,
@@ -909,7 +879,7 @@ class ProgramInfoModal extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Program information',
+                          'College information',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.white.withOpacity(0.85),
@@ -944,47 +914,23 @@ class ProgramInfoModal extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     buildSectionHeader(
-                      'Program Information',
+                      'College Information',
                       Icons.info_outline,
                     ),
                     const SizedBox(height: 12),
                     _buildInfoItem(
-                      Icons.school_outlined,
-                      'Program Name',
+                      Icons.account_balance_outlined,
+                      'College Name',
                       data['name'] ?? 'N/A',
                     ),
-                    const SizedBox(height: 8),
-                    if (collegeId.isNotEmpty)
-                      FutureBuilder<DocumentSnapshot>(
-                        future: FirebaseFirestore.instance
-                            .collection('colleges')
-                            .doc(collegeId)
-                            .get(),
-                        builder: (context, snapshot) {
-                          if (snapshot.hasData && snapshot.data!.exists) {
-                            final collegeData =
-                                snapshot.data!.data() as Map<String, dynamic>;
-                            return _buildInfoItem(
-                              Icons.account_balance_outlined,
-                              'College',
-                              collegeData['name'] ?? 'Unknown College',
-                            );
-                          }
-                          return _buildInfoItem(
-                            Icons.account_balance_outlined,
-                            'College',
-                            'Unknown College',
-                          );
-                        },
-                      ),
                     const SizedBox(height: 24),
                     buildSectionHeader('Metadata', Icons.access_time),
                     const SizedBox(height: 12),
-                    if (data['created_at'] != null)
+                    if (data['createdAt'] != null)
                       _buildInfoItem(
                         Icons.calendar_today_outlined,
                         'Created',
-                        _formatTimestamp(data['created_at']),
+                        _formatTimestamp(data['createdAt']),
                       ),
                     if (data['updatedAt'] != null) ...[
                       const SizedBox(height: 8),
@@ -1009,7 +955,7 @@ class ProgramInfoModal extends StatelessWidget {
                       child: OutlinedButton.icon(
                         onPressed: () {
                           Navigator.of(context).pop();
-                          showDeleteProgramModal(context, programDoc);
+                          showDeleteCollegeModal(context, collegeDoc);
                         },
                         icon: const Icon(Icons.delete_outline, size: 18),
                         label: const Text('Delete'),
@@ -1033,9 +979,9 @@ class ProgramInfoModal extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: () {
                           Navigator.of(context).pop();
-                          showAddEditProgramModal(
+                          showAddEditCollegeModal(
                             context,
-                            programDoc,
+                            collegeDoc,
                             previousModal: 'info',
                           );
                         },
@@ -1086,7 +1032,7 @@ class ProgramInfoModal extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF1F2937),
               ),
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.end,
             ),
@@ -1097,16 +1043,16 @@ class ProgramInfoModal extends StatelessWidget {
   }
 }
 
-// ==================== DELETE PROGRAM MODAL ====================
-void showDeleteProgramModal(BuildContext context, DocumentSnapshot programDoc) {
+// ==================== DELETE COLLEGE MODAL ====================
+void showDeleteCollegeModal(BuildContext context, DocumentSnapshot collegeDoc) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
-    barrierLabel: 'Delete Program',
+    barrierLabel: 'Delete College',
     barrierColor: Colors.black.withOpacity(0.6),
     transitionDuration: const Duration(milliseconds: 250),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return DeleteProgramModal(programDoc: programDoc);
+      return DeleteCollegeModal(collegeDoc: collegeDoc);
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       return ScaleTransition(
@@ -1122,25 +1068,25 @@ void showDeleteProgramModal(BuildContext context, DocumentSnapshot programDoc) {
   );
 }
 
-class DeleteProgramModal extends StatefulWidget {
-  final DocumentSnapshot programDoc;
-  const DeleteProgramModal({super.key, required this.programDoc});
+class DeleteCollegeModal extends StatefulWidget {
+  final DocumentSnapshot collegeDoc;
+  const DeleteCollegeModal({super.key, required this.collegeDoc});
 
   @override
-  State<DeleteProgramModal> createState() => _DeleteProgramModalState();
+  State<DeleteCollegeModal> createState() => _DeleteCollegeModalState();
 }
 
-class _DeleteProgramModalState extends State<DeleteProgramModal> {
+class _DeleteCollegeModalState extends State<DeleteCollegeModal> {
   bool _isDeleting = false;
 
-  Future<void> _deleteProgram() async {
+  Future<void> _deleteCollege() async {
     setState(() => _isDeleting = true);
-    final data = widget.programDoc.data() as Map<String, dynamic>;
+    final data = widget.collegeDoc.data() as Map<String, dynamic>;
 
     try {
       await FirebaseFirestore.instance
-          .collection('programs')
-          .doc(widget.programDoc.id)
+          .collection('colleges')
+          .doc(widget.collegeDoc.id)
           .delete();
 
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -1160,25 +1106,25 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
       await logRef.set({
         'logId': logRef.id,
         'user': actorName,
-        'action': 'Deleted program: ${data['name']}',
+        'action': 'Deleted college: ${data['name']}',
         'time': Timestamp.now(),
       });
 
       if (mounted) {
         Navigator.of(context).pop();
-        SnackbarUtil.showSuccess(context, 'Program deleted successfully!');
+        SnackbarUtil.showSuccess(context, 'College deleted successfully!');
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isDeleting = false);
-        SnackbarUtil.showError(context, 'Failed to delete program: $e');
+        SnackbarUtil.showError(context, 'Failed to delete college: $e');
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final data = widget.programDoc.data() as Map<String, dynamic>;
+    final data = widget.collegeDoc.data() as Map<String, dynamic>;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
@@ -1228,7 +1174,7 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Delete Program',
+                    'Delete College',
                     style: TextStyle(
                       fontSize: isMobile ? 20 : 24,
                       fontWeight: FontWeight.w700,
@@ -1243,7 +1189,7 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
               child: Column(
                 children: [
                   Text(
-                    'Are you sure you want to delete this program?',
+                    'Are you sure you want to delete this college?',
                     style: TextStyle(
                       fontSize: isMobile ? 14 : 16,
                       color: const Color(0xFF6B7280),
@@ -1264,7 +1210,7 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Program:',
+                          'College:',
                           style: TextStyle(
                             fontSize: 12,
                             color: Color(0xFF6B7280),
@@ -1273,7 +1219,7 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          data['name'] ?? 'Unknown Program',
+                          data['name'] ?? 'Unknown College',
                           style: TextStyle(
                             fontSize: isMobile ? 14 : 16,
                             color: const Color(0xFF1F2937),
@@ -1317,7 +1263,7 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
                         child: SizedBox(
                           height: isMobile ? 40 : 46,
                           child: ElevatedButton(
-                            onPressed: _isDeleting ? null : _deleteProgram,
+                            onPressed: _isDeleting ? null : _deleteCollege,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFEF4444),
                               foregroundColor: Colors.white,
@@ -1360,21 +1306,21 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
   }
 }
 
-// ==================== ADD/EDIT PROGRAM MODAL ====================
-void showAddEditProgramModal(
+// ==================== ADD/EDIT COLLEGE MODAL ====================
+void showAddEditCollegeModal(
   BuildContext context,
-  DocumentSnapshot? programDoc, {
+  DocumentSnapshot? collegeDoc, {
   String? previousModal,
 }) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
-    barrierLabel: programDoc == null ? 'Add Program' : 'Edit Program',
+    barrierLabel: collegeDoc == null ? 'Add College' : 'Edit College',
     barrierColor: Colors.black.withOpacity(0.5),
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return AddEditProgramModal(
-        programDoc: programDoc,
+      return AddEditCollegeModal(
+        collegeDoc: collegeDoc,
         previousModal: previousModal,
       );
     },
@@ -1395,54 +1341,29 @@ void showAddEditProgramModal(
   );
 }
 
-class AddEditProgramModal extends StatefulWidget {
-  final DocumentSnapshot? programDoc;
+class AddEditCollegeModal extends StatefulWidget {
+  final DocumentSnapshot? collegeDoc;
   final String? previousModal;
-  const AddEditProgramModal({super.key, this.programDoc, this.previousModal});
+  const AddEditCollegeModal({super.key, this.collegeDoc, this.previousModal});
 
   @override
-  State<AddEditProgramModal> createState() => _AddEditProgramModalState();
+  State<AddEditCollegeModal> createState() => _AddEditCollegeModalState();
 }
 
-class _AddEditProgramModalState extends State<AddEditProgramModal> {
+class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
   late TextEditingController _nameController;
   bool _isSubmitting = false;
-  String? _selectedCollegeId;
-  List<DocumentSnapshot> _colleges = [];
-  bool _loadingColleges = true;
 
-  bool get isEditing => widget.programDoc != null;
+  bool get isEditing => widget.collegeDoc != null;
 
   @override
   void initState() {
     super.initState();
-    if (widget.programDoc != null) {
-      final data = widget.programDoc!.data() as Map<String, dynamic>;
+    if (widget.collegeDoc != null) {
+      final data = widget.collegeDoc!.data() as Map<String, dynamic>;
       _nameController = TextEditingController(text: data['name'] ?? '');
-      _selectedCollegeId = data['collegeId'];
     } else {
       _nameController = TextEditingController();
-    }
-    _loadColleges();
-  }
-
-  Future<void> _loadColleges() async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('colleges')
-          .orderBy('name')
-          .get();
-      if (mounted) {
-        setState(() {
-          _colleges = snapshot.docs;
-          _loadingColleges = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _loadingColleges = false);
-        SnackbarUtil.showError(context, 'Failed to load colleges');
-      }
     }
   }
 
@@ -1452,34 +1373,28 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     super.dispose();
   }
 
-  Future<void> _saveProgram() async {
+  Future<void> _saveCollege() async {
     if (_nameController.text.trim().isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please enter a program name');
-      return;
-    }
-
-    if (_selectedCollegeId == null || _selectedCollegeId!.isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please select a college');
+      SnackbarUtil.showWarning(context, 'Please enter a college name');
       return;
     }
 
     setState(() => _isSubmitting = true);
 
     try {
-      final programData = {
+      final collegeData = {
         'name': _nameController.text.trim(),
-        'collegeId': _selectedCollegeId,
         'updatedAt': Timestamp.now(),
       };
 
       if (isEditing) {
         await FirebaseFirestore.instance
-            .collection('programs')
-            .doc(widget.programDoc!.id)
-            .update(programData);
+            .collection('colleges')
+            .doc(widget.collegeDoc!.id)
+            .update(collegeData);
       } else {
-        programData['created_at'] = Timestamp.now();
-        await FirebaseFirestore.instance.collection('programs').add(programData);
+        collegeData['createdAt'] = Timestamp.now();
+        await FirebaseFirestore.instance.collection('colleges').add(collegeData);
       }
 
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -1500,14 +1415,14 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
         'logId': logRef.id,
         'user': actorName,
         'action':
-            '${isEditing ? 'Updated' : 'Created'} program: ${_nameController.text.trim()}',
+            '${isEditing ? 'Updated' : 'Created'} college: ${_nameController.text.trim()}',
         'time': Timestamp.now(),
       });
 
       if (mounted) {
         SnackbarUtil.showSuccess(
           context,
-          'Program ${isEditing ? 'updated' : 'created'} successfully!',
+          'College ${isEditing ? 'updated' : 'created'} successfully!',
         );
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) Navigator.of(context).pop();
@@ -1518,7 +1433,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
         setState(() => _isSubmitting = false);
         SnackbarUtil.showError(
           context,
-          'Failed to ${isEditing ? 'update' : 'create'} program: $e',
+          'Failed to ${isEditing ? 'update' : 'create'} college: $e',
         );
       }
     }
@@ -1533,7 +1448,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 600),
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 450),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -1567,9 +1482,9 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                             Future.delayed(
                               const Duration(milliseconds: 200),
                               () {
-                                showProgramInfoModal(
+                                showCollegeInfoModal(
                                   context,
-                                  widget.programDoc!,
+                                  widget.collegeDoc!,
                                 );
                               },
                             );
@@ -1604,7 +1519,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isEditing ? 'Edit Program' : 'Add New Program',
+                            isEditing ? 'Edit College' : 'Add New College',
                             style: TextStyle(
                               fontSize: isMobile ? 20 : 24,
                               fontWeight: FontWeight.w700,
@@ -1615,8 +1530,8 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                           const SizedBox(height: 4),
                           Text(
                             isEditing
-                                ? 'Update program information'
-                                : 'Create a new academic program',
+                                ? 'Update college information'
+                                : 'Create a new college',
                             style: TextStyle(
                               fontSize: isMobile ? 14 : 16,
                               color: Colors.white.withOpacity(0.85),
@@ -1652,17 +1567,15 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       buildSectionHeader(
-                        'Program Information',
-                        Icons.school_outlined,
+                        'College Information',
+                        Icons.account_balance_outlined,
                       ),
-                      const SizedBox(height: 16),
-                      _buildCollegeDropdown(isMobile),
                       const SizedBox(height: 16),
                       buildTextField(
                         controller: _nameController,
-                        label: 'Program Name',
-                        hint: 'e.g., Bachelor of Science in Information Technology',
-                        icon: Icons.school_outlined,
+                        label: 'College Name',
+                        hint: 'e.g., College of Computer Studies',
+                        icon: Icons.account_balance_outlined,
                         isMobile: isMobile,
                       ),
                     ],
@@ -1711,7 +1624,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                       child: SizedBox(
                         height: isMobile ? 44 : 48,
                         child: ElevatedButton(
-                          onPressed: _isSubmitting ? null : _saveProgram,
+                          onPressed: _isSubmitting ? null : _saveCollege,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2E7D32),
                             foregroundColor: Colors.white,
@@ -1752,7 +1665,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                                     const Icon(Icons.save_outlined, size: 18),
                                     const SizedBox(width: 8),
                                     Text(
-                                      isEditing ? 'Save Changes' : 'Create Program',
+                                      isEditing ? 'Save Changes' : 'Create College',
                                       style: const TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w600,
@@ -1770,88 +1683,6 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildCollegeDropdown(bool isMobile) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'College',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF374151),
-            letterSpacing: -0.1,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: _loadingColleges
-              ? const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                )
-              : DropdownButtonFormField<String>(
-                  value: _selectedCollegeId,
-                  decoration: InputDecoration(
-                    hintText: 'Select a college',
-                    hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                    prefixIcon: const Icon(
-                      Icons.account_balance_outlined,
-                      color: Color(0xFF9CA3AF),
-                      size: 20,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                  ),
-                  items: _colleges.map((college) {
-                    final data = college.data() as Map<String, dynamic>;
-                    return DropdownMenuItem<String>(
-                      value: college.id,
-                      child: Text(
-                        data['name'] ?? 'Unknown',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF1F2937),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedCollegeId = value;
-                    });
-                  },
-                  isExpanded: true,
-                  icon: const Icon(Icons.arrow_drop_down),
-                  dropdownColor: Colors.white,
-                  style: const TextStyle(fontSize: 14, color: Color(0xFF1F2937)),
-                ),
-        ),
-      ],
     );
   }
 }

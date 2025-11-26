@@ -298,8 +298,8 @@ class UniversalUIComponents {
               isExpandable: true,
               subItems: [
                 MenuItem(icon: Icons.person, title: "Users", index: 6),
-       
-                MenuItem(icon: Icons.book, title: "Programs", index: 12),
+                MenuItem(icon: Icons.person, title: "Colleges", index: 12),
+                MenuItem(icon: Icons.book, title: "Programs", index: 13),
               ],
             ),
             MenuItem(

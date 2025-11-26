@@ -1,6 +1,7 @@
 import 'package:capstone_project/pages/admin_pages/admission_management.dart';
 
 import 'package:capstone_project/pages/admin_pages/announcement_page.dart';
+import 'package:capstone_project/pages/admin_pages/college.dart';
 import 'package:capstone_project/pages/admin_pages/dashboard_page.dart';
 import 'package:capstone_project/pages/admin_pages/faq_page.dart';
 import 'package:capstone_project/pages/admin_pages/human_escalation.dart';
@@ -93,6 +94,7 @@ class _AdminMainPageState extends State<AdminMainPage> {
     const AdmissionManagementPage(),
     const ScholarshipManagementPage(),
     const PlacementManagementPage(),
+    const CollegeManagementPage(),
     const ProgramManagementPage()
   ];
 
@@ -109,6 +111,7 @@ class _AdminMainPageState extends State<AdminMainPage> {
     'Admission',
     'Scholarship',
     'Placement',
+    'Colleges',
     'Programs'
   ];
 

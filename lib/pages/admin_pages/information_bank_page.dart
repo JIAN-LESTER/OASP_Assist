@@ -572,7 +572,7 @@ Widget _buildTableHeader() {
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           decoration: BoxDecoration(
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(6),
@@ -580,7 +580,7 @@ Widget _buildTableHeader() {
           child: const Row(
             children: [
               Expanded(
-                flex: 4,
+                flex: 3,
                 child: Text(
                   'Document',
                   style: TextStyle(
@@ -590,6 +590,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
+              SizedBox(width: 20,),
               Expanded(
                 flex: 3,
                 child: Text(
@@ -610,7 +611,7 @@ Widget _buildTableHeader() {
       return Container(
         padding: EdgeInsets.symmetric(
           vertical: isTablet ? 14 : 16,
-          horizontal: isTablet ? 12 : 16,
+          horizontal: 12,
         ),
         decoration: BoxDecoration(
           color: Colors.grey[50],
@@ -618,9 +619,8 @@ Widget _buildTableHeader() {
         ),
         child: Row(
           children: [
-            const SizedBox(width: 8),
             Expanded(
-              flex: 2,
+              flex: 3,
               child: Text(
                 'Document',
                 style: TextStyle(
@@ -631,7 +631,7 @@ Widget _buildTableHeader() {
               ),
             ),
             Expanded(
-              flex: 3,
+              flex: 4,
               child: Text(
                 'Content',
                 style: TextStyle(
@@ -641,8 +641,9 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
+            const SizedBox(width: 100),
             Expanded(
-              flex: 1,
+              flex: 3,
               child: Text(
                 'Category',
                 style: TextStyle(
@@ -652,7 +653,8 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            SizedBox(width: isTablet ? 60 : 80),
+            SizedBox(width: isTablet ? 40 : 5),
+            const SizedBox(width: 40), // Fixed space for action button
           ],
         ),
       );
@@ -800,6 +802,7 @@ Widget _buildIBRow({
       onTap: () => showIBInfoModal(context, doc),
       child: Row(
         children: [
+          // Document Title - flex: 3
           Expanded(
             flex: 3,
             child: Column(
@@ -818,7 +821,12 @@ Widget _buildIBRow({
               ],
             ),
           ),
+         if (isMobile)...[
+          const SizedBox(width: 20,)
+         ],
 
+
+          // Content - flex: 4 (only on tablet/desktop)
           if (!isMobile)
             Expanded(
               flex: 4,
@@ -829,8 +837,12 @@ Widget _buildIBRow({
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-          const SizedBox(width: 100),
+          
+          // Spacing to match header
+          if (!isMobile)
+            const SizedBox(width: 100),
 
+          // Category - flex: 3
           Expanded(
             flex: 3,
             child: Align(
@@ -852,45 +864,51 @@ Widget _buildIBRow({
               ),
             ),
           ),
+          
+          // Spacing before action button
           SizedBox(width: isTablet ? 40 : 5),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz),
-            onSelected: (value) {
-              if (value == 'edit') {
-                showEditIBModal(context, doc);
-              } else if (value == 'delete') {
-                showDeleteConfirmation(
-                  context,
-                  doc,
-                  DeleteConfigs.document,
-                  'information_bank',
-                  customDeleteHandler: handleInformationBankDelete
-                );
-              }
-            },
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
+          
+          // Action button - Fixed width 40
+          SizedBox(
+            width: 40,
+            child: PopupMenuButton<String>(
+              icon: const Icon(Icons.more_horiz),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  showEditIBModal(context, doc);
+                } else if (value == 'delete') {
+                  showDeleteConfirmation(
+                    context,
+                    doc,
+                    DeleteConfigs.document,
+                    'information_bank',
+                    customDeleteHandler: handleInformationBankDelete
+                  );
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
                   ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
                   ),
-                ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
