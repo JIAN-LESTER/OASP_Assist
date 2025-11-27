@@ -420,6 +420,9 @@ class _ProfileModalState extends State<ProfileModal> {
                     final name = data['name'] ?? '';
                     final scholarship = data['scholarship'] ?? '';
                     final affiliation = data['affiliation'] ?? '';
+                    final studentId = data['studentId'] ?? '';
+                    final lrn = data['lrn'] ?? '';
+                    final serviceUnit = data['serviceUnit'] ?? '';
 
                     return Column(
                       children: [
@@ -445,36 +448,67 @@ class _ProfileModalState extends State<ProfileModal> {
                                   isMobile: isMobile,
                                 ),
 
+                                // USER ROLE FIELDS
                                 if (role.toLowerCase() == 'user') ...[
-                                  if (year.isNotEmpty)
-                                    _buildInfoCard(
-                                      label: 'Year Level',
-                                      value: year,
-                                      icon: Icons.school_outlined,
-                                      isMobile: isMobile,
-                                    ),
-                                  if (program.isNotEmpty)
-                                    _buildInfoCard(
-                                      label: 'Program',
-                                      value: program,
-                                      icon: Icons.book_outlined,
-                                      isMobile: isMobile,
-                                    ),
+                                  // Show affiliation first
                                   if (affiliation.isNotEmpty)
                                     _buildInfoCard(
-                                      label: 'Affiliations',
+                                      label: 'Affiliation',
                                       value: affiliation,
-                                      icon: Icons.people_outline,
+                                      icon: Icons.business_outlined,
                                       isMobile: isMobile,
                                     ),
-                                  if (scholarship.isNotEmpty)
+
+                                  // INCOMING FRESHMAN APPLICANT
+                                  if (affiliation.toLowerCase() == 'incoming freshman applicant' && lrn.isNotEmpty)
                                     _buildInfoCard(
-                                      label: 'Scholarship',
-                                      value: scholarship,
-                                      icon: Icons.card_membership_outlined,
+                                      label: 'LRN',
+                                      value: lrn,
+                                      icon: Icons.numbers_outlined,
                                       isMobile: isMobile,
                                     ),
+
+                                  // CMU STUDENT FIELDS
+                                  if (affiliation.toLowerCase() == 'cmu student') ...[
+                                    if (studentId.isNotEmpty)
+                                      _buildInfoCard(
+                                        label: 'Student ID',
+                                        value: studentId,
+                                        icon: Icons.badge_outlined,
+                                        isMobile: isMobile,
+                                      ),
+                                    if (year.isNotEmpty)
+                                      _buildInfoCard(
+                                        label: 'Year Level',
+                                        value: year,
+                                        icon: Icons.school_outlined,
+                                        isMobile: isMobile,
+                                      ),
+                                    if (program.isNotEmpty)
+                                      _buildInfoCard(
+                                        label: 'Program',
+                                        value: program,
+                                        icon: Icons.book_outlined,
+                                        isMobile: isMobile,
+                                      ),
+                                    if (scholarship.isNotEmpty)
+                                      _buildInfoCard(
+                                        label: 'Scholarship',
+                                        value: scholarship,
+                                        icon: Icons.card_membership_outlined,
+                                        isMobile: isMobile,
+                                      ),
+                                  ],
                                 ],
+
+                                // STAFF ROLE FIELDS
+                                if (role.toLowerCase() == 'staff' && serviceUnit.isNotEmpty)
+                                  _buildInfoCard(
+                                    label: 'Service Unit',
+                                    value: serviceUnit,
+                                    icon: Icons.work_outline,
+                                    isMobile: isMobile,
+                                  ),
                               ],
                             ),
                           ),

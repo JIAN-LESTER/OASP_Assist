@@ -47,6 +47,8 @@
       'Placement',
     ];
 
+   
+
     @override
     void initState() {
       super.initState();
@@ -603,94 +605,147 @@
       );
     }
 
-    /// Builds the desktop view (4 columns grid, NO outer scrolling)
-    Widget _buildDesktopView() {
-      final spacing = _getGridSpacing(context);
-      final padding = _getResponsivePadding(context);
+Widget _buildDesktopView() {
+  final spacing = _getGridSpacing(context);
+  final padding = _getResponsivePadding(context);
 
-      final availableCategories =
-          categoryOrder.where((cat) => faqCategories.containsKey(cat)).toList();
+  final availableCategories =
+      categoryOrder.where((cat) => faqCategories.containsKey(cat)).toList();
 
-      for (var cat in faqCategories.keys) {
-        if (!availableCategories.contains(cat)) {
-          availableCategories.add(cat);
-        }
-      }
+  for (var cat in faqCategories.keys) {
+    if (!availableCategories.contains(cat)) {
+      availableCategories.add(cat);
+    }
+  }
 
-      if (availableCategories.isEmpty) {
-        return _buildEmptyState();
-      }
+  if (availableCategories.isEmpty) {
+    return _buildEmptyState();
+  }
 
-      return Padding(
-        padding: padding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            _buildHeader(),
-            SizedBox(height: 40),
-            Expanded(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: 1400),
-                  child: GridView.builder(
-                    shrinkWrap: false,
-                    physics: NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                      mainAxisSpacing: spacing,
-                      crossAxisSpacing: spacing,
-                      childAspectRatio: 0.75,
-                    ),
-                    itemCount: availableCategories.length,
-                    itemBuilder: (context, index) {
-                      return _buildDesktopCategoryCard(
-                        availableCategories[index],
-                      );
-                    },
-                  ),
+  // ✅ Limit to 3 categories
+  final displayCategories = availableCategories.take(3).toList();
+
+  return Padding(
+    padding: padding,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _buildHeader(),
+        SizedBox(height: 20),
+        Expanded(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 1200), // ✅ Reduced max width
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3, // ✅ Changed to 3 columns
+                  mainAxisSpacing: spacing,
+                  crossAxisSpacing: spacing,
+                  childAspectRatio: 0.75,
                 ),
+                itemCount: displayCategories.length,
+                itemBuilder: (context, index) {
+                  return _buildDesktopCategoryCard(
+                    displayCategories[index],
+                  );
+                },
               ),
             ),
-            SizedBox(height: 20),
-          ],
-        ),
-      );
-    }
-
-    /// Builds the mobile/tablet view (single column, collapsible)
-    Widget _buildMobileTabletView() {
-      final padding = _getResponsivePadding(context);
-
-      final availableCategories =
-          categoryOrder.where((cat) => faqCategories.containsKey(cat)).toList();
-
-      for (var cat in faqCategories.keys) {
-        if (!availableCategories.contains(cat)) {
-          availableCategories.add(cat);
-        }
-      }
-
-      if (availableCategories.isEmpty) {
-        return _buildEmptyState();
-      }
-
-      return SingleChildScrollView(
-        child: Padding(
-          padding: padding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _buildHeader(),
-              SizedBox(height: 32),
-              ...availableCategories.map(
-                (category) => _buildMobileTabletCategoryCard(category),
-              ),
-              SizedBox(height: 40),
-            ],
           ),
         ),
-      );
+        SizedBox(height: 20),
+      ],
+    ),
+  );
+}
+
+// ✅ Also update _buildMobileTabletView() to limit to 3 FAQs:
+
+Widget _buildMobileTabletView() {
+  final padding = _getResponsivePadding(context);
+
+  final availableCategories =
+      categoryOrder.where((cat) => faqCategories.containsKey(cat)).toList();
+
+  for (var cat in faqCategories.keys) {
+    if (!availableCategories.contains(cat)) {
+      availableCategories.add(cat);
     }
+  }
+
+  if (availableCategories.isEmpty) {
+    return _buildEmptyState();
+  }
+
+  // ✅ Limit to 3 categories
+  final displayCategories = availableCategories.take(3).toList();
+
+  return SingleChildScrollView(
+    child: Padding(
+      padding: padding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _buildHeader(),
+          SizedBox(height: 32),
+          // ✅ Center the FAQ cards
+          ...displayCategories.map(
+            (category) => Container(
+              constraints: BoxConstraints(maxWidth: 600), // ✅ Max width for centering
+              child: _buildMobileTabletCategoryCard(category),
+            ),
+          ),
+          SizedBox(height: 40),
+        ],
+      ),
+    ),
+  );
+}
+
+// ✅ Update _buildEmptyState() to show loading while fetching:
+
+Widget _buildEmptyState() {
+  // ✅ Don't show empty state while loading
+  if (_isLoadingFAQs) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: Color(0xFF2E7D32)),
+          SizedBox(height: 16),
+          Text(
+            'Loading FAQs...',
+            style: TextStyle(
+              fontSize: 15,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  return Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.help_outline, color: Colors.grey[300], size: 64),
+        SizedBox(height: 20),
+        Text(
+          'No FAQs Available',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade600,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
     /// Builds the header section with speech-to-text indicator
     Widget _buildHeader() {
@@ -825,28 +880,31 @@
     }
 
     /// Builds empty state
-    Widget _buildEmptyState() {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.help_outline, color: Colors.grey[300], size: 64),
-            SizedBox(height: 20),
-            Text(
-              'No FAQs Available',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+   
 
     @override
     Widget build(BuildContext context) {
+
+        if (_isLoadingFAQs) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            color: Color(0xFF2E7D32),
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Loading FAQs...',
+            style: TextStyle(
+              fontSize: 15,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
     
 
       if (_isDesktop(context)) {
@@ -964,6 +1022,9 @@
       const primaryColor = Color(0xFF2E7D32);
       final surfaceColor = Colors.grey.shade50;
       final borderColor = Colors.grey.shade300;
+
+     
+
 
       return Container(
         decoration: BoxDecoration(color: surfaceColor),

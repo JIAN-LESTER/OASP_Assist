@@ -2242,43 +2242,45 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      body: Consumer<ChatProvider>(
-        builder: (context, chatProvider, child) {
-          final messages = chatProvider.messages;
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.grey.shade50,
+    body: Consumer<ChatProvider>(
+      builder: (context, chatProvider, child) {
+        final messages = chatProvider.messages;
 
-          // ✅ Improved: Only auto-scroll if user isn't manually scrolling
-          if (!_showFAQs &&
-              !_isLoadingConversation &&
-              !_userIsScrolling &&
-              _scrollController.hasClients) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              final isNearBottom =
-                  _scrollController.position.pixels >=
-                  _scrollController.position.maxScrollExtent - 100;
-
-              if (isNearBottom) {
-                _scrollToBottomAnimated(delay: 50);
-              }
-            });
-          }
-
-          return Column(
-            children: [
-              Expanded(
-                child:
-                    _showFAQs
-                        ? FAQSection(
+        return Column(
+          children: [
+            Expanded(
+              child: _isLoadingConversation
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            color: Color(0xFF2E7D32),
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'Loading conversation...',
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _showFAQs
+                      ? FAQSection(
                           key: _faqSectionKey,
                           onFAQSelected: _onFAQSelected,
                           messageController: _controller,
                         )
-                        : (messages.isEmpty
-                            ? _buildEmptyChatState()
-                            : _buildMessagesList(messages, chatProvider)),
+                      : (messages.isEmpty
+                          ? _buildEmptyChatState()
+                          : _buildMessagesList(messages, chatProvider)),
               ),
               FAQInputSection(
                 controller: _controller,

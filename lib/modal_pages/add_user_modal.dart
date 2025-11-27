@@ -186,12 +186,10 @@ final List<String> _serviceUnits = ['N/A', 'Admission', 'Scholarship', 'Placemen
 
   final years = [
     'N/A',
-    'Incoming',
     '1st Year',
     '2nd Year',
     '3rd Year',
     '4th Year',
-    'Graduate',
   ];
 
   @override

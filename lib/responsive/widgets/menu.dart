@@ -1069,12 +1069,11 @@ class UniversalUIComponents {
   }
 
   return StreamBuilder<QuerySnapshot>(
-    stream:
-        FirebaseFirestore.instance
-            .collection('conversations')
-            .where('userId', isEqualTo: userId)
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
+    stream: FirebaseFirestore.instance
+        .collection('conversations')
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots(),
     builder: (context, snapshot) {
       if (snapshot.connectionState == ConnectionState.waiting) {
         return Container(
@@ -1111,15 +1110,14 @@ class UniversalUIComponents {
         );
       }
 
-      final conversations =
-          snapshot.data!.docs.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            return {
-              'id': doc.id,
-              'title': data['title'] ?? 'Untitled',
-              'createdAt': data['createdAt'],
-            };
-          }).toList();
+      final conversations = snapshot.data!.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return {
+          'id': doc.id,
+          'title': data['title'] ?? 'Untitled',
+          'createdAt': data['createdAt'],
+        };
+      }).toList();
 
       return Container(
         constraints: const BoxConstraints(maxHeight: 200),
@@ -1129,24 +1127,21 @@ class UniversalUIComponents {
           itemCount: conversations.length,
           itemBuilder: (context, index) {
             final conv = conversations[index];
-            final isSelected =
-                conv['id'] == UserConstant.selectedConversationId;
+            final isSelected = conv['id'] == UserConstant.selectedConversationId;
 
             return Container(
               margin: const EdgeInsets.symmetric(vertical: 2),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                color:
-                    isSelected
-                        ? primaryGreen.withOpacity(0.15)
-                        : Colors.transparent,
-                border:
-                    isSelected
-                        ? Border.all(
-                          color: primaryGreen.withOpacity(0.4),
-                          width: 1.5,
-                        )
-                        : null,
+                color: isSelected
+                    ? primaryGreen.withOpacity(0.15)
+                    : Colors.transparent,
+                border: isSelected
+                    ? Border.all(
+                        color: primaryGreen.withOpacity(0.4),
+                        width: 1.5,
+                      )
+                    : null,
               ),
               child: Material(
                 color: Colors.transparent,
@@ -1173,18 +1168,14 @@ class UniversalUIComponents {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color:
-                                isSelected
-                                    ? primaryGreen.withOpacity(0.2)
-                                    : Colors.grey.shade100,
+                            color: isSelected
+                                ? primaryGreen.withOpacity(0.2)
+                                : Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Icon(
                             Icons.chat_bubble_outline,
-                            color:
-                                isSelected
-                                    ? Colors.green[700]
-                                    : Colors.grey[500],
+                            color: isSelected ? Colors.green[700] : Colors.grey[500],
                             size: 14,
                           ),
                         ),
@@ -1194,14 +1185,8 @@ class UniversalUIComponents {
                             conv['title'] ?? 'Untitled',
                             style: TextStyle(
                               fontSize: 12,
-                              fontWeight:
-                                  isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                              color:
-                                  isSelected
-                                      ? Colors.green[800]
-                                      : Colors.grey[700],
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                              color: isSelected ? Colors.green[800] : Colors.grey[700],
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -1234,7 +1219,6 @@ class UniversalUIComponents {
 }
 
 
-
 static Future<void> _deleteConversation(
   BuildContext context,
   String conversationId,
@@ -1244,6 +1228,14 @@ static Future<void> _deleteConversation(
 
   final screenWidth = MediaQuery.of(context).size.width;
   final isMobile = screenWidth < 600;
+
+  // ✅ CRITICAL: Close drawer FIRST on mobile before showing dialog
+  if (isMobile && Navigator.of(context).canPop()) {
+    Navigator.of(context).pop();
+    // Wait for drawer animation to complete
+    await Future.delayed(const Duration(milliseconds: 350));
+    if (!context.mounted) return;
+  }
 
   await showGeneralDialog(
     context: context,
@@ -1332,7 +1324,6 @@ static Future<void> _deleteConversation(
                     ),
                     if (conversationTitle != null) ...[
                       const SizedBox(height: 20),
-                      // Conversation preview card
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
@@ -1382,6 +1373,7 @@ static Future<void> _deleteConversation(
   );
 }
 
+
 // Separate method to build action buttons with your style
 static Widget _buildDeleteActionButtons(
   BuildContext context,
@@ -1423,41 +1415,60 @@ static Widget _buildDeleteActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: ElevatedButton(
-          onPressed: () async {
-  try {
-    final firestore = FirebaseFirestore.instance;
-    final batch = firestore.batch();
+            onPressed: () async {
+              try {
+                // Check if this is the currently selected conversation
+                final wasSelected = UserConstant.selectedConversationId == conversationId;
 
-    final messagesSnapshot = await firestore
-        .collection('conversations')
-        .doc(conversationId)
-        .collection('messages')
-        .get();
+                // Clear selection if deleting current conversation
+                if (wasSelected) {
+                  await UserConstant.setSelectedConversation('');
+                  UserConstant.shouldShowFAQs = true;
 
-    for (final doc in messagesSnapshot.docs) {
-      batch.delete(doc.reference);
-    }
-    batch.delete(firestore.collection('conversations').doc(conversationId));
+                  // Clear chat provider messages
+                  if (context.mounted) {
+                    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+                    chatProvider.clearMessages();
+                  }
+                }
 
-    await batch.commit();
+                // Delete from Firestore
+                final firestore = FirebaseFirestore.instance;
+                final batch = firestore.batch();
 
-    if (context.mounted) {
-      SnackbarUtil.showSuccess(context, 'Conversation Deleted');
-   if (context.mounted) Navigator.of(context).pop();
-      // delay closing the dialog so snackbar attaches properly
-   
-    }
-  } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-},
+                final messagesSnapshot = await firestore
+                    .collection('conversations')
+                    .doc(conversationId)
+                    .collection('messages')
+                    .get();
+
+                for (final doc in messagesSnapshot.docs) {
+                  batch.delete(doc.reference);
+                }
+                batch.delete(firestore.collection('conversations').doc(conversationId));
+
+                await batch.commit();
+
+                if (context.mounted) {
+                  Navigator.of(context).pop(); // Close dialog
+                  
+                  // Show success snackbar
+                  SnackbarUtil.showSuccess(context, 'Conversation Deleted');
+                }
+              } catch (e) {
+                print('❌ Delete error: $e');
+                if (context.mounted) {
+                  Navigator.of(context).pop(); // Close dialog
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to delete: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
@@ -1480,7 +1491,6 @@ static Widget _buildDeleteActionButtons(
     ],
   );
 }
-
 
 
   

@@ -170,24 +170,69 @@ void showUserInfoModal(
                                 _formatRole(data['role']),
                                 Icons.admin_panel_settings_outlined,
                               ),
-                              const SizedBox(height: 16),
-                              _buildMetadataRow(
-                                'Year Level',
-                                data['year'] ?? 'Not specified',
-                                Icons.school_outlined,
-                              ),
-                              const SizedBox(height: 16),
-                              _buildMetadataRow(
-                                'Program',
-                                data['program'] ?? 'Not specified',
-                                Icons.book_outlined,
-                              ),
+                              
+                              // Show affiliation for users
+                              if (data['role']?.toString().toLowerCase() == 'user') ...[
+                                const SizedBox(height: 16),
+                                _buildMetadataRow(
+                                  'Affiliation',
+                                  data['affiliation'] ?? 'Not specified',
+                                  Icons.business_outlined,
+                                ),
+                                
+                                // Show LRN for Incoming Freshman Applicants
+                                if (data['affiliation']?.toString().toLowerCase() == 'incoming freshman applicant') ...[
+                                  const SizedBox(height: 16),
+                                  _buildMetadataRow(
+                                    'LRN',
+                                    data['lrn'] ?? 'Not specified',
+                                    Icons.numbers_outlined,
+                                  ),
+                                ],
+
+                                // Show Student ID for CMU Students
+                                if (data['affiliation']?.toString().toLowerCase() == 'cmu student') ...[
+                                  const SizedBox(height: 16),
+                                  _buildMetadataRow(
+                                    'Student ID',
+                                    data['studentId'] ?? 'Not specified',
+                                    Icons.badge_outlined,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildMetadataRow(
+                                    'Year Level',
+                                    data['year'] ?? 'Not specified',
+                                    Icons.school_outlined,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildMetadataRow(
+                                    'Program',
+                                    data['program'] ?? 'Not specified',
+                                    Icons.book_outlined,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildMetadataRow(
+                                    'Scholarship',
+                                    data['scholarship'] ?? 'Not specified',
+                                    Icons.school_outlined,
+                                  ),
+                                ],
+                              ],
+
+                              // Show service unit for staff
+                              if (data['role']?.toString().toLowerCase() == 'staff') ...[
+                                const SizedBox(height: 16),
+                                _buildMetadataRow(
+                                  'Service Unit',
+                                  data['serviceUnit'] ?? 'Not specified',
+                                  Icons.work_outline,
+                                ),
+                              ],
+
                               const SizedBox(height: 16),
                               _buildMetadataRow(
                                 'Status',
-                                data['isActive'] == true
-                                    ? 'Active'
-                                    : 'Inactive',
+                                data['isActive'] == true ? 'Active' : 'Inactive',
                                 Icons.circle_outlined,
                                 statusColor:
                                     data['isActive'] == true
@@ -255,12 +300,7 @@ Widget _buildActionButtons(
   bool isTablet,
   bool isDesktop,
 ) {
-  double buttonHeight =
-      isMobile
-          ? 40
-          : isTablet
-          ? 44
-          : 46;
+  double buttonHeight = isMobile ? 40 : isTablet ? 44 : 46;
   double fontSize = isMobile ? 14 : 15;
   double borderRadius = 10;
 
@@ -543,21 +583,19 @@ Future<void> _handleDeleteUser(
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder:
-          (context) => const Center(
-            child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-          ),
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+      ),
     );
 
     final currentUser = FirebaseAuth.instance.currentUser;
     String actorName = 'Unknown';
 
     if (currentUser != null) {
-      final currentUserDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(currentUser.uid)
-              .get();
+      final currentUserDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
       if (currentUserDoc.exists) {
         final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
         actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';

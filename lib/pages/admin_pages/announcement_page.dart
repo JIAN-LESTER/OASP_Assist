@@ -2211,7 +2211,7 @@ Widget build(BuildContext context) {
       children: [
         _buildHeader(category, createdTime, imageCount, hasOCR, ocrProcessedCount),
         if (deadline != null) _buildDeadline(deadline),
-        if (message.isNotEmpty) _buildMessage(message), // ✅ Updated with See More/Less
+        if (message.isNotEmpty) _buildMessage(message), 
         if (hasImages) _buildImageGallery(images),
         _buildActionButtons(data),
       ],
