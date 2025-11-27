@@ -6,6 +6,8 @@ import 'dart:ui' as ui;
 import 'package:capstone_project/pages/data/reports.dart';
 // import 'package:capstone_project/pages/data/reports.dart';
 
+import 'dart:ui' as ui;
+
 Widget buildStatCard(String title, String value, Color color, IconData icon) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -48,6 +50,7 @@ Widget buildStatCard(String title, String value, Color color, IconData icon) {
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   padding: EdgeInsets.all(iconPadding),
@@ -58,41 +61,13 @@ Widget buildStatCard(String title, String value, Color color, IconData icon) {
                   child: Icon(icon, color: color, size: iconSize),
                 ),
                 SizedBox(width: isMobile ? 6 : 8),
-              Expanded(
-  child: LayoutBuilder(
-    builder: (context, innerConstraints) {
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: value,
-          style: TextStyle(
-            fontSize: valueFontSize,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        textDirection: ui.TextDirection.ltr,
-        maxLines: 2,
-      )..layout(maxWidth: innerConstraints.maxWidth);
-
-      bool isTwoLines = textPainter.didExceedMaxLines;
-
-      final adjustedFontSize = isTwoLines
-          ? (valueFontSize - 2) // shrink slightly
-          : valueFontSize;
-
-      return Text(
-        value,
-        style: TextStyle(
-          fontSize: adjustedFontSize,
-          fontWeight: FontWeight.bold,
-          color: color,
-        ),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      );
-    },
-  ),
-),
+                Expanded(
+                  child: _buildAdaptiveValueText(
+                    value,
+                    valueFontSize,
+                    color,
+                  ),
+                ),
               ],
             ),
             SizedBox(height: spacing),
@@ -107,6 +82,58 @@ Widget buildStatCard(String title, String value, Color color, IconData icon) {
               overflow: TextOverflow.ellipsis,
             ),
           ],
+        ),
+      );
+    },
+  );
+}
+
+Widget _buildAdaptiveValueText(String value, double baseFontSize, Color color) {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      // Calculate if text needs 2 lines
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: value,
+          style: TextStyle(
+            fontSize: baseFontSize,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        textDirection: ui.TextDirection.ltr,
+        maxLines: 1,
+      )..layout(maxWidth: constraints.maxWidth);
+
+      final needsTwoLines = textPainter.didExceedMaxLines;
+      
+      // Calculate adjusted font size for 2-line text
+      // Reduce by 15-20% to fit better
+      final adjustedFontSize = needsTwoLines 
+          ? baseFontSize * 0.85 
+          : baseFontSize;
+      
+      // Calculate the height for consistent sizing
+      // Base height for 1 line + line height
+      final lineHeight = 1.2;
+      final singleLineHeight = baseFontSize * lineHeight;
+      final containerHeight = singleLineHeight * 2; // Always reserve space for 2 lines
+      
+      return SizedBox(
+        height: containerHeight,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: adjustedFontSize,
+              fontWeight: FontWeight.bold,
+              color: color,
+              height: lineHeight,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       );
     },

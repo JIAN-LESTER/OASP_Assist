@@ -770,7 +770,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 25),
             Expanded(
               flex: 3,
               child: Text(

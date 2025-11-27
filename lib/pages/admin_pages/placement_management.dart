@@ -14,6 +14,7 @@ import 'package:capstone_project/pages/admin_pages/widgets/empty_state.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:capstone_project/modal_pages/modal_widget/top_right_alert.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class PlacementManagementPage extends StatefulWidget {
   const PlacementManagementPage({super.key});
@@ -508,6 +509,18 @@ Widget _buildPlacementList({
                             .toList() ??
                         [];
 
+                          String deadline = '-';
+                    if (data['deadline'] != null) {
+                      if (data['deadline'] is Timestamp) {
+                        deadline = DateFormat(
+                          "MMMM d, yyyy",
+                        ).format((data['deadline'] as Timestamp).toDate());
+                      } else {
+                        deadline = data['deadline'].toString();
+                      }
+                    }
+
+
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: _buildPlacementRow(
@@ -516,6 +529,7 @@ Widget _buildPlacementList({
                         partnerCompany: data['partnerCompany'] ?? 'N/A',
                         contacts: contacts,
                         positions: positions,
+                        deadline: deadline,
                       ),
                     );
                   },
@@ -541,6 +555,7 @@ Widget _buildPlacementRow({
   required String partnerCompany,
   required List<String>? contacts,
   required List<String>? positions,
+  required String deadline,
 }) {
   return _PlacementRowWidget(
     context: context,
@@ -548,6 +563,7 @@ Widget _buildPlacementRow({
     partnerCompany: partnerCompany,
     contacts: contacts,
     positions: positions,
+    deadline: deadline,
   );
 }
 
@@ -754,7 +770,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 43),
             Expanded(
               flex: 4,
               child: Text(
@@ -771,6 +787,18 @@ Widget _buildTableHeader() {
               flex: 4,
               child: Text(
                 'Contacts',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: isTablet ? 13 : 14,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 4,
+              child: Text(
+                'Deadline',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
@@ -894,13 +922,13 @@ Widget _buildExpandableListYellow({
   );
 }
 
-
 class _PlacementRowWidget extends StatefulWidget {
   final BuildContext context;
   final DocumentSnapshot doc;
   final String partnerCompany;
   final List<String>? contacts;
   final List<String>? positions;
+  final String deadline;
 
   const _PlacementRowWidget({
     required this.context,
@@ -908,6 +936,7 @@ class _PlacementRowWidget extends StatefulWidget {
     required this.partnerCompany,
     required this.contacts,
     required this.positions,
+    required this.deadline,
   });
 
   @override
@@ -971,6 +1000,21 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
                 ),
               ),
             ],
+
+            if (!isMobile) ...[
+               Expanded(
+              flex: 4,
+              child: Text(
+                widget.deadline,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            ],
             SizedBox(width: isMobile ? 8 : (isTablet ? 16 : 20)),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_horiz, size: 20),
@@ -983,13 +1027,13 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
                             PlacementFormDialog(doc: widget.doc, isEdit: true),
                   );
                 } else if (value == 'delete') {
-              showDeleteConfirmation(
-  context,
-  doc,
-  DeleteConfigs.placements,
-  'placements',
-  customDeleteHandler: handlePlacementDelete,
-);
+                  showDeleteConfirmation(
+                    context,
+                    doc,
+                    DeleteConfigs.placements,
+                    'placements',
+                    customDeleteHandler: handlePlacementDelete,
+                  );
                 }
               },
               itemBuilder:

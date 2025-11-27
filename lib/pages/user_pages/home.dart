@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/pages/user_pages/user_main_page.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 class HomeDashboard extends StatefulWidget {
   const HomeDashboard({Key? key}) : super(key: key);
@@ -389,116 +390,124 @@ class _HomeDashboardState extends State<HomeDashboard>
     );
   }
 
-  Widget _buildChatPreviewSection() {
-    final isMobile = _isMobile(context);
 
-    if (!_messagesLoaded) {
-      return _buildChatLoadingSkeleton(isMobile);
-    }
+Widget _buildChatPreviewSection() {
+  final isMobile = _isMobile(context);
 
-    final hasConversation =
-        _cachedMessages != null && _cachedMessages!.isNotEmpty;
+  if (!_messagesLoaded) {
+    return _buildChatLoadingSkeleton(isMobile);
+  }
 
-    return GestureDetector(
-      onTap: () => _navigateToChatTab(context, hasConversation),
-      child: Container(
-        margin: EdgeInsets.symmetric(
-          horizontal: isMobile ? 16 : 20,
-          vertical: 8,
-        ),
-        padding: EdgeInsets.all(isMobile ? 16 : 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF2E7D32).withOpacity(0.15),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.smart_toy,
-                    color: const Color(0xFF2E7D32),
-                    size: isMobile ? 24 : 28,
-                  ),
+  final hasConversation =
+      _cachedMessages != null && _cachedMessages!.isNotEmpty;
+
+  return GestureDetector(
+    onTap: () => _navigateToChatTab(context, hasConversation),
+    child: Container(
+      margin: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 20,
+        vertical: 8,
+      ),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2E7D32).withOpacity(0.15),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'AI Chat Assistant',
-                        style: TextStyle(
+                child: Icon(
+                  Icons.smart_toy,
+                  color: const Color(0xFF2E7D32),
+                  size: isMobile ? 24 : 28,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ✅ UPDATED: Using MarkdownBody for bold text
+                    MarkdownBody(
+                      data: '**AI Chat Assistant**',
+                      styleSheet: MarkdownStyleSheet(
+                        p: TextStyle(
                           fontSize: isMobile ? 16 : 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
                         ),
+                        strong: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
                       ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.green,
-                              shape: BoxShape.circle,
-                            ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Online',
-                            style: TextStyle(
-                              fontSize: isMobile ? 12 : 13,
-                              color: Colors.green,
-                              fontWeight: FontWeight.w500,
-                            ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Online',
+                          style: TextStyle(
+                            fontSize: isMobile ? 12 : 13,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w500,
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Divider(height: 1),
-            const SizedBox(height: 16),
-            if (!hasConversation)
-              _buildNoMessagesYet(isMobile)
-            else
-              _buildRealChatMessages(_cachedMessages!, isMobile),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _navigateToChatTab(context, hasConversation),
-                icon: const Icon(Icons.arrow_forward, size: 18),
-                label: Text(hasConversation ? 'Continue Chat' : 'Start Chat'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF2E7D32),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 16),
+          if (!hasConversation)
+            _buildNoMessagesYet(isMobile)
+          else
+            _buildRealChatMessages(_cachedMessages!, isMobile),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _navigateToChatTab(context, hasConversation),
+              icon: const Icon(Icons.arrow_forward, size: 18),
+              label: Text(hasConversation ? 'Continue Chat' : 'Start Chat'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF2E7D32),
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildChatLoadingSkeleton(bool isMobile) {
     return Container(
@@ -1230,14 +1239,7 @@ class _HomeDashboardState extends State<HomeDashboard>
                           color: Colors.black87,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${announcements.length} new updates',
-                        style: TextStyle(
-                          fontSize: isMobile ? 12 : 13,
-                          color: Colors.black54,
-                        ),
-                      ),
+                    
                     ],
                   ),
                 ),

@@ -1071,7 +1071,7 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                 ],
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 40),
             // Eligibility/Requirements
             Expanded(
               flex: 4,
@@ -1083,7 +1083,7 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                     (value) => setState(() => eligibilityExpanded = value),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 85),
             // Benefits/Privileges
             Expanded(
               flex: 5,

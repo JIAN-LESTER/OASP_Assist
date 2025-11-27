@@ -606,89 +606,105 @@ class NotificationService {
   }
 }
 
- Future<bool> _shouldShowNotification(RemoteMessage message) async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        print('⚠️ No user logged in, ignoring notification');
+Future<bool> _shouldShowNotification(RemoteMessage message) async {
+  try {
+    print('🔍 ===== NOTIFICATION FILTER CHECK =====');
+    print('   Message data: ${message.data}');
+    
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('❌ No user logged in, blocking notification');
+      return false;
+    }
+
+    final currentUserId = user.uid;
+    print('✅ Current user: $currentUserId');
+    
+    // Get current user's role
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUserId)
+        .get();
+    
+    final currentUserRole = userDoc.data()?['role'] ?? 'user';
+    final currentUserServiceUnit = userDoc.data()?['serviceUnit'];
+    
+    print('✅ Current user role: $currentUserRole');
+    print('✅ Current user serviceUnit: $currentUserServiceUnit');
+    
+    // Extract notification metadata
+    final targetRole = message.data['targetRole'] ?? 'any';
+    final targetUserId = message.data['targetUserId'];
+    final notificationType = message.data['type'];
+    final notificationCategory = message.data['category'];
+    
+    print('📋 Notification metadata:');
+    print('   - targetRole: $targetRole');
+    print('   - targetUserId: $targetUserId');
+    print('   - type: $notificationType');
+    print('   - category: $notificationCategory');
+
+    // ✅ CASE 1: Specific user target (escalation replies)
+    if (targetUserId != null && targetUserId.isNotEmpty) {
+      final matches = targetUserId == currentUserId;
+      print('📌 Case 1: Specific user target');
+      print('   Result: ${matches ? "ALLOW" : "BLOCK"}');
+      return matches;
+    }
+
+    // ✅ CASE 2: Role-based with serviceUnit filtering for staff
+    if (targetRole != 'any') {
+      if (targetRole != currentUserRole) {
+        print('📌 Case 2: Role mismatch');
+        print('   Result: BLOCK (target: $targetRole, user: $currentUserRole)');
         return false;
       }
-
-      final currentUserId = user.uid;
       
-      // Get current user's role
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUserId)
-          .get();
-      
-      final currentUserRole = userDoc.data()?['role'] ?? 'user';
-      
-      // Extract notification metadata
-      final targetRole = message.data['targetRole'] ?? 'any';
-      final targetUserId = message.data['targetUserId'];
-      final notificationType = message.data['type'];
-      
-      print('🔍 Notification Filter Check:');
-      print('   Current User: $currentUserId');
-      print('   Current Role: $currentUserRole');
-      print('   Target Role: $targetRole');
-      print('   Target User: $targetUserId');
-      print('   Type: $notificationType');
-
-      // ✅ CASE 1: Notification has specific target user (escalation replies)
-      if (targetUserId != null && targetUserId.isNotEmpty) {
-        if (targetUserId != currentUserId) {
-          print('❌ Notification for different user ($targetUserId), ignoring');
-          return false;
-        }
-        print('✅ Notification is for this specific user');
-        return true;
-      }
-
-      // ✅ CASE 2: Notification has target role
-      if (targetRole != 'any') {
-        if (targetRole != currentUserRole) {
-          print('❌ Notification for $targetRole but user is $currentUserRole, ignoring');
-          return false;
-        }
-        print('✅ Notification matches user role');
-        return true;
-      }
-
-      // ✅ CASE 3: Notification is for everyone (announcements, deadlines)
-      if (notificationType == 'announcement' || notificationType == 'deadline_reminder') {
-        print('✅ General notification for all users');
-        return true;
-      }
-
-      // ✅ CASE 4: New escalation - only for staff and admin
-      if (notificationType == 'new_escalation') {
-        if (currentUserRole == 'staff' || currentUserRole == 'admin') {
-          print('✅ Escalation notification for staff/admin');
+      // ✅ For staff escalations, check serviceUnit match
+      if (currentUserRole == 'staff' && notificationType == 'new_escalation') {
+        if (currentUserServiceUnit == null) {
+          print('⚠️ Staff has no serviceUnit, allowing by default');
           return true;
         }
-        print('❌ Escalation notification but user is not staff/admin, ignoring');
-        return false;
-      }
-
-      // ✅ CASE 5: Escalation reply - only for the user who created it
-      if (notificationType == 'escalation_reply') {
-        // This should have targetUserId, but as fallback check role
-        if (currentUserRole == 'user') {
-          print('⚠️ Escalation reply without targetUserId (should not happen)');
-          return true; // Allow it but log warning
+        
+        // Extract serviceUnit from notification data
+        final escalationServiceUnit = message.data['serviceUnit'] ?? 
+                                      notificationCategory ?? 
+                                      'N/A';
+        
+        print('🔍 ServiceUnit check:');
+        print('   - Staff serviceUnit: $currentUserServiceUnit');
+        print('   - Escalation serviceUnit: $escalationServiceUnit');
+        
+        // Allow if serviceUnit matches or escalation is general (N/A)
+        if (escalationServiceUnit == 'N/A' || 
+            currentUserServiceUnit == escalationServiceUnit) {
+          print('   Result: ALLOW (serviceUnit match)');
+          return true;
         }
-        print('❌ Escalation reply but user is not a regular user, ignoring');
+        
+        print('   Result: BLOCK (serviceUnit mismatch)');
         return false;
       }
-
-      // Default: show notification (shouldn't reach here)
-      print('⚠️ Unknown notification type, showing by default');
-      return true;
       
-    } catch (e) {
-      print('❌ Error checking notification filter: $e');
-      return false; // Fail closed - don't show if error
+      print('📌 Case 2: Role match');
+      print('   Result: ALLOW');
+      return true;
     }
+
+    // ✅ CASE 3: General notifications (announcements, deadlines)
+    if (notificationType == 'announcement' || notificationType == 'deadline_reminder') {
+      print('📌 Case 3: General notification');
+      print('   Result: ALLOW');
+      return true;
+    }
+
+    // Default: block unknown types
+    print('⚠️ Unknown notification type, blocking by default');
+    return false;
+    
+  } catch (e) {
+    print('❌ Error in notification filter: $e');
+    return false; // Fail closed
   }
+}

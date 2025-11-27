@@ -7,26 +7,6 @@ import * as admin from "firebase-admin";
 
 const db = admin.firestore();
 
-async function getUsersByRole(role: string): Promise<string[]> {
-  try {
-    console.log(`👥 Fetching users with role: ${role}`);
-    
-    const usersSnapshot = await db
-      .collection("users")
-      .where("role", "==", role)
-      .where("isActive", "==", true)
-      .get();
-
-    const userIds = usersSnapshot.docs.map((doc) => doc.id);
-    console.log(`✅ Found ${userIds.length} active ${role} users`);
-    
-    return userIds;
-  } catch (error) {
-    console.error(`❌ Error fetching ${role} users:`, error);
-    return [];
-  }
-}
-
 // ✅ Get FCM tokens grouped by userId
 async function getUserFCMTokens(
   userIds: string[]
@@ -95,21 +75,28 @@ async function sendFCMNotifications(
   body: string,
   data: { [key: string]: string },
   targetRole?: string,
-  targetUserId?: string // ✅ NEW: For escalation replies
+  targetUserId?: string
 ): Promise<void> {
   try {
-    console.log(`📤 sendFCMNotifications called with:`);
-    console.log(`   Users: ${userIds.join(', ')}`);
+    console.log(`📤 ===== sendFCMNotifications CALLED =====`);
+    console.log(`   Users: [${userIds.join(', ')}]`);
     console.log(`   Target Role: ${targetRole || 'any'}`);
     console.log(`   Target User: ${targetUserId || 'none'}`);
     console.log(`   Type: ${data.type}`);
+    console.log(`   Title: ${title}`);
     
     const userTokensMap = await getUserFCMTokens(userIds);
 
     if (userTokensMap.size === 0) {
-      console.log("ℹ️ No mobile FCM tokens found");
+      console.log("⚠️ No mobile FCM tokens found for any user");
+      console.log(`   Searched for users: [${userIds.join(', ')}]`);
       return;
     }
+
+    console.log(`✅ Found tokens for ${userTokensMap.size} users`);
+    userTokensMap.forEach((tokens, userId) => {
+      console.log(`   User ${userId}: ${tokens.length} tokens`);
+    });
 
     const allTokens: string[] = [];
     const seenTokens = new Set<string>();
@@ -1031,6 +1018,17 @@ export const onEscalationCreated = onDocumentCreated(
       const userId = escalationData.userId;
       const conversationId = escalationData.conversationId || null;
 
+
+      // ✅ Get category from escalation document
+      let category: string | null = escalationData.category || null;
+      
+      console.log(`📂 Raw category from escalation: ${category}`);
+
+      // ✅ CRITICAL FIX: Normalize category to match serviceUnit values
+      const normalizedCategory = category ? normalizeCategory(category) : null;
+      
+      console.log(`📂 Normalized category: ${normalizedCategory}`);
+
       let userName = "A user";
       if (userId) {
         try {
@@ -1050,29 +1048,75 @@ export const onEscalationCreated = onDocumentCreated(
         80
       )}${question.length > 80 ? "..." : ""}`;
 
-      // ✅ FIXED: Get staff and admin users separately
-      const staffIds = await getUsersByRole("staff");
-      const adminIds = await getUsersByRole("admin");
+      let staffIds: string[] = [];
+      let adminIds: string[] = [];
 
-      if (staffIds.length === 0) {
-        console.log("⚠️ No staff members found");
-        await idempotencyRef.update({ 
-          status: "completed",
-          reason: "no_staff",
-          completedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
+      console.log(`📊 Routing escalation:`);
+      console.log(`   - Raw category: ${category}`);
+      console.log(`   - Normalized category: ${normalizedCategory}`);
+
+      // ✅ CRITICAL FIX: Filter staff by serviceUnit for specific categories
+      if (normalizedCategory && ['Admission', 'Scholarship', 'Placement'].includes(normalizedCategory)) {
+        console.log(`🔍 Looking for staff with serviceUnit: ${normalizedCategory}`);
+        
+        // Query staff with matching serviceUnit
+        const staffSnapshot = await db
+          .collection("users")
+          .where("role", "==", "staff")
+          .where("isActive", "==", true)
+          .where("serviceUnit", "==", normalizedCategory)
+          .get();
+        
+        staffIds = staffSnapshot.docs.map(doc => doc.id);
+        
+        console.log(`📊 Found ${staffIds.length} staff with serviceUnit: ${normalizedCategory}`);
+        console.log(`📊 Staff IDs: ${staffIds.join(', ')}`);
+        
+        // ✅ Log each staff's details for debugging
+        for (const doc of staffSnapshot.docs) {
+          const data = doc.data();
+          console.log(`   - ${doc.id}: ${data.name} (serviceUnit: ${data.serviceUnit})`);
+        }
+        
+        if (staffIds.length === 0) {
+          console.log(`⚠️ No staff found for ${normalizedCategory}, falling back to all staff`);
+          const allStaffSnapshot = await db
+            .collection("users")
+            .where("role", "==", "staff")
+            .where("isActive", "==", true)
+            .get();
+          staffIds = allStaffSnapshot.docs.map(doc => doc.id);
+          console.log(`📊 Fallback: Found ${staffIds.length} total staff`);
+        }
+      } else {
+        // If category is General/N/A or not set, send to all staff
+        const allStaffSnapshot = await db
+          .collection("users")
+          .where("role", "==", "staff")
+          .where("isActive", "==", true)
+          .get();
+        staffIds = allStaffSnapshot.docs.map(doc => doc.id);
+        console.log(`📊 All staff (no category filter): ${staffIds.length}`);
       }
 
-      if (adminIds.length === 0) {
-        console.log("⚠️ No admin found");
-        await idempotencyRef.update({ 
-          status: "completed",
-          reason: "no_admin",
-          completedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      }
+      // ✅ Admins ALWAYS get all escalations
+      const adminSnapshot = await db
+        .collection("users")
+        .where("role", "==", "admin")
+        .where("isActive", "==", true)
+        .get();
+      adminIds = adminSnapshot.docs.map(doc => doc.id);
+      console.log(`📊 All admins: ${adminIds.length}`);
 
       if (staffIds.length === 0 && adminIds.length === 0) {
+        console.log("⚠️ No staff or admin found");
+        await idempotencyRef.update({ 
+          status: "completed",
+          reason: "no_recipients",
+          category: category,
+          normalizedCategory: normalizedCategory,
+          completedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
         return;
       }
 
@@ -1081,6 +1125,8 @@ export const onEscalationCreated = onDocumentCreated(
 
       // Create notifications for staff
       if (staffIds.length > 0) {
+        console.log(`📤 Creating notifications for ${staffIds.length} staff members`);
+        
         staffNotifications = await createNotificationsForUsers(
           staffIds,
           "staff",
@@ -1093,10 +1139,15 @@ export const onEscalationCreated = onDocumentCreated(
             userId: userId,
             conversationId: conversationId,
             eventId: event.id,
+            category: category || 'General',
+            serviceUnit: normalizedCategory || 'N/A',
           }
         );
 
+        console.log(`✅ Created ${staffNotifications} staff notifications`);
+
         if (staffNotifications > 0) {
+          console.log(`📱 Sending FCM to ${staffIds.length} staff members`);
           await sendFCMNotifications(
             staffIds,
             notificationTitle,
@@ -1105,14 +1156,18 @@ export const onEscalationCreated = onDocumentCreated(
               type: "new_escalation",
               escalationId: escalationId,
               conversationId: conversationId || "",
+              category: category || 'General',
             },
-            "staff"
+            "staff" // ✅ Target role
           );
+          console.log(`✅ FCM sent to staff`);
         }
       }
 
       // Create notifications for admins
       if (adminIds.length > 0) {
+        console.log(`📤 Creating notifications for ${adminIds.length} admins`);
+        
         adminNotifications = await createNotificationsForUsers(
           adminIds,
           "admin",
@@ -1125,10 +1180,15 @@ export const onEscalationCreated = onDocumentCreated(
             userId: userId,
             conversationId: conversationId,
             eventId: event.id,
+            category: category || 'General',
+            serviceUnit: normalizedCategory || 'N/A',
           }
         );
 
+        console.log(`✅ Created ${adminNotifications} admin notifications`);
+
         if (adminNotifications > 0) {
+          console.log(`📱 Sending FCM to ${adminIds.length} admins`);
           await sendFCMNotifications(
             adminIds,
             notificationTitle,
@@ -1137,26 +1197,41 @@ export const onEscalationCreated = onDocumentCreated(
               type: "new_escalation",
               escalationId: escalationId,
               conversationId: conversationId || "",
+              category: category || 'General',
             },
-            "admin"
+            "admin" // ✅ Target role
           );
+          console.log(`✅ FCM sent to admins`);
         }
       }
 
-      console.log(
-        `✅ Notifications sent with escalationId: ${escalationId}, conversationId: ${conversationId}`
-      );
-      console.log(`✅ Created ${staffNotifications} staff + ${adminNotifications} admin notifications`);
+      console.log(`✅ Total notifications: ${staffNotifications + adminNotifications}`);
+      console.log(`   - Staff: ${staffNotifications}`);
+      console.log(`   - Admin: ${adminNotifications}`);
       
       await idempotencyRef.update({ 
         status: "completed",
         notificationsCreated: staffNotifications + adminNotifications,
+        staffNotifications: staffNotifications,
+        adminNotifications: adminNotifications,
+        category: category,
+        normalizedCategory: normalizedCategory,
+        staffIds: staffIds,
+        adminIds: adminIds,
         completedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       
-      return { success: true, staffNotifications, adminNotifications };
+      return { 
+        success: true, 
+        staffNotifications, 
+        adminNotifications,
+        category: category,
+        normalizedCategory: normalizedCategory,
+        staffCount: staffIds.length,
+        adminCount: adminIds.length
+      };
     } catch (error) {
-      console.error("Error creating escalation notification:", error);
+      console.error("❌ Error creating escalation notification:", error);
       
       try {
         const idempotencyRef = db.collection("notification_processing")
@@ -1174,6 +1249,7 @@ export const onEscalationCreated = onDocumentCreated(
     }
   }
 );
+
 
 export const onEscalationReplied = onDocumentUpdated(
   {
@@ -1347,3 +1423,69 @@ export const onEscalationReplied = onDocumentUpdated(
     }
   }
 );
+
+// async function getUsersByRoleAndCategory(
+//   role: string,
+//   category?: string
+// ): Promise<string[]> {
+//   try {
+//     console.log(`👥 Fetching ${role} users${category ? ` with category: ${category}` : ''}`);
+    
+//     let query = db
+//       .collection("users")
+//       .where("role", "==", role)
+//       .where("isActive", "==", true);
+
+//     // ✅ For staff, filter by serviceUnit matching the category
+//     if (role === "staff" && category) {
+//       // Normalize category to match serviceUnit field
+//       const serviceUnit = normalizeCategory(category);
+//       query = query.where("serviceUnit", "==", serviceUnit);
+//       console.log(`🔍 Filtering staff by serviceUnit: ${serviceUnit}`);
+//     }
+
+//     const usersSnapshot = await query.get();
+//     const userIds = usersSnapshot.docs.map((doc) => doc.id);
+    
+//     console.log(`✅ Found ${userIds.length} active ${role} users${category ? ` in ${category}` : ''}`);
+    
+//     return userIds;
+//   } catch (error) {
+//     console.error(`❌ Error fetching ${role} users:`, error);
+//     return [];
+//   }
+// } 
+
+
+function normalizeCategory(category: string): string {
+  const normalized = category.toLowerCase().trim();
+  
+  // Map variations to exact serviceUnit values
+  const categoryMap: { [key: string]: string } = {
+    'admission': 'Admission',
+    'admissions': 'Admission',
+    'enrollment': 'Admission',
+    'scholarship': 'Scholarship',
+    'scholarships': 'Scholarship',
+    'financial aid': 'Scholarship',
+    'placement': 'Placement',
+    'placements': 'Placement',
+    'job placement': 'Placement',
+    'career': 'Placement',
+    'careers': 'Placement',
+    'general': 'N/A',
+    'n/a': 'N/A',
+  };
+  
+  const mapped = categoryMap[normalized];
+  
+  if (mapped) {
+    console.log(`🔄 Mapped "${category}" → "${mapped}"`);
+    return mapped;
+  }
+  
+  // If not in map, capitalize first letter (for exact matches like "Admission")
+  const capitalized = category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
+  console.log(`🔄 Capitalized "${category}" → "${capitalized}"`);
+  return capitalized;
+}

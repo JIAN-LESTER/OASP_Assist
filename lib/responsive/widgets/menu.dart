@@ -208,7 +208,7 @@ class UniversalUIComponents {
                           onConversationSelected, // Pass it down
                     ),
                   ),
-                  if (menuConfig.showLogoutButton) _buildLogoutSection(context),
+                 
                 ],
               ),
         ),
@@ -1483,38 +1483,7 @@ static Widget _buildDeleteActionButtons(
 
 
 
-  static Widget _buildLogoutSection(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: Colors.grey[300]!, width: 1)),
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: () async {
-            Navigator.pop(context);
-            await showLogoutDialog(context);
-          },
-          icon: const Icon(Icons.logout_rounded, size: 18),
-          label: const Text(
-            'Logout',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFDC2626),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
+  
   static List<Widget> _buildPersistentMenuItems(
     BuildContext context,
     UserRole userRole,

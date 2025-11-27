@@ -591,7 +591,6 @@ Widget _buildUserRow({
   required String year,
   required String program,
   required String status,
-
   required Function(int)? onNavigateToPage,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
@@ -609,6 +608,7 @@ Widget _buildUserRow({
       onTap: () => showUserInfoModal(context, doc),
       child: Row(
         children: [
+          // Icon - matches header spacing
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -621,7 +621,9 @@ Widget _buildUserRow({
               color: Colors.grey[700],
             ),
           ),
-          const SizedBox(width: 2),
+          const SizedBox(width: 12),
+          
+          // User (Name & Email) - flex: 3
           Expanded(
             flex: 3,
             child: Column(
@@ -633,102 +635,83 @@ Widget _buildUserRow({
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (!isMobile && email.isNotEmpty)
                   Text(
                     email,
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
               ],
             ),
           ),
-          if (!isMobile)
-            Expanded(
-              flex: 3,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
+          
+          // Role - flex: 3
+          Expanded(
+            flex: 3,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 8 : 10,
+                  vertical: isMobile ? 4 : 6,
+                ),
+                decoration: BoxDecoration(
+                  color: role == 'OASP Admin'
+                      ? Colors.red[700]
+                      : role == 'OASP Staff'
+                          ? Colors.orange[700]
+                          : Colors.blue[700],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  role,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: role == 'OASP Admin'
+                        ? Colors.red[50]
+                        : role == 'OASP Staff'
+                            ? Colors.orange[50]
+                            : Colors.blue[50],
+                    fontWeight: FontWeight.w500,
                   ),
-                  decoration: BoxDecoration(
-                    color:
-                        role == 'OASP Admin'
-                            ? Colors.red[700]
-                            : role == 'OASP Staff'
-                            ? Colors.orange[700]
-                            : Colors.blue[700],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    role,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color:
-                          role == 'OASP Admin'
-                              ? Colors.red[50]
-                              : role == 'OASP Staff'
-                              ? Colors.orange[50]
-                              : Colors.blue[50],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
-          if (isMobile)
+          ),
+          
+          // Year - flex: 3 (desktop only)
+          if (!isMobile)...[
+
             Expanded(
               flex: 3,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color:
-                        role == 'OASP Admin'
-                            ? Colors.red[700]
-                            : role == 'OASP Staff'
-                            ? Colors.orange[700]
-                            : Colors.blue[700],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    role,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color:
-                          role == 'OASP Admin'
-                              ? Colors.red[50]
-                              : role == 'OASP Staff'
-                              ? Colors.orange[50]
-                              : Colors.blue[50],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
+              child: Text(
+                year,
+                style: const TextStyle(fontSize: 13),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-          if (!isMobile)
-            Expanded(
-              flex: 3,
-              child: Text(year, style: const TextStyle(fontSize: 13)),
-            ),
-          if (!isMobile)
-            Expanded(
+
+              Expanded(
               flex: 4,
               child: Text(
                 program,
                 style: const TextStyle(fontSize: 13),
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+     
+          
+          ],
+  
+          // Status - flex: 2
           Expanded(
             flex: 2,
             child: Align(
@@ -736,25 +719,29 @@ Widget _buildUserRow({
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color:
-                      status == 'Active' ? Colors.green[50] : Colors.orange[50],
+                  color: status == 'Active' ? Colors.green[50] : Colors.orange[50],
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   status,
                   style: TextStyle(
                     fontSize: 12,
-                    color:
-                        status == 'Active'
-                            ? Colors.green[700]
-                            : Colors.orange[700],
+                    color: status == 'Active'
+                        ? Colors.green[700]
+                        : Colors.orange[700],
                     fontWeight: FontWeight.w500,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
           ),
-          SizedBox(width: isTablet ? 60 : 5),
+          
+          // Menu button spacing
+          SizedBox(width: isTablet ? 60 : 60),
+          
+          // Popup menu
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {
@@ -774,35 +761,35 @@ Widget _buildUserRow({
                 );
               }
             },
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, size: 18),
+                    SizedBox(width: 8),
+                    Text('Edit'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, size: 18, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Delete', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
     ),
   );
 }
+
 
 Widget _buildHeader(
   String selectedRole,
@@ -913,6 +900,7 @@ Widget _buildHeader(
   );
 }
 
+
 Widget _buildTableHeader() {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -942,7 +930,7 @@ Widget _buildTableHeader() {
                 ),
               ),
               Expanded(
-                flex: 2,
+                flex: 3,
                 child: Text(
                   'Role',
                   style: TextStyle(
@@ -980,9 +968,9 @@ Widget _buildTableHeader() {
         ),
         child: Row(
           children: [
-            const SizedBox(width: 8),
+            const SizedBox(width: 40), // Icon space
             Expanded(
-              flex: 4,
+              flex: 3,
               child: Text(
                 'User',
                 style: TextStyle(
@@ -1003,32 +991,30 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            if (!isMobile)
-              Expanded(
-                flex: 3,
-                child: Text(
-                  'Year',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: isTablet ? 13 : 14,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-            if (!isMobile)
-              Expanded(
-                flex: 3,
-                child: Text(
-                  'Program',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: isTablet ? 13 : 14,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
             Expanded(
               flex: 3,
+              child: Text(
+                'Year',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: isTablet ? 13 : 14,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 4,
+              child: Text(
+                'Program',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: isTablet ? 13 : 14,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
               child: Text(
                 'Status',
                 style: TextStyle(
@@ -1038,6 +1024,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
+            SizedBox(width: isTablet ? 60 : 80), // Menu button space
           ],
         ),
       );

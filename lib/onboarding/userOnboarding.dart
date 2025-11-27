@@ -79,7 +79,6 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     'Parent',
     'Faculty',
     'CMU Staff',
-    'Employer',
     'Alumni',
   ];
 

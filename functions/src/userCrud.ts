@@ -1,4 +1,3 @@
-
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import {onDocumentDeleted} from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
@@ -32,12 +31,11 @@ async function isAdmin(uid: string): Promise<boolean> {
   }
 }
 
-
 export const createUser = onCall(
   {
     region: 'us-central1', 
     cors: true, 
-    invoker: 'private', // ✅ Only authenticated users can call
+    invoker: 'private',
     timeoutSeconds: 60,
     memory: '256MiB',
   },
@@ -49,7 +47,6 @@ export const createUser = onCall(
     console.log("========================================");
 
     try {
-      // Your existing code...
       if (!request.auth) {
         throw new HttpsError(
           "unauthenticated",
@@ -67,11 +64,19 @@ export const createUser = onCall(
         );
       }
 
-      const email = request.data.email as string;
-      const password = request.data.password as string;
-      const displayName = request.data.displayName as string | undefined;
-      const affiliation = request.data.affiliation as string | undefined;
-      const scholarship = request.data.scholarship as string | undefined;
+      const {
+        email,
+        password,
+        displayName,
+        role,
+        affiliation,
+        studentId,
+        year,
+        program,
+        scholarship,
+        lrn,
+        serviceUnit,
+      } = request.data;
 
       if (!email || !password) {
         throw new HttpsError(
@@ -80,6 +85,7 @@ export const createUser = onCall(
         );
       }
 
+      // Create user in Firebase Authentication
       const userRecord = await admin.auth().createUser({
         email: email,
         password: password,
@@ -87,14 +93,13 @@ export const createUser = onCall(
         emailVerified: true,
       });
 
-      await db.collection("users").doc(userRecord.uid).set({
+      // Prepare Firestore data based on role
+      const firestoreData: any = {
         uid: userRecord.uid,
         email: email,
         displayName: displayName || "",
         name: displayName || email.split("@")[0],
-        role: "user",
-        affiliation: affiliation || "",
-        scholarship: scholarship || "",
+        role: role || "user",
         profileComplete: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -107,11 +112,31 @@ export const createUser = onCall(
         onBoardingCompleted: false,
         verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
         verificationEmailSent: false,
-      });
+      };
 
+      // Add role-specific fields
+      if (role === "user") {
+        firestoreData.affiliation = affiliation || "";
+
+        if (affiliation === "CMU Student") {
+          firestoreData.studentId = studentId || "";
+          firestoreData.year = year || "";
+          firestoreData.program = program || "";
+          firestoreData.scholarship = scholarship || "";
+        } else if (affiliation === "Incoming Freshman Applicant") {
+          firestoreData.lrn = lrn || "";
+        }
+      } else if (role === "staff") {
+        firestoreData.serviceUnit = serviceUnit || "";
+      }
+
+      // Save to Firestore
+      await db.collection("users").doc(userRecord.uid).set(firestoreData);
+
+      // Create log entry
       await db.collection("logs").add({
         user: displayName || email,
-        action: "Admin created user account (auto-verified, no email sent)",
+        action: `Admin created ${role || 'user'} account (auto-verified, no email sent)`,
         time: admin.firestore.FieldValue.serverTimestamp(),
         userId: userRecord.uid,
         createdBy: callerUid,
@@ -147,6 +172,158 @@ export const createUser = onCall(
   }
 );
 
+export const updateUser = onCall(
+  {
+    region: 'us-central1',
+    cors: true,
+    invoker: 'private',
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  async (request) => {
+    console.log("🔥 updateUser function called");
+    console.log("📊 Update data:", JSON.stringify(request.data, null, 2));
+    
+    try {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "You must be logged in.");
+      }
+
+      const callerUid = request.auth.uid;
+      const callerIsAdmin = await isAdmin(callerUid);
+      
+      if (!callerIsAdmin) {
+        throw new HttpsError("permission-denied", "Only admins can update users.");
+      }
+
+      const {
+        uid,
+        email,
+        password,
+        displayName,
+        role,
+        affiliation,
+        studentId,
+        year,
+        program,
+        scholarship,
+        lrn,
+        serviceUnit,
+        isActive,
+      } = request.data;
+
+      if (!uid) {
+        throw new HttpsError("invalid-argument", "User ID (uid) is required.");
+      }
+
+      // Update Firebase Authentication
+      const authUpdateData: admin.auth.UpdateRequest = {};
+      if (email) {
+        authUpdateData.email = email;
+        authUpdateData.emailVerified = true;
+      }
+      if (password) authUpdateData.password = password;
+      if (displayName) authUpdateData.displayName = displayName;
+
+      if (Object.keys(authUpdateData).length > 0) {
+        await admin.auth().updateUser(uid, authUpdateData);
+      }
+
+      // Prepare Firestore update based on role
+      const firestoreUpdate: any = {
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      if (displayName !== undefined) {
+        firestoreUpdate.name = displayName;
+        firestoreUpdate.displayName = displayName;
+      }
+      if (email !== undefined) firestoreUpdate.email = email;
+      if (role !== undefined) firestoreUpdate.role = role;
+      if (isActive !== undefined) firestoreUpdate.isActive = isActive;
+
+      // Handle role-specific fields
+      if (role === "user") {
+        firestoreUpdate.affiliation = affiliation || "";
+
+        if (affiliation === "CMU Student") {
+          if (studentId !== undefined) firestoreUpdate.studentId = studentId;
+          if (year !== undefined) firestoreUpdate.year = year;
+          if (program !== undefined) firestoreUpdate.program = program;
+          if (scholarship !== undefined) firestoreUpdate.scholarship = scholarship;
+          
+          // Remove fields that don't belong
+          firestoreUpdate.lrn = admin.firestore.FieldValue.delete();
+          firestoreUpdate.serviceUnit = admin.firestore.FieldValue.delete();
+        } else if (affiliation === "Incoming Freshman Applicant") {
+          if (lrn !== undefined) firestoreUpdate.lrn = lrn;
+          
+          // Remove fields that don't belong
+          firestoreUpdate.studentId = admin.firestore.FieldValue.delete();
+          firestoreUpdate.year = admin.firestore.FieldValue.delete();
+          firestoreUpdate.program = admin.firestore.FieldValue.delete();
+          firestoreUpdate.scholarship = admin.firestore.FieldValue.delete();
+          firestoreUpdate.serviceUnit = admin.firestore.FieldValue.delete();
+        } else {
+          // Other affiliations - remove all specific fields
+          firestoreUpdate.studentId = admin.firestore.FieldValue.delete();
+          firestoreUpdate.year = admin.firestore.FieldValue.delete();
+          firestoreUpdate.program = admin.firestore.FieldValue.delete();
+          firestoreUpdate.scholarship = admin.firestore.FieldValue.delete();
+          firestoreUpdate.lrn = admin.firestore.FieldValue.delete();
+          firestoreUpdate.serviceUnit = admin.firestore.FieldValue.delete();
+        }
+      } else if (role === "staff") {
+        if (serviceUnit !== undefined) firestoreUpdate.serviceUnit = serviceUnit;
+        
+        // Remove user-specific fields
+        firestoreUpdate.affiliation = admin.firestore.FieldValue.delete();
+        firestoreUpdate.studentId = admin.firestore.FieldValue.delete();
+        firestoreUpdate.year = admin.firestore.FieldValue.delete();
+        firestoreUpdate.program = admin.firestore.FieldValue.delete();
+        firestoreUpdate.scholarship = admin.firestore.FieldValue.delete();
+        firestoreUpdate.lrn = admin.firestore.FieldValue.delete();
+      } else if (role === "admin") {
+        // Remove all role-specific fields for admin
+        firestoreUpdate.affiliation = admin.firestore.FieldValue.delete();
+        firestoreUpdate.studentId = admin.firestore.FieldValue.delete();
+        firestoreUpdate.year = admin.firestore.FieldValue.delete();
+        firestoreUpdate.program = admin.firestore.FieldValue.delete();
+        firestoreUpdate.scholarship = admin.firestore.FieldValue.delete();
+        firestoreUpdate.lrn = admin.firestore.FieldValue.delete();
+        firestoreUpdate.serviceUnit = admin.firestore.FieldValue.delete();
+      }
+
+      // Update Firestore
+      await db.collection("users").doc(uid).update(firestoreUpdate);
+
+      // Create log entry
+      await db.collection("logs").add({
+        user: displayName || email || "Unknown",
+        action: `Admin updated ${role || 'user'} account`,
+        time: admin.firestore.FieldValue.serverTimestamp(),
+        userId: uid,
+        updatedBy: callerUid,
+      });
+
+      console.log("✅ User updated successfully:", uid);
+      
+      return {
+        success: true,
+        message: `User ${uid} updated successfully.`,
+      };
+    } catch (error: any) {
+      console.error("❌ Error updating user:", error);
+      
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      
+      throw new HttpsError("internal", error.message || "Failed to update user");
+    }
+  }
+);
+
 export const deleteUser = onCall(
   {
     region: 'us-central1',
@@ -177,24 +354,18 @@ export const deleteUser = onCall(
 
       console.log(`🗑️ Starting cascade delete for user: ${uid}`);
 
-      // ========================================
-      // Step 1: Get user document to retrieve the actual user ID
-      // ========================================
+      // Get user document
       const userDoc = await db.collection('users').doc(uid).get();
       if (!userDoc.exists) {
         console.warn(`⚠️ User document not found: ${uid}`);
       }
 
-      // ========================================
-      // Step 2: Delete conversations and messages
-      // Try both 'userID' and 'userId' to handle any inconsistencies
-      // ========================================
+      // Delete conversations and messages
       let conversationsSnapshot = await db
         .collection('conversations')
         .where('userID', '==', uid)
         .get();
 
-      // If no results with 'userID', try 'userId'
       if (conversationsSnapshot.empty) {
         conversationsSnapshot = await db
           .collection('conversations')
@@ -210,22 +381,17 @@ export const deleteUser = onCall(
           await db.recursiveDelete(doc.ref);
         } catch (deleteError) {
           console.error(`❌ Failed to delete conversation ${doc.id}:`, deleteError);
-          // Continue with other deletions
         }
       }
 
       console.log(`✅ Deleted all conversations & messages for ${uid}`);
 
-      // ========================================
-      // Step 3: Delete escalations
-      // Try both 'userID' and 'userId' to handle any inconsistencies
-      // ========================================
+      // Delete escalations
       let escSnapshot = await db
         .collection('escalations')
         .where('userID', '==', uid)
         .get();
 
-      // If no results with 'userID', try 'userId'
       if (escSnapshot.empty) {
         escSnapshot = await db
           .collection('escalations')
@@ -242,20 +408,15 @@ export const deleteUser = onCall(
         console.log(`ℹ️ No escalations found for ${uid}`);
       }
 
-      // ========================================
-      // Step 4: Delete Firebase Authentication user
-      // ========================================
+      // Delete Firebase Authentication user
       try {
         await admin.auth().deleteUser(uid);
         console.log(`✅ Auth user deleted: ${uid}`);
       } catch (authError: any) {
         console.warn(`⚠️ Could not delete auth user: ${authError.message}`);
-        // Continue even if auth deletion fails
       }
 
-      // ========================================
-      // Step 5: Delete user document from Firestore
-      // ========================================
+      // Delete user document from Firestore
       try {
         await db.collection("users").doc(uid).delete();
         console.log(`✅ User document deleted: ${uid}`);
@@ -263,9 +424,7 @@ export const deleteUser = onCall(
         console.warn("⚠️ Could not delete user from Firestore:", firestoreError);
       }
 
-      // ========================================
-      // Step 6: Create log entry
-      // ========================================
+      // Create log entry
       await db.collection('logs').add({
         action: 'Admin deleted user account (cascade)',
         userId: uid,
@@ -291,65 +450,6 @@ export const deleteUser = onCall(
       }
       
       throw new HttpsError("internal", error.message || "Failed to delete user");
-    }
-  }
-);
-
-
-export const updateUser = onCall(
-  {
-    region: 'us-central1',
-    cors: true,
-    invoker: 'private',
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  async (request) => {
-    console.log("🔥 updateUser function called");
-    
-    try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "You must be logged in.");
-      }
-
-      const callerUid = request.auth.uid;
-      const callerIsAdmin = await isAdmin(callerUid);
-      
-      if (!callerIsAdmin) {
-        throw new HttpsError("permission-denied", "Only admins can update users.");
-      }
-
-      const uid = request.data.uid as string;
-      const email = request.data.email as string | undefined;
-      const password = request.data.password as string | undefined;
-      const displayName = request.data.displayName as string | undefined;
-
-      if (!uid) {
-        throw new HttpsError("invalid-argument", "User ID (uid) is required.");
-      }
-
-      const updateData: admin.auth.UpdateRequest = {};
-      if (email) {
-        updateData.email = email;
-        updateData.emailVerified = true;
-      }
-      if (password) updateData.password = password;
-      if (displayName) updateData.displayName = displayName;
-
-      await admin.auth().updateUser(uid, updateData);
-      
-      return {
-        success: true,
-        message: `User ${uid} updated successfully.`,
-      };
-    } catch (error: any) {
-      console.error("❌ Error updating user:", error);
-      
-      if (error instanceof HttpsError) {
-        throw error;
-      }
-      
-      throw new HttpsError("internal", error.message || "Failed to update user");
     }
   }
 );
@@ -426,7 +526,7 @@ export const onUserDelete = onDocumentDeleted(
         console.log(`⚠️ [TRIGGER] Auth user not found or already deleted: ${userId}`);
       }
 
-      // Delete conversations - try both field names
+      // Delete conversations
       let conversationsSnapshot = await db
         .collection('conversations')
         .where('userID', '==', userId)
@@ -448,7 +548,7 @@ export const onUserDelete = onDocumentDeleted(
 
       console.log(`✅ [TRIGGER] Deleted all conversations & messages for ${userId}`);
 
-      // Delete escalations - try both field names
+      // Delete escalations
       let escSnapshot = await db
         .collection('escalations')
         .where('userID', '==', userId)

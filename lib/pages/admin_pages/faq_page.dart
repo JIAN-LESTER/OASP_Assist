@@ -572,7 +572,7 @@ Widget _buildTableHeader() {
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           decoration: BoxDecoration(
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(6),
@@ -590,6 +590,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
+              SizedBox(width: 12),
               Expanded(
                 flex: 3,
                 child: Text(
@@ -601,7 +602,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 40),
+              SizedBox(width: 60), // Space for popup menu
             ],
           ),
         );
@@ -610,7 +611,7 @@ Widget _buildTableHeader() {
       return Container(
         padding: EdgeInsets.symmetric(
           vertical: isTablet ? 14 : 16,
-          horizontal: isTablet ? 12 : 16,
+          horizontal: 12,
         ),
         decoration: BoxDecoration(
           color: Colors.grey[50],
@@ -618,7 +619,6 @@ Widget _buildTableHeader() {
         ),
         child: Row(
           children: [
-            const SizedBox(width: 8),
             Expanded(
               flex: 4,
               child: Text(
@@ -630,6 +630,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
+            const SizedBox(width: 12),
             Expanded(
               flex: 3,
               child: Text(
@@ -641,6 +642,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
+            const SizedBox(width: 40),
             Expanded(
               flex: 3,
               child: Text(
@@ -652,6 +654,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
+            const SizedBox(width: 60), 
           ],
         ),
       );
@@ -659,29 +662,6 @@ Widget _buildTableHeader() {
   );
 }
 
-void _showTopRightAlert(BuildContext context, String message, AlertType type) {
-  if (!context.mounted) return;
-  final overlay = Overlay.of(context);
-  late OverlayEntry overlayEntry;
-  final screenWidth = MediaQuery.of(context).size.width;
-  final isMobile = screenWidth < 600;
-  final isTablet = screenWidth >= 600 && screenWidth < 1024;
-
-  overlayEntry = OverlayEntry(
-    builder:
-        (context) => TopRightAlert(
-          message: message,
-          type: type,
-          onDismiss: () => overlayEntry.remove(),
-          isMobile: isMobile,
-          isTablet: isTablet,
-        ),
-  );
-  overlay.insert(overlayEntry);
-  Future.delayed(const Duration(seconds: 4), () {
-    if (overlayEntry.mounted) overlayEntry.remove();
-  });
-}
 
 Widget _buildFAQList({
   required BuildContext context,
@@ -800,7 +780,6 @@ Widget _buildFAQRow({
               textAlign: TextAlign.left,
             ),
           ),
-          const SizedBox(width: 12),
           Expanded(
             flex: 3,
             child: Text(
@@ -812,7 +791,7 @@ Widget _buildFAQRow({
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 40),
           if (!isMobile)
             Expanded(
               flex: 3,
@@ -838,44 +817,46 @@ Widget _buildFAQRow({
                 ),
               ),
             ),
-          const SizedBox(width: 12),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz),
-            onSelected: (value) {
-              if (value == 'edit') {
-                showEditFAQModal(context, doc);
-              } else if (value == 'delete') {
-                showDeleteConfirmation(
-                  context,
-                  doc,
-                  DeleteConfigs.faqs,
-                  'faqs',
-                );
-              }
-            },
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
+          SizedBox(width: isMobile ? 12 : 12),
+          SizedBox(
+            width: 48, // Fixed width for popup menu
+            child: PopupMenuButton<String>(
+              icon: const Icon(Icons.more_horiz),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  showEditFAQModal(context, doc);
+                } else if (value == 'delete') {
+                  showDeleteConfirmation(
+                    context,
+                    doc,
+                    DeleteConfigs.faqs,
+                    'faqs',
+                  );
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
                   ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
                   ),
-                ],
+                ),
+              ],
+            ),
           ),
         ],
       ),

@@ -14,6 +14,7 @@ import 'package:capstone_project/models/message.dart';
 
 import 'package:capstone_project/services/answer_retrieval.dart';
 import 'package:capstone_project/services/cohere_service.dart';
+import 'package:provider/provider.dart';
 
 // Cache classes for better performance
 class FAQCache {
@@ -1015,181 +1016,201 @@ Return ONLY the category name (Admission, Scholarship, Placement, or General):''
       print('Error in post-response tasks: $e');
     }
   }
-
   Future<void> checkEscalation(
-    BuildContext context,
-    String answerText,
-    String? userId,
-    String question,
-  ) async {
-    if (conversationId == null) return;
+  BuildContext context,
+  String answerText,
+  String? userId,
+  String question,
+) async {
+  if (conversationId == null) return;
 
-    final lowerAnswer = answerText.toLowerCase();
+  final lowerAnswer = answerText.toLowerCase();
 
-    for (var keyword in escalationResponseKeywords) {
-      if (lowerAnswer.contains(keyword)) {
-        final reasonController = TextEditingController();
+  for (var keyword in escalationResponseKeywords) {
+    if (lowerAnswer.contains(keyword)) {
+      final reasonController = TextEditingController();
 
-        final bool? escalate = await showDialog<bool>(
-          context: context,
-          barrierDismissible: true,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Row(
-                children: [
-                  Icon(
-                    Icons.help_outline_rounded,
-                    color: Colors.orange.shade600,
-                    size: 24,
-                  ),
-                  SizedBox(width: 12),
-                  Text(
-                    'Need Human Help?',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "I couldn't provide a complete answer to your question. Would you like me to escalate this to OASP staff for personalized assistance?",
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.grey.shade700,
-                      height: 1.4,
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: Colors.blue.shade600,
-                          size: 16,
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "A staff member will review your question and respond directly.",
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.blue.shade700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  TextField(
-                    controller: reasonController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: "Reason for escalation (optional)",
-                      hintText:
-                          "e.g. I need clarification about scholarship requirements",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(
-                    'Maybe Later',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+      final bool? escalate = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.help_outline_rounded,
+                  color: Colors.orange.shade600,
+                  size: 24,
                 ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(true);
-                    _processAutoEscalation(
-                      userId,
-                      question,
-                      answerText,
-                      keyword,
-                      userReason:
-                          reasonController.text.trim().isNotEmpty
-                              ? reasonController.text.trim()
-                              : null,
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF2E7D32),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Text(
-                    'Yes, Get Help',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                SizedBox(width: 12),
+                Text(
+                  'Need Human Help?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
                   ),
                 ),
               ],
-            );
-          },
-        );
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "I couldn't provide a complete answer to your question. Would you like me to escalate this to OASP staff for personalized assistance?",
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.grey.shade700,
+                    height: 1.4,
+                  ),
+                ),
+                SizedBox(height: 12),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.blue.shade600,
+                        size: 16,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "A staff member will review your question and respond directly.",
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 16),
+                TextField(
+                  controller: reasonController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: "Reason for escalation (optional)",
+                    hintText:
+                        "e.g. I need clarification about scholarship requirements",
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(
+                  'Maybe Later',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(true);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF2E7D32),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  'Yes, Get Help',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          );
+        },
+      );
 
+      if (escalate == true) {
+        await _processAutoEscalation(
+          userId,
+          context,
+          question,
+          answerText,
+          keyword,
+          userReason:
+              reasonController.text.trim().isNotEmpty
+                  ? reasonController.text.trim()
+                  : null,
+        );
+      }
+
+      break;
+    }
+  }
+}
+
+Future<void> _processAutoEscalation(
+  String? userId,
+  BuildContext context,
+  String question,
+  String answerText,
+  String triggerKeyword, {
+  String? userReason,
+}) async {
+  try {
+    // ✅ NEW: Get category from the current conversation's last user message
+    String messageCategory = 'General';
+    
+    final messages = Provider.of<ChatProvider>(context, listen: false).messages;
+    
+    // Find the most recent user message to get category
+    for (int i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].sender == 'user') {
+        messageCategory = messages[i].category ?? 'General';
+        print('✅ Found category for auto-escalation: $messageCategory');
         break;
       }
     }
+
+    final escalationRef = _firestore.collection('escalations').doc();
+    final escalationId = escalationRef.id;
+
+    // ✅ UPDATED: Include category in escalation data
+    final escalatedData = {
+      'escalationId': escalationId,
+      'userId': userId,
+      'conversationId': conversationId!,
+      'question': question,
+      'botAnswer': answerText,
+      'status': 'pending',
+      'reason': userReason ?? 'Auto-escalated: $triggerKeyword',
+      'category': messageCategory, // ✅ NEW: Add category
+      'userReason': userReason,
+      'triggerKeyword': triggerKeyword,
+      'createdAt': Timestamp.now(),
+    };
+
+    await escalationRef.set(escalatedData);
+
+    print('✅ Auto-escalation created: $escalationId');
+    print('📂 Category: $messageCategory'); // ✅ NEW: Log category
+  } catch (e) {
+    print('❌ Error creating auto-escalation: $e');
   }
-
-  Future<void> _processAutoEscalation(
-    String? userId,
-    String question,
-    String answerText,
-    String triggerKeyword, {
-    String? userReason,
-  }) async {
-    try {
-      final escalationRef = _firestore.collection('escalations').doc();
-      final escalationId = escalationRef.id;
-
-      final escalatedData = {
-        'escalationId': escalationId,
-        'userId': userId,
-        'conversationId': conversationId!,
-        'question': question,
-        'botAnswer': answerText,
-        'status': 'pending',
-        'userReason': userReason,
-        'createdAt': Timestamp.now(),
-      };
-
-      await escalationRef.set(escalatedData);
-
-      // The Cloud Function will handle creating notifications
-      // No need to create them manually here anymore
-
-      print('Auto-escalation created: $escalationId');
-    } catch (e) {
-      print('Error creating auto-escalation: $e');
-    }
-  }
+}
 
   Future<void> _checkAndPromoteToFAQOptimized(
     String question,
