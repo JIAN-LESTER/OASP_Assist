@@ -220,10 +220,11 @@ class MobileProgramManagement extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('programs')
-                            .orderBy('name')
-                            .snapshots(),
+                        stream:
+                            FirebaseFirestore.instance
+                                .collection('programs')
+                                .orderBy('name')
+                                .snapshots(),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -308,10 +309,11 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('programs')
-                          .orderBy('name')
-                          .snapshots(),
+                      stream:
+                          FirebaseFirestore.instance
+                              .collection('programs')
+                              .orderBy('name')
+                              .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -402,11 +404,12 @@ Widget _buildProgramList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  final filtered = allPrograms.where((doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final name = (data['name'] ?? '').toString().toLowerCase();
-    return searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
-  }).toList();
+  final filtered =
+      allPrograms.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final name = (data['name'] ?? '').toString().toLowerCase();
+        return searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
+      }).toList();
 
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
@@ -421,24 +424,25 @@ Widget _buildProgramList({
   return Column(
     children: [
       Expanded(
-        child: currentPagePrograms.isEmpty
-            ? const Center(
-                child: Text('No programs match your search criteria.'),
-              )
-            : ListView.separated(
-                itemCount: currentPagePrograms.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final doc = currentPagePrograms[index];
-                  final data = doc.data() as Map<String, dynamic>;
-                  return _buildProgramRow(
-                    context: context,
-                    doc: doc,
-                    name: data['name'] ?? 'N/A',
-                    collegeId: data['collegeId'] ?? '',
-                  );
-                },
-              ),
+        child:
+            currentPagePrograms.isEmpty
+                ? const Center(
+                  child: Text('No programs match your search criteria.'),
+                )
+                : ListView.separated(
+                  itemCount: currentPagePrograms.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final doc = currentPagePrograms[index];
+                    final data = doc.data() as Map<String, dynamic>;
+                    return _buildProgramRow(
+                      context: context,
+                      doc: doc,
+                      name: data['name'] ?? 'N/A',
+                      collegeId: data['collegeId'] ?? '',
+                    );
+                  },
+                ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -502,10 +506,11 @@ Widget _buildProgramRow({
                 ),
                 if (!isMobile && collegeId.isNotEmpty)
                   FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseFirestore.instance
-                        .collection('colleges')
-                        .doc(collegeId)
-                        .get(),
+                    future:
+                        FirebaseFirestore.instance
+                            .collection('colleges')
+                            .doc(collegeId)
+                            .get(),
                     builder: (context, snapshot) {
                       if (snapshot.hasData && snapshot.data!.exists) {
                         final collegeData =
@@ -535,28 +540,29 @@ Widget _buildProgramRow({
                 showDeleteProgramModal(context, doc);
               }
             },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, size: 18),
-                    SizedBox(width: 8),
-                    Text('Edit'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete, size: 18, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Delete', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
+            itemBuilder:
+                (_) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
           ),
         ],
       ),
@@ -609,46 +615,47 @@ Widget _buildHeader(
           ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child: isMobile
-                ? Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    children: [
-                      buildStatCard(
-                        'Total Programs',
-                        '${program?.totalProgram}',
-                        Colors.blue,
-                        Icons.school,
-                      ),
-                      buildStatCard(
-                        'Program with Most Students',
-                        '${program?.dominantProgram}',
-                        Colors.green,
-                        Icons.check_circle,
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: buildStatCard(
+            child:
+                isMobile
+                    ? Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        buildStatCard(
                           'Total Programs',
                           '${program?.totalProgram}',
                           Colors.blue,
                           Icons.school,
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: buildStatCard(
+                        buildStatCard(
                           'Program with Most Students',
                           '${program?.dominantProgram}',
                           Colors.green,
                           Icons.check_circle,
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    )
+                    : Row(
+                      children: [
+                        Expanded(
+                          child: buildStatCard(
+                            'Total Programs',
+                            '${program?.totalProgram}',
+                            Colors.blue,
+                            Icons.school,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildStatCard(
+                            'Program with Most Students',
+                            '${program?.dominantProgram}',
+                            Colors.green,
+                            Icons.check_circle,
+                          ),
+                        ),
+                      ],
+                    ),
           ),
           buildSearchField('Search programs by name', searchController),
         ],
@@ -954,12 +961,14 @@ class ProgramInfoModal extends StatelessWidget {
                       data['name'] ?? 'N/A',
                     ),
                     const SizedBox(height: 8),
+                
                     if (collegeId.isNotEmpty)
                       FutureBuilder<DocumentSnapshot>(
-                        future: FirebaseFirestore.instance
-                            .collection('colleges')
-                            .doc(collegeId)
-                            .get(),
+                        future:
+                            FirebaseFirestore.instance
+                                .collection('colleges')
+                                .doc(collegeId)
+                                .get(),
                         builder: (context, snapshot) {
                           if (snapshot.hasData && snapshot.data!.exists) {
                             final collegeData =
@@ -1146,10 +1155,11 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
       final currentUser = FirebaseAuth.instance.currentUser;
       String actorName = 'Unknown';
       if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
         if (userDoc.exists) {
           final userData = userDoc.data() as Map<String, dynamic>;
           actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
@@ -1293,11 +1303,15 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
                           height: isMobile ? 40 : 46,
                           child: OutlinedButton(
                             onPressed:
-                                _isDeleting ? null : () => Navigator.of(context).pop(),
+                                _isDeleting
+                                    ? null
+                                    : () => Navigator.of(context).pop(),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF6B7280),
                               side: const BorderSide(
-                                  color: Color(0xFFD1D5DB), width: 1.5),
+                                color: Color(0xFFD1D5DB),
+                                width: 1.5,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -1327,24 +1341,26 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            child: _isDeleting
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
+                            child:
+                                _isDeleting
+                                    ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    )
+                                    : Text(
+                                      'Delete',
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 14 : 15,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                  )
-                                : Text(
-                                    'Delete',
-                                    style: TextStyle(
-                                      fontSize: isMobile ? 14 : 15,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
                           ),
                         ),
                       ),
@@ -1404,6 +1420,7 @@ class AddEditProgramModal extends StatefulWidget {
   State<AddEditProgramModal> createState() => _AddEditProgramModalState();
 }
 
+// ==================== MODIFIED ADD/EDIT PROGRAM MODAL STATE ====================
 class _AddEditProgramModalState extends State<AddEditProgramModal> {
   late TextEditingController _nameController;
   bool _isSubmitting = false;
@@ -1419,13 +1436,47 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     super.initState();
     if (widget.programDoc != null) {
       final data = widget.programDoc!.data() as Map<String, dynamic>;
-      _nameController = TextEditingController(text: data['name'] ?? '');
-      _selectedCollegeId = data['collegeId'];
+      final fullName = data['name'] ?? '';
       _selectedCategory = data['category']; // NEW: Load existing category
+      _selectedCollegeId = data['collegeId'];
+      
+      // Load colleges first, then strip prefix
+      _loadColleges().then((_) {
+        // NEW: Strip the prefix when editing to show only the user input part
+        String nameWithoutPrefix = fullName;
+        
+        // Check if we should strip the prefix based on college
+        bool shouldStripPrefix = true;
+        if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null && _selectedCollegeId!.isNotEmpty) {
+          final college = _colleges.firstWhere(
+            (c) => c.id == _selectedCollegeId,
+            orElse: () => _colleges.first,
+          );
+          final collegeData = college.data() as Map<String, dynamic>;
+          final collegeName = collegeData['name'] ?? '';
+          
+          // Don't strip prefix for "Others" or "Veterinary Medicine"
+          if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
+            shouldStripPrefix = false;
+          }
+        }
+        
+        if (shouldStripPrefix) {
+          if (_selectedCategory == 'Bachelor' && fullName.startsWith('Bachelor ')) {
+            nameWithoutPrefix = fullName.substring('Bachelor '.length);
+          } else if (_selectedCategory == 'Masteral' && fullName.startsWith('Master of ')) {
+            nameWithoutPrefix = fullName.substring('Master of '.length);
+          }
+        }
+        
+        setState(() {
+          _nameController.text = nameWithoutPrefix;
+        });
+      });
     } else {
       _nameController = TextEditingController();
+      _loadColleges();
     }
-    _loadColleges();
   }
 
   Future<void> _loadColleges() async {
@@ -1456,8 +1507,23 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
 
   // NEW: Helper method to format program name based on category
   String _formatProgramName(String input) {
-    if (_selectedCategory == 'Bachelor') {
-      return 'Bachelor of Science in $input';
+    // Check if college is "Others" or "Veterinary Medicine" - don't add prefix
+    if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null) {
+      // Check the college name
+      final college = _colleges.firstWhere(
+        (c) => c.id == _selectedCollegeId,
+        orElse: () => _colleges.first,
+      );
+      final collegeData = college.data() as Map<String, dynamic>;
+      final collegeName = collegeData['name'] ?? '';
+      
+      // If college is "Others" or "Veterinary Medicine", return input as-is
+      if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
+        return input;
+      }
+      
+      // Otherwise, add "Bachelor " prefix
+      return 'Bachelor $input';
     } else if (_selectedCategory == 'Masteral') {
       return 'Master of $input';
     }
@@ -1476,9 +1542,12 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
       return;
     }
 
-    if (_selectedCollegeId == null || _selectedCollegeId!.isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please select a college');
-      return;
+    // NEW: Only validate college for Bachelor programs
+    if (_selectedCategory == 'Bachelor') {
+      if (_selectedCollegeId == null || _selectedCollegeId!.isEmpty) {
+        SnackbarUtil.showWarning(context, 'Please select a college');
+        return;
+      }
     }
 
     setState(() => _isSubmitting = true);
@@ -1489,10 +1558,17 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
 
       final programData = {
         'name': formattedName,
-        'collegeId': _selectedCollegeId,
         'category': _selectedCategory, // NEW: Save category
         'updatedAt': Timestamp.now(),
       };
+
+      // NEW: Only add collegeId for Bachelor programs
+      if (_selectedCategory == 'Bachelor') {
+        programData['collegeId'] = _selectedCollegeId;
+      } else {
+        // For Masteral programs, explicitly set collegeId to empty string or remove it
+        programData['collegeId'] = '';
+      }
 
       if (isEditing) {
         await FirebaseFirestore.instance
@@ -1681,8 +1757,11 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                       // NEW: Category dropdown at the top
                       _buildCategoryDropdown(isMobile),
                       const SizedBox(height: 16),
-                      _buildCollegeDropdown(isMobile),
-                      const SizedBox(height: 16),
+                      // NEW: Only show college dropdown for Bachelor programs
+                      if (_selectedCategory == 'Bachelor') ...[
+                        _buildCollegeDropdown(isMobile),
+                        const SizedBox(height: 16),
+                      ],
                       // MODIFIED: Show prefix hint based on selected category
                       _buildProgramNameField(isMobile),
                     ],
@@ -1815,6 +1894,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                 onTap: () {
                   setState(() {
                     _selectedCategory = 'Bachelor';
+                    // Don't clear collegeId when switching to Bachelor
                   });
                 },
                 borderRadius: BorderRadius.circular(10),
@@ -1871,6 +1951,8 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                 onTap: () {
                   setState(() {
                     _selectedCategory = 'Masteral';
+                    // Clear collegeId when switching to Masteral
+                    _selectedCollegeId = null;
                   });
                 },
                 borderRadius: BorderRadius.circular(10),
@@ -1896,6 +1978,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                         onChanged: (value) {
                           setState(() {
                             _selectedCategory = value;
+                            _selectedCollegeId = null;
                           });
                         },
                         activeColor: const Color(0xFF2E7D32),
@@ -1931,10 +2014,24 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
   Widget _buildProgramNameField(bool isMobile) {
     String prefix = '';
     String example = '';
+    bool showPrefix = true;
     
-    if (_selectedCategory == 'Bachelor') {
-      prefix = 'Bachelor of Science in ';
-      example = 'Information Technology';
+    // Check if college is "Others" or "Veterinary Medicine"
+    if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null) {
+      final college = _colleges.firstWhere(
+        (c) => c.id == _selectedCollegeId,
+        orElse: () => _colleges.first,
+      );
+      final collegeData = college.data() as Map<String, dynamic>;
+      final collegeName = collegeData['name'] ?? '';
+      
+      if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
+        showPrefix = false;
+        example = 'Bachelor of Science in Information Technology';
+      } else {
+        prefix = 'Bachelor ';
+        example = 'of Science in Information Technology';
+      }
     } else if (_selectedCategory == 'Masteral') {
       prefix = 'Master of ';
       example = 'Business Administration';
@@ -1982,7 +2079,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                 color: Color(0xFF9CA3AF),
                 size: 20,
               ),
-              prefixText: _selectedCategory != null ? prefix : null,
+              prefixText: (_selectedCategory != null && showPrefix) ? prefix : null,
               prefixStyle: const TextStyle(
                 color: Color(0xFF1F2937),
                 fontSize: 14,
@@ -2003,18 +2100,19 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
         if (_selectedCategory != null) ...[
           const SizedBox(height: 8),
           Text(
-            'Will be saved as: $prefix${_nameController.text.isNotEmpty ? _nameController.text : example}',
+            showPrefix 
+                ? 'Will be saved as: $prefix${_nameController.text.isNotEmpty ? _nameController.text : example}'
+                : 'Will be saved as: ${_nameController.text.isNotEmpty ? _nameController.text : example}',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[600],
- 
+              fontStyle: FontStyle.italic,
             ),
           ),
         ],
       ],
     );
   }
-
 
   Widget _buildCollegeDropdown(bool isMobile) {
     return Column(
@@ -2098,3 +2196,4 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     );
   }
 }
+
