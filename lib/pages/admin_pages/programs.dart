@@ -1421,6 +1421,7 @@ class AddEditProgramModal extends StatefulWidget {
 }
 
 // ==================== MODIFIED ADD/EDIT PROGRAM MODAL STATE ====================
+// ==================== MODIFIED ADD/EDIT PROGRAM MODAL STATE ====================
 class _AddEditProgramModalState extends State<AddEditProgramModal> {
   late TextEditingController _nameController;
   bool _isSubmitting = false;
@@ -1434,6 +1435,10 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
   @override
   void initState() {
     super.initState();
+    
+    // Initialize controller immediately
+    _nameController = TextEditingController();
+    
     if (widget.programDoc != null) {
       final data = widget.programDoc!.data() as Map<String, dynamic>;
       final fullName = data['name'] ?? '';
@@ -1442,22 +1447,28 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
       
       // Load colleges first, then strip prefix
       _loadColleges().then((_) {
+        if (!mounted) return;
+        
         // NEW: Strip the prefix when editing to show only the user input part
         String nameWithoutPrefix = fullName;
         
         // Check if we should strip the prefix based on college
         bool shouldStripPrefix = true;
         if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null && _selectedCollegeId!.isNotEmpty) {
-          final college = _colleges.firstWhere(
-            (c) => c.id == _selectedCollegeId,
-            orElse: () => _colleges.first,
-          );
-          final collegeData = college.data() as Map<String, dynamic>;
-          final collegeName = collegeData['name'] ?? '';
-          
-          // Don't strip prefix for "Others" or "Veterinary Medicine"
-          if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
-            shouldStripPrefix = false;
+          try {
+            final college = _colleges.firstWhere(
+              (c) => c.id == _selectedCollegeId,
+            );
+            final collegeData = college.data() as Map<String, dynamic>;
+            final collegeName = collegeData['name'] ?? '';
+            
+            // Don't strip prefix for "Others" or "Veterinary Medicine"
+            if (collegeName == 'Others' || collegeName == 'College of Veterinary Medicine') {
+              shouldStripPrefix = false;
+            }
+          } catch (e) {
+            // If college not found, strip prefix by default
+            shouldStripPrefix = true;
           }
         }
         
@@ -1474,7 +1485,6 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
         });
       });
     } else {
-      _nameController = TextEditingController();
       _loadColleges();
     }
   }
@@ -1510,20 +1520,24 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     // Check if college is "Others" or "Veterinary Medicine" - don't add prefix
     if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null) {
       // Check the college name
-      final college = _colleges.firstWhere(
-        (c) => c.id == _selectedCollegeId,
-        orElse: () => _colleges.first,
-      );
-      final collegeData = college.data() as Map<String, dynamic>;
-      final collegeName = collegeData['name'] ?? '';
-      
-      // If college is "Others" or "Veterinary Medicine", return input as-is
-      if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
-        return input;
+      try {
+        final college = _colleges.firstWhere(
+          (c) => c.id == _selectedCollegeId,
+        );
+        final collegeData = college.data() as Map<String, dynamic>;
+        final collegeName = collegeData['name'] ?? '';
+        
+        // If college is "Others" or "Veterinary Medicine", return input as-is
+        if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
+          return input;
+        }
+        
+        // Otherwise, add "Bachelor " prefix
+        return 'Bachelor $input';
+      } catch (e) {
+        // If college not found, add prefix by default
+        return 'Bachelor $input';
       }
-      
-      // Otherwise, add "Bachelor " prefix
-      return 'Bachelor $input';
     } else if (_selectedCategory == 'Masteral') {
       return 'Master of $input';
     }
@@ -2017,22 +2031,35 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     bool showPrefix = true;
     
     // Check if college is "Others" or "Veterinary Medicine"
-    if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null) {
-      final college = _colleges.firstWhere(
-        (c) => c.id == _selectedCollegeId,
-        orElse: () => _colleges.first,
-      );
-      final collegeData = college.data() as Map<String, dynamic>;
-      final collegeName = collegeData['name'] ?? '';
-      
-      if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
-        showPrefix = false;
-        example = 'Bachelor of Science in Information Technology';
-      } else {
+    if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null && _colleges.isNotEmpty) {
+      try {
+        final college = _colleges.firstWhere(
+          (c) => c.id == _selectedCollegeId,
+        );
+        final collegeData = college.data() as Map<String, dynamic>;
+        final collegeName = collegeData['name'] ?? '';
+        
+        if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
+          showPrefix = false;
+          example = 'Bachelor of Science in Information Technology';
+        } else {
+          showPrefix = true;
+          prefix = 'Bachelor ';
+          example = 'of Science in Information Technology';
+        }
+      } catch (e) {
+        // Default to showing prefix if college not found
+        showPrefix = true;
         prefix = 'Bachelor ';
         example = 'of Science in Information Technology';
       }
+    } else if (_selectedCategory == 'Bachelor') {
+      // Bachelor selected but no college yet
+      showPrefix = true;
+      prefix = 'Bachelor ';
+      example = 'of Science in Information Technology';
     } else if (_selectedCategory == 'Masteral') {
+      showPrefix = true;
       prefix = 'Master of ';
       example = 'Business Administration';
     }
@@ -2197,3 +2224,15 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
   }
 }
 
+// ==================== MODIFIED PROGRAM INFO MODAL ====================
+// Add category display in the ProgramInfoModal build method's content section:
+
+// Inside ProgramInfoModal's build method, add after the Program Name info item:
+/*
+const SizedBox(height: 8),
+_buildInfoItem(
+  Icons.category_outlined,
+  'Category',
+  data['category'] ?? 'N/A',
+),
+*/
