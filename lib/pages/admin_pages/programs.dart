@@ -1408,6 +1408,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
   late TextEditingController _nameController;
   bool _isSubmitting = false;
   String? _selectedCollegeId;
+  String? _selectedCategory; // NEW: Category field
   List<DocumentSnapshot> _colleges = [];
   bool _loadingColleges = true;
 
@@ -1420,6 +1421,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
       final data = widget.programDoc!.data() as Map<String, dynamic>;
       _nameController = TextEditingController(text: data['name'] ?? '');
       _selectedCollegeId = data['collegeId'];
+      _selectedCategory = data['category']; // NEW: Load existing category
     } else {
       _nameController = TextEditingController();
     }
@@ -1452,7 +1454,23 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     super.dispose();
   }
 
+  // NEW: Helper method to format program name based on category
+  String _formatProgramName(String input) {
+    if (_selectedCategory == 'Bachelor') {
+      return 'Bachelor in $input';
+    } else if (_selectedCategory == 'Masteral') {
+      return 'Master of $input';
+    }
+    return input;
+  }
+
   Future<void> _saveProgram() async {
+    // NEW: Validate category first
+    if (_selectedCategory == null || _selectedCategory!.isEmpty) {
+      SnackbarUtil.showWarning(context, 'Please select a program category');
+      return;
+    }
+
     if (_nameController.text.trim().isEmpty) {
       SnackbarUtil.showWarning(context, 'Please enter a program name');
       return;
@@ -1466,9 +1484,13 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     setState(() => _isSubmitting = true);
 
     try {
+      // NEW: Format the program name based on category
+      final formattedName = _formatProgramName(_nameController.text.trim());
+
       final programData = {
-        'name': _nameController.text.trim(),
+        'name': formattedName,
         'collegeId': _selectedCollegeId,
+        'category': _selectedCategory, // NEW: Save category
         'updatedAt': Timestamp.now(),
       };
 
@@ -1500,7 +1522,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
         'logId': logRef.id,
         'user': actorName,
         'action':
-            '${isEditing ? 'Updated' : 'Created'} program: ${_nameController.text.trim()}',
+            '${isEditing ? 'Updated' : 'Created'} program: $formattedName',
         'time': Timestamp.now(),
       });
 
@@ -1533,7 +1555,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 600),
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 650), // Increased height
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -1550,7 +1572,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header
+              // Header (same as before)
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.all(isMobile ? 20 : 28),
@@ -1644,7 +1666,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                   ],
                 ),
               ),
-              // Content
+              // Content - MODIFIED ORDER
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.all(isMobile ? 20 : 28),
@@ -1656,20 +1678,18 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                         Icons.school_outlined,
                       ),
                       const SizedBox(height: 16),
+                      // NEW: Category dropdown at the top
+                      _buildCategoryDropdown(isMobile),
+                      const SizedBox(height: 16),
                       _buildCollegeDropdown(isMobile),
                       const SizedBox(height: 16),
-                      buildTextField(
-                        controller: _nameController,
-                        label: 'Program Name',
-                        hint: 'e.g., Bachelor of Science in Information Technology',
-                        icon: Icons.school_outlined,
-                        isMobile: isMobile,
-                      ),
+                      // MODIFIED: Show prefix hint based on selected category
+                      _buildProgramNameField(isMobile),
                     ],
                   ),
                 ),
               ),
-              // Actions
+              // Actions (same as before)
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -1772,6 +1792,229 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
       ),
     );
   }
+
+  // NEW: Category radio buttons widget
+  Widget _buildCategoryDropdown(bool isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Category',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF374151),
+            letterSpacing: -0.1,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedCategory = 'Bachelor';
+                  });
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: _selectedCategory == 'Bachelor'
+                        ? const Color(0xFF2E7D32).withOpacity(0.1)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _selectedCategory == 'Bachelor'
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFFE5E7EB),
+                      width: _selectedCategory == 'Bachelor' ? 2 : 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Radio<String>(
+                        value: 'Bachelor',
+                        groupValue: _selectedCategory,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedCategory = value;
+                          });
+                        },
+                        activeColor: const Color(0xFF2E7D32),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Bachelor',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: _selectedCategory == 'Bachelor'
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                            color: _selectedCategory == 'Bachelor'
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFF374151),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedCategory = 'Masteral';
+                  });
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: _selectedCategory == 'Masteral'
+                        ? const Color(0xFF2E7D32).withOpacity(0.1)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _selectedCategory == 'Masteral'
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFFE5E7EB),
+                      width: _selectedCategory == 'Masteral' ? 2 : 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Radio<String>(
+                        value: 'Masteral',
+                        groupValue: _selectedCategory,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedCategory = value;
+                          });
+                        },
+                        activeColor: const Color(0xFF2E7D32),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Masteral',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: _selectedCategory == 'Masteral'
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                            color: _selectedCategory == 'Masteral'
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFF374151),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // NEW: Modified program name field with dynamic hint
+  Widget _buildProgramNameField(bool isMobile) {
+    String prefix = '';
+    String example = '';
+    
+    if (_selectedCategory == 'Bachelor') {
+      prefix = 'Bachelor in ';
+      example = 'Information Technology';
+    } else if (_selectedCategory == 'Masteral') {
+      prefix = 'Master of ';
+      example = 'Business Administration';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Program Name',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF374151),
+            letterSpacing: -0.1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: TextField(
+            controller: _nameController,
+            enabled: _selectedCategory != null,
+            decoration: InputDecoration(
+              hintText: _selectedCategory != null 
+                  ? 'e.g., $example'
+                  : 'Select a category first',
+              hintStyle: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 14,
+              ),
+              prefixIcon: const Icon(
+                Icons.school_outlined,
+                color: Color(0xFF9CA3AF),
+                size: 20,
+              ),
+              prefixText: _selectedCategory != null ? prefix : null,
+              prefixStyle: const TextStyle(
+                color: Color(0xFF1F2937),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+        ),
+        if (_selectedCategory != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Will be saved as: $prefix${_nameController.text.isNotEmpty ? _nameController.text : example}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+ 
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
 
   Widget _buildCollegeDropdown(bool isMobile) {
     return Column(
