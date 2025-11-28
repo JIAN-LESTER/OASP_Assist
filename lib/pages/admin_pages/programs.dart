@@ -1457,7 +1457,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
   // NEW: Helper method to format program name based on category
   String _formatProgramName(String input) {
     if (_selectedCategory == 'Bachelor') {
-      return 'Bachelor in $input';
+      return 'Bachelor of Science in $input';
     } else if (_selectedCategory == 'Masteral') {
       return 'Master of $input';
     }
@@ -1933,7 +1933,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     String example = '';
     
     if (_selectedCategory == 'Bachelor') {
-      prefix = 'Bachelor in ';
+      prefix = 'Bachelor of Science in ';
       example = 'Information Technology';
     } else if (_selectedCategory == 'Masteral') {
       prefix = 'Master of ';
