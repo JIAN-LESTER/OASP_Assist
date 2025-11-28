@@ -1078,240 +1078,218 @@ Future<void> _saveUserProfile() async {
     );
   }
 
-  // Replace the _buildProfilePage method with this version that auto-shows summary:
-  Widget _buildProfilePage(
-    UserOnboardingPage page,
-    double iconSize,
-    double titleFontSize,
-    double descriptionFontSize,
-    double maxWidth,
-  ) {
-    // Check if all required fields are completed for summary
-    bool allFieldsCompleted = false;
+Widget _buildProfilePage(
+  UserOnboardingPage page,
+  double iconSize,
+  double titleFontSize,
+  double descriptionFontSize,
+  double maxWidth,
+) {
+  // Check if all required fields are completed for summary
+  bool allFieldsCompleted = false;
 
-    if (_role == 'user' && _enrollmentStatus != null) {
-      if (_enrollmentStatus == 'not_enrolled') {
-        if (_isIncomingFreshman == true) {
-          allFieldsCompleted = _lrn.trim().length == 12 && _lrnConfirmed;
-        } else if (_isIncomingFreshman == false) {
-          if (_selectedAffiliation == 'Others') {
-            allFieldsCompleted =
-                _customAffiliation.trim().isNotEmpty &&
-                _customAffiliationConfirmed;
-          } else {
-            allFieldsCompleted =
-                _selectedAffiliation != null &&
-                _selectedAffiliation!.isNotEmpty;
-          }
+  if (_role == 'user' && _enrollmentStatus != null) {
+    if (_enrollmentStatus == 'not_enrolled') {
+      if (_isIncomingFreshman == true) {
+        allFieldsCompleted = _lrn.trim().length == 12 && _lrnConfirmed;
+      } else if (_isIncomingFreshman == false) {
+        if (_selectedAffiliation == 'Others') {
+          allFieldsCompleted = _customAffiliation.trim().isNotEmpty && 
+                              _customAffiliationConfirmed;
+        } else {
+          allFieldsCompleted = _selectedAffiliation != null && 
+                              _selectedAffiliation!.isNotEmpty;
         }
-      } else {
-        // ENROLLED checks
-        bool studentIdComplete =
-            _studentId.trim().isNotEmpty && _studentIdConfirmed;
-        bool studentTypeComplete = _studentType != null;
+      }
+    } else {
+      // ENROLLED checks
+      if (_studentType == 'undergraduate') {
+        bool studentIdComplete = _studentId.trim().isNotEmpty && _studentIdConfirmed;
+        bool yearComplete = _selectedYear.isNotEmpty;
+        bool collegeComplete = _selectedCollege.isNotEmpty;
+        bool programComplete = (_selectedYear == 'Incoming') || _selectedProgram.isNotEmpty;
+        bool scholarshipComplete = _hasScholarship != null &&
+            (_hasScholarship == false ||
+                (_hasScholarship == true &&
+                    _selectedScholarship != null &&
+                    _selectedScholarship != 'N/A' &&
+                    _selectedScholarship!.isNotEmpty));
 
-        if (_studentType == 'undergraduate') {
-          bool yearComplete = _selectedYear.isNotEmpty;
-          bool collegeComplete = _selectedCollege.isNotEmpty;
-          bool programComplete =
-              (_selectedYear == 'Incoming') || _selectedProgram.isNotEmpty;
-          bool scholarshipComplete =
-              _hasScholarship != null &&
-              (_hasScholarship == false ||
-                  (_hasScholarship == true &&
-                      _selectedScholarship != null &&
-                      _selectedScholarship != 'N/A' &&
-                      _selectedScholarship!.isNotEmpty));
-
-          allFieldsCompleted =
-              studentIdComplete &&
-              studentTypeComplete &&
-              yearComplete &&
-              collegeComplete &&
-              programComplete &&
-              scholarshipComplete;
-        } else if (_studentType == 'graduate') {
-          bool graduateTypeComplete = _graduateType != null;
-
-          if (_graduateType == 'masteral') {
-            allFieldsCompleted =
-                studentIdComplete &&
-                studentTypeComplete &&
-                graduateTypeComplete &&
-                _selectedCollege.isNotEmpty &&
-                _selectedProgram.isNotEmpty;
-          } else if (_graduateType == 'not_masteral') {
-            allFieldsCompleted =
-                studentIdComplete &&
-                studentTypeComplete &&
-                graduateTypeComplete &&
-                _graduatedCollege.isNotEmpty &&
-                _graduatedProgram.isNotEmpty;
-          }
+        allFieldsCompleted = studentIdComplete &&
+            yearComplete && collegeComplete && programComplete && scholarshipComplete;
+      } else if (_studentType == 'graduate') {
+        bool graduateTypeComplete = _graduateType != null;
+        
+        if (_graduateType == 'masteral') {
+          // ✅ Masteral: Just need college and program
+          allFieldsCompleted = graduateTypeComplete && 
+              _selectedCollege.isNotEmpty && 
+              _selectedProgram.isNotEmpty;
+        } else if (_graduateType == 'not_masteral') {
+          // ✅ Not masteral: Just need graduated college and program
+          allFieldsCompleted = graduateTypeComplete && 
+              _graduatedCollege.isNotEmpty && 
+              _graduatedProgram.isNotEmpty;
         }
       }
     }
+  }
 
-    // Show summary when complete
-    if (allFieldsCompleted) {
-      return _buildProfileSummary(descriptionFontSize);
-    }
+  // Show summary when complete
+  if (allFieldsCompleted) {
+    return _buildProfileSummary(descriptionFontSize);
+  }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          Container(
-            width: iconSize * 0.9,
-            height: iconSize * 0.9,
-            decoration: BoxDecoration(
-              color: primaryColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(page.icon, size: iconSize * 0.4, color: primaryColor),
+  // Rest of the method remains the same...
+  return SingleChildScrollView(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Column(
+      children: [
+        const SizedBox(height: 20),
+        Container(
+          width: iconSize * 0.9,
+          height: iconSize * 0.9,
+          decoration: BoxDecoration(
+            color: primaryColor.withOpacity(0.1),
+            shape: BoxShape.circle,
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Hello ${_firstNameController.text.isNotEmpty ? _firstNameController.text : 'there'}!',
-            style: TextStyle(
-              fontSize: titleFontSize * 0.8,
-              fontWeight: FontWeight.w800,
-              color: textPrimaryColor,
-              letterSpacing: -0.5,
-            ),
-            textAlign: TextAlign.center,
+          child: Icon(page.icon, size: iconSize * 0.4, color: primaryColor),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Hello ${_firstNameController.text.isNotEmpty ? _firstNameController.text : 'there'}!',
+          style: TextStyle(
+            fontSize: titleFontSize * 0.8,
+            fontWeight: FontWeight.w800,
+            color: textPrimaryColor,
+            letterSpacing: -0.5,
           ),
-          const SizedBox(height: 8),
-          Text(
-            page.title,
-            style: TextStyle(
-              fontSize: titleFontSize * 0.7,
-              fontWeight: FontWeight.w700,
-              color: textPrimaryColor,
-              letterSpacing: -0.3,
-            ),
-            textAlign: TextAlign.center,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          page.title,
+          style: TextStyle(
+            fontSize: titleFontSize * 0.7,
+            fontWeight: FontWeight.w700,
+            color: textPrimaryColor,
+            letterSpacing: -0.3,
           ),
-          const SizedBox(height: 12),
-          Text(
-            page.description,
-            style: TextStyle(
-              fontSize: descriptionFontSize * 0.9,
-              color: textSecondaryColor,
-              height: 1.4,
-            ),
-            textAlign: TextAlign.center,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          page.description,
+          style: TextStyle(
+            fontSize: descriptionFontSize * 0.9,
+            color: textSecondaryColor,
+            height: 1.4,
           ),
-          const SizedBox(height: 24),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 24),
 
-          if (_role == 'user') ...[
-            // Step 1: Enrollment Status
-            if (_enrollmentStatus == null) ...[
+        if (_role == 'user') ...[
+          // Step 1: Enrollment Status
+          if (_enrollmentStatus == null) ...[
+            _buildSectionTitle(
+              'Are you currently enrolled?',
+              descriptionFontSize,
+            ),
+            const SizedBox(height: 12),
+            _buildRadioOption(
+              title: 'Yes, I am enrolled',
+              value: 'enrolled',
+              groupValue: _enrollmentStatus,
+              onChanged: (value) => setState(() {
+                _enrollmentStatus = value;
+                _resetAllFields();
+              }),
+              fontSize: descriptionFontSize,
+            ),
+            const SizedBox(height: 12),
+            _buildRadioOption(
+              title: 'No, not yet enrolled',
+              value: 'not_enrolled',
+              groupValue: _enrollmentStatus,
+              onChanged: (value) => setState(() {
+                _enrollmentStatus = value;
+                _resetEnrolledFields();
+              }),
+              fontSize: descriptionFontSize,
+            ),
+          ]
+          // === ENROLLED FLOW ===
+          else if (_enrollmentStatus == 'enrolled') ...[
+            // Ask undergraduate or graduate FIRST
+            if (_studentType == null) ...[
+              const SizedBox(height: 24),
               _buildSectionTitle(
-                'Are you currently enrolled?',
+                'Are you an undergraduate or graduate student?',
                 descriptionFontSize,
               ),
               const SizedBox(height: 12),
               _buildRadioOption(
-                title: 'Yes, I am enrolled',
-                value: 'enrolled',
-                groupValue: _enrollmentStatus,
-                onChanged:
-                    (value) => setState(() {
-                      _enrollmentStatus = value;
-                      _resetAllFields();
-                    }),
+                title: 'Undergraduate',
+                value: 'undergraduate',
+                groupValue: _studentType,
+                onChanged: (value) => setState(() {
+                  _studentType = value;
+                  _resetEnrolledFields();
+                }),
                 fontSize: descriptionFontSize,
               ),
               const SizedBox(height: 12),
               _buildRadioOption(
-                title: 'No, not yet enrolled',
-                value: 'not_enrolled',
-                groupValue: _enrollmentStatus,
-                onChanged:
-                    (value) => setState(() {
-                      _enrollmentStatus = value;
-                      _resetEnrolledFields();
-                    }),
+                title: 'Graduate',
+                value: 'graduate',
+                groupValue: _studentType,
+                onChanged: (value) => setState(() {
+                  _studentType = value;
+                  _resetEnrolledFields();
+                }),
                 fontSize: descriptionFontSize,
               ),
-            ]
-            // === ENROLLED FLOW ===
-            else if (_enrollmentStatus == 'enrolled') ...[
-              // Ask undergraduate or graduate FIRST
-              if (_studentType == null) ...[
-                const SizedBox(height: 24),
-                _buildSectionTitle(
-                  'Are you an undergraduate or graduate student?',
-                  descriptionFontSize,
-                ),
-                const SizedBox(height: 12),
-                _buildRadioOption(
-                  title: 'Undergraduate',
-                  value: 'undergraduate',
-                  groupValue: _studentType,
-                  onChanged:
-                      (value) => setState(() {
-                        _studentType = value;
-                        _resetEnrolledFields();
-                      }),
-                  fontSize: descriptionFontSize,
-                ),
-                const SizedBox(height: 12),
-                _buildRadioOption(
-                  title: 'Graduate',
-                  value: 'graduate',
-                  groupValue: _studentType,
-                  onChanged:
-                      (value) => setState(() {
-                        _studentType = value;
-                        _resetEnrolledFields();
-                      }),
-                  fontSize: descriptionFontSize,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _enrollmentStatus = null;
-                          _studentType = null;
-                        });
-                      },
-                      icon: const Icon(Icons.arrow_back, size: 18),
-                      label: Text(
-                        'Previous',
-                        style: TextStyle(fontSize: descriptionFontSize * 0.85),
-                      ),
-                      style: TextButton.styleFrom(
-                        foregroundColor: primaryColor,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _enrollmentStatus = null;
+                        _studentType = null;
+                      });
+                    },
+                    icon: const Icon(Icons.arrow_back, size: 18),
+                    label: Text(
+                      'Previous',
+                      style: TextStyle(fontSize: descriptionFontSize * 0.85),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: primaryColor,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
                     ),
-                  ],
-                ),
-              ]
-              // Continue with Student ID and rest of flow...
-              else
-                ..._buildEnrolledFlow(descriptionFontSize),
+                  ),
+                ],
+              ),
             ]
-            // === NOT ENROLLED FLOW ===
-            else if (_enrollmentStatus == 'not_enrolled') ...[
-              ..._buildNotEnrolledFlow(descriptionFontSize),
-            ],
+            // Continue with flow based on student type
+            else ..._buildEnrolledFlow(descriptionFontSize),
+          ]
+          // === NOT ENROLLED FLOW ===
+          else if (_enrollmentStatus == 'not_enrolled') ...[
+            ..._buildNotEnrolledFlow(descriptionFontSize),
           ],
-          const SizedBox(height: 32),
         ],
-      ),
-    );
-  }
-
+        const SizedBox(height: 32),
+      ],
+    ),
+  );
+}
   void _resetEnrolledFields() {
     _studentId = '';
     _studentIdConfirmed = false;
@@ -1695,7 +1673,7 @@ Future<void> _saveUserProfile() async {
   return [];
 }
 
-  List<Widget> _buildGraduateFlow(double descriptionFontSize) {
+ List<Widget> _buildGraduateFlow(double descriptionFontSize) {
   // Ask if taking masteral
   if (_graduateType == null) {
     return [
@@ -1706,7 +1684,7 @@ Future<void> _saveUserProfile() async {
       ),
       const SizedBox(height: 12),
       _buildRadioOption(
-        title: 'Yes, taking Masteral',
+        title: 'Yes, I am taking Masteral',
         value: 'masteral',
         groupValue: _graduateType,
         onChanged: (value) => setState(() {
@@ -1722,7 +1700,7 @@ Future<void> _saveUserProfile() async {
       ),
       const SizedBox(height: 12),
       _buildRadioOption(
-        title: 'No, already graduated',
+        title: 'No, I am not',
         value: 'not_masteral',
         groupValue: _graduateType,
         onChanged: (value) => setState(() {
@@ -1769,27 +1747,6 @@ Future<void> _saveUserProfile() async {
   if (_graduateType == 'masteral') {
     if (_selectedCollege.isEmpty || _selectedProgram.isEmpty) {
       return [
-        const SizedBox(height: 24),
-        _buildSectionTitle('Select your College', descriptionFontSize),
-        const SizedBox(height: 12),
-        _buildDropdownField(
-          value: _selectedCollege.isEmpty ||
-                  !_colleges.keys.contains(_selectedCollege)
-              ? null
-              : _selectedCollege,
-          items: _colleges.keys.toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedCollege = value ?? '';
-              _selectedCollegeId = _colleges[value];
-              _selectedProgram = '';
-            });
-          },
-          hint: 'Select your college',
-          icon: Icons.account_balance_outlined,
-          fontSize: descriptionFontSize,
-        ),
-        if (_selectedCollege.isNotEmpty) ...[
           const SizedBox(height: 24),
           _buildSectionTitle('Select your Masteral Program', descriptionFontSize),
           const SizedBox(height: 12),
@@ -1816,7 +1773,7 @@ Future<void> _saveUserProfile() async {
               fontSize: descriptionFontSize,
             );
           }(),
-        ],
+        
         const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.start,
@@ -1847,6 +1804,8 @@ Future<void> _saveUserProfile() async {
         ),
       ];
     }
+    // ✅ If both college and program are selected, return empty to trigger summary
+    return [];
   }
 
   // If not taking masteral (already graduated) - show Bachelor programs they graduated from
@@ -1934,10 +1893,11 @@ Future<void> _saveUserProfile() async {
               ),
             ),
           ],
-          ),
-        
+        ),
       ];
     }
+    // ✅ If both graduated college and program are selected, return empty to trigger summary
+    return [];
   }
 
   return [];

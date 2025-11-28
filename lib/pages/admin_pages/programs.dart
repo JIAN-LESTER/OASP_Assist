@@ -1420,6 +1420,7 @@ class AddEditProgramModal extends StatefulWidget {
   State<AddEditProgramModal> createState() => _AddEditProgramModalState();
 }
 
+// ==================== MODIFIED ADD/EDIT PROGRAM MODAL STATE ====================
 class _AddEditProgramModalState extends State<AddEditProgramModal> {
   late TextEditingController _nameController;
   bool _isSubmitting = false;
@@ -1437,21 +1438,45 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
       final data = widget.programDoc!.data() as Map<String, dynamic>;
       final fullName = data['name'] ?? '';
       _selectedCategory = data['category']; // NEW: Load existing category
-      
-      // NEW: Strip the prefix when editing to show only the user input part
-      String nameWithoutPrefix = fullName;
-      if (_selectedCategory == 'Bachelor' && fullName.startsWith('Bachelor ')) {
-        nameWithoutPrefix = fullName.substring('Bachelor '.length);
-      } else if (_selectedCategory == 'Masteral' && fullName.startsWith('Master of ')) {
-        nameWithoutPrefix = fullName.substring('Master of '.length);
-      }
-      
-      _nameController = TextEditingController(text: nameWithoutPrefix);
       _selectedCollegeId = data['collegeId'];
+      
+      // Load colleges first, then strip prefix
+      _loadColleges().then((_) {
+        // NEW: Strip the prefix when editing to show only the user input part
+        String nameWithoutPrefix = fullName;
+        
+        // Check if we should strip the prefix based on college
+        bool shouldStripPrefix = true;
+        if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null && _selectedCollegeId!.isNotEmpty) {
+          final college = _colleges.firstWhere(
+            (c) => c.id == _selectedCollegeId,
+            orElse: () => _colleges.first,
+          );
+          final collegeData = college.data() as Map<String, dynamic>;
+          final collegeName = collegeData['name'] ?? '';
+          
+          // Don't strip prefix for "Others" or "Veterinary Medicine"
+          if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
+            shouldStripPrefix = false;
+          }
+        }
+        
+        if (shouldStripPrefix) {
+          if (_selectedCategory == 'Bachelor' && fullName.startsWith('Bachelor ')) {
+            nameWithoutPrefix = fullName.substring('Bachelor '.length);
+          } else if (_selectedCategory == 'Masteral' && fullName.startsWith('Master of ')) {
+            nameWithoutPrefix = fullName.substring('Master of '.length);
+          }
+        }
+        
+        setState(() {
+          _nameController.text = nameWithoutPrefix;
+        });
+      });
     } else {
       _nameController = TextEditingController();
+      _loadColleges();
     }
-    _loadColleges();
   }
 
   Future<void> _loadColleges() async {
@@ -1482,7 +1507,22 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
 
   // NEW: Helper method to format program name based on category
   String _formatProgramName(String input) {
-    if (_selectedCategory == 'Bachelor') {
+    // Check if college is "Others" or "Veterinary Medicine" - don't add prefix
+    if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null) {
+      // Check the college name
+      final college = _colleges.firstWhere(
+        (c) => c.id == _selectedCollegeId,
+        orElse: () => _colleges.first,
+      );
+      final collegeData = college.data() as Map<String, dynamic>;
+      final collegeName = collegeData['name'] ?? '';
+      
+      // If college is "Others" or "Veterinary Medicine", return input as-is
+      if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
+        return input;
+      }
+      
+      // Otherwise, add "Bachelor " prefix
       return 'Bachelor $input';
     } else if (_selectedCategory == 'Masteral') {
       return 'Master of $input';
@@ -1974,10 +2014,24 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
   Widget _buildProgramNameField(bool isMobile) {
     String prefix = '';
     String example = '';
+    bool showPrefix = true;
     
-    if (_selectedCategory == 'Bachelor') {
-      prefix = 'Bachelor ';
-      example = 'of Science in Information Technology';
+    // Check if college is "Others" or "Veterinary Medicine"
+    if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null) {
+      final college = _colleges.firstWhere(
+        (c) => c.id == _selectedCollegeId,
+        orElse: () => _colleges.first,
+      );
+      final collegeData = college.data() as Map<String, dynamic>;
+      final collegeName = collegeData['name'] ?? '';
+      
+      if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
+        showPrefix = false;
+        example = 'Bachelor of Science in Information Technology';
+      } else {
+        prefix = 'Bachelor ';
+        example = 'of Science in Information Technology';
+      }
     } else if (_selectedCategory == 'Masteral') {
       prefix = 'Master of ';
       example = 'Business Administration';
@@ -2025,7 +2079,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                 color: Color(0xFF9CA3AF),
                 size: 20,
               ),
-              prefixText: _selectedCategory != null ? prefix : null,
+              prefixText: (_selectedCategory != null && showPrefix) ? prefix : null,
               prefixStyle: const TextStyle(
                 color: Color(0xFF1F2937),
                 fontSize: 14,
@@ -2046,7 +2100,9 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
         if (_selectedCategory != null) ...[
           const SizedBox(height: 8),
           Text(
-            'Will be saved as: $prefix${_nameController.text.isNotEmpty ? _nameController.text : example}',
+            showPrefix 
+                ? 'Will be saved as: $prefix${_nameController.text.isNotEmpty ? _nameController.text : example}'
+                : 'Will be saved as: ${_nameController.text.isNotEmpty ? _nameController.text : example}',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[600],
@@ -2140,3 +2196,4 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     );
   }
 }
+
