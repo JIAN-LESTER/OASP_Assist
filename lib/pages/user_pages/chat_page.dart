@@ -2604,7 +2604,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     );
   }
 
-  // ✅ IMPROVED: Messages list with better scroll behavior
+  //  IMPROVED: Messages list with better scroll behavior
   Widget _buildMessagesList(List<Message> messages, ChatProvider chatProvider) {
     return NotificationListener<ScrollNotification>(
       onNotification: (scrollNotification) {
@@ -2622,7 +2622,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       },
       child: ListView.builder(
         controller: _scrollController,
-        physics: BouncingScrollPhysics(), // ✅ iOS-like bouncy scroll
+        physics: BouncingScrollPhysics(), // iOS-like bouncy scroll
         itemCount: messages.length,
         padding: EdgeInsets.only(top: 16, bottom: 24, left: 8, right: 8),
         itemBuilder: (context, index) {

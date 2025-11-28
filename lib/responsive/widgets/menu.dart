@@ -208,7 +208,6 @@ class UniversalUIComponents {
                           onConversationSelected, // Pass it down
                     ),
                   ),
-                 
                 ],
               ),
         ),
@@ -656,7 +655,6 @@ class UniversalUIComponents {
     StateSetter setDrawerState,
     UserRole userRole,
   ) {
-
     // Get expansion state from the shared map
     bool isExpanded = _expandedState[item.title] ?? false;
 
@@ -1048,452 +1046,534 @@ class UniversalUIComponents {
     onItemTap(index);
   }
 
- static Widget _buildChatHistoryList(
-  BuildContext context,
-  List<Map<String, dynamic>> conversations,
-  String? selectedConversationId,
-  Function(BuildContext, String?)? onConversationSelected,
-) {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
+  static Widget _buildChatHistoryList(
+    BuildContext context,
+    List<Map<String, dynamic>> conversations,
+    String? selectedConversationId,
+    Function(BuildContext, String?)? onConversationSelected,
+  ) {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
 
-  if (userId == null) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      child: Center(
-        child: Text(
-          'Please log in',
-          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+    if (userId == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        child: Center(
+          child: Text(
+            'Please log in',
+            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+          ),
         ),
-      ),
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream:
+          FirebaseFirestore.instance
+              .collection('conversations')
+              .where('userId', isEqualTo: userId)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.chat_outlined, color: Colors.grey[400], size: 30),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No conversations yet',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final conversations =
+            snapshot.data!.docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return {
+                'id': doc.id,
+                'title': data['title'] ?? 'Untitled',
+                'createdAt': data['createdAt'],
+              };
+            }).toList();
+
+        return Container(
+          constraints: const BoxConstraints(maxHeight: 200),
+          child: ListView.builder(
+            shrinkWrap: true,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            itemCount: conversations.length,
+            itemBuilder: (context, index) {
+              final conv = conversations[index];
+              final isSelected =
+                  conv['id'] == UserConstant.selectedConversationId;
+
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color:
+                      isSelected
+                          ? primaryGreen.withOpacity(0.15)
+                          : Colors.transparent,
+                  border:
+                      isSelected
+                          ? Border.all(
+                            color: primaryGreen.withOpacity(0.4),
+                            width: 1.5,
+                          )
+                          : null,
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () async {
+                      HapticFeedback.lightImpact();
+                      Navigator.of(context).pop(); // Close drawer
+
+                      await UserConstant.setSelectedConversation(conv['id']);
+
+                      if (onConversationSelected != null && context.mounted) {
+                        await Future.delayed(Duration(milliseconds: 100));
+                        onConversationSelected(context, conv['id']);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color:
+                                  isSelected
+                                      ? primaryGreen.withOpacity(0.2)
+                                      : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Icon(
+                              Icons.chat_bubble_outline,
+                              color:
+                                  isSelected
+                                      ? Colors.green[700]
+                                      : Colors.grey[500],
+                              size: 14,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              conv['title'] ?? 'Untitled',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight:
+                                    isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                color:
+                                    isSelected
+                                        ? Colors.green[800]
+                                        : Colors.grey[700],
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.delete_outline,
+                              size: 18,
+                              color: Colors.grey[500],
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                            onPressed:
+                                () => _deleteConversation(context, conv['id']),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
-  return StreamBuilder<QuerySnapshot>(
-    stream: FirebaseFirestore.instance
-        .collection('conversations')
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          child: Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
-              ),
-            ),
-          ),
-        );
-      }
+  static Future<void> _deleteConversation(
+    BuildContext context,
+    String conversationId, {
+    String? conversationTitle,
+  }) async {
+    if (!context.mounted) return;
 
-      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.chat_outlined, color: Colors.grey[400], size: 30),
-                const SizedBox(height: 8),
-                Text(
-                  'No conversations yet',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    // ✅ CRITICAL: Close drawer FIRST on mobile before showing dialog
+    if (isMobile && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      // Wait for drawer animation to complete
+      await Future.delayed(const Duration(milliseconds: 350));
+      if (!context.mounted) return;
+    }
+
+    await showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Delete Conversation Confirmation',
+      barrierColor: Colors.black.withOpacity(0.5),
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
-          ),
-        );
-      }
-
-      final conversations = snapshot.data!.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return {
-          'id': doc.id,
-          'title': data['title'] ?? 'Untitled',
-          'createdAt': data['createdAt'],
-        };
-      }).toList();
-
-      return Container(
-        constraints: const BoxConstraints(maxHeight: 200),
-        child: ListView.builder(
-          shrinkWrap: true,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          itemCount: conversations.length,
-          itemBuilder: (context, index) {
-            final conv = conversations[index];
-            final isSelected = conv['id'] == UserConstant.selectedConversationId;
-
-            return Container(
-              margin: const EdgeInsets.symmetric(vertical: 2),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: isSelected
-                    ? primaryGreen.withOpacity(0.15)
-                    : Colors.transparent,
-                border: isSelected
-                    ? Border.all(
-                        color: primaryGreen.withOpacity(0.4),
-                        width: 1.5,
-                      )
-                    : null,
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () async {
-                    HapticFeedback.lightImpact();
-                    Navigator.of(context).pop(); // Close drawer
-
-                    await UserConstant.setSelectedConversation(conv['id']);
-
-                    if (onConversationSelected != null && context.mounted) {
-                      await Future.delayed(Duration(milliseconds: 100));
-                      onConversationSelected(context, conv['id']);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with icon
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.fromLTRB(
+                    isMobile ? 24 : 32,
+                    isMobile ? 32 : 40,
+                    isMobile ? 24 : 32,
+                    isMobile ? 16 : 20,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? primaryGreen.withOpacity(0.2)
-                                : Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Icon(
-                            Icons.chat_bubble_outline,
-                            color: isSelected ? Colors.green[700] : Colors.grey[500],
-                            size: 14,
-                          ),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(32),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Color(0xFFEF4444),
+                          size: 32,
+                        ),
+                      ),
+                      SizedBox(height: isMobile ? 16 : 20),
+                      const Text(
+                        'Delete Conversation',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827),
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Content
+                Padding(
+                  padding: EdgeInsets.all(isMobile ? 24 : 32),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Are you sure you want to delete this conversation?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                          height: 1.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (conversationTitle != null) ...[
+                        const SizedBox(height: 20),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF9FAFB),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: const Color(0xFFE5E7EB),
+                              width: 1,
+                            ),
+                          ),
                           child: Text(
-                            conv['title'] ?? 'Untitled',
+                            conversationTitle,
                             style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                              color: isSelected ? Colors.green[800] : Colors.grey[700],
+                              fontSize: isMobile ? 14 : 15,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF111827),
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        IconButton(
-                          icon: Icon(
-                            Icons.delete_outline,
-                            size: 18,
-                            color: Colors.grey[500],
-                          ),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
-                          ),
-                          onPressed: () => _deleteConversation(context, conv['id']),
-                        ),
                       ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    },
-  );
-}
+                      const SizedBox(height: 24),
 
-
-static Future<void> _deleteConversation(
-  BuildContext context,
-  String conversationId,
-  {String? conversationTitle}
-) async {
-  if (!context.mounted) return;
-
-  final screenWidth = MediaQuery.of(context).size.width;
-  final isMobile = screenWidth < 600;
-
-  // ✅ CRITICAL: Close drawer FIRST on mobile before showing dialog
-  if (isMobile && Navigator.of(context).canPop()) {
-    Navigator.of(context).pop();
-    // Wait for drawer animation to complete
-    await Future.delayed(const Duration(milliseconds: 350));
-    if (!context.mounted) return;
-  }
-
-  await showGeneralDialog(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'Delete Conversation Confirmation',
-    barrierColor: Colors.black.withOpacity(0.5),
-    transitionDuration: const Duration(milliseconds: 200),
-    pageBuilder: (context, animation, secondaryAnimation) {
-      return Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header with icon
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.fromLTRB(
-                  isMobile ? 24 : 32,
-                  isMobile ? 32 : 40,
-                  isMobile ? 24 : 32,
-                  isMobile ? 16 : 20,
-                ),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFEF2F2),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEE2E2),
-                        borderRadius: BorderRadius.circular(32),
-                      ),
-                      child: const Icon(
-                        Icons.delete_outline,
-                        color: Color(0xFFEF4444),
-                        size: 32,
-                      ),
-                    ),
-                    SizedBox(height: isMobile ? 16 : 20),
-                    const Text(
-                      'Delete Conversation',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF111827),
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Content
-              Padding(
-                padding: EdgeInsets.all(isMobile ? 24 : 32),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Are you sure you want to delete this conversation?',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF6B7280),
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (conversationTitle != null) ...[
-                      const SizedBox(height: 20),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF9FAFB),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: const Color(0xFFE5E7EB),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          conversationTitle,
-                          style: TextStyle(
-                            fontSize: isMobile ? 14 : 15,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF111827),
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      // Action Buttons
+                      _buildDeleteActionButtons(
+                        context,
+                        conversationId,
+                        isMobile,
                       ),
                     ],
-                    const SizedBox(height: 24),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
 
-                    // Action Buttons
-                    _buildDeleteActionButtons(context, conversationId, isMobile),
-                  ],
+  // 2. REPLACE _buildDeleteActionButtons method (around line 620-680)
+  static Widget _buildDeleteActionButtons(
+    BuildContext context,
+    String conversationId,
+    bool isMobile,
+  ) {
+    // Use ValueNotifier for delete loading state
+    final isDeleting = ValueNotifier<bool>(false);
+
+    double buttonHeight = 48;
+    double fontSize = isMobile ? 15 : 16;
+    double borderRadius = 8;
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: isDeleting,
+      builder: (context, deleting, _) {
+        return Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: buttonHeight,
+                child: OutlinedButton(
+                  onPressed:
+                      deleting ? null : () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF6B7280),
+                    backgroundColor: Colors.white,
+                    disabledForegroundColor: Colors.grey.shade400,
+                    side: BorderSide(
+                      color:
+                          deleting
+                              ? const Color(0xFFE5E7EB)
+                              : const Color(0xFFD1D5DB),
+                      width: 1,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(borderRadius),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
-        ),
-      );
-    },
-    transitionBuilder: (context, animation, secondaryAnimation, child) {
-      return FadeTransition(
-        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.95, end: 1.0).animate(
-            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-          ),
-          child: child,
-        ),
-      );
-    },
-  );
-}
-
-
-// Separate method to build action buttons with your style
-static Widget _buildDeleteActionButtons(
-  BuildContext context,
-  String conversationId,
-  bool isMobile,
-) {
-  double buttonHeight = 48;
-  double fontSize = isMobile ? 15 : 16;
-  double borderRadius = 8;
-
-  return Row(
-    children: [
-      Expanded(
-        child: SizedBox(
-          height: buttonHeight,
-          child: OutlinedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF6B7280),
-              backgroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFFD1D5DB), width: 1),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
             ),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: SizedBox(
-          height: buttonHeight,
-          child: ElevatedButton(
-            onPressed: () async {
-              try {
-                // Check if this is the currently selected conversation
-                final wasSelected = UserConstant.selectedConversationId == conversationId;
+            const SizedBox(width: 12),
+            Expanded(
+              child: SizedBox(
+                height: buttonHeight,
+                child: ElevatedButton(
+                  onPressed:
+                      deleting
+                          ? null
+                          : () async {
+                            isDeleting.value = true;
 
-                // Clear selection if deleting current conversation
-                if (wasSelected) {
-                  await UserConstant.setSelectedConversation('');
-                  UserConstant.shouldShowFAQs = true;
+                            try {
+                              // Check if this is the currently selected conversation
+                              final wasSelected =
+                                  UserConstant.selectedConversationId ==
+                                  conversationId;
 
-                  // Clear chat provider messages
-                  if (context.mounted) {
-                    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-                    chatProvider.clearMessages();
-                  }
-                }
+                              // Clear selection if deleting current conversation
+                              if (wasSelected) {
+                                await UserConstant.setSelectedConversation('');
+                                UserConstant.shouldShowFAQs = true;
 
-                // Delete from Firestore
-                final firestore = FirebaseFirestore.instance;
-                final batch = firestore.batch();
+                                // Clear chat provider messages
+                                if (context.mounted) {
+                                  final chatProvider =
+                                      Provider.of<ChatProvider>(
+                                        context,
+                                        listen: false,
+                                      );
+                                  chatProvider.clearMessages();
+                                }
+                              }
 
-                final messagesSnapshot = await firestore
-                    .collection('conversations')
-                    .doc(conversationId)
-                    .collection('messages')
-                    .get();
+                              // Delete from Firestore
+                              final firestore = FirebaseFirestore.instance;
+                              final batch = firestore.batch();
 
-                for (final doc in messagesSnapshot.docs) {
-                  batch.delete(doc.reference);
-                }
-                batch.delete(firestore.collection('conversations').doc(conversationId));
+                              final messagesSnapshot =
+                                  await firestore
+                                      .collection('conversations')
+                                      .doc(conversationId)
+                                      .collection('messages')
+                                      .get();
 
-                await batch.commit();
+                              for (final doc in messagesSnapshot.docs) {
+                                batch.delete(doc.reference);
+                              }
+                              batch.delete(
+                                firestore
+                                    .collection('conversations')
+                                    .doc(conversationId),
+                              );
 
-                if (context.mounted) {
-                  Navigator.of(context).pop(); // Close dialog
-                  
-                  // Show success snackbar
-                  SnackbarUtil.showSuccess(context, 'Conversation Deleted');
-                }
-              } catch (e) {
-                print('❌ Delete error: $e');
-                if (context.mounted) {
-                  Navigator.of(context).pop(); // Close dialog
-                  
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to delete: $e'),
-                      backgroundColor: Colors.red,
+                              await batch.commit();
+
+                              if (context.mounted) {
+                                Navigator.of(context).pop(); // Close dialog
+                                SnackbarUtil.showSuccess(
+                                  context,
+                                  'Conversation Deleted',
+                                );
+                              }
+                            } catch (e) {
+                              print('❌ Delete error: $e');
+                              if (context.mounted) {
+                                Navigator.of(context).pop(); // Close dialog
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to delete: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (context.mounted) {
+                                isDeleting.value = false;
+                              }
+                            }
+                          },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        deleting
+                            ? const Color(0xFFFCA5A5)
+                            : const Color(0xFFEF4444),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFFFCA5A5),
+                    disabledForegroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(borderRadius),
                     ),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(borderRadius),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child:
+                      deleting
+                          ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Deleting...',
+                                style: TextStyle(
+                                  fontSize: fontSize,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          )
+                          : Text(
+                            'Delete',
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
             ),
-            child: Text(
-              'Delete',
-              style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-      ),
-    ],
-  );
-}
+          ],
+        );
+      },
+    );
+  }
 
-
-  
   static List<Widget> _buildPersistentMenuItems(
     BuildContext context,
     UserRole userRole,
@@ -1749,172 +1829,232 @@ static Widget _buildDeleteActionButtons(
     );
   }
 
- static Widget _buildPersistentChatHistoryList(
-  BuildContext context, {
-  Function(BuildContext, String?)? onConversationSelected,
-}) {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
+  static Widget _buildPersistentChatHistoryList(
+    BuildContext context, {
+    Function(BuildContext, String?)? onConversationSelected,
+  }) {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
 
-  if (userId == null) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      child: Center(
-        child: Text(
-          'Please log in',
-          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+    if (userId == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        child: Center(
+          child: Text(
+            'Please log in',
+            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+          ),
         ),
-      ),
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream:
+          FirebaseFirestore.instance
+              .collection('conversations')
+              .where('userId', isEqualTo: userId)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.chat_outlined, color: Colors.grey[400], size: 30),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No conversations yet',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final conversations =
+            snapshot.data!.docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return {'id': doc.id, 'title': data['title'] ?? 'Untitled'};
+            }).toList();
+
+        return Container(
+          constraints: const BoxConstraints(maxHeight: 400),
+          child: ListView.builder(
+            shrinkWrap: true,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            itemCount: conversations.length,
+            itemBuilder: (context, index) {
+              final conv = conversations[index];
+              final convId = conv['id'] as String;
+              final isSelected = convId == UserConstant.selectedConversationId;
+
+              return _buildConversationTile(
+                context: context,
+                convId: convId,
+                title: conv['title'] as String,
+                isSelected: isSelected,
+                onConversationSelected: onConversationSelected,
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
-  return StreamBuilder<QuerySnapshot>(
-    stream: FirebaseFirestore.instance
-        .collection('conversations')
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting &&
-          !snapshot.hasData) {
+  // 1. REPLACE _buildConversationTile method (around line 800-850)
+  static Widget _buildConversationTile({
+    required BuildContext context,
+    required String convId,
+    required String title,
+    required bool isSelected,
+    Function(BuildContext, String?)? onConversationSelected,
+  }) {
+    // Use ValueNotifier to track loading state per conversation
+    final isDeleting = ValueNotifier<bool>(false);
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: isDeleting,
+      builder: (context, deleting, _) {
         return Container(
-          padding: const EdgeInsets.all(16),
-          child: Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color:
+                isSelected
+                    ? UniversalUIComponents.primaryGreen.withOpacity(0.15)
+                    : Colors.transparent,
+            border:
+                isSelected
+                    ? Border.all(
+                      color: UniversalUIComponents.primaryGreen.withOpacity(
+                        0.4,
+                      ),
+                      width: 1.5,
+                    )
+                    : null,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap:
+                  deleting
+                      ? null
+                      : () async {
+                        HapticFeedback.lightImpact();
+                        await UserConstant.setSelectedConversation(convId);
+                        if (onConversationSelected != null && context.mounted) {
+                          onConversationSelected(context, convId);
+                        }
+                      },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color:
+                            isSelected
+                                ? UniversalUIComponents.primaryGreen
+                                    .withOpacity(0.2)
+                                : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(
+                        Icons.chat_bubble_outline,
+                        color:
+                            isSelected ? Colors.green[700] : Colors.grey[500],
+                        size: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color:
+                              isSelected ? Colors.green[800] : Colors.grey[700],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    // Show loading indicator or delete button
+                    if (deleting)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              UniversalUIComponents.primaryGreen,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      IconButton(
+                        icon: Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: Colors.grey[500],
+                        ),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
+                        onPressed: () async {
+                          isDeleting.value = true;
+                          await _deleteConversation(
+                            context,
+                            convId,
+                            conversationTitle: title,
+                          );
+                          if (context.mounted) {
+                            isDeleting.value = false;
+                          }
+                        },
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
         );
-      }
-
-      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.chat_outlined, color: Colors.grey[400], size: 30),
-                const SizedBox(height: 8),
-                Text(
-                  'No conversations yet',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-
-      final conversations = snapshot.data!.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return {
-          'id': doc.id,
-          'title': data['title'] ?? 'Untitled',
-        };
-      }).toList();
-
-      return Container(
-        constraints: const BoxConstraints(maxHeight: 400),
-        child: ListView.builder(
-          shrinkWrap: true,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          itemCount: conversations.length,
-          itemBuilder: (context, index) {
-            final conv = conversations[index];
-            final convId = conv['id'] as String;
-            final isSelected = convId == UserConstant.selectedConversationId;
-
-            return _buildConversationTile(
-              context: context,
-              convId: convId,
-              title: conv['title'] as String,
-              isSelected: isSelected,
-              onConversationSelected: onConversationSelected,
-            );
-          },
-        ),
-      );
-    },
-  );
-}
-
-static Widget _buildConversationTile({
-  required BuildContext context,
-  required String convId,
-  required String title,
-  required bool isSelected,
-  Function(BuildContext, String?)? onConversationSelected,
-}) {
-  return Container(
-    margin: const EdgeInsets.symmetric(vertical: 2),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(8),
-      color: isSelected ? primaryGreen.withOpacity(0.15) : Colors.transparent,
-      border: isSelected
-          ? Border.all(color: primaryGreen.withOpacity(0.4), width: 1.5)
-          : null,
-    ),
-    child: Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () async {
-          HapticFeedback.lightImpact();
-          await UserConstant.setSelectedConversation(convId);
-          if (onConversationSelected != null && context.mounted) {
-            onConversationSelected(context, convId);
-          }
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? primaryGreen.withOpacity(0.2)
-                      : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Icon(
-                  Icons.chat_bubble_outline,
-                  color: isSelected ? Colors.green[700] : Colors.grey[500],
-                  size: 14,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                    color: isSelected ? Colors.green[800] : Colors.grey[700],
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              IconButton(
-                icon: Icon(Icons.delete_outline, size: 18, color: Colors.grey[500]),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                onPressed: () => _deleteConversation(context, convId),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
+      },
+    );
+  }
 
   static Widget _buildUserProfileDropdown(
     BuildContext context, {
