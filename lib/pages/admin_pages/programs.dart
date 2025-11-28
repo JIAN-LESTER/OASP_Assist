@@ -1421,6 +1421,7 @@ class AddEditProgramModal extends StatefulWidget {
 }
 
 // ==================== MODIFIED ADD/EDIT PROGRAM MODAL STATE ====================
+// ==================== MODIFIED ADD/EDIT PROGRAM MODAL STATE ====================
 class _AddEditProgramModalState extends State<AddEditProgramModal> {
   late TextEditingController _nameController;
   bool _isSubmitting = false;
@@ -1434,6 +1435,10 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
   @override
   void initState() {
     super.initState();
+    
+    // Initialize controller immediately
+    _nameController = TextEditingController();
+    
     if (widget.programDoc != null) {
       final data = widget.programDoc!.data() as Map<String, dynamic>;
       final fullName = data['name'] ?? '';
@@ -1442,6 +1447,8 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
       
       // Load colleges first, then strip prefix
       _loadColleges().then((_) {
+        if (!mounted) return;
+        
         // NEW: Strip the prefix when editing to show only the user input part
         String nameWithoutPrefix = fullName;
         
@@ -1478,7 +1485,6 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
         });
       });
     } else {
-      _nameController = TextEditingController();
       _loadColleges();
     }
   }
@@ -1522,7 +1528,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
         final collegeName = collegeData['name'] ?? '';
         
         // If college is "Others" or "Veterinary Medicine", return input as-is
-        if (collegeName == 'Others' || collegeName == 'College of Veterinary Medicine') {
+        if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
           return input;
         }
         
@@ -2033,7 +2039,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
         final collegeData = college.data() as Map<String, dynamic>;
         final collegeName = collegeData['name'] ?? '';
         
-        if (collegeName == 'Others' || collegeName == 'College of Veterinary Medicine') {
+        if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
           showPrefix = false;
           example = 'Bachelor of Science in Information Technology';
         } else {
@@ -2218,3 +2224,15 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
   }
 }
 
+// ==================== MODIFIED PROGRAM INFO MODAL ====================
+// Add category display in the ProgramInfoModal build method's content section:
+
+// Inside ProgramInfoModal's build method, add after the Program Name info item:
+/*
+const SizedBox(height: 8),
+_buildInfoItem(
+  Icons.category_outlined,
+  'Category',
+  data['category'] ?? 'N/A',
+),
+*/

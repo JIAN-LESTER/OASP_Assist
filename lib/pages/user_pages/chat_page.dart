@@ -2144,40 +2144,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                     ),
                   ),
 
-                  // What happens next
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'What happens next?',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600, //  Semibold
-                            color: Colors.grey.shade800,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        _buildNextStepItem(
-                          icon: Icons.person_search,
-                          text: 'A staff member will review your conversation',
-                        ),
-                        const SizedBox(height: 10),
-                        _buildNextStepItem(
-                          icon: Icons.chat_bubble_outline,
-                          text: 'They\'ll provide personalized assistance',
-                        ),
-                        const SizedBox(height: 10),
-                        _buildNextStepItem(
-                          icon: Icons.email_outlined,
-                          text:
-                              'You\'ll be notified via device notification and in-app',
-                        ),
-                      ],
-                    ),
-                  ),
+             const SizedBox(height: 30,),
 
                   Container(
                     padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
