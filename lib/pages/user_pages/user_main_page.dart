@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:capstone_project/models/message.dart';
 import 'package:capstone_project/onboarding/onBoardingGuide.dart';
 import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 import 'package:circle_nav_bar/circle_nav_bar.dart' show CircleNavBar;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -1224,98 +1225,12 @@ class _UserMainPageState extends State<UserMainPage>
                     size: 20,
                     color: Colors.grey[500],
                   ),
-                  onPressed: () async {
-                    // Use the same delete function from menu.dart
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      barrierDismissible: false,
-                      builder:
-                          (dialogContext) => AlertDialog(
-                            title: const Text('Delete Conversation'),
-                            content: const Text(
-                              'Are you sure you want to delete this conversation?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed:
-                                    () => Navigator.pop(dialogContext, false),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed:
-                                    () => Navigator.pop(dialogContext, true),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.red,
-                                ),
-                                child: const Text('Delete'),
-                              ),
-                            ],
-                          ),
-                    );
-
-                    if (confirmed != true || !context.mounted) return;
-
-                    try {
-                      final wasSelected = _conversationId == convId;
-
-                      if (wasSelected) {
-                        await UserConstant.setSelectedConversation('');
-                        UserConstant.shouldShowFAQs = true;
-
-                        if (context.mounted) {
-                          final chatProvider = Provider.of<ChatProvider>(
-                            context,
-                            listen: false,
-                          );
-                          chatProvider.clearMessages();
-
-                          setState(() {
-                            _conversationId = null;
-                            _showFAQs = true;
-                          });
-                        }
-                      }
-
-                      final firestore = FirebaseFirestore.instance;
-                      final batch = firestore.batch();
-
-                      final messagesSnapshot =
-                          await firestore
-                              .collection('conversations')
-                              .doc(convId)
-                              .collection('messages')
-                              .get();
-
-                      for (final doc in messagesSnapshot.docs) {
-                        batch.delete(doc.reference);
-                      }
-                      batch.delete(
-                        firestore.collection('conversations').doc(convId),
-                      );
-
-                      await batch.commit();
-
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Conversation deleted'),
-                            backgroundColor: UniversalUIComponents.primaryGreen,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      print('❌ Delete error: $e');
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Failed to delete: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  },
+                  onPressed:
+                      () => _showDeleteConversationDialog(
+                        context,
+                        convId,
+                        conv['title'] ?? 'Untitled',
+                      ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -1327,6 +1242,342 @@ class _UserMainPageState extends State<UserMainPage>
               ),
             );
           },
+        );
+      },
+    );
+  }
+
+  Future<void> _showDeleteConversationDialog(
+    BuildContext context,
+    String conversationId,
+    String conversationTitle,
+  ) async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    // ValueNotifier for delete loading state
+    final isDeleting = ValueNotifier<bool>(false);
+
+    await showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Delete Conversation Confirmation',
+      barrierColor: Colors.black.withOpacity(0.5),
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with icon
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.fromLTRB(
+                    isMobile ? 24 : 32,
+                    isMobile ? 32 : 40,
+                    isMobile ? 24 : 32,
+                    isMobile ? 16 : 20,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(32),
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Color(0xFFEF4444),
+                          size: 32,
+                        ),
+                      ),
+                      SizedBox(height: isMobile ? 16 : 20),
+                      const Text(
+                        'Delete Conversation',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827),
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Content
+                Padding(
+                  padding: EdgeInsets.all(isMobile ? 24 : 32),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Are you sure you want to delete this conversation?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                          height: 1.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF9FAFB),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(0xFFE5E7EB),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          conversationTitle,
+                          style: TextStyle(
+                            fontSize: isMobile ? 14 : 15,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF111827),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Action Buttons
+                      ValueListenableBuilder<bool>(
+                        valueListenable: isDeleting,
+                        builder: (context, deleting, _) {
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 48,
+                                  child: OutlinedButton(
+                                    onPressed:
+                                        deleting
+                                            ? null
+                                            : () => Navigator.of(context).pop(),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF6B7280),
+                                      backgroundColor: Colors.white,
+                                      disabledForegroundColor:
+                                          Colors.grey.shade400,
+                                      side: BorderSide(
+                                        color:
+                                            deleting
+                                                ? const Color(0xFFE5E7EB)
+                                                : const Color(0xFFD1D5DB),
+                                        width: 1,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Cancel',
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 15 : 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 48,
+                                  child: ElevatedButton(
+                                    onPressed:
+                                        deleting
+                                            ? null
+                                            : () async {
+                                              isDeleting.value = true;
+
+                                              try {
+                                                final wasSelected =
+                                                    _conversationId ==
+                                                    conversationId;
+
+                                                if (wasSelected) {
+                                                  await UserConstant.setSelectedConversation(
+                                                    '',
+                                                  );
+                                                  UserConstant.shouldShowFAQs =
+                                                      true;
+
+                                                  if (context.mounted) {
+                                                    final chatProvider =
+                                                        Provider.of<
+                                                          ChatProvider
+                                                        >(
+                                                          context,
+                                                          listen: false,
+                                                        );
+                                                    chatProvider
+                                                        .clearMessages();
+
+                                                    setState(() {
+                                                      _conversationId = null;
+                                                      _showFAQs = true;
+                                                    });
+                                                  }
+                                                }
+
+                                                final firestore =
+                                                    FirebaseFirestore.instance;
+                                                final batch = firestore.batch();
+
+                                                final messagesSnapshot =
+                                                    await firestore
+                                                        .collection(
+                                                          'conversations',
+                                                        )
+                                                        .doc(conversationId)
+                                                        .collection('messages')
+                                                        .get();
+
+                                                for (final doc
+                                                    in messagesSnapshot.docs) {
+                                                  batch.delete(doc.reference);
+                                                }
+                                                batch.delete(
+                                                  firestore
+                                                      .collection(
+                                                        'conversations',
+                                                      )
+                                                      .doc(conversationId),
+                                                );
+
+                                                await batch.commit();
+
+                                                if (context.mounted) {
+                                                  Navigator.of(context).pop();
+                                                  SnackbarUtil.showSuccess(
+                                                    context,
+                                                    'Conversation deleted successfully',
+                                                  );
+                                                }
+                                              } catch (e) {
+                                                print('❌ Delete error: $e');
+                                                if (context.mounted) {
+                                                  Navigator.of(context).pop();
+                                                  SnackbarUtil.showError(
+                                                    context,
+                                                    'Failed to delete conversation',
+                                                  );
+                                                }
+                                              } finally {
+                                                if (context.mounted) {
+                                                  isDeleting.value = false;
+                                                }
+                                              }
+                                            },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          deleting
+                                              ? const Color(0xFFFCA5A5)
+                                              : const Color(0xFFEF4444),
+                                      foregroundColor: Colors.white,
+                                      disabledBackgroundColor: const Color(
+                                        0xFFFCA5A5,
+                                      ),
+                                      disabledForegroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                    ),
+                                    child:
+                                        deleting
+                                            ? Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                const SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                          Color
+                                                        >(Colors.white),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Text(
+                                                  'Deleting...',
+                                                  style: TextStyle(
+                                                    fontSize:
+                                                        isMobile ? 15 : 16,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                            : Text(
+                                              'Delete',
+                                              style: TextStyle(
+                                                fontSize: isMobile ? 15 : 16,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
+            child: child,
+          ),
         );
       },
     );
