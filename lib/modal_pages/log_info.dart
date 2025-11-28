@@ -1,3 +1,4 @@
+import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -8,8 +9,9 @@ void showLogsInfoModal(
   BuildContext context,
   DocumentSnapshot doc,
   List<Map<String, dynamic>> messages,
-  bool isMessage,
-) {
+  bool isMessage, {
+  bool showDeleteButton = false, // 🔹 NEW: Optional parameter for delete access
+}) {
   final data = doc.data() as Map<String, dynamic>;
 
   final screenWidth = MediaQuery.of(context).size.width;
@@ -187,20 +189,15 @@ void showLogsInfoModal(
                             data['reply'] ?? 'No message available.',
                           ),
                           const SizedBox(height: 20),
-
-                          // Current Document Content (fallback
                         ] else ...[
-                          buildSectionHeader(
-                            'Action',
-                            Icons.flash_on_outlined,
-                          ),
+                          buildSectionHeader('Action', Icons.flash_on_outlined),
                           const SizedBox(height: 12),
                           _buildScrollableContentCard(
                             data['action'] ??
                                 'No action information available.',
                           ),
                         ],
-  const SizedBox(height: 20),
+                        const SizedBox(height: 20),
                         // Timestamp
                         buildSectionHeader(
                           'Timestamp',
@@ -209,16 +206,17 @@ void showLogsInfoModal(
                         const SizedBox(height: 12),
                         _buildContentCard(formattedDate),
 
-                        const SizedBox(height: 24),
-
-                        // Delete Button
-                        _buildDeleteButton(
-                          context,
-                          doc,
-                          isMobile,
-                          isTablet,
-                          isDesktop,
-                        ),
+                        // 🔹 CONDITIONAL DELETE BUTTON - Only shown for admins
+                        if (showDeleteButton) ...[
+                          const SizedBox(height: 24),
+                          _buildDeleteButton(
+                            context,
+                            doc,
+                            isMobile,
+                            isTablet,
+                            isDesktop,
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -245,9 +243,6 @@ void showLogsInfoModal(
     },
   );
 }
-
-// Helper method to build section headers
-
 
 // Helper method to build content cards
 Widget _buildContentCard(String content) {
@@ -469,7 +464,7 @@ void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Action:',
+                            'Message:',
                             style: TextStyle(
                               fontSize: 12,
                               color: Color(0xFF6B7280),
@@ -478,9 +473,9 @@ void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            data['action'] ??
-                                data['content'] ??
-                                'No action available',
+                            data['message'] ??
+                                data['action'] ??
+                                'No message available',
                             style: TextStyle(
                               fontSize: isMobile ? 14 : 16,
                               color: const Color(0xFF1F2937),
@@ -577,6 +572,7 @@ Widget _buildDeleteActionButtons(
 }
 
 // Handle delete log
+
 Future<void> _handleDeleteLog(
   BuildContext context,
   DocumentSnapshot doc,
@@ -608,19 +604,38 @@ Future<void> _handleDeleteLog(
     }
 
     final docData = doc.data() as Map<String, dynamic>;
-    String deletedAction = docData['action'] ?? docData['content'] ?? 'Unknown';
 
-    // Delete log document
-    await FirebaseFirestore.instance.collection('logs').doc(doc.id).delete();
+    // 🔹 FIXED: Check which collection this document belongs to
+    String deletedContent;
+    String collectionName;
 
-    // Log the deletion action
-    final logRef = FirebaseFirestore.instance.collection('logs').doc();
-    await logRef.set({
-      'logId': logRef.id,
-      'user': actorName,
-      'action': 'Deleted Log: $deletedAction',
-      'time': Timestamp.now(),
-    });
+    if (docData.containsKey('message')) {
+      // This is from message_logs collection
+      deletedContent = docData['message'] ?? 'Unknown';
+      collectionName = 'message_logs';
+    } else {
+      // This is from logs collection (User Activity Logs)
+      deletedContent = docData['action'] ?? 'Unknown';
+      collectionName = 'logs';
+    }
+
+    // 🔹 FIXED: Delete from the correct collection
+    await FirebaseFirestore.instance
+        .collection(collectionName)
+        .doc(doc.id)
+        .delete();
+
+    // 🔹 Only log to 'logs' collection if we deleted a message log
+    // (Don't create a log when deleting a log - prevents recursion)
+    if (collectionName == 'message_logs') {
+      final logRef = FirebaseFirestore.instance.collection('logs').doc();
+      await logRef.set({
+        'logId': logRef.id,
+        'user': actorName,
+        'action': 'Deleted Message Log: $deletedContent',
+        'time': Timestamp.now(),
+      });
+    }
 
     if (context.mounted) {
       // Close loading dialog
@@ -630,19 +645,11 @@ Future<void> _handleDeleteLog(
       // Close info modal
       Navigator.of(context).pop();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Text('Log deleted successfully'),
-            ],
-          ),
-          backgroundColor: const Color(0xFF10B981),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
+      SnackbarUtil.showSuccess(
+        context,
+        collectionName == 'message_logs'
+            ? 'Message log deleted successfully'
+            : 'Activity log deleted successfully',
       );
     }
   } catch (error) {
@@ -650,52 +657,7 @@ Future<void> _handleDeleteLog(
       // Close loading dialog
       Navigator.of(context).pop();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Text('Delete failed: $error'),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      SnackbarUtil.showError(context, 'Delete failed: $error');
     }
   }
-}
-
-Widget _buildMetadataRow(String label, dynamic value, IconData icon) {
-  return Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Icon(icon, size: 18, color: const Color(0xFF64748B)),
-      const SizedBox(width: 12),
-      Expanded(
-        flex: 2,
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF64748B),
-          ),
-        ),
-      ),
-      Expanded(
-        flex: 3,
-        child: Text(
-          value?.toString() ?? 'Not available',
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF334155),
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-      ),
-    ],
-  );
 }

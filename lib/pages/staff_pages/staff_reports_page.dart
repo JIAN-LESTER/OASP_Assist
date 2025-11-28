@@ -45,10 +45,10 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
 
   Future<void> _loadUserName() async {
     if (!mounted) return;
-    
+
     final name = await _fetchUserName();
     if (!mounted) return;
-    
+
     setState(() {
       userName = name;
       isLoadingUser = false;
@@ -60,7 +60,9 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
 
     setState(() => isLoadingInquiry = true);
     try {
-      final data = await _firebaseService.getInquiryReportsData(selectedTimeFrame);
+      final data = await _firebaseService.getInquiryReportsData(
+        selectedTimeFrame,
+      );
       if (!mounted) return;
       setState(() {
         inq = data;
@@ -86,7 +88,9 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
     setState(() => isRefreshing = true);
 
     try {
-      final data = await _firebaseService.getInquiryReportsData(selectedTimeFrame);
+      final data = await _firebaseService.getInquiryReportsData(
+        selectedTimeFrame,
+      );
       if (!mounted) return;
       setState(() {
         inq = data;
@@ -105,10 +109,7 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
       setState(() => isRefreshing = false);
 
       if (mounted) {
-        _showSnackBar(
-          message: 'Failed to refresh reports',
-          isError: true,
-        );
+        _showSnackBar(message: 'Failed to refresh reports', isError: true);
       }
     }
   }
@@ -124,7 +125,9 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isError ? Icons.error_outline : Icons.check_circle_outline_outlined,
+              isError
+                  ? Icons.error_outline
+                  : Icons.check_circle_outline_outlined,
               color: Colors.white,
               size: isMobile ? 20 : 24,
             ),
@@ -152,9 +155,7 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
           right: 20,
           left: isMobile ? 20 : (screenWidth - (isTablet ? 380 : 420)),
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(4),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
         elevation: 6,
       ),
     );
@@ -165,10 +166,11 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
     if (currentUser == null) return 'User';
 
     try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
 
       return userDoc.exists ? (userDoc.data()?['name'] ?? 'User') : 'User';
     } catch (e) {
@@ -180,9 +182,7 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
   @override
   Widget build(BuildContext context) {
     if (isLoadingUser) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return ResponsiveLayout(
@@ -255,10 +255,11 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat();
-    
-    _animation = Tween<double>(begin: -1.0, end: 2.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+
+    _animation = Tween<double>(
+      begin: -1.0,
+      end: 2.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -280,16 +281,13 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [
-                Colors.grey[300]!,
-                Colors.grey[100]!,
-                Colors.grey[300]!,
-              ],
-              stops: [
-                _animation.value - 0.3,
-                _animation.value,
-                _animation.value + 0.3,
-              ].map((e) => e.clamp(0.0, 1.0)).toList(),
+              colors: [Colors.grey[300]!, Colors.grey[100]!, Colors.grey[300]!],
+              stops:
+                  [
+                    _animation.value - 0.3,
+                    _animation.value,
+                    _animation.value + 0.3,
+                  ].map((e) => e.clamp(0.0, 1.0)).toList(),
             ),
           ),
         );
@@ -331,10 +329,7 @@ Widget buildStatCardSkeleton({bool isMobile = false}) {
           ],
         ),
         const SizedBox(height: 12),
-        SkeletonLoader(
-          height: isMobile ? 24 : 32,
-          width: isMobile ? 60 : 80,
-        ),
+        SkeletonLoader(height: isMobile ? 24 : 32, width: isMobile ? 60 : 80),
       ],
     ),
   );
@@ -358,10 +353,7 @@ Widget buildChartCardSkeleton({bool isMobile = false}) {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SkeletonLoader(
-          height: isMobile ? 18 : 20,
-          width: isMobile ? 120 : 150,
-        ),
+        SkeletonLoader(height: isMobile ? 18 : 20, width: isMobile ? 120 : 150),
         const SizedBox(height: 16),
         Expanded(
           child: SkeletonLoader(
@@ -417,7 +409,7 @@ class DesktopDashboard extends StatelessWidget {
               userName,
             ),
             const SizedBox(height: 32),
-            
+
             if (isLoading)
               ...buildSkeletonReport(isMobile: false)
             else
@@ -476,7 +468,7 @@ class TabletDashboard extends StatelessWidget {
               userName,
             ),
             const SizedBox(height: 32),
-            
+
             if (isLoading)
               ...buildSkeletonReport(isMobile: false)
             else
@@ -535,7 +527,7 @@ class MobileDashboard extends StatelessWidget {
               userName,
             ),
             const SizedBox(height: 24),
-            
+
             if (isLoading)
               ...buildSkeletonReport(isMobile: true)
             else
@@ -724,7 +716,12 @@ List<Widget> buildInquiryTrendsReport(
       height: 400,
       child: Row(
         children: [
-          Expanded(child: buildInquiryTrendCard(data?.inquiryTrend ?? [], selectedTimeFrame.toString())),
+          Expanded(
+            child: buildInquiryTrendCard(
+              data?.inquiryTrend ?? [],
+              selectedTimeFrame.toString(),
+            ),
+          ),
         ],
       ),
     ),
@@ -794,11 +791,6 @@ Widget buildHeader(
                           onChanged: onTimeFrameChanged,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      RefreshButton(
-                        onRefresh: onRefresh,
-                        isRefreshing: isRefreshing,
-                      ),
                     ],
                   ),
                 ],
@@ -823,11 +815,6 @@ Widget buildHeader(
                         ],
                         initialValue: selectedTimeFrame,
                         onChanged: onTimeFrameChanged,
-                      ),
-                      const SizedBox(width: 12),
-                      RefreshButton(
-                        onRefresh: onRefresh,
-                        isRefreshing: isRefreshing,
                       ),
                     ],
                   ),
