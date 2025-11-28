@@ -1,5 +1,3 @@
-
-
 import 'package:capstone_project/icon_and_color.dart';
 
 import 'package:capstone_project/services/fb_sync.dart';
@@ -16,6 +14,7 @@ import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 class AnnouncementPage extends StatefulWidget {
   const AnnouncementPage({super.key});
@@ -55,9 +54,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       setState(() {
         isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading announcements: $e')),
-      );
+      SnackbarUtil.showError(context, 'Error loading announcements: $e');
     }
   }
 
@@ -75,6 +72,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
       final result = await FacebookSyncService.syncPosts();
 
+      if (!mounted) return; // ADDED THIS LINE
+
       print('📦 Sync result: $result');
 
       if (result['success'] == true) {
@@ -86,7 +85,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
         if (mounted) {
           _showSuccessSnackBar(
-            '✅ Synced $count posts' + (failed > 0 ? ' ($failed failed)' : ''),
+            'Synced $count posts${failed > 0 ? ' ($failed failed)' : ''}',
           );
         }
       } else {
@@ -351,7 +350,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                                             if (data?.text != null) {
                                               tokenController.text =
                                                   data!.text!;
-                                              _showSuccessSnackBar(
+                                              SnackbarUtil.showSuccess(
+                                                context,
                                                 '✅ Token pasted from clipboard',
                                               );
                                             }
@@ -431,14 +431,16 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                                                     tokenController.text.trim();
 
                                                 if (token.isEmpty) {
-                                                  _showErrorSnackBar(
+                                                  SnackbarUtil.showError(
+                                                    context,
                                                     'Please enter a token',
                                                   );
                                                   return;
                                                 }
 
                                                 if (token.length < 50) {
-                                                  _showErrorSnackBar(
+                                                  SnackbarUtil.showError(
+                                                    context,
                                                     'Token seems too short',
                                                   );
                                                   return;
@@ -457,6 +459,9 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                                                         token,
                                                       );
 
+                                                  if (!context.mounted)
+                                                    return; // ADDED THIS LINE
+
                                                   if (result['success'] ==
                                                           true ||
                                                       result['ok'] == true) {
@@ -468,8 +473,9 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                                                             .round();
 
                                                     Navigator.pop(context);
-                                                    _showSuccessSnackBar(
-                                                      '✅ Token saved! Valid for ~$daysValid days.',
+                                                    SnackbarUtil.showSuccess(
+                                                      context,
+                                                      'Token saved! Valid for ~$daysValid days.',
                                                     );
                                                     await _autoSyncAfterTokenSave();
                                                     return;
@@ -481,6 +487,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                                                   );
                                                 } catch (e) {
                                                   print('❌ Error: $e');
+
+                                                  if (!context.mounted)
+                                                    return; // ADDED THIS LINE
+
                                                   setDialogState(
                                                     () => isExchanging = false,
                                                   );
@@ -488,7 +498,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                                                       FacebookSyncService.parseErrorMessage(
                                                         e,
                                                       );
-                                                  _showErrorSnackBar(
+                                                  SnackbarUtil.showError(
+                                                    context,
                                                     'Failed to save token: $errorMessage',
                                                   );
                                                 }
@@ -633,6 +644,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
       final result = await FacebookSyncService.syncPosts();
 
+      if (!mounted) return; // ADDED THIS LINE
+
       Navigator.pop(context); // Close loading dialog
 
       if (result['success'] == true) {
@@ -646,13 +659,14 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
         // Show success message
         _showSuccessSnackBar(
-          '✅ Successfully synced $count posts!' +
-              (failed > 0 ? ' ($failed failed)' : ''),
+          'Successfully synced $count posts!${failed > 0 ? ' ($failed failed)' : ''}',
         );
       } else {
         throw Exception(result['error'] ?? result['message'] ?? 'Sync failed');
       }
     } catch (e) {
+      if (!mounted) return; // ADDED THIS LINE
+
       Navigator.pop(context); // Close loading dialog
 
       print('❌ Auto-sync failed: $e');
@@ -731,7 +745,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                   foregroundColor: Colors.white,
                 ),
               ),
-     
             ],
           ),
     );
@@ -740,42 +753,12 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   // Helper methods for snackbars
   void _showSuccessSnackBar(String message) {
     if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.white, size: 20),
-            SizedBox(width: 8),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.green[600],
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 4),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
+    SnackbarUtil.showSuccess(context, message);
   }
 
   void _showErrorSnackBar(String message) {
     if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.error, color: Colors.white, size: 20),
-            SizedBox(width: 8),
-            Expanded(child: Text(message, style: TextStyle(fontSize: 13))),
-          ],
-        ),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 5),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
+    SnackbarUtil.showError(context, message);
   }
 
   List<DocumentSnapshot> get filteredAnnouncements {
@@ -879,7 +862,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                   right: 32,
                   child: _buildRefreshButton(isDesktop: true),
                 ),
-                
               ],
             ),
           ),
@@ -1096,210 +1078,217 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   }
 
   // MAIN CONTENT
-Widget _buildMainContent({required bool isDesktop}) {
-  return StreamBuilder<QuerySnapshot>(
-    stream: FirebaseFirestore.instance
-        .collection('announcements')
-        .where('deleted', isEqualTo: false)
-        .orderBy('created_time', descending: true)
-        .snapshots(),
-    builder: (context, snapshot) {
-      // Loading state
-      if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
-                strokeWidth: 3,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Loading announcements...',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-
-      // Error state
-      if (snapshot.hasError) {
-        return Center(
-          child: Container(
-            padding: const EdgeInsets.all(48),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 20,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
+  Widget _buildMainContent({required bool isDesktop}) {
+    return StreamBuilder<QuerySnapshot>(
+      stream:
+          FirebaseFirestore.instance
+              .collection('announcements')
+              .where('deleted', isEqualTo: false)
+              .orderBy('created_time', descending: true)
+              .snapshots(),
+      builder: (context, snapshot) {
+        // Loading state
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: Colors.red[50],
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: Colors.red[400],
-                  ),
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
+                  strokeWidth: 3,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 Text(
-                  'Error loading announcements',
+                  'Loading announcements...',
                   style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  snapshot.error.toString(),
-                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  textAlign: TextAlign.center,
                 ),
               ],
             ),
-          ),
-        );
-      }
+          );
+        }
 
-      // Filter announcements based on search and category
-      final allAnnouncements = snapshot.data?.docs ?? [];
-      final displayedAnnouncements = _filterAnnouncementsFromDocs(allAnnouncements);
-
-      // Empty state
-      if (displayedAnnouncements.isEmpty) {
-        return Center(
-          child: Container(
-            padding: const EdgeInsets.all(48),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 20,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    shape: BoxShape.circle,
+        // Error state
+        if (snapshot.hasError) {
+          return Center(
+            child: Container(
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
                   ),
-                  child: Icon(
-                    Icons.announcement_outlined,
-                    size: 64,
-                    color: Colors.green[400],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'No announcements found',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Try adjusting your search or check back later for updates',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-
-      // List view
-      return RefreshIndicator(
-        onRefresh: _refreshFromFacebook,
-        color: Colors.green[600],
-        child: ListView.builder(
-          padding:
-              isDesktop
-                  ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
-                  : EdgeInsets.zero,
-          itemCount: displayedAnnouncements.length,
-          itemBuilder: (context, index) {
-            return Center(
-              child: Container(
-                constraints:
-                    isDesktop ? const BoxConstraints(maxWidth: 1100) : null,
-                padding: EdgeInsets.only(bottom: isDesktop ? 24 : 16),
-                child: AnnouncementCard(
-                  announcement: displayedAnnouncements[index],
-                  index: index,
-                  isDesktop: isDesktop,
-                  onEdit: _editAnnouncement,
-                  onDelete: _deleteAnnouncement,
-                ),
+                ],
               ),
-            );
-          },
-        ),
-      );
-    },
-  );
-}
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: Colors.red[50],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red[400],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Error loading announcements',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    snapshot.error.toString(),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
 
-List<DocumentSnapshot> _filterAnnouncementsFromDocs(List<DocumentSnapshot> docs) {
-  var filtered = docs.where((doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final message = data['message'] ?? '';
-    final category = data['category'] ?? '';
+        // Filter announcements based on search and category
+        final allAnnouncements = snapshot.data?.docs ?? [];
+        final displayedAnnouncements = _filterAnnouncementsFromDocs(
+          allAnnouncements,
+        );
 
-    String normalizedSelectedCategory =
-        selectedCategory.trim().toLowerCase();
-    String normalizedDocCategory = category.trim().toLowerCase();
+        // Empty state
+        if (displayedAnnouncements.isEmpty) {
+          return Center(
+            child: Container(
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.announcement_outlined,
+                      size: 64,
+                      color: Colors.green[400],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'No announcements found',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Try adjusting your search or check back later for updates',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
 
-    bool categoryMatches =
-        normalizedSelectedCategory == 'all categories'.toLowerCase() ||
-        normalizedDocCategory == normalizedSelectedCategory ||
-        normalizedDocCategory ==
-            _sentenceCase(normalizedSelectedCategory);
+        // List view
+        return RefreshIndicator(
+          onRefresh: _refreshFromFacebook,
+          color: Colors.green[600],
+          child: ListView.builder(
+            padding:
+                isDesktop
+                    ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
+                    : EdgeInsets.zero,
+            itemCount: displayedAnnouncements.length,
+            itemBuilder: (context, index) {
+              return Center(
+                child: Container(
+                  constraints:
+                      isDesktop ? const BoxConstraints(maxWidth: 1100) : null,
+                  padding: EdgeInsets.only(bottom: isDesktop ? 24 : 16),
+                  child: AnnouncementCard(
+                    announcement: displayedAnnouncements[index],
+                    index: index,
+                    isDesktop: isDesktop,
+                    onEdit: _editAnnouncement,
+                    onDelete: _deleteAnnouncement,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
 
-    if (!categoryMatches) {
-      return false;
-    }
+  List<DocumentSnapshot> _filterAnnouncementsFromDocs(
+    List<DocumentSnapshot> docs,
+  ) {
+    var filtered =
+        docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final message = data['message'] ?? '';
+          final category = data['category'] ?? '';
 
-    if (_searchController.text.isNotEmpty) {
-      final query = _searchController.text.toLowerCase();
-      final querySentence = _sentenceCase(query);
-      return message.toLowerCase().contains(query) ||
-          message.contains(querySentence);
-    }
+          String normalizedSelectedCategory =
+              selectedCategory.trim().toLowerCase();
+          String normalizedDocCategory = category.trim().toLowerCase();
 
-    return true;
-  }).toList();
+          bool categoryMatches =
+              normalizedSelectedCategory == 'all categories'.toLowerCase() ||
+              normalizedDocCategory == normalizedSelectedCategory ||
+              normalizedDocCategory ==
+                  _sentenceCase(normalizedSelectedCategory);
 
-  return filtered;
-}
+          if (!categoryMatches) {
+            return false;
+          }
+
+          if (_searchController.text.isNotEmpty) {
+            final query = _searchController.text.toLowerCase();
+            final querySentence = _sentenceCase(query);
+            return message.toLowerCase().contains(query) ||
+                message.contains(querySentence);
+          }
+
+          return true;
+        }).toList();
+
+    return filtered;
+  }
 
   // SIDEBAR
   Widget _buildSidebar() {
@@ -1482,16 +1471,15 @@ List<DocumentSnapshot> _filterAnnouncementsFromDocs(List<DocumentSnapshot> docs)
       text: data['category'] ?? 'General',
     );
     final d = data['deadline'];
-String deadlineText = '';
+    String deadlineText = '';
 
-if (d is Timestamp) {
-  deadlineText = DateFormat('yyyy-MM-dd').format(d.toDate());
-} else if (d is String) {
-  deadlineText = d;
-}
+    if (d is Timestamp) {
+      deadlineText = DateFormat('yyyy-MM-dd').format(d.toDate());
+    } else if (d is String) {
+      deadlineText = d;
+    }
 
-final deadlineController = TextEditingController(text: deadlineText);
-
+    final deadlineController = TextEditingController(text: deadlineText);
 
     String selectedCategory = data['category'] ?? 'General';
     bool isLoading = false;
@@ -1890,25 +1878,9 @@ final deadlineController = TextEditingController(text: deadlineText);
                       ? null
                       : () async {
                         if (messageController.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.error,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text('Message cannot be empty'),
-                                ],
-                              ),
-                              backgroundColor: Colors.red,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
+                          SnackbarUtil.showError(
+                            context,
+                            'Message cannot be empty',
                           );
                           return;
                         }
@@ -1933,52 +1905,22 @@ final deadlineController = TextEditingController(text: deadlineText);
                                 'updated_at': FieldValue.serverTimestamp(),
                               });
 
-                          Navigator.pop(context);
-                          loadAnnouncements();
+                          if (!context.mounted) return; // ADDED THIS LINE
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.check_circle,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'Announcement updated successfully',
-                                  ),
-                                ],
-                              ),
-                              backgroundColor: const Color(0xFF2E7D32),
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
+                          Navigator.pop(context);
+                          await loadAnnouncements();
+
+                          SnackbarUtil.showSuccess(
+                            context,
+                            'Announcement updated successfully',
                           );
                         } catch (e) {
+                          if (!context.mounted) return; //  ADDED THIS LINE
+
                           setDialogState(() => isLoading = false);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.error,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text('Error updating announcement: $e'),
-                                ],
-                              ),
-                              backgroundColor: Colors.red,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
+                          SnackbarUtil.showError(
+                            context,
+                            'Error updating announcement: $e',
                           );
                         }
                       },
@@ -2159,701 +2101,746 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
     super.dispose();
   }
 
- @override
-Widget build(BuildContext context) {
-  final data = widget.announcement.data() as Map<String, dynamic>;
-  final message = data['message'] ?? "";
-  final category = data['category'] ?? 'General';
-  final deadline = data['deadline'];
-  
-  List<String> images = [];
-  
-  if (data['images'] != null && data['images'] is List) {
-    images = (data['images'] as List)
-        .map((item) {
-          if (item is String) return item;
-          if (item is Map && item.containsKey('url')) return item['url'].toString();
-          return '';
-        })
-        .where((url) => url.isNotEmpty && url.startsWith('http'))
-        .toList();
-  }
-  
-  if (images.isEmpty && 
-      data['full_picture'] != null && 
-      (data['full_picture'] as String).isNotEmpty &&
-      (data['full_picture'] as String).startsWith('http')) {
-    images = [data['full_picture'] as String];
-  }
-  
-  final hasImages = images.isNotEmpty;
-  final imageCount = data['image_count'] ?? images.length;
-  final createdTime = _formatDate(data['created_time']);
-  final hasOCR = data['has_image_text'] == true;
-  final ocrProcessedCount = data['ocr_processed_count'] ?? 0;
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.announcement.data() as Map<String, dynamic>;
+    final message = data['message'] ?? "";
+    final category = data['category'] ?? 'General';
+    final deadline = data['deadline'];
 
-  return Container(
-    decoration: BoxDecoration(
-      color: Colors.white,
+    List<String> images = [];
+
+    if (data['images'] != null && data['images'] is List) {
+      images =
+          (data['images'] as List)
+              .map((item) {
+                if (item is String) return item;
+                if (item is Map && item.containsKey('url'))
+                  return item['url'].toString();
+                return '';
+              })
+              .where((url) => url.isNotEmpty && url.startsWith('http'))
+              .toList();
+    }
+
+    if (images.isEmpty &&
+        data['full_picture'] != null &&
+        (data['full_picture'] as String).isNotEmpty &&
+        (data['full_picture'] as String).startsWith('http')) {
+      images = [data['full_picture'] as String];
+    }
+
+    final hasImages = images.isNotEmpty;
+    final imageCount = data['image_count'] ?? images.length;
+    final createdTime = _formatDate(data['created_time']);
+    final hasOCR = data['has_image_text'] == true;
+    final ocrProcessedCount = data['ocr_processed_count'] ?? 0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+            spreadRadius: -4,
+          ),
+        ],
+        border: Border.all(color: Colors.grey[300]!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(
+            category,
+            createdTime,
+            imageCount,
+            hasOCR,
+            ocrProcessedCount,
+          ),
+          if (deadline != null) _buildDeadline(deadline),
+          if (message.isNotEmpty) _buildMessage(message),
+          if (hasImages) _buildImageGallery(images),
+          _buildActionButtons(data),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageGallery(List<String> images) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        widget.isDesktop ? 24 : 20,
+        0,
+        widget.isDesktop ? 24 : 20,
+        widget.isDesktop ? 20 : 16,
+      ),
+      child:
+          images.length == 1
+              ? _buildSingleImage(images[0])
+              : _buildImageCollage(images),
+    );
+  }
+
+  Widget _buildSingleImage(String imageUrl) {
+    return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.08),
-          blurRadius: 24,
-          offset: const Offset(0, 8),
-          spreadRadius: -4,
-        ),
-      ],
-      border: Border.all(color: Colors.grey[300]!, width: 1),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeader(category, createdTime, imageCount, hasOCR, ocrProcessedCount),
-        if (deadline != null) _buildDeadline(deadline),
-        if (message.isNotEmpty) _buildMessage(message), 
-        if (hasImages) _buildImageGallery(images),
-        _buildActionButtons(data),
-      ],
-    ),
-  );
-}
-
-Widget _buildImageGallery(List<String> images) {
-  return Padding(
-    padding: EdgeInsets.fromLTRB(
-      widget.isDesktop ? 24 : 20,
-      0,
-      widget.isDesktop ? 24 : 20,
-      widget.isDesktop ? 20 : 16,
-    ),
-    child: images.length == 1
-        ? _buildSingleImage(images[0])
-        : _buildImageCollage(images),
-  );
-}
-
-Widget _buildSingleImage(String imageUrl) {
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(12),
-    child: GestureDetector(
-      onTap: () => _showFullScreenImage(context, [imageUrl], 0),
-      child: Container(
-        height: widget.isDesktop ? 400 : 300,
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => _buildImageError(),
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return _buildImageLoading(loadingProgress);
-                },
-              ),
-            ),
-            Positioned(
-              top: 12,
-              left: 12,
-              child: _buildFullscreenButton([imageUrl], 0),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-Widget _buildImageCollage(List<String> images) {
-  final imageCount = images.length;
-  
-  // Different layouts based on number of images
-  if (imageCount == 2) {
-    return _buildTwoImageLayout(images);
-  } else if (imageCount == 3) {
-    return _buildThreeImageLayout(images);
-  } else if (imageCount == 4) {
-    return _buildFourImageLayout(images);
-  } else {
-    // 5 or more images
-    return _buildMultiImageLayout(images);
-  }
-}
-
-// Layout for 2 images (side by side)
-Widget _buildTwoImageLayout(List<String> images) {
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(12),
-    child: SizedBox(
-      height: widget.isDesktop ? 400 : 300,
-      child: Row(
-        children: [
-          Expanded(child: _buildCollageImage(images[0], 0, images)),
-          const SizedBox(width: 4),
-          Expanded(child: _buildCollageImage(images[1], 1, images)),
-        ],
-      ),
-    ),
-  );
-}
-
-// Layout for 3 images (1 large on left, 2 stacked on right)
-Widget _buildThreeImageLayout(List<String> images) {
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(12),
-    child: SizedBox(
-      height: widget.isDesktop ? 400 : 300,
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: _buildCollageImage(images[0], 0, images),
+      child: GestureDetector(
+        onTap: () => _showFullScreenImage(context, [imageUrl], 0),
+        child: Container(
+          height: widget.isDesktop ? 400 : 300,
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(width: 4),
-          Expanded(
-            flex: 1,
-            child: Column(
-              children: [
-                Expanded(child: _buildCollageImage(images[1], 1, images)),
-                const SizedBox(height: 4),
-                Expanded(child: _buildCollageImage(images[2], 2, images)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-// Layout for 4 images (2x2 grid)
-Widget _buildFourImageLayout(List<String> images) {
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(12),
-    child: SizedBox(
-      height: widget.isDesktop ? 400 : 300,
-      child: Column(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: _buildCollageImage(images[0], 0, images)),
-                const SizedBox(width: 4),
-                Expanded(child: _buildCollageImage(images[1], 1, images)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: _buildCollageImage(images[2], 2, images)),
-                const SizedBox(width: 4),
-                Expanded(child: _buildCollageImage(images[3], 3, images)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-// Layout for 5+ images (2x2 grid with "+N" overlay on last image)
-Widget _buildMultiImageLayout(List<String> images) {
-  final displayImages = images.take(4).toList();
-  final remainingCount = images.length - 4;
-  
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(12),
-    child: SizedBox(
-      height: widget.isDesktop ? 400 : 300,
-      child: Column(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: _buildCollageImage(displayImages[0], 0, images)),
-                const SizedBox(width: 4),
-                Expanded(child: _buildCollageImage(displayImages[1], 1, images)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: _buildCollageImage(displayImages[2], 2, images)),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: _buildCollageImage(
-                    displayImages[3],
-                    3,
-                    images,
-                    showOverlay: true,
-                    overlayText: '+$remainingCount',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Widget _buildCollageImage(
-  String imageUrl,
-  int index,
-  List<String> allImages, {
-  bool showOverlay = false,
-  String? overlayText,
-}) {
-  return GestureDetector(
-    onTap: () => _showFullScreenImage(context, allImages, index),
-    child: Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.network(
-          imageUrl,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(
-            color: Colors.grey[200],
-            child: Icon(Icons.image, color: Colors.grey[400], size: 32),
-          ),
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Container(
-              color: Colors.grey[100],
-              child: Center(
-                child: CircularProgressIndicator(
-                  value: loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                      : null,
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder:
+                      (context, error, stackTrace) => _buildImageError(),
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return _buildImageLoading(loadingProgress);
+                  },
                 ),
               ),
-            );
-          },
-        ),
-        if (showOverlay && overlayText != null)
-          Container(
-            color: Colors.black.withOpacity(0.6),
-            child: Center(
-              child: Text(
-                overlayText,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                ),
+              Positioned(
+                top: 12,
+                left: 12,
+                child: _buildFullscreenButton([imageUrl], 0),
               ),
-            ),
+            ],
           ),
-        // Fullscreen button on hover
-        Positioned(
-          top: 8,
-          right: 8,
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.6),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(Icons.fullscreen, color: Colors.white, size: 16),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildFullscreenButton(List<String> images, int index) {
-  return Material(
-    color: Colors.transparent,
-    child: InkWell(
-      onTap: () => _showFullScreenImage(context, images, index),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.7),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Icon(Icons.fullscreen, color: Colors.white, size: 20),
-      ),
-    ),
-  );
-}
-
-  void _showFullScreenImage(BuildContext context, List<String> images, int initialIndex) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => FullScreenImageGallery(
-          images: images,
-          initialIndex: initialIndex,
         ),
       ),
     );
   }
 
- 
-Widget _buildImageCarousel(List<String> images) {
-  return Stack(
-    children: [
-      PageView.builder(
-        controller: _pageController,
-        itemCount: images.length,
-        onPageChanged: (index) {
-          setState(() {
-            _currentImageIndex = index;
-          });
-        },
-        itemBuilder: (context, index) {
-          return GestureDetector(
-            onTap: () => _showFullScreenImage(context, images, index),
-            child: Image.network(
-              images[index],
-              width: double.infinity,
-              height: double.infinity,
-              fit: BoxFit.contain, // ✅ Changed from cover to contain
-              errorBuilder: (context, error, stackTrace) => _buildImageError(),
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return _buildImageLoading(loadingProgress);
-              },
-            ),
-          );
-        },
+  Widget _buildImageCollage(List<String> images) {
+    final imageCount = images.length;
+
+    // Different layouts based on number of images
+    if (imageCount == 2) {
+      return _buildTwoImageLayout(images);
+    } else if (imageCount == 3) {
+      return _buildThreeImageLayout(images);
+    } else if (imageCount == 4) {
+      return _buildFourImageLayout(images);
+    } else {
+      // 5 or more images
+      return _buildMultiImageLayout(images);
+    }
+  }
+
+  // Layout for 2 images (side by side)
+  Widget _buildTwoImageLayout(List<String> images) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: widget.isDesktop ? 400 : 300,
+        child: Row(
+          children: [
+            Expanded(child: _buildCollageImage(images[0], 0, images)),
+            const SizedBox(width: 4),
+            Expanded(child: _buildCollageImage(images[1], 1, images)),
+          ],
+        ),
       ),
+    );
+  }
 
-      if (images.length > 1) ...[
-        _buildNavigationArrow(
-          alignment: Alignment.centerLeft,
-          icon: Icons.chevron_left,
-          onTap: () {
-            if (_currentImageIndex > 0) {
-              _pageController.previousPage(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-              );
-            }
-          },
-          enabled: _currentImageIndex > 0,
-        ),
-        _buildNavigationArrow(
-          alignment: Alignment.centerRight,
-          icon: Icons.chevron_right,
-          onTap: () {
-            if (_currentImageIndex < images.length - 1) {
-              _pageController.nextPage(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-              );
-            }
-          },
-          enabled: _currentImageIndex < images.length - 1,
-        ),
-      ],
-
-      if (images.length > 1)
-        Positioned(
-          top: 12,
-          right: 12,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(20),
+  // Layout for 3 images (1 large on left, 2 stacked on right)
+  Widget _buildThreeImageLayout(List<String> images) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: widget.isDesktop ? 400 : 300,
+        child: Row(
+          children: [
+            Expanded(flex: 2, child: _buildCollageImage(images[0], 0, images)),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 1,
+              child: Column(
+                children: [
+                  Expanded(child: _buildCollageImage(images[1], 1, images)),
+                  const SizedBox(height: 4),
+                  Expanded(child: _buildCollageImage(images[2], 2, images)),
+                ],
+              ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.photo_library, color: Colors.white, size: 16),
-                const SizedBox(width: 6),
-                Text(
-                  '${_currentImageIndex + 1}/${images.length}',
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Layout for 4 images (2x2 grid)
+  Widget _buildFourImageLayout(List<String> images) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: widget.isDesktop ? 400 : 300,
+        child: Column(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(child: _buildCollageImage(images[0], 0, images)),
+                  const SizedBox(width: 4),
+                  Expanded(child: _buildCollageImage(images[1], 1, images)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(child: _buildCollageImage(images[2], 2, images)),
+                  const SizedBox(width: 4),
+                  Expanded(child: _buildCollageImage(images[3], 3, images)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Layout for 5+ images (2x2 grid with "+N" overlay on last image)
+  Widget _buildMultiImageLayout(List<String> images) {
+    final displayImages = images.take(4).toList();
+    final remainingCount = images.length - 4;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: widget.isDesktop ? 400 : 300,
+        child: Column(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildCollageImage(displayImages[0], 0, images),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: _buildCollageImage(displayImages[1], 1, images),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildCollageImage(displayImages[2], 2, images),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: _buildCollageImage(
+                      displayImages[3],
+                      3,
+                      images,
+                      showOverlay: true,
+                      overlayText: '+$remainingCount',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCollageImage(
+    String imageUrl,
+    int index,
+    List<String> allImages, {
+    bool showOverlay = false,
+    String? overlayText,
+  }) {
+    return GestureDetector(
+      onTap: () => _showFullScreenImage(context, allImages, index),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            errorBuilder:
+                (context, error, stackTrace) => Container(
+                  color: Colors.grey[200],
+                  child: Icon(Icons.image, color: Colors.grey[400], size: 32),
+                ),
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                color: Colors.grey[100],
+                child: Center(
+                  child: CircularProgressIndicator(
+                    value:
+                        loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.green[600]!,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          if (showOverlay && overlayText != null)
+            Container(
+              color: Colors.black.withOpacity(0.6),
+              child: Center(
+                child: Text(
+                  overlayText,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 13,
+                    fontSize: 32,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-
-      Positioned(
-        top: 12,
-        left: 12,
-        child: _buildFullscreenButton(images, _currentImageIndex),
-      ),
-    ],
-  );
-}
-
-
-Widget _buildNavigationArrow({
-  required AlignmentGeometry alignment,
-  required IconData icon,
-  required VoidCallback onTap,
-  required bool enabled,
-}) {
-  if (!enabled) return const SizedBox.shrink();
-
-  return Align(
-    alignment: alignment,
-    child: Padding(
-      padding: const EdgeInsets.all(8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(24),
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.6),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-Widget _buildHeader(
-  String category, 
-  String createdTime, 
-  int imageCount, 
-  bool hasOCR,
-  int ocrProcessedCount
-) {
-  return Padding(
-    padding: EdgeInsets.all(widget.isDesktop ? 24 : 20),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                getColorForCategory(category).withOpacity(0.9),
-                getColorForCategory(category),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            getCategoryIcon(category),
-            color: Colors.white,
-            size: 26,
-          ),
-        ),
-        const SizedBox(width: 18),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          getColorForCategory(category).withOpacity(0.15),
-                          getColorForCategory(category).withOpacity(0.08),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      category.toUpperCase(),
-                      style: TextStyle(
-                        color: getColorForCategory(category),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.access_time_rounded, size: 14, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text(
-                          createdTime,
-                          style: TextStyle(
-                            color: Colors.grey[700],
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildDeadline(dynamic deadline) {
-  return Container(
-    margin: EdgeInsets.fromLTRB(
-      widget.isDesktop ? 24 : 20,
-      0,
-      widget.isDesktop ? 24 : 20,
-      widget.isDesktop ? 20 : 16,
-    ),
-    child: Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.orange[600],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.schedule_rounded, color: Colors.white, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'DEADLINE',
-                style: TextStyle(
-                  color: Colors.orange[800],
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                ),
+            ),
+          // Fullscreen button on hover
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(20),
               ),
-              const SizedBox(height: 2),
-              Text(
-                DateFormat('MMMM d, yyyy').format((deadline as Timestamp).toDate()),
-                style: TextStyle(
-                  color: Colors.orange[900],
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-// ✅ NEW: Message widget with See More/Less functionality
-Widget _buildMessage(String message) {
-  // Count the number of lines
-  final textPainter = TextPainter(
-    text: TextSpan(
-      text: message,
-      style: TextStyle(
-        fontSize: widget.isDesktop ? 15 : 14,
-        height: 1.7,
-        color: Colors.grey[700],
-      ),
-    ),
-    maxLines: null,
-    textDirection: Directionality.of(context)
-  )..layout(maxWidth: MediaQuery.of(context).size.width - (widget.isDesktop ? 48 : 40));
-
-  final lineCount = textPainter.computeLineMetrics().length;
-  final needsExpansion = lineCount > 3;
-
-  return Padding(
-    padding: EdgeInsets.fromLTRB(
-      widget.isDesktop ? 24 : 20,
-      0,
-      widget.isDesktop ? 24 : 20,
-      widget.isDesktop ? 20 : 16,
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          message,
-          style: TextStyle(
-            fontSize: widget.isDesktop ? 15 : 14,
-            height: 1.7,
-            color: Colors.grey[700],
-          ),
-          maxLines: needsExpansion && !_isMessageExpanded ? 3 : null,
-          overflow: needsExpansion && !_isMessageExpanded 
-              ? TextOverflow.ellipsis 
-              : null,
-        ),
-        if (needsExpansion) ...[
-          const SizedBox(height: 8),
-          InkWell(
-            onTap: () {
-              setState(() {
-                _isMessageExpanded = !_isMessageExpanded;
-              });
-            },
-            borderRadius: BorderRadius.circular(4),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _isMessageExpanded ? 'See less' : 'See more',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.green[700],
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    _isMessageExpanded 
-                        ? Icons.keyboard_arrow_up 
-                        : Icons.keyboard_arrow_down,
-                    size: 18,
-                    color: Colors.green[700],
-                  ),
-                ],
+              child: const Icon(
+                Icons.fullscreen,
+                color: Colors.white,
+                size: 16,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFullscreenButton(List<String> images, int index) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showFullScreenImage(context, images, index),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Icon(Icons.fullscreen, color: Colors.white, size: 20),
+        ),
+      ),
+    );
+  }
+
+  void _showFullScreenImage(
+    BuildContext context,
+    List<String> images,
+    int initialIndex,
+  ) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => FullScreenImageGallery(
+              images: images,
+              initialIndex: initialIndex,
+            ),
+      ),
+    );
+  }
+
+  Widget _buildImageCarousel(List<String> images) {
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _pageController,
+          itemCount: images.length,
+          onPageChanged: (index) {
+            setState(() {
+              _currentImageIndex = index;
+            });
+          },
+          itemBuilder: (context, index) {
+            return GestureDetector(
+              onTap: () => _showFullScreenImage(context, images, index),
+              child: Image.network(
+                images[index],
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.contain, // ✅ Changed from cover to contain
+                errorBuilder:
+                    (context, error, stackTrace) => _buildImageError(),
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return _buildImageLoading(loadingProgress);
+                },
+              ),
+            );
+          },
+        ),
+
+        if (images.length > 1) ...[
+          _buildNavigationArrow(
+            alignment: Alignment.centerLeft,
+            icon: Icons.chevron_left,
+            onTap: () {
+              if (_currentImageIndex > 0) {
+                _pageController.previousPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              }
+            },
+            enabled: _currentImageIndex > 0,
+          ),
+          _buildNavigationArrow(
+            alignment: Alignment.centerRight,
+            icon: Icons.chevron_right,
+            onTap: () {
+              if (_currentImageIndex < images.length - 1) {
+                _pageController.nextPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              }
+            },
+            enabled: _currentImageIndex < images.length - 1,
+          ),
+        ],
+
+        if (images.length > 1)
+          Positioned(
+            top: 12,
+            right: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.photo_library,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${_currentImageIndex + 1}/${images.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        Positioned(
+          top: 12,
+          left: 12,
+          child: _buildFullscreenButton(images, _currentImageIndex),
+        ),
       ],
-    ),
-  );
-}
+    );
+  }
+
+  Widget _buildNavigationArrow({
+    required AlignmentGeometry alignment,
+    required IconData icon,
+    required VoidCallback onTap,
+    required bool enabled,
+  }) {
+    if (!enabled) return const SizedBox.shrink();
+
+    return Align(
+      alignment: alignment,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(24),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.6),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: Colors.white, size: 28),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(
+    String category,
+    String createdTime,
+    int imageCount,
+    bool hasOCR,
+    int ocrProcessedCount,
+  ) {
+    return Padding(
+      padding: EdgeInsets.all(widget.isDesktop ? 24 : 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  getColorForCategory(category).withOpacity(0.9),
+                  getColorForCategory(category),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              getCategoryIcon(category),
+              color: Colors.white,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            getColorForCategory(category).withOpacity(0.15),
+                            getColorForCategory(category).withOpacity(0.08),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        category.toUpperCase(),
+                        style: TextStyle(
+                          color: getColorForCategory(category),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.access_time_rounded,
+                            size: 14,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            createdTime,
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeadline(dynamic deadline) {
+    return Container(
+      margin: EdgeInsets.fromLTRB(
+        widget.isDesktop ? 24 : 20,
+        0,
+        widget.isDesktop ? 24 : 20,
+        widget.isDesktop ? 20 : 16,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.orange[600],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.schedule_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'DEADLINE',
+                  style: TextStyle(
+                    color: Colors.orange[800],
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  DateFormat(
+                    'MMMM d, yyyy',
+                  ).format((deadline as Timestamp).toDate()),
+                  style: TextStyle(
+                    color: Colors.orange[900],
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NEW: Message widget with See More/Less functionality
+  Widget _buildMessage(String message) {
+    // Count the number of lines
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: message,
+        style: TextStyle(
+          fontSize: widget.isDesktop ? 15 : 14,
+          height: 1.7,
+          color: Colors.grey[700],
+        ),
+      ),
+      maxLines: null,
+      textDirection: Directionality.of(context),
+    )..layout(
+      maxWidth:
+          MediaQuery.of(context).size.width - (widget.isDesktop ? 48 : 40),
+    );
+
+    final lineCount = textPainter.computeLineMetrics().length;
+    final needsExpansion = lineCount > 3;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        widget.isDesktop ? 24 : 20,
+        0,
+        widget.isDesktop ? 24 : 20,
+        widget.isDesktop ? 20 : 16,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            message,
+            style: TextStyle(
+              fontSize: widget.isDesktop ? 15 : 14,
+              height: 1.7,
+              color: Colors.grey[700],
+            ),
+            maxLines: needsExpansion && !_isMessageExpanded ? 3 : null,
+            overflow:
+                needsExpansion && !_isMessageExpanded
+                    ? TextOverflow.ellipsis
+                    : null,
+          ),
+          if (needsExpansion) ...[
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _isMessageExpanded = !_isMessageExpanded;
+                });
+              },
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _isMessageExpanded ? 'See less' : 'See more',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green[700],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _isMessageExpanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      size: 18,
+                      color: Colors.green[700],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   Widget _buildImageError() {
     return Container(
@@ -2865,11 +2852,18 @@ Widget _buildMessage(String message) {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.image_not_supported_outlined, color: Colors.grey[600], size: 48),
+          Icon(
+            Icons.image_not_supported_outlined,
+            color: Colors.grey[600],
+            size: 48,
+          ),
           const SizedBox(height: 12),
           Text(
             'Unable to load image',
-            style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -2881,9 +2875,11 @@ Widget _buildMessage(String message) {
       color: Colors.grey[100],
       child: Center(
         child: CircularProgressIndicator(
-          value: loadingProgress.expectedTotalBytes != null
-              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-              : null,
+          value:
+              loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                  : null,
           strokeWidth: 3,
           valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
         ),
@@ -2944,9 +2940,12 @@ Widget _buildMessage(String message) {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
           decoration: BoxDecoration(
-            gradient: isPrimary
-                ? LinearGradient(colors: [Colors.green[600]!, Colors.green[700]!])
-                : null,
+            gradient:
+                isPrimary
+                    ? LinearGradient(
+                      colors: [Colors.green[600]!, Colors.green[700]!],
+                    )
+                    : null,
             color: isPrimary ? null : Colors.white,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
@@ -2956,7 +2955,11 @@ Widget _buildMessage(String message) {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 20, color: isPrimary ? Colors.white : Colors.grey[700]),
+              Icon(
+                icon,
+                size: 20,
+                color: isPrimary ? Colors.white : Colors.grey[700],
+              ),
               const SizedBox(width: 10),
               Text(
                 label,
@@ -3008,7 +3011,7 @@ Widget _buildMessage(String message) {
       final date = DateTime.parse(dateString);
       final now = DateTime.now();
       final difference = now.difference(date);
-      
+
       if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
       if (difference.inHours < 24) return '${difference.inHours}h ago';
       if (difference.inDays == 1) return 'Yesterday';
@@ -3078,14 +3081,18 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
                     widget.images[index],
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.error, color: Colors.white, size: 64);
+                      return const Icon(
+                        Icons.error,
+                        color: Colors.white,
+                        size: 64,
+                      );
                     },
                   ),
                 ),
               );
             },
           ),
-          
+
           // ✅ NEW: Navigation arrows in fullscreen
           if (widget.images.length > 1) ...[
             _buildFullscreenNavigationArrow(
@@ -3115,7 +3122,7 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
               enabled: _currentIndex < widget.images.length - 1,
             ),
           ],
-          
+
           // Close button
           SafeArea(
             child: Align(
@@ -3133,14 +3140,18 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
                         color: Colors.black.withOpacity(0.6),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close, color: Colors.white, size: 24),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
           ),
-          
+
           // Image counter
           if (widget.images.length > 1)
             SafeArea(
@@ -3149,7 +3160,10 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.7),
                       borderRadius: BorderRadius.circular(24),
@@ -3171,7 +3185,7 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
     );
   }
 
-  // ✅ NEW: Navigation arrow for fullscreen mode
+  //  NEW: Navigation arrow for fullscreen mode
   Widget _buildFullscreenNavigationArrow({
     required AlignmentGeometry alignment,
     required IconData icon,
@@ -3195,11 +3209,7 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
                 color: Colors.black.withOpacity(0.6),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                icon,
-                color: Colors.white,
-                size: 32,
-              ),
+              child: Icon(icon, color: Colors.white, size: 32),
             ),
           ),
         ),
