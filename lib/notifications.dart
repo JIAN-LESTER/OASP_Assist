@@ -23,8 +23,365 @@ class _NotificationModalState extends State<NotificationModal>
   late TabController _tabController;
   int _selectedTabIndex = 0;
 
+  // Undo functionality
+  Map<String, dynamic>? _lastDeletedNotification;
+  List<Map<String, dynamic>>? _lastClearedNotifications;
+  OverlayEntry? _undoOverlayEntry;
+
   // Cache the snapshot data to prevent rebuilding
   QuerySnapshot? _cachedSnapshot;
+
+  void _showCustomSnackbar(
+    String message, {
+    required Color backgroundColor,
+    required Color iconBackgroundColor,
+    required IconData icon,
+    required LinearGradient progressGradient,
+  }) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    overlayEntry = OverlayEntry(
+      builder:
+          (context) => Positioned(
+            bottom: 24,
+            right: 24,
+            child: TweenAnimationBuilder<Offset>(
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutCubic,
+              tween: Tween(begin: const Offset(1.2, 0), end: Offset.zero),
+              builder: (context, offset, child) {
+                return Transform.translate(
+                  offset: Offset(offset.dx * 100, 0),
+                  child: child,
+                );
+              },
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: isMobile ? screenWidth - 32 : 460,
+                  decoration: BoxDecoration(
+                    color: backgroundColor,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.25),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.all(isMobile ? 16 : 18),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: iconBackgroundColor,
+                                borderRadius: BorderRadius.circular(50),
+                              ),
+                              child: Icon(
+                                icon,
+                                color: Colors.white,
+                                size: isMobile ? 20 : 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  message,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: isMobile ? 15 : 16,
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => overlayEntry.remove(),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  Icons.close,
+                                  color: Colors.white.withOpacity(0.7),
+                                  size: isMobile ? 18 : 20,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TweenAnimationBuilder<double>(
+                        duration: const Duration(seconds: 5),
+                        curve: Curves.linear,
+                        tween: Tween(begin: 0.0, end: 1.0),
+                        builder: (context, value, child) {
+                          return ClipRRect(
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(12),
+                              bottomRight: Radius.circular(12),
+                            ),
+                            child: SizedBox(
+                              height: 4,
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.3),
+                                    ),
+                                  ),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: FractionallySizedBox(
+                                      widthFactor: value,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          gradient: progressGradient,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+    );
+
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 5), () {
+      if (overlayEntry.mounted) overlayEntry.remove();
+    });
+  }
+
+  void _showSuccessSnackbar(String message) {
+    _showCustomSnackbar(
+      message,
+      backgroundColor: const Color(0xFF1E3A32),
+      iconBackgroundColor: const Color(0xFF10B981),
+      icon: Icons.check_circle,
+      progressGradient: const LinearGradient(
+        colors: [Color(0xFF059669), Color(0xFF10B981)],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ),
+    );
+  }
+
+  void _showErrorSnackbar(String message) {
+    _showCustomSnackbar(
+      message,
+      backgroundColor: const Color(0xFF3A2327),
+      iconBackgroundColor: const Color(0xFFEF4444),
+      icon: Icons.error,
+      progressGradient: const LinearGradient(
+        colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ),
+    );
+  }
+
+  void _showUndoSnackbar(String message, VoidCallback onUndo) {
+    // Remove any existing undo snackbar
+    _undoOverlayEntry?.remove();
+
+    final overlay = Overlay.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    _undoOverlayEntry = OverlayEntry(
+      builder:
+          (context) => Positioned(
+            bottom: 24,
+            right: 24,
+            child: TweenAnimationBuilder<Offset>(
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutCubic,
+              tween: Tween(begin: const Offset(1.2, 0), end: Offset.zero),
+              builder: (context, offset, child) {
+                return Transform.translate(
+                  offset: Offset(offset.dx * 100, 0),
+                  child: child,
+                );
+              },
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: isMobile ? screenWidth - 32 : 460,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2D2D2D),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.25),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.all(isMobile ? 16 : 18),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF6B7280),
+                                borderRadius: BorderRadius.circular(50),
+                              ),
+                              child: Icon(
+                                Icons.info,
+                                color: Colors.white,
+                                size: isMobile ? 20 : 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  message,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: isMobile ? 15 : 16,
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: () {
+                                  _undoOverlayEntry?.remove();
+                                  _undoOverlayEntry = null;
+                                  onUndo();
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF4B5563),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'UNDO',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: isMobile ? 13 : 14,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () {
+                                _undoOverlayEntry?.remove();
+                                _undoOverlayEntry = null;
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  Icons.close,
+                                  color: Colors.white.withOpacity(0.7),
+                                  size: isMobile ? 18 : 20,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TweenAnimationBuilder<double>(
+                        duration: const Duration(seconds: 5),
+                        curve: Curves.linear,
+                        tween: Tween(begin: 0.0, end: 1.0),
+                        onEnd: () {
+                          _undoOverlayEntry?.remove();
+                          _undoOverlayEntry = null;
+                        },
+                        builder: (context, value, child) {
+                          return ClipRRect(
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(12),
+                              bottomRight: Radius.circular(12),
+                            ),
+                            child: SizedBox(
+                              height: 4,
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.3),
+                                    ),
+                                  ),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: FractionallySizedBox(
+                                      widthFactor: value,
+                                      child: Container(
+                                        decoration: const BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Color(0xFF4B5563),
+                                              Color(0xFF6B7280),
+                                            ],
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+    );
+
+    overlay.insert(_undoOverlayEntry!);
+  }
 
   @override
   void initState() {
@@ -44,6 +401,7 @@ class _NotificationModalState extends State<NotificationModal>
   @override
   void dispose() {
     _tabController.dispose();
+    _undoOverlayEntry?.remove();
     super.dispose();
   }
 
@@ -66,6 +424,384 @@ class _NotificationModalState extends State<NotificationModal>
     } catch (e) {
       print('❌ Error marking notification as read: $e');
     }
+  }
+
+  Future<void> _deleteNotification(String notificationId) async {
+    try {
+      // Get the notification data before deleting
+      final notificationDoc =
+          await _firestore
+              .collection('notifications')
+              .doc(notificationId)
+              .get();
+
+      if (!notificationDoc.exists) {
+        _showErrorSnackbar('Notification not found');
+        return;
+      }
+
+      final notificationData = notificationDoc.data() as Map<String, dynamic>;
+      notificationData['notificationId'] = notificationId; // Store the ID
+
+      // Delete the notification
+      await _firestore.collection('notifications').doc(notificationId).delete();
+      print('✅ Deleted notification: $notificationId');
+
+      // Store for undo
+      _lastDeletedNotification = notificationData;
+      _lastClearedNotifications = null; // Clear the other undo option
+
+      if (mounted) {
+        _showUndoSnackbar('Notification deleted', _undoDelete);
+      }
+    } catch (e) {
+      print('❌ Error deleting notification: $e');
+      if (mounted) {
+        _showErrorSnackbar('Failed to delete notification');
+      }
+    }
+  }
+
+  Future<void> _undoDelete() async {
+    if (_lastDeletedNotification == null) return;
+
+    try {
+      final notificationId =
+          _lastDeletedNotification!['notificationId'] as String;
+      final notificationData = Map<String, dynamic>.from(
+        _lastDeletedNotification!,
+      );
+      notificationData.remove('notificationId'); // Remove the ID before saving
+
+      // Restore the notification
+      await _firestore
+          .collection('notifications')
+          .doc(notificationId)
+          .set(notificationData);
+
+      print('✅ Restored notification: $notificationId');
+
+      _lastDeletedNotification = null;
+
+      if (mounted) {
+        _showSuccessSnackbar('Notification restored');
+      }
+    } catch (e) {
+      print('❌ Error restoring notification: $e');
+      if (mounted) {
+        _showErrorSnackbar('Failed to restore notification');
+      }
+    }
+  }
+
+  Future<void> _undoClearAll() async {
+    if (_lastClearedNotifications == null ||
+        _lastClearedNotifications!.isEmpty) {
+      return;
+    }
+
+    try {
+      final batch = _firestore.batch();
+
+      for (final notificationData in _lastClearedNotifications!) {
+        final notificationId = notificationData['notificationId'] as String;
+        final data = Map<String, dynamic>.from(notificationData);
+        data.remove('notificationId'); // Remove the ID before saving
+
+        batch.set(
+          _firestore.collection('notifications').doc(notificationId),
+          data,
+        );
+      }
+
+      await batch.commit();
+
+      print('✅ Restored ${_lastClearedNotifications!.length} notifications');
+
+      final count = _lastClearedNotifications!.length;
+      _lastClearedNotifications = null;
+
+      if (mounted) {
+        _showSuccessSnackbar('$count notifications restored');
+      }
+    } catch (e) {
+      print('❌ Error restoring notifications: $e');
+      if (mounted) {
+        _showErrorSnackbar('Failed to restore notifications');
+      }
+    }
+  }
+
+  Future<void> _toggleReadStatus(
+    String notificationId,
+    bool isCurrentlyRead,
+  ) async {
+    if (currentUserId == null) return;
+
+    try {
+      if (isCurrentlyRead) {
+        // Mark as unread - remove from readBy array
+        await _firestore.collection('notifications').doc(notificationId).update(
+          {
+            'readBy': FieldValue.arrayRemove([currentUserId]),
+          },
+        );
+        print('✅ Marked notification as unread: $notificationId');
+      } else {
+        // Mark as read - add to readBy array
+        await _firestore.collection('notifications').doc(notificationId).update(
+          {
+            'readBy': FieldValue.arrayUnion([currentUserId]),
+          },
+        );
+        print('✅ Marked notification as read: $notificationId');
+      }
+    } catch (e) {
+      print('❌ Error toggling read status: $e');
+      if (mounted) {
+        _showErrorSnackbar('Failed to update notification');
+      }
+    }
+  }
+
+  void _showNotificationMenu(
+    BuildContext context,
+    String notificationId,
+    bool isRead,
+    Offset buttonPosition,
+    Size buttonSize,
+  ) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+
+    overlayEntry = OverlayEntry(
+      builder:
+          (context) => Stack(
+            children: [
+              // Invisible barrier to close menu when tapping outside
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: () => overlayEntry.remove(),
+                  child: Container(color: Colors.transparent),
+                ),
+              ),
+              // Menu positioned below the button
+              Positioned(
+                left: buttonPosition.dx - 180, // Position to the left of button
+                top:
+                    buttonPosition.dy +
+                    buttonSize.height +
+                    4, // Below the button
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    width: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Mark as read/unread option
+                        InkWell(
+                          onTap: () {
+                            overlayEntry.remove();
+                            _toggleReadStatus(notificationId, isRead);
+                          },
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isRead
+                                      ? Icons.mark_email_unread_outlined
+                                      : Icons.mark_email_read_outlined,
+                                  color: const Color(0xFF2E7D32),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  isRead ? 'Mark as unread' : 'Mark as read',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        Divider(height: 1, color: Colors.grey[200]),
+
+                        // Delete option
+                        InkWell(
+                          onTap: () {
+                            overlayEntry.remove();
+                            _showDeleteConfirmation(notificationId);
+                          },
+                          borderRadius: const BorderRadius.vertical(
+                            bottom: Radius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            child: Row(
+                              children: const [
+                                Icon(
+                                  Icons.delete_outline,
+                                  color: Color(0xFFEF4444),
+                                  size: 20,
+                                ),
+                                SizedBox(width: 12),
+                                Text(
+                                  'Delete notification',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFFEF4444),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    overlay.insert(overlayEntry);
+  }
+
+  void _showDeleteConfirmation(String notificationId) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder:
+          (context) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 400),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Delete Icon
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFEF4444),
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Title
+                  const Text(
+                    'Delete Notification',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Message
+                  const Text(
+                    'Are you sure you want to delete this notification? This action cannot be undone.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black54,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.grey[700],
+                            side: BorderSide(color: Colors.grey[300]!),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _deleteNotification(notificationId);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFEF4444),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Delete',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
   }
 
   Future<void> _markAllAsRead() async {
@@ -94,17 +830,7 @@ class _NotificationModalState extends State<NotificationModal>
       await batch.commit();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('All notifications marked as read'),
-            backgroundColor: const Color(0xFF2E7D32),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        _showSuccessSnackbar('All notifications marked as read');
       }
     } catch (e) {
       print('❌ Error marking all as read: $e');
@@ -116,35 +842,107 @@ class _NotificationModalState extends State<NotificationModal>
 
     final result = await showDialog<bool>(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
       builder:
-          (context) => AlertDialog(
+          (context) => Dialog(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
             ),
-            title: const Text('Clear All Notifications'),
-            content: const Text(
-              'Are you sure you want to clear all notifications? This action cannot be undone.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 400),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Delete Icon
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.delete_sweep_outlined,
+                      color: Color(0xFFEF4444),
+                      size: 32,
+                    ),
                   ),
-                ),
-                child: const Text('Clear All'),
+                  const SizedBox(height: 16),
+
+                  // Title
+                  const Text(
+                    'Clear All Notifications',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Message
+                  const Text(
+                    'Are you sure you want to clear all notifications? This action cannot be undone.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black54,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.grey[700],
+                            side: BorderSide(color: Colors.grey[300]!),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFEF4444),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Clear All',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
     );
 
@@ -152,10 +950,21 @@ class _NotificationModalState extends State<NotificationModal>
       try {
         Query notificationsQuery = _firestore
             .collection('notifications')
-            .where('userId', isEqualTo: currentUserId);
+            .where('userId', isEqualTo: currentUserId)
+            .where('targetRole', isEqualTo: widget.role);
 
         final snapshot = await notificationsQuery.get();
 
+        // Store all notifications for undo
+        _lastClearedNotifications =
+            snapshot.docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              data['notificationId'] = doc.id; // Store the document ID
+              return data;
+            }).toList();
+        _lastDeletedNotification = null; // Clear the other undo option
+
+        // Delete all notifications
         final batch = _firestore.batch();
         for (final doc in snapshot.docs) {
           batch.delete(doc.reference);
@@ -163,26 +972,14 @@ class _NotificationModalState extends State<NotificationModal>
         await batch.commit();
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('All notifications cleared'),
-              backgroundColor: const Color(0xFF2E7D32),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              margin: const EdgeInsets.all(16),
-            ),
+          _showUndoSnackbar(
+            '${snapshot.docs.length} notifications cleared',
+            _undoClearAll,
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error clearing notifications: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _showErrorSnackbar('Error clearing notifications: $e');
         }
       }
     }
@@ -549,12 +1346,7 @@ class _NotificationModalState extends State<NotificationModal>
                       if (conversationId == null ||
                           conversationId.isEmpty ||
                           conversationId == 'null') {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('No conversation available'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
+                        _showErrorSnackbar('No conversation available');
                         return;
                       }
 
@@ -740,12 +1532,7 @@ class _NotificationModalState extends State<NotificationModal>
                     print('   - conversationId: $conversationId');
 
                     if (escalationId == null || escalationId.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Error: No escalation ID'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      _showErrorSnackbar('Error: No escalation ID');
                       return;
                     }
 
@@ -840,25 +1627,72 @@ class _NotificationModalState extends State<NotificationModal>
 
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
       builder:
-          (context) => AlertDialog(
+          (context) => Dialog(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
             ),
-            title: Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.red.shade600),
-                const SizedBox(width: 12),
-                const Text('Error'),
-              ],
-            ),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 400),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Error Icon
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.error_outline_rounded,
+                      color: Color(0xFFEF4444),
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Error Message
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black87,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // OK Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'OK',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
     );
   }
@@ -896,6 +1730,50 @@ class _NotificationModalState extends State<NotificationModal>
                   ),
                 ),
                 const Spacer(),
+                // Clear All button
+                StreamBuilder<QuerySnapshot>(
+                  stream:
+                      _firestore
+                          .collection('notifications')
+                          .where('userId', isEqualTo: currentUserId)
+                          .where('targetRole', isEqualTo: widget.role)
+                          .snapshots(),
+                  builder: (context, snapshot) {
+                    final hasNotifications =
+                        snapshot.hasData && snapshot.data!.docs.isNotEmpty;
+
+                    return TextButton.icon(
+                      onPressed:
+                          hasNotifications ? _clearAllNotifications : null,
+                      icon: Icon(
+                        Icons.delete_sweep_outlined,
+                        size: 18,
+                        color:
+                            hasNotifications
+                                ? const Color(0xFFEF4444)
+                                : Colors.grey[400],
+                      ),
+                      label: Text(
+                        'Clear all',
+                        style: TextStyle(
+                          color:
+                              hasNotifications
+                                  ? const Color(0xFFEF4444)
+                                  : Colors.grey[400],
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 16),
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.of(context).pop(),
@@ -1304,12 +2182,44 @@ class _NotificationModalState extends State<NotificationModal>
                     ),
                   ),
 
-                  // Unread Indicator
+                  // Three-dot menu button
+                  Builder(
+                    builder: (context) {
+                      return IconButton(
+                        icon: Icon(
+                          Icons.more_vert,
+                          color: Colors.grey[600],
+                          size: 20,
+                        ),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () {
+                          // Get button position
+                          final RenderBox renderBox =
+                              context.findRenderObject() as RenderBox;
+                          final buttonPosition = renderBox.localToGlobal(
+                            Offset.zero,
+                          );
+                          final buttonSize = renderBox.size;
+
+                          _showNotificationMenu(
+                            context,
+                            doc.id,
+                            isRead,
+                            buttonPosition,
+                            buttonSize,
+                          );
+                        },
+                      );
+                    },
+                  ),
+
+                  // Unread Indicator (moved next to menu)
                   if (!isRead)
                     Container(
                       width: 8,
                       height: 8,
-                      margin: const EdgeInsets.only(left: 8, top: 6),
+                      margin: const EdgeInsets.only(left: 4, right: 4),
                       decoration: const BoxDecoration(
                         color: Color(0xFF2E7D32),
                         shape: BoxShape.circle,
