@@ -112,6 +112,8 @@ export const createUser = onCall(
         onBoardingCompleted: false,
         verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
         verificationEmailSent: false,
+        dailyMessageCount: 0,
+        lastMessageResetDate: admin.firestore.FieldValue.serverTimestamp(),
       };
 
       // Add role-specific fields

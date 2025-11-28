@@ -5,11 +5,13 @@ import 'package:capstone_project/modal_pages/escalation_info.dart';
 class HumanEscalation extends StatefulWidget {
   final String? initialEscalationId;
   final bool autoOpen;
+  final String serviceUnit; // Add this parameter
 
   const HumanEscalation({
     super.key,
     this.initialEscalationId,
     this.autoOpen = false,
+    required this.serviceUnit, // Make it required
   });
 
   @override
@@ -43,6 +45,7 @@ class _HumanEscalationState extends State<HumanEscalation>
     print('📄 HumanEscalation initState:');
     print('   - initialEscalationId: ${widget.initialEscalationId}');
     print('   - autoOpen: ${widget.autoOpen}');
+    print('   - serviceUnit: ${widget.serviceUnit}');
 
     if (widget.autoOpen && widget.initialEscalationId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -186,6 +189,13 @@ class _HumanEscalationState extends State<HumanEscalation>
         status.contains(_searchQuery);
   }
 
+  // Add this method to check if escalation matches service unit
+  bool _matchesServiceUnit(Map<String, dynamic> escalation) {
+    final category = escalation['category']?.toString() ?? '';
+    // Case-insensitive comparison
+    return category.toLowerCase() == widget.serviceUnit.toLowerCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -246,7 +256,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                               if (isTablet) ...[
                                 const SizedBox(height: 4),
                                 Text(
-                                  "Manage and resolve user escalations",
+                                  "Manage ${widget.serviceUnit} escalations",
                                   style: TextStyle(
                                     fontSize: isDesktop ? 15 : 14,
                                     color: Colors.grey[600],
@@ -403,11 +413,13 @@ class _HumanEscalationState extends State<HumanEscalation>
                       ),
                     ),
 
-                    // Enhanced Stats Row - Responsive
+                    // Enhanced Stats Row - Responsive (Filtered by service unit)
                     StreamBuilder<QuerySnapshot>(
+                            key: const ValueKey('escalations_stats'), 
                       stream:
                           FirebaseFirestore.instance
                               .collection('escalations')
+                              .where('category', isEqualTo: widget.serviceUnit)
                               .snapshots(),
                       builder: (context, snapshot) {
                         if (!snapshot.hasData) {
@@ -500,12 +512,14 @@ class _HumanEscalationState extends State<HumanEscalation>
               ),
             ),
 
-            // Enhanced List - Responsive
+            // Enhanced List - Responsive (Filtered by service unit)
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
+                       key: const ValueKey('escalations_list'),  
                 stream:
                     FirebaseFirestore.instance
                         .collection('escalations')
+                        .where('category', isEqualTo: widget.serviceUnit)
                         .orderBy('createdAt', descending: true)
                         .snapshots(),
                 builder: (context, snapshot) {
@@ -522,7 +536,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                     return _EmptyState(
                       icon: Icons.inbox_outlined,
                       title: "No escalations found",
-                      subtitle: "All caught up! No escalations to review.",
+                      subtitle: "All caught up! No ${widget.serviceUnit} escalations to review.",
                       isCompact: !isTablet,
                     );
                   }

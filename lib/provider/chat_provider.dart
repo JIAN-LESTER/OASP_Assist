@@ -77,6 +77,15 @@ class ChatProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
+  static const int MAX_DAILY_MESSAGES = 10;
+
+  StreamSubscription<DocumentSnapshot>? _userMessageCountSubscription;
+
+   int _userDailyMessageCount = 0;
+  DateTime? _userLastResetDate;
+  
+  int get userDailyMessageCount => _userDailyMessageCount;
+
   final escalationResponseKeywords = [
     "i'm not sure",
     "i'm sorry",
@@ -93,6 +102,28 @@ class ChatProvider extends ChangeNotifier {
     "recommend speaking with",
   ];
 
+  void listenToUserMessageCount() {
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  if (userId == null) return;
+
+  _userMessageCountSubscription?.cancel();
+  
+  _userMessageCountSubscription = _firestore
+      .collection('users')
+      .doc(userId)
+      .snapshots()
+      .listen((snapshot) {
+        if (snapshot.exists) {
+          final data = snapshot.data()!;
+          _userDailyMessageCount = data['dailyMessageCount'] ?? 0;
+          _userLastResetDate = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+          
+          print('📊 Real-time update: User message count = $_userDailyMessageCount');
+          notifyListeners();
+        }
+      });
+}
+
   void setScrollCallback(VoidCallback callback) {
     _onMessageAdded = callback;
   }
@@ -100,6 +131,109 @@ class ChatProvider extends ChangeNotifier {
   void clearScrollCallback() {
     _onMessageAdded = null;
   }
+
+    bool get isMessageLimitReached {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return false;
+    
+    final now = DateTime.now();
+    
+    // Check if we need to reset (it's past 6 AM of next day)
+    final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
+    final shouldReset = _userLastResetDate == null || 
+                       (now.isAfter(resetTime) && 
+                        (_userLastResetDate!.isBefore(resetTime) || 
+                         _userLastResetDate!.day != now.day));
+    
+    if (shouldReset) {
+      // Will be reset when next message is sent
+      return false;
+    }
+    
+    return _userDailyMessageCount >= MAX_DAILY_MESSAGES;
+  }
+
+   Duration getTimeUntilReset() {
+    final now = DateTime.now();
+    DateTime nextReset;
+    
+    if (now.hour < 6) {
+      // Reset is today at 6 AM
+      nextReset = DateTime(now.year, now.month, now.day, 6, 0, 0);
+    } else {
+      // Reset is tomorrow at 6 AM
+      nextReset = DateTime(now.year, now.month, now.day + 1, 6, 0, 0);
+    }
+    
+    return nextReset.difference(now);
+  }
+
+  Future<void> loadUserMessageCount() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        _userDailyMessageCount = data['dailyMessageCount'] ?? 0;
+        _userLastResetDate = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+        
+        print('✅ Loaded user message count: $_userDailyMessageCount/$MAX_DAILY_MESSAGES');
+        
+        notifyListeners();
+      }
+    } catch (e) {
+      print('❌ Error loading user message count: $e');
+    }
+  }
+
+   Future<void> _updateUserMessageCount() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final now = DateTime.now();
+      
+      // Check if we need to reset (it's past 6 AM of next day)
+      final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
+      final shouldReset = _userLastResetDate == null || 
+                         (now.isAfter(resetTime) && 
+                          (_userLastResetDate!.isBefore(resetTime) || 
+                           _userLastResetDate!.day != now.day));
+      
+      final userRef = _firestore.collection('users').doc(userId);
+      
+      if (shouldReset) {
+        // Reset counter
+        await userRef.update({
+          'dailyMessageCount': 1,
+          'lastMessageResetDate': Timestamp.now(),
+        });
+        
+        _userDailyMessageCount = 1;
+        _userLastResetDate = now;
+        
+        print('✅ User message count reset to 1');
+      } else {
+        // Increment counter
+        await userRef.update({
+          'dailyMessageCount': FieldValue.increment(1),
+        });
+        
+        _userDailyMessageCount++;
+        
+        print('✅ User message count incremented to $_userDailyMessageCount');
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      print('❌ Error updating user message count: $e');
+    }
+  }
+
+
 
   StreamSubscription<QuerySnapshot>? _messagesSubscription;
   bool _isSettingConversation = false;
@@ -170,40 +304,38 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
- Future<void> loadConversationInfo() async {
-  if (conversationId == null) return;
+  Future<void> loadConversationInfo() async {
+    if (conversationId == null) return;
 
-  try {
-    final doc = await _firestore
-        .collection('conversations')
-        .doc(conversationId!)
-        .get();
-        
-    if (doc.exists) {
-      final data = doc.data()!;
-      // ✅ Make sure you're creating a proper Conversation object
-      currentConversation = Conversation(
-        id: doc.id,
-        userId: data['userId'] ?? '',
-        title: data['title'] ?? 'Untitled',
-        status: data['status'] ?? 'active',
-        createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
- 
-      );
-      print('✅ Loaded conversation: ${currentConversation!.title}');
-    } else {
-      currentConversation = null;
-      print('⚠️ Conversation document does not exist');
+    try {
+      final doc = await _firestore
+          .collection('conversations')
+          .doc(conversationId!)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        currentConversation = Conversation(
+          id: doc.id,
+          userId: data['userId'] ?? '',
+          title: data['title'] ?? 'Untitled',
+          status: data['status'] ?? 'active',
+          createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        );
+        print('✅ Loaded conversation: ${currentConversation!.title}');
+      } else {
+        currentConversation = null;
+        print('⚠️ Conversation document does not exist');
+      }
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+    } catch (e) {
+      print('❌ Error loading conversation info: $e');
     }
-
-    // Notify listeners after build completes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      notifyListeners();
-    });
-  } catch (e) {
-    print('❌ Error loading conversation info: $e');
   }
-}
+
 
   Map<String, dynamic> _messageToMap(Message message) {
     return {
@@ -376,82 +508,90 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void listenToMessages() {
-  if (conversationId == null) return;
+    if (conversationId == null) return;
 
-  print('👂 Starting message listener for conversation: $conversationId');
+    print('👂 Starting message listener for conversation: $conversationId');
 
-  _messagesSubscription = _firestore
-      .collection('conversations')
-      .doc(conversationId!)
-      .collection('messages')
-      .orderBy('sent_at', descending: false)
-      .snapshots()
-      .listen(
-        (snapshot) {
-          // ✅ Skip if we're actively creating messages
-          if (_isLoading) {
-            print('⏭️ Skipping listener update - message creation in progress');
-            return;
-          }
+    _messagesSubscription = _firestore
+        .collection('conversations')
+        .doc(conversationId!)
+        .collection('messages')
+        .orderBy('sent_at', descending: false)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            // ✅ Skip if we're actively creating messages
+            if (_isLoading) {
+              print(
+                '⏭️ Skipping listener update - message creation in progress',
+              );
+              return;
+            }
 
-          bool changed = false;
+            bool changed = false;
 
-          print('📩 Message snapshot received: ${snapshot.docs.length} total messages');
-          print('   Changes: ${snapshot.docChanges.length}');
+            print(
+              '📩 Message snapshot received: ${snapshot.docs.length} total messages',
+            );
+            print('   Changes: ${snapshot.docChanges.length}');
 
-          for (var change in snapshot.docChanges) {
-            final data = change.doc.data();
-            if (data == null) continue;
+            for (var change in snapshot.docChanges) {
+              final data = change.doc.data();
+              if (data == null) continue;
 
-            final message = Message.fromJson(data);
-            final index = _messages.indexWhere((m) => m.id == message.id);
+              final message = Message.fromJson(data);
+              final index = _messages.indexWhere((m) => m.id == message.id);
 
-            if (change.type == DocumentChangeType.added) {
-              // ✅ FIX: Only add if not already in local state
-              final isAlreadyLocal = _messages.any((m) => m.id == message.id);
-              final isCurrentlyStreaming = _streamingContent.containsKey(message.id);
+              if (change.type == DocumentChangeType.added) {
+                // ✅ FIX: Only add if not already in local state
+                final isAlreadyLocal = _messages.any((m) => m.id == message.id);
+                final isCurrentlyStreaming = _streamingContent.containsKey(
+                  message.id,
+                );
 
-              if (!isAlreadyLocal && !isCurrentlyStreaming) {
-                print('➕ Adding message from Firestore: ${message.id}');
-                print('   Sender: ${message.sender}');
-                print('   Content: ${message.content.substring(0, min(50, message.content.length))}...');
+                if (!isAlreadyLocal && !isCurrentlyStreaming) {
+                  print('➕ Adding message from Firestore: ${message.id}');
+                  print('   Sender: ${message.sender}');
+                  print(
+                    '   Content: ${message.content.substring(0, min(50, message.content.length))}...',
+                  );
 
-                _messages.add(message);
-                _processedMessages.add(message.id);
-                changed = true;
-              } else {
-                print('⏭️ Skipping duplicate/local message: ${message.id}');
-              }
-            } else if (change.type == DocumentChangeType.modified) {
-              if (index != -1 && !_streamingContent.containsKey(message.id)) {
-                print('✏️ Updating message: ${message.id}');
-                _messages[index] = message;
-                changed = true;
-              }
-            } else if (change.type == DocumentChangeType.removed) {
-              if (index != -1) {
-                print('🗑️ Removing message: ${message.id}');
-                _messages.removeAt(index);
-                _processedMessages.remove(message.id);
-                changed = true;
+                  _messages.add(message);
+                  _processedMessages.add(message.id);
+                  changed = true;
+                } else {
+                  print('⏭️ Skipping duplicate/local message: ${message.id}');
+                }
+              } else if (change.type == DocumentChangeType.modified) {
+                if (index != -1 && !_streamingContent.containsKey(message.id)) {
+                  print('✏️ Updating message: ${message.id}');
+                  _messages[index] = message;
+                  changed = true;
+                }
+              } else if (change.type == DocumentChangeType.removed) {
+                if (index != -1) {
+                  print('🗑️ Removing message: ${message.id}');
+                  _messages.removeAt(index);
+                  _processedMessages.remove(message.id);
+                  changed = true;
+                }
               }
             }
-          }
 
-          if (changed) {
-            _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
-            print('✅ Messages updated. Total count: ${_messages.length}');
+            if (changed) {
+              _messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+              print('✅ Messages updated. Total count: ${_messages.length}');
 
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              notifyListeners();
-            });
-          }
-        },
-        onError: (error) {
-          print('❌ Error listening to messages: $error');
-        },
-      );
-}
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                notifyListeners();
+              });
+            }
+          },
+          onError: (error) {
+            print('❌ Error listening to messages: $error');
+          },
+        );
+  }
 
   void debugPrintMessageState(String context) {
     print('=== DEBUG $context ===');
@@ -469,11 +609,17 @@ class ChatProvider extends ChangeNotifier {
 
   String? getStreamingContent(String messageId) => _streamingContent[messageId];
 
-  Future<void> askQuestionWithStreaming(
+Future<void> askQuestionWithStreaming(
   BuildContext context,
   String question,
 ) async {
   if (_isLoading) return;
+
+  // Check message limit
+  if (isMessageLimitReached) {
+    print('❌ User daily message limit reached');
+    return;
+  }
 
   // Create conversation if needed
   if (conversationId == null || conversationId!.isEmpty) {
@@ -524,7 +670,7 @@ class ChatProvider extends ChangeNotifier {
       print('✅ Classified category: $questionCategory');
     }
 
-    // ✅ FIX: Create user message and add to UI IMMEDIATELY
+    // Create user message
     final userMessageRef = _firestore
         .collection('conversations')
         .doc(conversationId!)
@@ -545,41 +691,54 @@ class ChatProvider extends ChangeNotifier {
       count: count,
     );
 
-    // ✅ Add to local state FIRST (immediate UI update)
+    // Add to local state FIRST
     _messages.add(userMsg);
     _processedMessages.add(userMsg.id);
-    
-    // ✅ Notify listeners immediately so message appears
     notifyListeners();
     _onMessageAdded?.call();
 
-    // ✅ Save to Firestore in background (don't await)
+    // Save to Firestore
     userMessageRef.set(_messageToMap(userMsg)).catchError((e) {
       print('Error saving user message: $e');
     });
 
-       bool shouldUpdateTitle = false;
-    
+    // Increment user message count
+    await _updateUserMessageCount();
+
+    // Update conversation title if needed
+    bool shouldUpdateTitle = false;
     if (currentConversation != null) {
       final title = currentConversation!.title.toLowerCase();
-      shouldUpdateTitle = (title.contains('new conversation') ||
+      shouldUpdateTitle =
+          (title.contains('new conversation') ||
               title == 'untitled' ||
               title.trim().isEmpty) &&
           _messages.where((m) => m.sender == 'user').length <= 1;
     }
 
     if (shouldUpdateTitle) {
-      // ✅ Do this synchronously, not in background
       await _updateConversationTitleNow(question);
     }
 
+    // ✅ FIX: Build complete conversation history with BOTH user and bot messages
+    final allMessages = _messages
+        .where((m) => m.conversationId == conversationId)
+        .toList();
+    allMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    
+    // Take last 10 messages (5 exchanges) for context
+    final recentHistory = allMessages.length > 10
+        ? allMessages.sublist(allMessages.length - 10)
+        : allMessages;
 
-    // Limit history to last 5 messages
-    final history = _messages.where((m) => m.conversationId == conversationId).toList();
-    history.sort((a, b) => a.sentAt.compareTo(b.sentAt));
-    final recentHistory = history.length > 5 ? history.sublist(history.length - 5) : history;
+    print('📝 Sending conversation history:');
+    print('   Total messages in conversation: ${allMessages.length}');
+    print('   Recent messages being sent: ${recentHistory.length}');
+    for (var msg in recentHistory) {
+      print('   - ${msg.sender}: ${msg.content.substring(0, min(50, msg.content.length))}...');
+    }
 
-    // ✅ Create bot message placeholder IMMEDIATELY
+    // Create bot message placeholder
     final botMessageId = "bot_${userMsg.id}";
     final botMessage = Message(
       id: botMessageId,
@@ -592,7 +751,7 @@ class ChatProvider extends ChangeNotifier {
       count: count,
     );
 
-    // ✅ Add bot message to UI immediately
+    // Add bot message to UI immediately
     _messages.add(botMessage);
     _streamingContent[botMessageId] = "";
     notifyListeners();
@@ -611,7 +770,8 @@ class ChatProvider extends ChangeNotifier {
           (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
         );
 
-        _streamingContent[botMessageId] = _streamingContent[botMessageId]! + chunk;
+        _streamingContent[botMessageId] =
+            _streamingContent[botMessageId]! + chunk;
 
         if (i % (chunkSize * 3) == 0) {
           notifyListeners();
@@ -622,12 +782,12 @@ class ChatProvider extends ChangeNotifier {
       finalAnswer = answer;
       unawaited(_incrementFAQSimilarityCountAsync(existingFAQ["question"]));
     } else {
-      // RAG streaming
+      // RAG streaming with complete history
       int chunkCounter = 0;
 
       await for (final streamedText in _retriever.generateAnswerStream(
         question,
-        conversationHistory: recentHistory,
+        conversationHistory: recentHistory, // ✅ Now includes both user and bot messages
         conversationId: conversationId!,
       )) {
         chunkCounter++;
@@ -654,7 +814,7 @@ class ChatProvider extends ChangeNotifier {
       }
     }
 
-    // ✅ Update bot message locally
+    // Update bot message locally
     final idx = _messages.indexWhere((m) => m.id == botMessageId);
     if (idx >= 0) {
       _messages[idx] = botMessage.copyWith(content: verified);
@@ -666,7 +826,7 @@ class ChatProvider extends ChangeNotifier {
     final totalMs = DateTime.now().difference(startTime).inMilliseconds;
     print("⚡ Total response time: ${totalMs}ms");
 
-    // ✅ Save bot message to Firestore (background)
+    // Save bot message to Firestore (background)
     unawaited(() async {
       final batch = _firestore.batch();
 
@@ -687,7 +847,7 @@ class ChatProvider extends ChangeNotifier {
       await batch.commit();
     }());
 
-    // ✅ FIX 2: Update title and reload conversation info
+    // Update title and reload conversation info
     await _updateConversationTitleIfNeeded(question);
 
     // Background tasks
@@ -708,60 +868,62 @@ class ChatProvider extends ChangeNotifier {
   }
 }
 
-Future<void> _updateConversationTitleNow(String question) async {
-  if (conversationId == null) return;
 
-  try {
-    print('🔄 Updating conversation title for first message...');
+  Future<void> _updateConversationTitleNow(String question) async {
+    if (conversationId == null) return;
 
-    final titlePrompt = '''
+    try {
+      print('🔄 Updating conversation title for first message...');
+
+      final titlePrompt = '''
 Generate a short, descriptive title (max 5 words) for the following user question:
 
 Question:
 $question
 ''';
 
-    final newTitle = await _cohere!.generateResponse(titlePrompt);
-    print('Generated title from Cohere: "$newTitle"');
+      final newTitle = await _cohere!.generateResponse(titlePrompt);
+      print('Generated title from Cohere: "$newTitle"');
 
-    if (newTitle != null && newTitle.trim().isNotEmpty) {
-      final updatedTitle = newTitle.trim();
+      if (newTitle != null && newTitle.trim().isNotEmpty) {
+        final updatedTitle = newTitle.trim();
 
-      // ✅ Update Firestore
-      await _firestore
-          .collection('conversations')
-          .doc(conversationId!)
-          .update({'title': updatedTitle});
+        // ✅ Update Firestore
+        await _firestore
+            .collection('conversations')
+            .doc(conversationId!)
+            .update({'title': updatedTitle});
 
-      print('✅ Updated conversation title to: "$updatedTitle"');
+        print('✅ Updated conversation title to: "$updatedTitle"');
 
-      // ✅ Update local state
-      if (currentConversation != null) {
-        currentConversation = Conversation(
-          id: currentConversation!.id,
-          userId: currentConversation!.userId,
-          title: updatedTitle,
-          status: currentConversation!.status,
-          createdAt: currentConversation!.createdAt,
+        // ✅ Update local state
+        if (currentConversation != null) {
+          currentConversation = Conversation(
+            id: currentConversation!.id,
+            userId: currentConversation!.userId,
+            title: updatedTitle,
+            status: currentConversation!.status,
+            createdAt: currentConversation!.createdAt,
+          );
+        }
+
+        // ✅ Update UserConstant cache
+        final convIndex = UserConstant.recentConversations.indexWhere(
+          (c) => c['id'] == conversationId,
         );
-      }
+        if (convIndex != -1) {
+          UserConstant.recentConversations[convIndex]['title'] = updatedTitle;
+        }
 
-      // ✅ Update UserConstant cache
-      final convIndex = UserConstant.recentConversations
-          .indexWhere((c) => c['id'] == conversationId);
-      if (convIndex != -1) {
-        UserConstant.recentConversations[convIndex]['title'] = updatedTitle;
-      }
+        // ✅ Force UI update
+        notifyListeners();
 
-      // ✅ Force UI update
-      notifyListeners();
-      
-      print('✅ Title update complete and UI notified');
+        print('✅ Title update complete and UI notified');
+      }
+    } catch (titleError) {
+      print('❌ Error updating conversation title: $titleError');
     }
-  } catch (titleError) {
-    print('❌ Error updating conversation title: $titleError');
   }
-}
 
   Map<String, dynamic>? _findBestFAQMatch(
     String question,
@@ -1016,201 +1178,203 @@ Return ONLY the category name (Admission, Scholarship, Placement, or General):''
       print('Error in post-response tasks: $e');
     }
   }
+
   Future<void> checkEscalation(
-  BuildContext context,
-  String answerText,
-  String? userId,
-  String question,
-) async {
-  if (conversationId == null) return;
+    BuildContext context,
+    String answerText,
+    String? userId,
+    String question,
+  ) async {
+    if (conversationId == null) return;
 
-  final lowerAnswer = answerText.toLowerCase();
+    final lowerAnswer = answerText.toLowerCase();
 
-  for (var keyword in escalationResponseKeywords) {
-    if (lowerAnswer.contains(keyword)) {
-      final reasonController = TextEditingController();
+    for (var keyword in escalationResponseKeywords) {
+      if (lowerAnswer.contains(keyword)) {
+        final reasonController = TextEditingController();
 
-      final bool? escalate = await showDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: [
-                Icon(
-                  Icons.help_outline_rounded,
-                  color: Colors.orange.shade600,
-                  size: 24,
-                ),
-                SizedBox(width: 12),
-                Text(
-                  'Need Human Help?',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade800,
+        final bool? escalate = await showDialog<bool>(
+          context: context,
+          barrierDismissible: true,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.help_outline_rounded,
+                    color: Colors.orange.shade600,
+                    size: 24,
                   ),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "I couldn't provide a complete answer to your question. Would you like me to escalate this to OASP staff for personalized assistance?",
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.grey.shade700,
-                    height: 1.4,
+                  SizedBox(width: 12),
+                  Text(
+                    'Need Human Help?',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade800,
+                    ),
                   ),
-                ),
-                SizedBox(height: 12),
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "I couldn't provide a complete answer to your question. Would you like me to escalate this to OASP staff for personalized assistance?",
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.grey.shade700,
+                      height: 1.4,
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Colors.blue.shade600,
-                        size: 16,
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          "A staff member will review your question and respond directly.",
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.blue.shade700,
+                  SizedBox(height: 12),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.blue.shade600,
+                          size: 16,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "A staff member will review your question and respond directly.",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.blue.shade700,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                SizedBox(height: 16),
-                TextField(
-                  controller: reasonController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: "Reason for escalation (optional)",
-                    hintText:
-                        "e.g. I need clarification about scholarship requirements",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                  SizedBox(height: 16),
+                  TextField(
+                    controller: reasonController,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: "Reason for escalation (optional)",
+                      hintText:
+                          "e.g. I need clarification about scholarship requirements",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(
+                    'Maybe Later',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(true);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF2E7D32),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Yes, Get Help',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
               ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(
-                  'Maybe Later',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(true);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF2E7D32),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  'Yes, Get Help',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          );
-        },
-      );
-
-      if (escalate == true) {
-        await _processAutoEscalation(
-          userId,
-          context,
-          question,
-          answerText,
-          keyword,
-          userReason:
-              reasonController.text.trim().isNotEmpty
-                  ? reasonController.text.trim()
-                  : null,
+            );
+          },
         );
-      }
 
-      break;
-    }
-  }
-}
+        if (escalate == true) {
+          await _processAutoEscalation(
+            userId,
+            context,
+            question,
+            answerText,
+            keyword,
+            userReason:
+                reasonController.text.trim().isNotEmpty
+                    ? reasonController.text.trim()
+                    : null,
+          );
+        }
 
-Future<void> _processAutoEscalation(
-  String? userId,
-  BuildContext context,
-  String question,
-  String answerText,
-  String triggerKeyword, {
-  String? userReason,
-}) async {
-  try {
-    // ✅ NEW: Get category from the current conversation's last user message
-    String messageCategory = 'General';
-    
-    final messages = Provider.of<ChatProvider>(context, listen: false).messages;
-    
-    // Find the most recent user message to get category
-    for (int i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].sender == 'user') {
-        messageCategory = messages[i].category ?? 'General';
-        print('✅ Found category for auto-escalation: $messageCategory');
         break;
       }
     }
-
-    final escalationRef = _firestore.collection('escalations').doc();
-    final escalationId = escalationRef.id;
-
-    // ✅ UPDATED: Include category in escalation data
-    final escalatedData = {
-      'escalationId': escalationId,
-      'userId': userId,
-      'conversationId': conversationId!,
-      'question': question,
-      'botAnswer': answerText,
-      'status': 'pending',
-      'reason': userReason ?? 'Auto-escalated: $triggerKeyword',
-      'category': messageCategory, // ✅ NEW: Add category
-      'userReason': userReason,
-      'triggerKeyword': triggerKeyword,
-      'createdAt': Timestamp.now(),
-    };
-
-    await escalationRef.set(escalatedData);
-
-    print('✅ Auto-escalation created: $escalationId');
-    print('📂 Category: $messageCategory'); // ✅ NEW: Log category
-  } catch (e) {
-    print('❌ Error creating auto-escalation: $e');
   }
-}
+
+  Future<void> _processAutoEscalation(
+    String? userId,
+    BuildContext context,
+    String question,
+    String answerText,
+    String triggerKeyword, {
+    String? userReason,
+  }) async {
+    try {
+      // ✅ NEW: Get category from the current conversation's last user message
+      String messageCategory = 'General';
+
+      final messages =
+          Provider.of<ChatProvider>(context, listen: false).messages;
+
+      // Find the most recent user message to get category
+      for (int i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].sender == 'user') {
+          messageCategory = messages[i].category ?? 'General';
+          print('✅ Found category for auto-escalation: $messageCategory');
+          break;
+        }
+      }
+
+      final escalationRef = _firestore.collection('escalations').doc();
+      final escalationId = escalationRef.id;
+
+      // ✅ UPDATED: Include category in escalation data
+      final escalatedData = {
+        'escalationId': escalationId,
+        'userId': userId,
+        'conversationId': conversationId!,
+        'question': question,
+        'botAnswer': answerText,
+        'status': 'pending',
+        'reason': userReason ?? 'Auto-escalated: $triggerKeyword',
+        'category': messageCategory, // ✅ NEW: Add category
+        'userReason': userReason,
+        'triggerKeyword': triggerKeyword,
+        'createdAt': Timestamp.now(),
+      };
+
+      await escalationRef.set(escalatedData);
+
+      print('✅ Auto-escalation created: $escalationId');
+      print('📂 Category: $messageCategory'); // ✅ NEW: Log category
+    } catch (e) {
+      print('❌ Error creating auto-escalation: $e');
+    }
+  }
 
   Future<void> _checkAndPromoteToFAQOptimized(
     String question,
@@ -1524,77 +1688,78 @@ Future<void> _processAutoEscalation(
     }
   }
 
- Future<void> _updateConversationTitleIfNeeded(String question) async {
-  if (conversationId == null) return;
+  Future<void> _updateConversationTitleIfNeeded(String question) async {
+    if (conversationId == null) return;
 
-  bool shouldUpdateTitle = false;
+    bool shouldUpdateTitle = false;
 
-  if (currentConversation == null) {
-    await loadConversationInfo();
-  }
+    if (currentConversation == null) {
+      await loadConversationInfo();
+    }
 
-  if (currentConversation != null) {
-    final title = currentConversation!.title.toLowerCase();
-    shouldUpdateTitle = (title.contains('new conversation') ||
-            title == 'untitled' ||
-            title.trim().isEmpty) &&
-        _messages.where((m) => m.sender == 'user').length <= 1;
-  }
+    if (currentConversation != null) {
+      final title = currentConversation!.title.toLowerCase();
+      shouldUpdateTitle =
+          (title.contains('new conversation') ||
+              title == 'untitled' ||
+              title.trim().isEmpty) &&
+          _messages.where((m) => m.sender == 'user').length <= 1;
+    }
 
-  if (shouldUpdateTitle) {
-    try {
-      final titlePrompt = '''
+    if (shouldUpdateTitle) {
+      try {
+        final titlePrompt = '''
 Generate a short, descriptive title (max 5 words) for the following user question:
 
 Question:
 $question
 ''';
 
-      final newTitle = await _cohere!.generateResponse(titlePrompt);
-      print('Generated title from Cohere: "$newTitle"');
+        final newTitle = await _cohere!.generateResponse(titlePrompt);
+        print('Generated title from Cohere: "$newTitle"');
 
-      if (newTitle != null && newTitle.trim().isNotEmpty) {
-        final updatedTitle = newTitle.trim();
+        if (newTitle != null && newTitle.trim().isNotEmpty) {
+          final updatedTitle = newTitle.trim();
 
-        // ✅ Update Firestore first
-        await _firestore
-            .collection('conversations')
-            .doc(conversationId!)
-            .update({'title': updatedTitle});
+          // ✅ Update Firestore first
+          await _firestore
+              .collection('conversations')
+              .doc(conversationId!)
+              .update({'title': updatedTitle});
 
-        print('Updated conversation title to: "$updatedTitle"');
+          print('Updated conversation title to: "$updatedTitle"');
 
-        // ✅ Update local state immediately
-        if (currentConversation != null) {
-          currentConversation = Conversation(
-            id: currentConversation!.id,
-            userId: currentConversation!.userId,
-            title: updatedTitle, // New title
-            status: currentConversation!.status,
-            createdAt: currentConversation!.createdAt,
+          // ✅ Update local state immediately
+          if (currentConversation != null) {
+            currentConversation = Conversation(
+              id: currentConversation!.id,
+              userId: currentConversation!.userId,
+              title: updatedTitle, // New title
+              status: currentConversation!.status,
+              createdAt: currentConversation!.createdAt,
+            );
+          }
 
+          // ✅ Update UserConstant cache
+          final convIndex = UserConstant.recentConversations.indexWhere(
+            (c) => c['id'] == conversationId,
           );
-        }
+          if (convIndex != -1) {
+            UserConstant.recentConversations[convIndex]['title'] = updatedTitle;
+          }
 
-        // ✅ Update UserConstant cache
-        final convIndex = UserConstant.recentConversations
-            .indexWhere((c) => c['id'] == conversationId);
-        if (convIndex != -1) {
-          UserConstant.recentConversations[convIndex]['title'] = updatedTitle;
-        }
+          // ✅ Force UI update
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            notifyListeners();
+          });
 
-        // ✅ Force UI update
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          notifyListeners();
-        });
-        
-        print('✅ Title update complete and UI notified');
+          print('✅ Title update complete and UI notified');
+        }
+      } catch (titleError) {
+        print('Error updating conversation title: $titleError');
       }
-    } catch (titleError) {
-      print('Error updating conversation title: $titleError');
     }
   }
-}
 
   //  Future<List<double>> generateEmbedding(String question) async {
   //   try {
@@ -1769,12 +1934,13 @@ $question
     print('✅ ChatProvider cleared (including escalation listener)');
   }
 
-  @override
-  void dispose() {
-    _messagesSubscription?.cancel();
-    _escalationSubscription?.cancel(); // ✅ NEW: Cancel on dispose
-    super.dispose();
-  }
+@override
+void dispose() {
+  _messagesSubscription?.cancel();
+  _escalationSubscription?.cancel();
+  _userMessageCountSubscription?.cancel(); // ✅ NEW
+  super.dispose();
+}
 }
 
 // Helper class for grouping similar questions

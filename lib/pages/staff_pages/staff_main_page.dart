@@ -4,6 +4,8 @@ import 'package:capstone_project/pages/staff_pages/staff_reports_page.dart';
 import 'package:capstone_project/pages/staff_pages/staff_announcement_page.dart';
 import 'package:capstone_project/pages/staff_pages/staff_message_logs.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/responsive/widgets/menu.dart';
 
@@ -35,6 +37,9 @@ class _StaffMainPageState extends State<StaffMainPage> {
   String? _conversationId;
   bool _shouldAutoOpen = false;
 
+  String _serviceUnit = "";
+  bool _isLoadingServiceUnit = true;
+
   final List<String> _pageTitles = const [
     'Dashboard',
     'Reports',
@@ -52,6 +57,8 @@ class _StaffMainPageState extends State<StaffMainPage> {
     _escalationId = widget.escalationId;
     _conversationId = widget.conversationId;
     _shouldAutoOpen = widget.autoOpen;
+
+      _fetchStaffServiceUnit();
     
     print('🎯 StaffMainPage initialized with:');
     print('   - initialTabIndex: ${widget.initialTabIndex}');
@@ -60,7 +67,45 @@ class _StaffMainPageState extends State<StaffMainPage> {
     print('   - autoOpen: ${widget.autoOpen}');
   }
 
-  @override
+    Future<void> _fetchStaffServiceUnit() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print('⚠️ No user logged in');
+        setState(() {
+          _isLoadingServiceUnit = false;
+        });
+        return;
+      }
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (userDoc.exists) {
+        final data = userDoc.data();
+        setState(() {
+          _serviceUnit = data?['serviceUnit'] as String;
+          _isLoadingServiceUnit = false;
+        });
+        
+        print('✅ Staff service unit loaded: $_serviceUnit');
+      } else {
+        print('⚠️ User document not found');
+        setState(() {
+          _isLoadingServiceUnit = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Error fetching service unit: $e');
+      setState(() {
+        _isLoadingServiceUnit = false;
+      });
+    }
+  }
+
+ @override
   void didChangeDependencies() {
     super.didChangeDependencies();
 
@@ -99,6 +144,14 @@ class _StaffMainPageState extends State<StaffMainPage> {
   }
 
   List<Widget> _getPages() {
+
+     if (_isLoadingServiceUnit) {
+      return [
+        const Center(child: CircularProgressIndicator()),
+
+      ];
+    }
+
     return [
       const StaffDashboardPage(),
       const StaffReportsPage(),
@@ -107,6 +160,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
         key: ValueKey('escalation_$_escalationId'), // ✅ Force rebuild when escalationId changes
         initialEscalationId: _escalationId,
         autoOpen: _shouldAutoOpen && _selectedIndex == 2,
+         serviceUnit: _serviceUnit,
       ),
       const StaffAnnouncementPage(),
       const StaffMessageLogsPage(),

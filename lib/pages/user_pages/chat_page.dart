@@ -2,6 +2,7 @@ import 'dart:async';
 
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:capstone_project/pages/user_pages/chat_utilities.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -2175,56 +2176,67 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
   }
 
-  void _sendMessage(ChatProvider chatProvider) async {
-    final text = _controller.text.trim();
-    if (text.isEmpty || chatProvider.isLoading) return;
+void _sendMessage(ChatProvider chatProvider) async {
+  final text = _controller.text.trim();
+  if (text.isEmpty || chatProvider.isLoading) return;
 
-    _controller.clear();
+  // ✅ NEW: Check message limit
+  if (chatProvider.isMessageLimitReached) {
+    final timeUntilReset = chatProvider.getTimeUntilReset();
+    
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => MessageLimitDialog(
+        timeUntilReset: timeUntilReset,
+      ),
+    );
+    return;
+  }
 
-    if (_showFAQs && mounted) {
-      setState(() {
-        _showFAQs = false;
-      });
+  _controller.clear();
+
+  if (_showFAQs && mounted) {
+    setState(() {
+      _showFAQs = false;
+    });
+  }
+
+  try {
+    await chatProvider.askQuestionWithStreaming(context, text);
+    await Future.delayed(Duration(milliseconds: 150));
+
+    if (mounted && _scrollController.hasClients) {
+      _scrollToBottomAnimated(delay: 100);
     }
-
-    try {
-      // Send message
-      await chatProvider.askQuestionWithStreaming(context, text);
-
-      // ✅ Improved: Wait for message to be added and scroll smoothly
-      await Future.delayed(Duration(milliseconds: 150));
-
-      if (mounted && _scrollController.hasClients) {
-        // Ensure we're at the bottom
-        _scrollToBottomAnimated(delay: 100);
-      }
-    } catch (e) {
-      debugPrint('Error sending message: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  Icons.error_outline_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                SizedBox(width: 12),
-                Expanded(child: Text('Error sending message: ${e.toString()}')),
-              ],
-            ),
-            backgroundColor: Colors.red.shade400,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: EdgeInsets.all(16),
+  } catch (e) {
+    debugPrint('Error sending message: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              SizedBox(width: 12),
+              Expanded(child: Text('Error sending message: ${e.toString()}')),
+            ],
           ),
-        );
-      }
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: EdgeInsets.all(16),
+        ),
+      );
     }
   }
+}
+
 
   @override
   void dispose() {

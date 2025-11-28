@@ -193,21 +193,33 @@ function buildConversationContext(
 ): string {
   if (!conversationHistory || conversationHistory.length === 0) return "";
 
-  const recentHistory = conversationHistory.slice(-5); // Increased from 4 to 5
+  // Take last 10 messages (5 exchanges) for better context
+  const recentHistory = conversationHistory.slice(-10);
   const contextParts: string[] = [];
 
   for (const message of recentHistory) {
+    // Map sender to proper role names
     const role = message.sender === "user" ? "User" : "Assistant";
+    
+    // Truncate very long messages but keep reasonable length
     const content = message.content.length > 500
       ? message.content.substring(0, 500) + "..."
       : message.content;
+    
     contextParts.push(`${role}: ${content}`);
   }
 
-  return contextParts.join("\n");
+  const fullContext = contextParts.join("\n\n");
+  
+  console.log(`📝 Built conversation context:`);
+  console.log(`   Messages included: ${recentHistory.length}`);
+  console.log(`   Total context length: ${fullContext.length} chars`);
+  
+  return fullContext;
 }
 
-// ✅ COMPLETELY REWRITTEN: More comprehensive, accurate prompts
+// ✅ UPDATED: Enhanced prompts to better use conversation history
+
 function buildContextAwarePrompt(
   query: string,
   contexts: Array<{ content: string; title: string; score: number }>,
@@ -219,31 +231,44 @@ function buildContextAwarePrompt(
     knowledgeSection += `Document ${idx + 1}: ${ctx.title}\n${ctx.content}\n\n`;
   });
 
+  // ✅ Improved: Better instructions for using conversation history
+  const historySection = conversationHistory 
+    ? `Previous conversation context (use this to understand follow-up questions and maintain continuity):\n${conversationHistory}\n\n`
+    : "";
+
   return `You are OASP Assist, the official AI assistant for Central Mindanao University's Office of Admissions, Scholarships, and Placement (OASP).
 
-${conversationHistory ? `Previous conversation:\n${conversationHistory}\n\n` : ""}Current question: "${query}"
+${historySection}Current question: "${query}"
 
 Knowledge Base Documents:
 ${knowledgeSection}
 
 CRITICAL INSTRUCTIONS:
-1. **Comprehensiveness**: Provide detailed, thorough answers using ALL relevant information from the documents
-2. **Accuracy**: Only use information directly stated in the knowledge base - never make assumptions or add external information
-3. **Structure**: Organize complex answers with clear explanations, including:
+1. **Context Awareness**: 
+   - If this is a follow-up question (indicated by conversation history), reference previous discussion
+   - Use pronouns and context clues from history to understand what "it", "that", "those" refer to
+   - Maintain continuity in your responses based on what was discussed before
+
+2. **Comprehensiveness**: Provide detailed, thorough answers using ALL relevant information from the documents
+
+3. **Accuracy**: Only use information directly stated in the knowledge base - never make assumptions
+
+4. **Structure**: Organize complex answers with clear explanations, including:
    - Step-by-step procedures when applicable
    - Specific requirements, dates, and deadlines
    - All relevant details (fees, contacts, locations, etc.)
-4. **Context Awareness**: Use conversation history to understand follow-up questions
-5. **Natural Language**: Write as a knowledgeable university assistant would - friendly but professional
-6. **NO DISCLAIMERS**: Do NOT suggest contacting OASP or mention limitations unless the information is genuinely not in the documents
-7. **Completeness**: If the documents contain the answer, give the FULL answer with all details
 
-If multiple documents cover the topic, synthesize them into one coherent, complete response.
+5. **Natural Language**: Write as a knowledgeable university assistant would - friendly but professional
+
+6. **NO DISCLAIMERS**: Do NOT suggest contacting OASP unless information is genuinely not in the documents
+
+7. **Completeness**: Give FULL answers with all details when information is available
+
+If this is a follow-up question, acknowledge the previous context naturally in your response.
 
 Answer:`;
 }
 
-// ✅ IMPROVED: Better handling for partial information
 function buildPartialInfoPrompt(
   query: string,
   contexts: Array<{ content: string; title: string; score: number }>,
@@ -254,22 +279,26 @@ function buildPartialInfoPrompt(
     knowledgeSection += `[${ctx.title}]\n${ctx.content}\n\n`;
   });
 
+  const historySection = conversationHistory 
+    ? `Recent conversation (use for context):\n${conversationHistory}\n\n`
+    : "";
+
   return `You are OASP Assist for Central Mindanao University.
 
-${conversationHistory ? `Recent conversation:\n${conversationHistory}\n\n` : ""}Question: "${query}"
+${historySection}Question: "${query}"
 
 Available Information:
 ${knowledgeSection}
 
 Instructions:
-1. Provide whatever specific information IS available from the documents above
-2. Be thorough with what you CAN answer
-3. Only if truly critical information is missing, briefly mention that OASP staff can provide additional details
-4. Focus on being helpful with what you know, not apologetic about gaps
+1. If this is a follow-up question, use conversation history to understand the full context
+2. Provide whatever specific information IS available from the documents
+3. Be thorough with what you CAN answer
+4. Only if truly critical information is missing, briefly mention that OASP staff can provide additional details
+5. Maintain natural conversation flow if there's prior context
 
 Answer:`;
 }
-
 async function retrieveRelevantDocuments(
   query: string,
   queryEmbedding: number[],
@@ -570,50 +599,6 @@ export const generateAnswer = onRequest(
   }
   
 );
-
-// Quick fix with multiple model fallbacks
-// Add this to your Cloud Function
-
-// const GEMINI_MODELS = [
-//   'gemini-2.0-flash-exp',
-//   'gemini-2.5-flash-002',
-//   'gemini-2.5-flash',
-//   'gemini-2.5-pro',
-//   'gemini-pro'
-// ];
-
-// let cachedModel: string | null = null;
-
-// async function findWorkingGeminiModel(apiKey: string): Promise<string> {
-//   for (const model of GEMINI_MODELS) {
-//     try {
-//       const response = await axios.post(
-//         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-//         {
-//           contents: [{ parts: [{ text: "test" }] }],
-//           generationConfig: { maxOutputTokens: 10 }
-//         },
-//         { timeout: 5000 }
-//       );
-      
-//       if (response.status === 200) {
-//         console.log(`✅ Found working model: ${model}`);
-//         return model;
-//       }
-//     } catch (error) {
-//       console.log(`⚠️ Model ${model} not available`);
-//       continue;
-//     }
-//   }
-  
-//   throw new Error('No working Gemini model found');
-// }
-
-// async function getGeminiModel(apiKey: string): Promise<string> {
-//   if (cachedModel) return cachedModel;
-//   cachedModel = await findWorkingGeminiModel(apiKey);
-//   return cachedModel;
-// }
 
 export async function generateGeminiResponse(
   prompt: string,

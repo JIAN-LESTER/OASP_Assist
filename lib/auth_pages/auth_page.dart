@@ -102,7 +102,7 @@ class RoleBasedRouter extends StatelessWidget {
         // ✅ Handle errors by showing retry - don't sign out
         if (snapshot.hasError || !snapshot.hasData) {
           print('❌ Error in RoleBasedRouter: ${snapshot.error}');
-          
+
           return Scaffold(
             body: Center(
               child: Padding(
@@ -110,11 +110,18 @@ class RoleBasedRouter extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline, size: 64, color: Colors.red.shade400),
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red.shade400,
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'Error loading account',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -177,7 +184,6 @@ class RoleBasedRouter extends StatelessWidget {
     );
   }
 
-
   Future<UserData> _getUserDataAndLogEvent() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -186,10 +192,11 @@ class RoleBasedRouter extends StatelessWidget {
       }
 
       print('🔍 Fetching user data for: ${user.uid}');
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
 
       String role = 'user';
       String name = user.displayName ?? user.email?.split('@')[0] ?? 'User';
@@ -217,7 +224,7 @@ class RoleBasedRouter extends StatelessWidget {
         }
       } else {
         print('⚠️ User document not found, creating new one');
-        
+
         // Create a user doc if not existing
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
@@ -225,13 +232,18 @@ class RoleBasedRouter extends StatelessWidget {
           'name': name,
           'photoURL': user.photoURL ?? '',
           'role': 'user',
-          'profileCompleted': false,
           'createdAt': FieldValue.serverTimestamp(),
+          'firstLogin': true,
           'isActive': true,
+          'profileCompleted': false,
+          'onboardingCompleted': false,
+          'hasSeenOnboardingGuide': false,
           'isVerified': user.emailVerified,
           'linkedProviders': ['password'],
+          'dailyMessageCount': 0, // ✅ Initialize to 0
+          'lastMessageResetDate': FieldValue.serverTimestamp(), // ✅ Set to now
         });
-        
+
         print('✅ New user document created');
       }
 

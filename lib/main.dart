@@ -535,6 +535,7 @@ class MyApp extends StatelessWidget {
           return HumanEscalation(
             initialEscalationId: escalationId,
             autoOpen: autoOpen,
+            serviceUnit: "",
           );
         },
         '/onboarding': (context) => const OnboardingScreen(),
@@ -573,9 +574,11 @@ class MyApp extends StatelessWidget {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
           final escalationId = args?['escalationId'] as String?;
           final autoOpen = args?['autoOpen'] as bool? ?? false;
+            final serviceUnit = args?['serviceUnit'] as String;
           return HumanEscalation(
             initialEscalationId: escalationId,
             autoOpen: autoOpen,
+            serviceUnit: serviceUnit
           );
         },
       },

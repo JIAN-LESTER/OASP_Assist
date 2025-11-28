@@ -476,6 +476,8 @@ class _SquareTileState extends State<SquareTile> {
           'isFirstLogin': true,
           'profileCompleted': false,
           'linkedProviders': ['google.com'],
+                   'dailyMessageCount': 0,                       
+    'lastMessageResetDate': FieldValue.serverTimestamp(), 
         });
         print('🎉 Created new user: ${user.email}');
       } else {

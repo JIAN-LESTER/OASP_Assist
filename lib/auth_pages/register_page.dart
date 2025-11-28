@@ -346,6 +346,7 @@ class _RegisterPageState extends State<RegisterPage> {
         'email': user.email ?? '',
         'name': name,
         'role': 'user',
+         'photoURL': user.photoURL ?? '',
         'createdAt': FieldValue.serverTimestamp(),
         'firstLogin': true,
         'isActive': true,
@@ -354,6 +355,8 @@ class _RegisterPageState extends State<RegisterPage> {
         'hasSeenOnboardingGuide': false,
         'isVerified': false,
         'linkedProviders': ['password'],
+         'dailyMessageCount': 0,                       
+    'lastMessageResetDate': FieldValue.serverTimestamp(), 
       };
 
       // Step 2: Run ALL operations in parallel (MAXIMUM SPEED)
