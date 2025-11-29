@@ -297,7 +297,11 @@ class UniversalUIComponents {
               isExpandable: true,
               subItems: [
                 MenuItem(icon: Icons.person, title: "Users", index: 6),
-                MenuItem(icon: Icons.person, title: "Colleges", index: 12),
+                MenuItem(
+                  icon: Icons.account_balance_outlined,
+                  title: "Colleges",
+                  index: 12,
+                ),
                 MenuItem(icon: Icons.book, title: "Programs", index: 13),
               ],
             ),
@@ -566,7 +570,11 @@ class UniversalUIComponents {
       }
     }
 
-    return Column(children: menuItems);
+    // ✅ CRITICAL FIX: Wrap in SingleChildScrollView to prevent overflow
+    return SingleChildScrollView(
+      physics: BouncingScrollPhysics(),
+      child: Column(children: menuItems),
+    );
   }
 
   static Widget _buildRegularMenuItem(
@@ -647,6 +655,11 @@ class UniversalUIComponents {
     'User Management': false,
   };
 
+  // ✅ Add this counter to force rebuild
+  static int _rebuildCounter = 0;
+
+  // Replace the entire _buildExpandableMenuItem method with this:
+
   static Widget _buildExpandableMenuItem(
     BuildContext context,
     MenuItem item,
@@ -662,6 +675,9 @@ class UniversalUIComponents {
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Theme(
         data: ThemeData(
+          dividerColor: Colors.transparent,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
           expansionTileTheme: ExpansionTileThemeData(
             expansionAnimationStyle: AnimationStyle(duration: Duration.zero),
           ),
@@ -672,6 +688,8 @@ class UniversalUIComponents {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: ExpansionTile(
+              // ✅ Use counter to force unique key on every rebuild
+              key: ValueKey('${item.title}_$isExpanded\_$_rebuildCounter'),
               tilePadding: const EdgeInsets.symmetric(
                 horizontal: 8,
                 vertical: 0,
@@ -680,7 +698,6 @@ class UniversalUIComponents {
               leading: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // No vertical line for parent item
                   Container(
                     width: 3,
                     height: 20,
@@ -690,8 +707,6 @@ class UniversalUIComponents {
                       borderRadius: BorderRadius.circular(1.5),
                     ),
                   ),
-
-                  // Icon
                   Container(
                     width: 20,
                     height: 20,
@@ -717,9 +732,33 @@ class UniversalUIComponents {
               collapsedBackgroundColor: Colors.transparent,
               initiallyExpanded: isExpanded,
               onExpansionChanged: (expanded) {
-                setDrawerState(() {
-                  _expandedState[item.title] = expanded;
-                });
+                // Close ALL groups first
+                _expandedState['Services'] = false;
+                _expandedState['Logs'] = false;
+                _expandedState['User Management'] = false;
+
+                PersistentDrawerState.setUserManagementExpanded(false);
+                PersistentDrawerState.setServicesExpanded(false);
+                PersistentDrawerState.setLogsExpanded(false);
+
+                // Then open the clicked one if expanding
+                if (expanded) {
+                  _expandedState[item.title] = true;
+
+                  if (item.title == 'User Management') {
+                    PersistentDrawerState.setUserManagementExpanded(true);
+                  } else if (item.title == 'Services') {
+                    PersistentDrawerState.setServicesExpanded(true);
+                  } else if (item.title == 'Logs') {
+                    PersistentDrawerState.setLogsExpanded(true);
+                  }
+                }
+
+                // ✅ Increment counter to force all tiles to rebuild
+                _rebuildCounter++;
+
+                // Force UI update
+                setDrawerState(() {});
               },
               children:
                   item.subItems?.map((subItem) {
@@ -744,8 +783,7 @@ class UniversalUIComponents {
                               context: context,
                               index: subItem.index,
                               onItemTap: onItemTap,
-                              groupIndex:
-                                  item.index, // ✅ Pass parent group index
+                              groupIndex: item.index,
                               setDrawerState: setDrawerState,
                             );
                           },
@@ -756,7 +794,6 @@ class UniversalUIComponents {
                             ),
                             child: Row(
                               children: [
-                                // Green vertical line indicator for sub-items
                                 Container(
                                   width: 3,
                                   height: 18,
@@ -772,8 +809,6 @@ class UniversalUIComponents {
                                     borderRadius: BorderRadius.circular(1.5),
                                   ),
                                 ),
-
-                                // Sub-item icon
                                 Container(
                                   width: 18,
                                   height: 18,
@@ -787,8 +822,6 @@ class UniversalUIComponents {
                                     size: 18,
                                   ),
                                 ),
-
-                                // Sub-item title
                                 Expanded(
                                   child: Padding(
                                     padding: const EdgeInsets.only(left: 8),
