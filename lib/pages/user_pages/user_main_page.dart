@@ -1583,152 +1583,320 @@ class _UserMainPageState extends State<UserMainPage>
     );
   }
 
+  // Widget _buildBottomNavigationBar() {
+  //   int getActualIndex() {
+  //     if (_selectedIndex == 0) return 0;
+  //     if (_selectedIndex == 1) return 1;
+  //     if (_selectedIndex == 2) return 2;
+  //     if (_selectedIndex >= 3) return 3;
+  //     return 0;
+  //   }
+
+  //   // Height when expanded vs collapsed
+  //   final double expandedHeight = 80; // CircleNavBar height + padding
+  //   final double collapsedHeight = 30; // Just enough for the pull tab
+
+  //   return AnimatedContainer(
+  //     duration: const Duration(milliseconds: 400),
+  //     curve: Curves.easeInOut,
+  //     height: _isBottomNavExpanded ? expandedHeight : collapsedHeight,
+  //     child: Stack(
+  //       clipBehavior: Clip.none,
+  //       children: [
+  //         // Main navigation bar
+  //         if (_isBottomNavExpanded)
+  //           Positioned(
+  //             left: 0,
+  //             right: 0,
+  //             bottom: 0,
+  //             child: GestureDetector(
+  //               onTap: _resetBottomNavTimer,
+  //               child: CircleNavBar(
+  //                 activeIcons: const [
+  //                   Icon(Icons.home, color: Colors.green),
+  //                   Icon(Icons.chat, color: Colors.green),
+  //                   Icon(Icons.announcement, color: Colors.green),
+  //                   Icon(Icons.apps, color: Colors.green),
+  //                 ],
+  //                 inactiveIcons: const [
+  //                   Text(
+  //                     "Home",
+  //                     style: TextStyle(
+  //                       fontSize: 11,
+  //                       fontWeight: FontWeight.w500,
+  //                     ),
+  //                   ),
+  //                   Text(
+  //                     "Chat",
+  //                     style: TextStyle(
+  //                       fontSize: 11,
+  //                       fontWeight: FontWeight.w500,
+  //                     ),
+  //                   ),
+  //                   Text(
+  //                     "Announcements",
+  //                     style: TextStyle(
+  //                       fontSize: 10,
+  //                       fontWeight: FontWeight.w500,
+  //                     ),
+  //                   ),
+  //                   Text(
+  //                     "Services",
+  //                     style: TextStyle(
+  //                       fontSize: 11,
+  //                       fontWeight: FontWeight.w500,
+  //                     ),
+  //                   ),
+  //                 ],
+  //                 color: Colors.white,
+  //                 circleColor: UniversalUIComponents.primaryGreen,
+  //                 height: 60,
+  //                 circleWidth: 60,
+  //                 activeIndex: getActualIndex(),
+  //                 onTap: (index) {
+  //                   HapticFeedback.mediumImpact();
+  //                   _resetBottomNavTimer();
+  //                   if (index == 3) {
+  //                     _showServicesMenu();
+  //                   } else {
+  //                     _onNavigationItemTap(index);
+  //                   }
+  //                 },
+  //                 padding: const EdgeInsets.only(
+  //                   left: 16,
+  //                   right: 16,
+  //                   bottom: 20,
+  //                 ),
+  //                 cornerRadius: const BorderRadius.only(
+  //                   topLeft: Radius.circular(8),
+  //                   topRight: Radius.circular(8),
+  //                   bottomRight: Radius.circular(24),
+  //                   bottomLeft: Radius.circular(24),
+  //                 ),
+  //                 shadowColor: Colors.grey.shade300,
+  //                 circleShadowColor: Colors.grey.shade400,
+  //                 elevation: 8,
+  //                 gradient: LinearGradient(
+  //                   begin: Alignment.topCenter,
+  //                   end: Alignment.bottomCenter,
+  //                   colors: [Colors.white, Colors.grey.shade50],
+  //                 ),
+  //               ),
+  //             ),
+  //           ),
+
+  //         // Pull tab - always visible, changes icon based on state
+  //         Positioned(
+  //           bottom: 0,
+  //           left: 0,
+  //           right: 0,
+  //           child: GestureDetector(
+  //             onTap: () {
+  //               HapticFeedback.mediumImpact();
+  //               setState(() {
+  //                 _isBottomNavExpanded = !_isBottomNavExpanded;
+  //               });
+  //               if (_isBottomNavExpanded) {
+  //                 _startBottomNavTimer();
+  //               }
+  //             },
+  //             child: Center(
+  //               child: Container(
+  //                 width: 60,
+  //                 height: 26,
+  //                 decoration: BoxDecoration(
+  //                   color: UniversalUIComponents.primaryGreen,
+  //                   borderRadius: BorderRadius.circular(14),
+  //                   boxShadow: [
+  //                     BoxShadow(
+  //                       color: Colors.black.withOpacity(0.15),
+  //                       blurRadius: _isBottomNavExpanded ? 6 : 4,
+  //                       offset: Offset(0, _isBottomNavExpanded ? 2 : 1),
+  //                     ),
+  //                   ],
+  //                 ),
+  //                 child: Center(
+  //                   child: Icon(
+  //                     _isBottomNavExpanded
+  //                         ? Icons.keyboard_arrow_down
+  //                         : Icons.keyboard_arrow_up,
+  //                     color: Colors.white,
+  //                     size: 20,
+  //                   ),
+  //                 ),
+  //               ),
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  // Replace the _buildBottomNavigationBar method with this:
+
   Widget _buildBottomNavigationBar() {
-    int getActualIndex() {
-      if (_selectedIndex == 0) return 0;
-      if (_selectedIndex == 1) return 1;
-      if (_selectedIndex == 2) return 2;
-      if (_selectedIndex >= 3) return 3;
-      return 0;
-    }
-
-    // Height when expanded vs collapsed
-    final double expandedHeight = 80; // CircleNavBar height + padding
-    final double collapsedHeight = 30; // Just enough for the pull tab
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
-      height: _isBottomNavExpanded ? expandedHeight : collapsedHeight,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Main navigation bar
-          if (_isBottomNavExpanded)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: GestureDetector(
-                onTap: _resetBottomNavTimer,
-                child: CircleNavBar(
-                  activeIcons: const [
-                    Icon(Icons.home, color: Colors.green),
-                    Icon(Icons.chat, color: Colors.green),
-                    Icon(Icons.announcement, color: Colors.green),
-                    Icon(Icons.apps, color: Colors.green),
-                  ],
-                  inactiveIcons: const [
-                    Text(
-                      "Home",
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      "Chat",
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      "Announcements",
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      "Services",
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                  color: Colors.white,
-                  circleColor: UniversalUIComponents.primaryGreen,
-                  height: 60,
-                  circleWidth: 60,
-                  activeIndex: getActualIndex(),
-                  onTap: (index) {
-                    HapticFeedback.mediumImpact();
-                    _resetBottomNavTimer();
-                    if (index == 3) {
-                      _showServicesMenu();
-                    } else {
-                      _onNavigationItemTap(index);
-                    }
-                  },
-                  padding: const EdgeInsets.only(
-                    left: 16,
-                    right: 16,
-                    bottom: 20,
-                  ),
-                  cornerRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
-                    bottomRight: Radius.circular(24),
-                    bottomLeft: Radius.circular(24),
-                  ),
-                  shadowColor: Colors.grey.shade300,
-                  circleShadowColor: Colors.grey.shade400,
-                  elevation: 8,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.white, Colors.grey.shade50],
-                  ),
-                ),
-              ),
-            ),
-
-          // Pull tab - always visible, changes icon based on state
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.mediumImpact();
-                setState(() {
-                  _isBottomNavExpanded = !_isBottomNavExpanded;
-                });
-                if (_isBottomNavExpanded) {
-                  _startBottomNavTimer();
-                }
-              },
-              child: Center(
-                child: Container(
-                  width: 60,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: UniversalUIComponents.primaryGreen,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: _isBottomNavExpanded ? 6 : 4,
-                        offset: Offset(0, _isBottomNavExpanded ? 2 : 1),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Icon(
-                      _isBottomNavExpanded
-                          ? Icons.keyboard_arrow_down
-                          : Icons.keyboard_arrow_up,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
           ),
         ],
+      ),
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Calculate if we need to use smaller sizes
+            final screenWidth = constraints.maxWidth;
+            final isVerySmall = screenWidth < 320; // iPhone SE 1st gen
+            final isSmall = screenWidth < 375; // Small phones
+
+            return SizedBox(
+              height: 65,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: _buildNavItem(
+                      icon: Icons.home,
+                      label: 'Home',
+                      index: 0,
+                      isSelected: _selectedIndex == 0,
+                      isVerySmall: isVerySmall,
+                      isSmall: isSmall,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildNavItem(
+                      icon: Icons.chat_bubble_outline,
+                      label: 'Chat',
+                      index: 1,
+                      isSelected: _selectedIndex == 1,
+                      isVerySmall: isVerySmall,
+                      isSmall: isSmall,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildNavItem(
+                      icon: Icons.announcement_outlined,
+                      label: 'Announcements',
+                      index: 2,
+                      isSelected: _selectedIndex == 2,
+                      isVerySmall: isVerySmall,
+                      isSmall: isSmall,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildNavItem(
+                      icon: Icons.apps,
+                      label: 'Services',
+                      index: 3,
+                      isSelected: _selectedIndex >= 3,
+                      isVerySmall: isVerySmall,
+                      isSmall: isSmall,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required int index,
+    required bool isSelected,
+    required bool isVerySmall,
+    required bool isSmall,
+  }) {
+    // Map to filled icons when selected
+    IconData displayIcon = icon;
+    if (isSelected) {
+      if (icon == Icons.home) {
+        displayIcon = Icons.home;
+      } else if (icon == Icons.chat_bubble_outline) {
+        displayIcon = Icons.chat_bubble;
+      } else if (icon == Icons.announcement_outlined) {
+        displayIcon = Icons.announcement;
+      } else if (icon == Icons.apps) {
+        displayIcon = Icons.apps;
+      }
+    }
+
+    // Adaptive sizing based on screen width
+    final double iconSize = isVerySmall ? 20 : (isSmall ? 22 : 24);
+    final double fontSize = isVerySmall ? 8 : (isSmall ? 9 : 10);
+    final double spacing = isVerySmall ? 2 : 4;
+
+    return InkWell(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        if (index == 3) {
+          _showServicesMenu();
+        } else {
+          _onNavigationItemTap(index);
+        }
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isVerySmall ? 0 : 2,
+          vertical: 8,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              displayIcon,
+              size: iconSize,
+              color:
+                  isSelected
+                      ? UniversalUIComponents.primaryGreen
+                      : Colors.grey.shade400,
+            ),
+            SizedBox(height: spacing),
+            Flexible(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.center,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth,
+                      ),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w500,
+                          color:
+                              isSelected
+                                  ? UniversalUIComponents.primaryGreen
+                                  : Colors.grey.shade600,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
