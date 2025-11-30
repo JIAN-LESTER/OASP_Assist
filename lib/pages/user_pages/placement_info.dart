@@ -763,7 +763,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Company Name Section
+                          // Company Name Section (KEEP WITH LEFT PADDING)
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(20),
@@ -840,7 +840,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                             ),
                           ),
 
-                          // Available Positions
+                          // Available Positions (WITH BULLETS)
                           if (placement.positions.isNotEmpty) ...[
                             const SizedBox(height: 16),
                             Container(
@@ -865,19 +865,37 @@ class _PlacementInfoState extends State<PlacementInfo>
                                   const SizedBox(height: 8),
                                   ...placement.positions.map((position) {
                                     return Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 4,
-                                        left: 12,
-                                        top: 4,
-                                      ),
-                                      child: Text(
-                                        position,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          height: 1.5,
-                                          color: Colors.grey[800],
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 6,
+                                            ),
+                                            child: Container(
+                                              width: 6,
+                                              height: 6,
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[800],
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              position,
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                height: 1.5,
+                                                color: Colors.grey[800],
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     );
                                   }).toList(),
@@ -886,7 +904,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                             ),
                           ],
 
-                          // Contact Information
+                          // Contact Information (WITH BULLETS)
                           if (placement.contacts.isNotEmpty) ...[
                             const SizedBox(height: 16),
                             Container(
@@ -911,19 +929,37 @@ class _PlacementInfoState extends State<PlacementInfo>
                                   const SizedBox(height: 8),
                                   ...placement.contacts.map((contact) {
                                     return Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 4,
-                                        left: 12,
-                                        top: 4,
-                                      ),
-                                      child: SelectableText(
-                                        contact,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          height: 1.5,
-                                          color: Colors.grey[800],
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 6,
+                                            ),
+                                            child: Container(
+                                              width: 6,
+                                              height: 6,
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[800],
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: SelectableText(
+                                              contact,
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                height: 1.5,
+                                                color: Colors.grey[800],
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     );
                                   }).toList(),

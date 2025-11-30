@@ -14,7 +14,6 @@ import 'package:capstone_project/pages/admin_pages/scholarship_management.dart';
 import 'package:capstone_project/pages/admin_pages/system_logs_page.dart';
 import 'package:capstone_project/pages/admin_pages/user_management_page.dart';
 
-
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/responsive/widgets/menu.dart';
@@ -24,7 +23,7 @@ class AdminMainPage extends StatefulWidget {
   final String? escalationId;
   final String? conversationId;
   final bool autoOpen;
-  
+
   const AdminMainPage({
     super.key,
     this.initialTabIndex,
@@ -44,13 +43,13 @@ class _AdminMainPageState extends State<AdminMainPage> {
   @override
   void initState() {
     super.initState();
-    
+
     // ✅ Set initial tab if provided
     if (widget.initialTabIndex != null) {
       _selectedIndex = widget.initialTabIndex!;
       print('🎯 Admin initial tab set to: $_selectedIndex');
     }
-    
+
     // ✅ Handle escalation auto-open after build
     if (widget.autoOpen && widget.escalationId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -74,28 +73,26 @@ class _AdminMainPageState extends State<AdminMainPage> {
 
   // Update the _pages list to pass the callback and handle escalation
   List<Widget> get _pages => [
-    const DashboardPage(),        
+    const DashboardPage(),
     const ReportsPage(),
     const InformationBankPage(),
     const FaqManagementPage(),
     const AnnouncementPage(),
-    
+
     // ✅ Pass escalation parameters to HumanEscalation page
     HumanEscalation(
       initialEscalationId: widget.escalationId,
       autoOpen: widget.autoOpen,
     ),
-    
-    UserManagementPage(
-      onNavigateToPage: _navigateToPage,
-    ),
+
+    UserManagementPage(onNavigateToPage: _navigateToPage),
     const UserActivityLogsPage(),
     const AdminMessageLogsPage(),
     const AdmissionManagementPage(),
     const ScholarshipManagementPage(),
     const PlacementManagementPage(),
     const CollegeManagementPage(),
-    const ProgramManagementPage()
+    const ProgramManagementPage(),
   ];
 
   final List<String> _pageTitles = [
@@ -112,7 +109,7 @@ class _AdminMainPageState extends State<AdminMainPage> {
     'Scholarship',
     'Placement',
     'Colleges',
-    'Programs'
+    'Programs',
   ];
 
   void _onNavigationItemTap(int index) {

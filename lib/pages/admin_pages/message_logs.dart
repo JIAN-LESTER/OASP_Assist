@@ -449,65 +449,74 @@ Widget mainContent(
           ),
 
           const SizedBox(height: 16),
-Expanded(
-          child:Container(
-            height: MediaQuery.of(context).size.height - 200,
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                _buildTableHeader(),
-                const SizedBox(height: 10),
-
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream:
-                        FirebaseFirestore.instance
-                            .collection('message_logs')
-                            .orderBy('time', descending: true)
-                            .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      }
-
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return buildEmptyState(isLoading, true, 'Message Logs');
-                      }
-
-                      return _buildLogsList(
-                        allLogs: snapshot.data!.docs,
-
-                        searchQuery: searchController.text,
-                        selectedDateRange: selectedDateRange,
-                        currentPage: currentPage,
-                        itemsPerPage: itemsPerPage,
-                        onPageChanged: onPageChanged,
-                        onItemsPerPageChanged: onItemsPerPageChanged,
-                        messages: messages,
-                      );
-                    },
+          Expanded(
+            child: Container(
+              height: MediaQuery.of(context).size.height - 200,
+              padding: EdgeInsets.all(padding),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Column(
+                children: [
+                  _buildTableHeader(),
+                  const SizedBox(height: 10),
+
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream:
+                          FirebaseFirestore.instance
+                              .collection('message_logs')
+                              .orderBy('time', descending: true)
+                              .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Text('Error: ${snapshot.error}'),
+                          );
+                        }
+
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return buildEmptyState(
+                            isLoading,
+                            true,
+                            'Message Logs',
+                          );
+                        }
+
+                        return _buildLogsList(
+                          allLogs: snapshot.data!.docs,
+
+                          searchQuery: searchController.text,
+                          selectedDateRange: selectedDateRange,
+                          currentPage: currentPage,
+                          itemsPerPage: itemsPerPage,
+                          onPageChanged: onPageChanged,
+                          onItemsPerPageChanged: onItemsPerPageChanged,
+                          messages: messages,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-),
         ],
       ),
     ),
@@ -819,7 +828,14 @@ Widget _buildLogsRow({
       ],
     ),
     child: InkWell(
-      onTap: () => showLogsInfoModal(context, doc, messages, true),
+      onTap:
+          () => showLogsInfoModal(
+            context,
+            doc,
+            messages,
+            true,
+            showDeleteButton: true,
+          ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -847,7 +863,6 @@ Widget _buildLogsRow({
                       overflow: TextOverflow.ellipsis,
                       maxLines: 2,
                     ),
-                    
                   ),
               ],
             ),
@@ -896,7 +911,6 @@ Widget _buildLogsRow({
                     overflow: TextOverflow.ellipsis,
                     maxLines: 2,
                   ),
-
                 ],
               ),
             ),

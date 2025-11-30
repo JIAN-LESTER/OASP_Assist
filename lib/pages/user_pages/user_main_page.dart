@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:capstone_project/models/message.dart';
 import 'package:capstone_project/onboarding/onBoardingGuide.dart';
 import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 import 'package:circle_nav_bar/circle_nav_bar.dart' show CircleNavBar;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -1224,98 +1225,12 @@ class _UserMainPageState extends State<UserMainPage>
                     size: 20,
                     color: Colors.grey[500],
                   ),
-                  onPressed: () async {
-                    // Use the same delete function from menu.dart
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      barrierDismissible: false,
-                      builder:
-                          (dialogContext) => AlertDialog(
-                            title: const Text('Delete Conversation'),
-                            content: const Text(
-                              'Are you sure you want to delete this conversation?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed:
-                                    () => Navigator.pop(dialogContext, false),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed:
-                                    () => Navigator.pop(dialogContext, true),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.red,
-                                ),
-                                child: const Text('Delete'),
-                              ),
-                            ],
-                          ),
-                    );
-
-                    if (confirmed != true || !context.mounted) return;
-
-                    try {
-                      final wasSelected = _conversationId == convId;
-
-                      if (wasSelected) {
-                        await UserConstant.setSelectedConversation('');
-                        UserConstant.shouldShowFAQs = true;
-
-                        if (context.mounted) {
-                          final chatProvider = Provider.of<ChatProvider>(
-                            context,
-                            listen: false,
-                          );
-                          chatProvider.clearMessages();
-
-                          setState(() {
-                            _conversationId = null;
-                            _showFAQs = true;
-                          });
-                        }
-                      }
-
-                      final firestore = FirebaseFirestore.instance;
-                      final batch = firestore.batch();
-
-                      final messagesSnapshot =
-                          await firestore
-                              .collection('conversations')
-                              .doc(convId)
-                              .collection('messages')
-                              .get();
-
-                      for (final doc in messagesSnapshot.docs) {
-                        batch.delete(doc.reference);
-                      }
-                      batch.delete(
-                        firestore.collection('conversations').doc(convId),
-                      );
-
-                      await batch.commit();
-
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Conversation deleted'),
-                            backgroundColor: UniversalUIComponents.primaryGreen,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      print('❌ Delete error: $e');
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Failed to delete: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  },
+                  onPressed:
+                      () => _showDeleteConversationDialog(
+                        context,
+                        convId,
+                        conv['title'] ?? 'Untitled',
+                      ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -1332,152 +1247,656 @@ class _UserMainPageState extends State<UserMainPage>
     );
   }
 
-  Widget _buildBottomNavigationBar() {
-    int getActualIndex() {
-      if (_selectedIndex == 0) return 0;
-      if (_selectedIndex == 1) return 1;
-      if (_selectedIndex == 2) return 2;
-      if (_selectedIndex >= 3) return 3;
-      return 0;
-    }
+  Future<void> _showDeleteConversationDialog(
+    BuildContext context,
+    String conversationId,
+    String conversationTitle,
+  ) async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
-    // Height when expanded vs collapsed
-    final double expandedHeight = 80; // CircleNavBar height + padding
-    final double collapsedHeight = 30; // Just enough for the pull tab
+    // ValueNotifier for delete loading state
+    final isDeleting = ValueNotifier<bool>(false);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
-      height: _isBottomNavExpanded ? expandedHeight : collapsedHeight,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Main navigation bar
-          if (_isBottomNavExpanded)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: GestureDetector(
-                onTap: _resetBottomNavTimer,
-                child: CircleNavBar(
-                  activeIcons: const [
-                    Icon(Icons.home, color: Colors.green),
-                    Icon(Icons.chat, color: Colors.green),
-                    Icon(Icons.announcement, color: Colors.green),
-                    Icon(Icons.apps, color: Colors.green),
-                  ],
-                  inactiveIcons: const [
-                    Text(
-                      "Home",
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      "Chat",
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      "Announcements",
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      "Services",
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                  color: Colors.white,
-                  circleColor: UniversalUIComponents.primaryGreen,
-                  height: 60,
-                  circleWidth: 60,
-                  activeIndex: getActualIndex(),
-                  onTap: (index) {
-                    HapticFeedback.mediumImpact();
-                    _resetBottomNavTimer();
-                    if (index == 3) {
-                      _showServicesMenu();
-                    } else {
-                      _onNavigationItemTap(index);
-                    }
-                  },
-                  padding: const EdgeInsets.only(
-                    left: 16,
-                    right: 16,
-                    bottom: 20,
-                  ),
-                  cornerRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
-                    bottomRight: Radius.circular(24),
-                    bottomLeft: Radius.circular(24),
-                  ),
-                  shadowColor: Colors.grey.shade300,
-                  circleShadowColor: Colors.grey.shade400,
-                  elevation: 8,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.white, Colors.grey.shade50],
-                  ),
+    await showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Delete Conversation Confirmation',
+      barrierColor: Colors.black.withOpacity(0.5),
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
                 ),
-              ),
+              ],
             ),
-
-          // Pull tab - always visible, changes icon based on state
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.mediumImpact();
-                setState(() {
-                  _isBottomNavExpanded = !_isBottomNavExpanded;
-                });
-                if (_isBottomNavExpanded) {
-                  _startBottomNavTimer();
-                }
-              },
-              child: Center(
-                child: Container(
-                  width: 60,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: UniversalUIComponents.primaryGreen,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: _isBottomNavExpanded ? 6 : 4,
-                        offset: Offset(0, _isBottomNavExpanded ? 2 : 1),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with icon
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.fromLTRB(
+                    isMobile ? 24 : 32,
+                    isMobile ? 32 : 40,
+                    isMobile ? 24 : 32,
+                    isMobile ? 16 : 20,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(32),
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Color(0xFFEF4444),
+                          size: 32,
+                        ),
+                      ),
+                      SizedBox(height: isMobile ? 16 : 20),
+                      const Text(
+                        'Delete Conversation',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827),
+                          letterSpacing: -0.3,
+                        ),
                       ),
                     ],
                   ),
-                  child: Center(
-                    child: Icon(
-                      _isBottomNavExpanded
-                          ? Icons.keyboard_arrow_down
-                          : Icons.keyboard_arrow_up,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                ),
+
+                // Content
+                Padding(
+                  padding: EdgeInsets.all(isMobile ? 24 : 32),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Are you sure you want to delete this conversation?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                          height: 1.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF9FAFB),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(0xFFE5E7EB),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          conversationTitle,
+                          style: TextStyle(
+                            fontSize: isMobile ? 14 : 15,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF111827),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Action Buttons
+                      ValueListenableBuilder<bool>(
+                        valueListenable: isDeleting,
+                        builder: (context, deleting, _) {
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 48,
+                                  child: OutlinedButton(
+                                    onPressed:
+                                        deleting
+                                            ? null
+                                            : () => Navigator.of(context).pop(),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF6B7280),
+                                      backgroundColor: Colors.white,
+                                      disabledForegroundColor:
+                                          Colors.grey.shade400,
+                                      side: BorderSide(
+                                        color:
+                                            deleting
+                                                ? const Color(0xFFE5E7EB)
+                                                : const Color(0xFFD1D5DB),
+                                        width: 1,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Cancel',
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 15 : 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 48,
+                                  child: ElevatedButton(
+                                    onPressed:
+                                        deleting
+                                            ? null
+                                            : () async {
+                                              isDeleting.value = true;
+
+                                              try {
+                                                final wasSelected =
+                                                    _conversationId ==
+                                                    conversationId;
+
+                                                if (wasSelected) {
+                                                  await UserConstant.setSelectedConversation(
+                                                    '',
+                                                  );
+                                                  UserConstant.shouldShowFAQs =
+                                                      true;
+
+                                                  if (context.mounted) {
+                                                    final chatProvider =
+                                                        Provider.of<
+                                                          ChatProvider
+                                                        >(
+                                                          context,
+                                                          listen: false,
+                                                        );
+                                                    chatProvider
+                                                        .clearMessages();
+
+                                                    setState(() {
+                                                      _conversationId = null;
+                                                      _showFAQs = true;
+                                                    });
+                                                  }
+                                                }
+
+                                                final firestore =
+                                                    FirebaseFirestore.instance;
+                                                final batch = firestore.batch();
+
+                                                final messagesSnapshot =
+                                                    await firestore
+                                                        .collection(
+                                                          'conversations',
+                                                        )
+                                                        .doc(conversationId)
+                                                        .collection('messages')
+                                                        .get();
+
+                                                for (final doc
+                                                    in messagesSnapshot.docs) {
+                                                  batch.delete(doc.reference);
+                                                }
+                                                batch.delete(
+                                                  firestore
+                                                      .collection(
+                                                        'conversations',
+                                                      )
+                                                      .doc(conversationId),
+                                                );
+
+                                                await batch.commit();
+
+                                                if (context.mounted) {
+                                                  Navigator.of(context).pop();
+                                                  SnackbarUtil.showSuccess(
+                                                    context,
+                                                    'Conversation deleted successfully',
+                                                  );
+                                                }
+                                              } catch (e) {
+                                                print('❌ Delete error: $e');
+                                                if (context.mounted) {
+                                                  Navigator.of(context).pop();
+                                                  SnackbarUtil.showError(
+                                                    context,
+                                                    'Failed to delete conversation',
+                                                  );
+                                                }
+                                              } finally {
+                                                if (context.mounted) {
+                                                  isDeleting.value = false;
+                                                }
+                                              }
+                                            },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          deleting
+                                              ? const Color(0xFFFCA5A5)
+                                              : const Color(0xFFEF4444),
+                                      foregroundColor: Colors.white,
+                                      disabledBackgroundColor: const Color(
+                                        0xFFFCA5A5,
+                                      ),
+                                      disabledForegroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                    ),
+                                    child:
+                                        deleting
+                                            ? Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                const SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                          Color
+                                                        >(Colors.white),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Text(
+                                                  'Deleting...',
+                                                  style: TextStyle(
+                                                    fontSize:
+                                                        isMobile ? 15 : 16,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                            : Text(
+                                              'Delete',
+                                              style: TextStyle(
+                                                fontSize: isMobile ? 15 : 16,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ),
-              ),
+              ],
             ),
           ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  // Widget _buildBottomNavigationBar() {
+  //   int getActualIndex() {
+  //     if (_selectedIndex == 0) return 0;
+  //     if (_selectedIndex == 1) return 1;
+  //     if (_selectedIndex == 2) return 2;
+  //     if (_selectedIndex >= 3) return 3;
+  //     return 0;
+  //   }
+
+  //   // Height when expanded vs collapsed
+  //   final double expandedHeight = 80; // CircleNavBar height + padding
+  //   final double collapsedHeight = 30; // Just enough for the pull tab
+
+  //   return AnimatedContainer(
+  //     duration: const Duration(milliseconds: 400),
+  //     curve: Curves.easeInOut,
+  //     height: _isBottomNavExpanded ? expandedHeight : collapsedHeight,
+  //     child: Stack(
+  //       clipBehavior: Clip.none,
+  //       children: [
+  //         // Main navigation bar
+  //         if (_isBottomNavExpanded)
+  //           Positioned(
+  //             left: 0,
+  //             right: 0,
+  //             bottom: 0,
+  //             child: GestureDetector(
+  //               onTap: _resetBottomNavTimer,
+  //               child: CircleNavBar(
+  //                 activeIcons: const [
+  //                   Icon(Icons.home, color: Colors.green),
+  //                   Icon(Icons.chat, color: Colors.green),
+  //                   Icon(Icons.announcement, color: Colors.green),
+  //                   Icon(Icons.apps, color: Colors.green),
+  //                 ],
+  //                 inactiveIcons: const [
+  //                   Text(
+  //                     "Home",
+  //                     style: TextStyle(
+  //                       fontSize: 11,
+  //                       fontWeight: FontWeight.w500,
+  //                     ),
+  //                   ),
+  //                   Text(
+  //                     "Chat",
+  //                     style: TextStyle(
+  //                       fontSize: 11,
+  //                       fontWeight: FontWeight.w500,
+  //                     ),
+  //                   ),
+  //                   Text(
+  //                     "Announcements",
+  //                     style: TextStyle(
+  //                       fontSize: 10,
+  //                       fontWeight: FontWeight.w500,
+  //                     ),
+  //                   ),
+  //                   Text(
+  //                     "Services",
+  //                     style: TextStyle(
+  //                       fontSize: 11,
+  //                       fontWeight: FontWeight.w500,
+  //                     ),
+  //                   ),
+  //                 ],
+  //                 color: Colors.white,
+  //                 circleColor: UniversalUIComponents.primaryGreen,
+  //                 height: 60,
+  //                 circleWidth: 60,
+  //                 activeIndex: getActualIndex(),
+  //                 onTap: (index) {
+  //                   HapticFeedback.mediumImpact();
+  //                   _resetBottomNavTimer();
+  //                   if (index == 3) {
+  //                     _showServicesMenu();
+  //                   } else {
+  //                     _onNavigationItemTap(index);
+  //                   }
+  //                 },
+  //                 padding: const EdgeInsets.only(
+  //                   left: 16,
+  //                   right: 16,
+  //                   bottom: 20,
+  //                 ),
+  //                 cornerRadius: const BorderRadius.only(
+  //                   topLeft: Radius.circular(8),
+  //                   topRight: Radius.circular(8),
+  //                   bottomRight: Radius.circular(24),
+  //                   bottomLeft: Radius.circular(24),
+  //                 ),
+  //                 shadowColor: Colors.grey.shade300,
+  //                 circleShadowColor: Colors.grey.shade400,
+  //                 elevation: 8,
+  //                 gradient: LinearGradient(
+  //                   begin: Alignment.topCenter,
+  //                   end: Alignment.bottomCenter,
+  //                   colors: [Colors.white, Colors.grey.shade50],
+  //                 ),
+  //               ),
+  //             ),
+  //           ),
+
+  //         // Pull tab - always visible, changes icon based on state
+  //         Positioned(
+  //           bottom: 0,
+  //           left: 0,
+  //           right: 0,
+  //           child: GestureDetector(
+  //             onTap: () {
+  //               HapticFeedback.mediumImpact();
+  //               setState(() {
+  //                 _isBottomNavExpanded = !_isBottomNavExpanded;
+  //               });
+  //               if (_isBottomNavExpanded) {
+  //                 _startBottomNavTimer();
+  //               }
+  //             },
+  //             child: Center(
+  //               child: Container(
+  //                 width: 60,
+  //                 height: 26,
+  //                 decoration: BoxDecoration(
+  //                   color: UniversalUIComponents.primaryGreen,
+  //                   borderRadius: BorderRadius.circular(14),
+  //                   boxShadow: [
+  //                     BoxShadow(
+  //                       color: Colors.black.withOpacity(0.15),
+  //                       blurRadius: _isBottomNavExpanded ? 6 : 4,
+  //                       offset: Offset(0, _isBottomNavExpanded ? 2 : 1),
+  //                     ),
+  //                   ],
+  //                 ),
+  //                 child: Center(
+  //                   child: Icon(
+  //                     _isBottomNavExpanded
+  //                         ? Icons.keyboard_arrow_down
+  //                         : Icons.keyboard_arrow_up,
+  //                     color: Colors.white,
+  //                     size: 20,
+  //                   ),
+  //                 ),
+  //               ),
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  // Replace the _buildBottomNavigationBar method with this:
+
+  Widget _buildBottomNavigationBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
         ],
+      ),
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Calculate if we need to use smaller sizes
+            final screenWidth = constraints.maxWidth;
+            final isVerySmall = screenWidth < 320; // iPhone SE 1st gen
+            final isSmall = screenWidth < 375; // Small phones
+
+            return SizedBox(
+              height: 65,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: _buildNavItem(
+                      icon: Icons.home,
+                      label: 'Home',
+                      index: 0,
+                      isSelected: _selectedIndex == 0,
+                      isVerySmall: isVerySmall,
+                      isSmall: isSmall,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildNavItem(
+                      icon: Icons.chat_bubble_outline,
+                      label: 'Chat',
+                      index: 1,
+                      isSelected: _selectedIndex == 1,
+                      isVerySmall: isVerySmall,
+                      isSmall: isSmall,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildNavItem(
+                      icon: Icons.announcement_outlined,
+                      label: 'Announcements',
+                      index: 2,
+                      isSelected: _selectedIndex == 2,
+                      isVerySmall: isVerySmall,
+                      isSmall: isSmall,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildNavItem(
+                      icon: Icons.apps,
+                      label: 'Services',
+                      index: 3,
+                      isSelected: _selectedIndex >= 3,
+                      isVerySmall: isVerySmall,
+                      isSmall: isSmall,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required int index,
+    required bool isSelected,
+    required bool isVerySmall,
+    required bool isSmall,
+  }) {
+    // Map to filled icons when selected
+    IconData displayIcon = icon;
+    if (isSelected) {
+      if (icon == Icons.home) {
+        displayIcon = Icons.home;
+      } else if (icon == Icons.chat_bubble_outline) {
+        displayIcon = Icons.chat_bubble;
+      } else if (icon == Icons.announcement_outlined) {
+        displayIcon = Icons.announcement;
+      } else if (icon == Icons.apps) {
+        displayIcon = Icons.apps;
+      }
+    }
+
+    // Adaptive sizing based on screen width
+    final double iconSize = isVerySmall ? 20 : (isSmall ? 22 : 24);
+    final double fontSize = isVerySmall ? 8 : (isSmall ? 9 : 10);
+    final double spacing = isVerySmall ? 2 : 4;
+
+    return InkWell(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        if (index == 3) {
+          _showServicesMenu();
+        } else {
+          _onNavigationItemTap(index);
+        }
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isVerySmall ? 0 : 2,
+          vertical: 8,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              displayIcon,
+              size: iconSize,
+              color:
+                  isSelected
+                      ? UniversalUIComponents.primaryGreen
+                      : Colors.grey.shade400,
+            ),
+            SizedBox(height: spacing),
+            Flexible(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.center,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth,
+                      ),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w500,
+                          color:
+                              isSelected
+                                  ? UniversalUIComponents.primaryGreen
+                                  : Colors.grey.shade600,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

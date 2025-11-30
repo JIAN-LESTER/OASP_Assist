@@ -59,10 +59,15 @@ class _StaffMessageLogsPageState extends State<StaffMessageLogsPage> {
           isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Message logs refreshed'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: const Text('Message logs refreshed'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(
+              bottom: 16,
+              right: 16,
+              left: MediaQuery.of(context).size.width - 350,
+            ),
           ),
         );
       }
@@ -812,7 +817,14 @@ Widget _buildLogsRow({
       ],
     ),
     child: InkWell(
-      onTap: () => showLogsInfoModal(context, doc, messages, true),
+      onTap:
+          () => showLogsInfoModal(
+            context,
+            doc,
+            messages,
+            true,
+            showDeleteButton: false,
+          ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -887,7 +899,6 @@ Widget _buildLogsRow({
                     overflow: TextOverflow.ellipsis,
                     maxLines: 2,
                   ),
-                 
                 ],
               ),
             ),

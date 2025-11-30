@@ -17,7 +17,7 @@ Widget buildPersistentDrawerItem({
   final bool isServiceSelected =
       (selectedIndex >= 8 && selectedIndex <= 10) && isServiceGroup;
 
-  return Container(
+  Widget itemContent = Container(
     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
     constraints: const BoxConstraints(minHeight: 44),
     child: Material(
@@ -29,14 +29,32 @@ Widget buildPersistentDrawerItem({
                   : Colors.transparent),
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
-  borderRadius: BorderRadius.circular(8),
-  onTap: () {
-    // ✅ Close all groups when clicking any item
-    if (index >= 0) {
-      PersistentDrawerState.resetExpansionStates();
-    }
-    onTap(index);
-  },
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          // For sub-items (inside a group), DON'T close the parent group
+          if (isSubItem) {
+            // Just navigate, don't touch expansion states
+            onTap(index);
+            return;
+          }
+
+          // For group items (negative indices), close OTHER groups only
+          if (index < 0) {
+            if (index != -3)
+              PersistentDrawerState.setUserManagementExpanded(false);
+            if (index != -1) PersistentDrawerState.setServicesExpanded(false);
+            if (index != -2) PersistentDrawerState.setLogsExpanded(false);
+
+            bool currentState = PersistentDrawerState.getExpansionState(index);
+            PersistentDrawerState.setExpansionState(index, !currentState);
+          }
+          // For regular items (positive indices), close ALL groups
+          else {
+            PersistentDrawerState.resetExpansionStates();
+          }
+
+          onTap(index);
+        },
         child: Container(
           width: double.infinity,
           constraints: const BoxConstraints(minHeight: 44),
@@ -104,16 +122,21 @@ Widget buildPersistentDrawerItem({
                     ),
                   ),
                 ),
-
-              // Tooltip for collapsed state
-              if (!isExpanded)
-                Expanded(
-                  child: Tooltip(message: title, child: Container(height: 44)),
-                ),
             ],
           ),
         ),
       ),
     ),
   );
+
+  // Wrap with Tooltip when collapsed
+  if (!isExpanded) {
+    return Tooltip(
+      message: title,
+      waitDuration: const Duration(milliseconds: 500),
+      child: itemContent,
+    );
+  }
+
+  return itemContent;
 }

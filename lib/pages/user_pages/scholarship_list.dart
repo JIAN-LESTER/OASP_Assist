@@ -838,19 +838,38 @@ class _ScholarshipListState extends State<ScholarshipList>
                                       ),
                                     ),
                                     const SizedBox(height: 8),
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 12),
-                                      child: Text(
-                                        DateFormat(
-                                          'MMMM d, yyyy',
-                                        ).format(deadline.toDate()),
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          color: Colors.grey[800],
-                                          fontWeight: FontWeight.w500,
-                                          height: 1.5,
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 6,
+                                          ),
+                                          child: Container(
+                                            width: 6,
+                                            height: 6,
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[800],
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            DateFormat(
+                                              'MMMM d, yyyy',
+                                            ).format(deadline.toDate()),
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              color: Colors.grey[800],
+                                              fontWeight: FontWeight.w500,
+                                              height: 1.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                   if (deadline != null &&
@@ -867,17 +886,36 @@ class _ScholarshipListState extends State<ScholarshipList>
                                       ),
                                     ),
                                     const SizedBox(height: 8),
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 12),
-                                      child: Text(
-                                        data['duration'].toString(),
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          color: Colors.grey[800],
-                                          fontWeight: FontWeight.w500,
-                                          height: 1.5,
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 6,
+                                          ),
+                                          child: Container(
+                                            width: 6,
+                                            height: 6,
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[800],
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            data['duration'].toString(),
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              color: Colors.grey[800],
+                                              fontWeight: FontWeight.w500,
+                                              height: 1.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ],
@@ -912,17 +950,34 @@ class _ScholarshipListState extends State<ScholarshipList>
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 12),
-                                    child: Text(
-                                      data['description'],
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        height: 1.5,
-                                        color: Colors.grey[800],
-                                        fontWeight: FontWeight.w500,
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 6),
+                                        child: Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[800],
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          data['description'],
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            height: 1.5,
+                                            color: Colors.grey[800],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -954,24 +1009,42 @@ class _ScholarshipListState extends State<ScholarshipList>
                                       letterSpacing: 0.5,
                                     ),
                                   ),
-                                  const SizedBox(height: 7),
+                                  const SizedBox(height: 8),
                                   ...List<String>.from(
                                     data['eligibilityRequirements'],
                                   ).map((requirement) {
                                     return Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 6,
-                                        left: 12,
-                                        top: 6,
-                                      ),
-                                      child: Text(
-                                        requirement,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          height: 1.5,
-                                          color: Colors.grey[800],
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 6,
+                                            ),
+                                            child: Container(
+                                              width: 6,
+                                              height: 6,
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[800],
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              requirement,
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                height: 1.5,
+                                                color: Colors.grey[800],
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     );
                                   }).toList(),
@@ -1004,24 +1077,42 @@ class _ScholarshipListState extends State<ScholarshipList>
                                       letterSpacing: 0.5,
                                     ),
                                   ),
-                                  const SizedBox(height: 7),
+                                  const SizedBox(height: 8),
                                   ...List<String>.from(data['privileges']).map((
                                     privilege,
                                   ) {
                                     return Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 6,
-                                        left: 12,
-                                        top: 6,
-                                      ),
-                                      child: Text(
-                                        privilege,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          height: 1.5,
-                                          color: Colors.grey[800],
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 6,
+                                            ),
+                                            child: Container(
+                                              width: 6,
+                                              height: 6,
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[800],
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              privilege,
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                height: 1.5,
+                                                color: Colors.grey[800],
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     );
                                   }).toList(),
