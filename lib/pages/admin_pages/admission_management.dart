@@ -634,12 +634,12 @@ Widget _buildHeader(
                 isMobile
                     ? Column(
                       children: [
-                        buildStatCard(
-                          'Latest Admission Academic Year',
-                          '${ad?.latestAdmission}',
-                          Colors.blue,
-                          Icons.message,
-                        ),
+                        // buildStatCard(
+                        //   'Latest Admission Academic Year',
+                        //   '${ad?.latestAdmission}',
+                        //   Colors.blue,
+                        //   Icons.message,
+                        // ),
                         const SizedBox(height: 12),
                         buildStatCard(
                           'Total Admission Documents',
@@ -651,15 +651,16 @@ Widget _buildHeader(
                     )
                     : Row(
                       children: [
-                        Expanded(
-                          child: buildStatCard(
-                            'Latest Admission Academic Year',
-                            '${ad?.latestAdmission}',
-                            Colors.blue,
-                            Icons.message,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
+                        // Expanded(
+                        //   child: 
+                        //   buildStatCard(
+                        //     'Latest Admission Academic Year',
+                        //     '${ad?.latestAdmission}',
+                        //     Colors.blue,
+                        //     Icons.message,
+                        //   ),
+                        // ),
+                        // const SizedBox(width: 16),
                         Expanded(
                           child: buildStatCard(
                             'Total Admission Documents',

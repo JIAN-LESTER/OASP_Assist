@@ -520,7 +520,7 @@ Widget _buildHeader(
                 Expanded(
                   child: buildStatCard(
                     'Most Frequent Category',
-                    ib?.mostFrequentCategory ?? "Unknown",
+                    ib?.mostFrequentCategory.toUpperCase() ?? "Unknown",
                     Colors.green,
                     Icons.check_circle,
                   ),
