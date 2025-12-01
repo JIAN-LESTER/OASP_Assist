@@ -32,12 +32,15 @@ class _UserManagementPageState extends State<UserManagementPage> {
   bool isLoading = true;
   final StatDataManagement statData = StatDataManagement();
 
+    late final Stream<QuerySnapshot> _usersStream;
+
   UserData? user;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+ _usersStream = FirebaseFirestore.instance.collection('users').snapshots();
     loadStatData();
   }
 
@@ -115,6 +118,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         onItemsPerPageChanged: _changeItemsPerPage,
         onNavigateToPage: widget.onNavigateToPage,
         user: user,
+         usersStream: _usersStream, 
       ),
       tabletBody: TabletUserManagement(
         selectedRole: selectedRole,
@@ -126,6 +130,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         onItemsPerPageChanged: _changeItemsPerPage,
         onNavigateToPage: widget.onNavigateToPage,
         user: user,
+         usersStream: _usersStream, 
       ),
       desktopBody: DesktopUserManagement(
         selectedRole: selectedRole,
@@ -137,6 +142,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         onItemsPerPageChanged: _changeItemsPerPage,
         onNavigateToPage: widget.onNavigateToPage,
         user: user,
+         usersStream: _usersStream, 
       ),
     );
   }
@@ -152,6 +158,7 @@ class DesktopUserManagement extends StatelessWidget {
   final ValueChanged<int> onItemsPerPageChanged;
   final Function(int)? onNavigateToPage;
   final UserData? user;
+    final Stream<QuerySnapshot> usersStream;
 
   const DesktopUserManagement({
     super.key,
@@ -164,6 +171,7 @@ class DesktopUserManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     this.onNavigateToPage,
     this.user,
+    required this.usersStream,
   });
 
   @override
@@ -180,6 +188,7 @@ class DesktopUserManagement extends StatelessWidget {
       onNavigateToPage,
       24.0,
       user,
+      usersStream
     );
   }
 }
@@ -194,6 +203,7 @@ class TabletUserManagement extends StatelessWidget {
   final ValueChanged<int> onItemsPerPageChanged;
   final Function(int)? onNavigateToPage;
   final UserData? user;
+    final Stream<QuerySnapshot> usersStream;
 
   const TabletUserManagement({
     super.key,
@@ -206,6 +216,7 @@ class TabletUserManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     this.onNavigateToPage,
     this.user,
+    required this.usersStream,
   });
 
   @override
@@ -222,6 +233,7 @@ class TabletUserManagement extends StatelessWidget {
       onNavigateToPage,
       20.0,
       user,
+      usersStream
     );
   }
 }
@@ -236,6 +248,7 @@ class MobileUserManagement extends StatelessWidget {
   final ValueChanged<int> onItemsPerPageChanged;
   final Function(int)? onNavigateToPage;
   final UserData? user;
+    final Stream<QuerySnapshot> usersStream;
 
   const MobileUserManagement({
     super.key,
@@ -248,6 +261,7 @@ class MobileUserManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     this.onNavigateToPage,
     this.user,
+    required this.usersStream,
   });
 
   @override
@@ -292,11 +306,9 @@ class MobileUserManagement extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                         key: const ValueKey('users_stream'),
+                    
                         stream:
-                            FirebaseFirestore.instance
-                                .collection('users')
-                                .snapshots(),
+                          usersStream,
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -352,6 +364,7 @@ Widget mainContent(
   final Function(int)? onNavigateToPage,
   final double padding,
   final UserData? user,
+    final Stream<QuerySnapshot> usersStream,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -389,10 +402,9 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
+                      
                       stream:
-                          FirebaseFirestore.instance
-                              .collection('users')
-                              .snapshots(),
+                         usersStream,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {

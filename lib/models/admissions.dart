@@ -11,7 +11,8 @@ class Admissions {
   final List<String>? links;
   final String source;
   final DateTime createdAt;
-  final List<Map<String, dynamic>>? schedules; // ✅ NEW: Add schedules field
+  final List<Map<String, dynamic>>? schedules;
+  final String? type; // ✅ EXISTING: Type field for CMUCAT, GSAT, SLHSAT
 
   Admissions({
     required this.id,
@@ -24,13 +25,13 @@ class Admissions {
     this.links,
     required this.source,
     required this.createdAt,
-    this.schedules, // ✅ NEW
+    this.schedules,
+    this.type, // ✅ Already exists
   });
 
   factory Admissions.fromJson(Map<String, dynamic> json) {
     print("📥 Admissions.fromJson input: $json");
 
-    // Helper to parse academic year string into start/end integers
     Map<String, int>? parseAcademicYear(String? yearStr) {
       if (yearStr == null || yearStr.trim().isEmpty) return null;
       final rangeRegex = RegExp(r'(\d{4})\s*[-–]\s*(\d{4})');
@@ -53,7 +54,6 @@ class Admissions {
     }
 
     try {
-      // Parse steps
       List<String> stepsList = <String>[];
       if (json['steps'] is List<String>) {
         stepsList = json['steps'] as List<String>;
@@ -61,32 +61,31 @@ class Admissions {
         stepsList = (json['steps'] as List).map((e) => e.toString()).toList();
       }
 
-      // Parse requirements
       List<String>? requirementsList;
       if (json['requirements'] is List<String>) {
         requirementsList = json['requirements'] as List<String>;
       } else if (json['requirements'] is List) {
-        requirementsList = (json['requirements'] as List).map((e) => e.toString()).toList();
+        requirementsList =
+            (json['requirements'] as List).map((e) => e.toString()).toList();
       }
 
-      // Parse links
       List<String>? linksList;
       if (json['links'] is List) {
         linksList = List<String>.from(json['links'].map((e) => e.toString()));
       }
 
-      // Parse contacts
       List<String>? contactList = _parseStringList(json['contact']);
 
-      // Parse academic year
-      Map<String, int>? academicYearMap = parseAcademicYear(json['academicYear']?.toString());
+      Map<String, int>? academicYearMap = parseAcademicYear(
+        json['academicYear']?.toString(),
+      );
 
-      // ✅ NEW: Parse schedules
       List<Map<String, dynamic>>? schedulesList;
       if (json['schedules'] is List) {
-        schedulesList = (json['schedules'] as List)
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
+        schedulesList =
+            (json['schedules'] as List)
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .toList();
       }
 
       return Admissions(
@@ -99,12 +98,14 @@ class Admissions {
         academicYear: academicYearMap,
         links: linksList,
         source: json['source']?.toString() ?? 'Unknown',
-        createdAt: json['createdAt'] is String
-            ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
-            : (json['createdAt'] is Timestamp
-                ? (json['createdAt'] as Timestamp).toDate()
-                : DateTime.now()),
-        schedules: schedulesList, // ✅ NEW
+        createdAt:
+            json['createdAt'] is String
+                ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
+                : (json['createdAt'] is Timestamp
+                    ? (json['createdAt'] as Timestamp).toDate()
+                    : DateTime.now()),
+        schedules: schedulesList,
+        type: json['type']?.toString(), // ✅ Parse type field
       );
     } catch (e) {
       print("❌ Error in Admissions.fromJson: $e");
@@ -131,7 +132,19 @@ class Admissions {
       'links': links,
       'source': source,
       'createdAt': createdAt.toIso8601String(),
-      'schedules': schedules, // ✅ NEW
+      'schedules': schedules,
+      'type': type, // ✅ Include type in JSON
     };
   }
+
+  // ✅ Helper method to display type in UI
+  String get displayType {
+    if (type == null || type!.isEmpty) return 'General Admission';
+    return type!; // Returns CMUCAT, GSAT, or SLHSAT
+  }
+
+  // ✅ Helper to check if this is a specific test type
+  bool isCMUCAT() => type?.toUpperCase() == 'CMUCAT';
+  bool isGSAT() => type?.toUpperCase() == 'GSAT';
+  bool isSLHSAT() => type?.toUpperCase() == 'SLHSAT';
 }

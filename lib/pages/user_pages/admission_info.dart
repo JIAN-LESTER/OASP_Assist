@@ -14,11 +14,10 @@ class AdmissionInfo extends StatefulWidget {
 class _AdmissionInfoState extends State<AdmissionInfo>
     with TickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  List<Admissions> _admissionYears = [];
-  Map<String, int>? _selectedAcademicYear;
+  List<Admissions> _admissionsByType = [];
+  String? _selectedType;
   bool _isLoading = true;
   String? _error;
-  int _currentStepIndex = 0;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -67,27 +66,27 @@ class _AdmissionInfoState extends State<AdmissionInfo>
                 )
                 .toList();
 
-        // Group by academic year and keep one admission per year
-        final Map<String, Admissions> yearMap = {};
+        // Group by type and keep the most recent one per type
+        final Map<String, Admissions> typeMap = {};
         for (final admission in admissions) {
-          final yearStr = _formatAcademicYear(admission.academicYear);
-          if (!yearMap.containsKey(yearStr)) {
-            yearMap[yearStr] = admission;
+          final type = admission.type ?? 'General Admission';
+          if (!typeMap.containsKey(type)) {
+            typeMap[type] = admission;
           }
         }
 
-        // Sort descending (most recent first)
+        // Sort by type name
         final sortedAdmissions =
-            yearMap.values.toList()..sort((a, b) {
-              final aStart = a.academicYear?['start'] ?? 0;
-              final bStart = b.academicYear?['start'] ?? 0;
-              return bStart.compareTo(aStart);
+            typeMap.values.toList()..sort((a, b) {
+              final aType = a.type ?? 'General Admission';
+              final bType = b.type ?? 'General Admission';
+              return aType.compareTo(bType);
             });
 
         setState(() {
-          _admissionYears = sortedAdmissions;
-          if (_admissionYears.isNotEmpty) {
-            _selectedAcademicYear = _admissionYears.first.academicYear;
+          _admissionsByType = sortedAdmissions;
+          if (_admissionsByType.isNotEmpty) {
+            _selectedType = _admissionsByType.first.type ?? 'General Admission';
           }
           _isLoading = false;
         });
@@ -107,24 +106,10 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     }
   }
 
-  String _formatAcademicYear(Map<String, int>? year) {
-    if (year == null) return 'Unknown Year';
-    if (year.containsKey('end')) {
-      return '${year['start']}-${year['end']}';
-    }
-    return '${year['start']}';
-  }
-
-  bool _isSameAcademicYear(Map<String, int>? year1, Map<String, int>? year2) {
-    if (year1 == null || year2 == null) return false;
-    return year1['start'] == year2['start'] && year1['end'] == year2['end'];
-  }
-
   Admissions? get _selectedAdmission {
-    return _admissionYears.firstWhere(
-      (admission) =>
-          _isSameAcademicYear(admission.academicYear, _selectedAcademicYear),
-      orElse: () => _admissionYears.first,
+    return _admissionsByType.firstWhere(
+      (admission) => (admission.type ?? 'General Admission') == _selectedType,
+      orElse: () => _admissionsByType.first,
     );
   }
 
@@ -160,7 +145,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
       );
     }
 
-    if (_error != null || _admissionYears.isEmpty) {
+    if (_error != null || _admissionsByType.isEmpty) {
       return _buildErrorState();
     }
 
@@ -176,8 +161,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
               opacity: _fadeAnimation,
               child: Column(
                 children: [
-                  _buildAcademicYearSelector(),
-                  // ✅ NEW: Add schedule section
+                  _buildTypeSelector(),
                   _buildScheduleSection(),
                   _buildStepsAndRequirements(),
                   _buildHelpSection(),
@@ -260,8 +244,8 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     );
   }
 
-  Widget _buildAcademicYearSelector() {
-    if (_admissionYears.length <= 1) return const SizedBox.shrink();
+  Widget _buildTypeSelector() {
+    if (_admissionsByType.length <= 1) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
@@ -307,14 +291,14 @@ class _AdmissionInfoState extends State<AdmissionInfo>
                   ],
                 ),
                 child: Icon(
-                  Icons.calendar_today_rounded,
+                  Icons.category_rounded,
                   color: Colors.white,
                   size: 20,
                 ),
               ),
               const SizedBox(width: 12),
               Text(
-                'Select Academic Year',
+                'Select Admission Type',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -329,19 +313,15 @@ class _AdmissionInfoState extends State<AdmissionInfo>
             spacing: 8,
             runSpacing: 8,
             children:
-                _admissionYears.map((admission) {
+                _admissionsByType.map((admission) {
                   try {
-                    final yearStr = _formatAcademicYear(admission.academicYear);
-                    final isSelected = _isSameAcademicYear(
-                      admission.academicYear,
-                      _selectedAcademicYear,
-                    );
+                    final type = admission.type ?? 'General Admission';
+                    final isSelected = type == _selectedType;
 
                     return InkWell(
                       onTap: () {
                         setState(() {
-                          _selectedAcademicYear = admission.academicYear;
-                          _currentStepIndex = 0;
+                          _selectedType = type;
                         });
                       },
                       borderRadius: BorderRadius.circular(20),
@@ -383,7 +363,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
                                   : null,
                         ),
                         child: Text(
-                          yearStr,
+                          type,
                           style: TextStyle(
                             color: isSelected ? Colors.white : Colors.grey[700],
                             fontWeight: FontWeight.w600,
@@ -393,7 +373,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
                       ),
                     );
                   } catch (e) {
-                    print('Error displaying academic year: $e');
+                    print('Error displaying admission type: $e');
                     return const SizedBox.shrink();
                   }
                 }).toList(),
@@ -403,7 +383,6 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     );
   }
 
-  // ✅ NEW: Build schedule section
   Widget _buildScheduleSection() {
     final schedules = _selectedAdmission?.schedules;
 
@@ -497,7 +476,6 @@ class _AdmissionInfoState extends State<AdmissionInfo>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Date and Day
                   Row(
                     children: [
                       Container(
@@ -539,8 +517,6 @@ class _AdmissionInfoState extends State<AdmissionInfo>
                       ),
                     ],
                   ),
-
-                  // Locations
                   if (locations.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     Container(
@@ -622,7 +598,6 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     final steps = _selectedAdmission?.steps ?? [];
     final requirements = _selectedAdmission?.requirements ?? [];
 
-    // Check if both are empty
     if (steps.isEmpty && requirements.isEmpty) {
       return Center(
         child: Container(
@@ -676,11 +651,9 @@ class _AdmissionInfoState extends State<AdmissionInfo>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Responsive layout: side by side on desktop/tablet, stacked on mobile
         final isMobile = constraints.maxWidth < 800;
 
         if (isMobile) {
-          // Stack vertically on mobile
           return Column(
             children: [
               if (steps.isNotEmpty) _buildStepsSection(steps),
@@ -690,7 +663,6 @@ class _AdmissionInfoState extends State<AdmissionInfo>
             ],
           );
         } else {
-          // Side by side on larger screens
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1076,3 +1048,5 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     );
   }
 }
+
+

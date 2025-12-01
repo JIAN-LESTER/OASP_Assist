@@ -85,6 +85,8 @@ async function sendFCMNotifications(
     console.log(`   Type: ${data.type}`);
     console.log(`   Title: ${title}`);
     
+    // ✅ FIX: Only get tokens for the SPECIFIC userIds provided
+    // This is the critical fix - we were getting tokens for all users before
     const userTokensMap = await getUserFCMTokens(userIds);
 
     if (userTokensMap.size === 0) {
@@ -98,10 +100,17 @@ async function sendFCMNotifications(
       console.log(`   User ${userId}: ${tokens.length} tokens`);
     });
 
+    // ✅ ADDITIONAL FIX: Verify tokens belong to intended users
     const allTokens: string[] = [];
     const seenTokens = new Set<string>();
     
-    userTokensMap.forEach((tokens) => {
+    userTokensMap.forEach((tokens, userId) => {
+      // Double-check this userId is in our intended list
+      if (!userIds.includes(userId)) {
+        console.warn(`⚠️ WARNING: Skipping tokens for user ${userId} - not in intended list`);
+        return;
+      }
+      
       tokens.forEach(token => {
         if (!seenTokens.has(token)) {
           seenTokens.add(token);
@@ -116,21 +125,19 @@ async function sendFCMNotifications(
     }
 
     console.log(
-      `📱 Sending FCM to ${allTokens.length} unique mobile devices`
+      `📱 Sending FCM to ${allTokens.length} unique mobile devices for ${userIds.length} specific users`
     );
     
-    // ✅ CRITICAL: Include targetUserId in notification data
-        const notificationData: { [key: string]: string } = {
-          ...data,
-          click_action: "FLUTTER_NOTIFICATION_CLICK",
-          targetRole: targetRole || "any",
-        };
-        
-        // ✅ Add targetUserId for escalation replies
-        if (targetUserId) {
-          notificationData.targetUserId = targetUserId;
-          console.log(`✅ Added targetUserId to notification data: ${targetUserId}`);
-        }
+    const notificationData: { [key: string]: string } = {
+      ...data,
+      click_action: "FLUTTER_NOTIFICATION_CLICK",
+      targetRole: targetRole || "any",
+    };
+    
+    if (targetUserId) {
+      notificationData.targetUserId = targetUserId;
+      console.log(`✅ Added targetUserId to notification data: ${targetUserId}`);
+    }
     
     const message = {
       notification: {
@@ -173,6 +180,7 @@ async function sendFCMNotifications(
     console.log(
       `✅ FCM sent: ${response.successCount} successful, ${response.failureCount} failed`
     );
+    console.log(`   Intended for ${userIds.length} specific users`);
 
     if (response.failureCount > 0) {
       const tokensToRemove = new Map<string, string[]>();
@@ -979,7 +987,7 @@ export const onEscalationCreated = onDocumentCreated(
   {
     document: "escalations/{escalationId}",
     region: "us-central1",
-    retry: false,
+    retry: false, // ✅ Already disabled retry
   },
   async (event) => {
     try {
@@ -994,6 +1002,7 @@ export const onEscalationCreated = onDocumentCreated(
       console.log(`🆕 New escalation: ${escalationId}`);
       console.log(`🆕 Event ID: ${event.id}`);
 
+      // ✅ CRITICAL: Idempotency check to prevent duplicate processing
       const idempotencyRef = db.collection("notification_processing")
         .doc(`escalation_created_${escalationId}_${event.id}`);
       
@@ -1007,7 +1016,7 @@ export const onEscalationCreated = onDocumentCreated(
         });
         console.log(`✅ Idempotency lock acquired for escalation ${escalationId}`);
       } catch (error: any) {
-        if (error.code === 6) {
+        if (error.code === 6) { // ALREADY_EXISTS error
           console.log(`⚠️ Notification already being processed for escalation ${escalationId} (event: ${event.id})`);
           return { success: false, reason: "already_processing" };
         }
@@ -1018,15 +1027,10 @@ export const onEscalationCreated = onDocumentCreated(
       const userId = escalationData.userId;
       const conversationId = escalationData.conversationId || null;
 
-
-      // ✅ Get category from escalation document
       let category: string | null = escalationData.category || null;
-      
       console.log(`📂 Raw category from escalation: ${category}`);
 
-      // ✅ CRITICAL FIX: Normalize category to match serviceUnit values
       const normalizedCategory = category ? normalizeCategory(category) : null;
-      
       console.log(`📂 Normalized category: ${normalizedCategory}`);
 
       let userName = "A user";
@@ -1055,11 +1059,10 @@ export const onEscalationCreated = onDocumentCreated(
       console.log(`   - Raw category: ${category}`);
       console.log(`   - Normalized category: ${normalizedCategory}`);
 
-      // ✅ CRITICAL FIX: Filter staff by serviceUnit for specific categories
+      // ✅ Filter staff by serviceUnit for specific categories
       if (normalizedCategory && ['Admission', 'Scholarship', 'Placement'].includes(normalizedCategory)) {
         console.log(`🔍 Looking for staff with serviceUnit: ${normalizedCategory}`);
         
-        // Query staff with matching serviceUnit
         const staffSnapshot = await db
           .collection("users")
           .where("role", "==", "staff")
@@ -1072,7 +1075,6 @@ export const onEscalationCreated = onDocumentCreated(
         console.log(`📊 Found ${staffIds.length} staff with serviceUnit: ${normalizedCategory}`);
         console.log(`📊 Staff IDs: ${staffIds.join(', ')}`);
         
-        // ✅ Log each staff's details for debugging
         for (const doc of staffSnapshot.docs) {
           const data = doc.data();
           console.log(`   - ${doc.id}: ${data.name} (serviceUnit: ${data.serviceUnit})`);
@@ -1089,7 +1091,6 @@ export const onEscalationCreated = onDocumentCreated(
           console.log(`📊 Fallback: Found ${staffIds.length} total staff`);
         }
       } else {
-        // If category is General/N/A or not set, send to all staff
         const allStaffSnapshot = await db
           .collection("users")
           .where("role", "==", "staff")
@@ -1099,7 +1100,7 @@ export const onEscalationCreated = onDocumentCreated(
         console.log(`📊 All staff (no category filter): ${staffIds.length}`);
       }
 
-      // ✅ Admins ALWAYS get all escalations
+      // Admins ALWAYS get all escalations
       const adminSnapshot = await db
         .collection("users")
         .where("role", "==", "admin")
@@ -1147,9 +1148,10 @@ export const onEscalationCreated = onDocumentCreated(
         console.log(`✅ Created ${staffNotifications} staff notifications`);
 
         if (staffNotifications > 0) {
-          console.log(`📱 Sending FCM to ${staffIds.length} staff members`);
+          console.log(`📱 Sending FCM to ONLY ${staffIds.length} filtered staff members`);
+          // ✅ FIX: Only send to the filtered staffIds
           await sendFCMNotifications(
-            staffIds,
+            staffIds, // This now contains ONLY filtered staff
             notificationTitle,
             notificationBody,
             {
@@ -1158,9 +1160,9 @@ export const onEscalationCreated = onDocumentCreated(
               conversationId: conversationId || "",
               category: category || 'General',
             },
-            "staff" // ✅ Target role
+            "staff"
           );
-          console.log(`✅ FCM sent to staff`);
+          console.log(`✅ FCM sent to filtered staff only`);
         }
       }
 
@@ -1199,7 +1201,7 @@ export const onEscalationCreated = onDocumentCreated(
               conversationId: conversationId || "",
               category: category || 'General',
             },
-            "admin" // ✅ Target role
+            "admin"
           );
           console.log(`✅ FCM sent to admins`);
         }

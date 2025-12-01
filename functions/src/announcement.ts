@@ -16,7 +16,7 @@ const db = admin.firestore();
 const storage = admin.storage();
 
 const FB_API_VERSION = "v24.0";
-const PAGE_ID = "730995450096065";
+// const PAGE_ID = "730995450096065";
 
 interface FacebookPost {
   id: string;
@@ -26,17 +26,6 @@ interface FacebookPost {
   permalink_url?: string;
   attachments?: any;
 }
-
-// interface PostFilterConfig {
-//   /** Fetch posts from this month only */
-//   thisMonthOnly?: boolean;
-
-//   /** Fetch posts from a specific date */
-//   startDate?: Date;
-
-//   /** Maximum number of posts to fetch */
-//   maxPosts?: number;
-// }
 
 interface CategoryToInfoBankConfig {
   includeInSearch: boolean;
@@ -61,45 +50,39 @@ interface CohereResult {
   deadline: string | null;
 }
 
-// interface AnnouncementData {
-//   announcementId: string; // ✅ Unique ID field
-//   message: string;
-//   created_time: string;
-//   full_picture: string;
-//   original_image_url: string;
-//   permalink_url: string;
-//   category: string;
-//   deadline: admin.firestore.Timestamp | null;
-//   deleted: boolean; // ✅ Soft delete flag
-//   fetched_at: admin.firestore.FieldValue;
-//   processed_by_cohere: boolean;
-//   stored_in_storage: boolean;
-//   notification_sent: boolean;
-//   ocr_text?: string;
-//   has_image_text: boolean;
-// }
 
-// ============================================================================
-// ✅ NEW: OCR FUNCTIONS FOR IMAGE TEXT EXTRACTION
-// ============================================================================
+async function getPageId(): Promise<string> {
+  try {
+    const tokenDoc = await db
+      .collection("fb_tokens")
+      .doc("facebook_admin")
+      .get();
 
-/**
- * Extract text from image using Google Cloud Vision API
- */
+    if (!tokenDoc.exists) {
+      throw new Error(
+        "No Facebook configuration found. Please configure token using the settings."
+      );
+    }
 
-//   function normalizeImageUrl(url: string): string {
-//   try {
-//     const parsed = new URL(url);
-//     // Remove tracking params and get base image path
-//     // Facebook URLs often have different query params for same image
-//     const pathParts = parsed.pathname.split('/');
-//     // Get the image identifier (usually last meaningful segment)
-//     const imageId = pathParts.filter(p => p && !p.includes('_n') && p.length > 10).pop();
-//     return imageId || parsed.pathname;
-//   } catch {
-//     return url;
-//   }
-// }
+    const data = tokenDoc.data();
+    
+    // Get the page ID from saved configuration
+    const pageId = data?.pageId;
+    
+    if (!pageId) {
+      throw new Error(
+        "No Page ID configured. Please add your Facebook Page ID in settings."
+      );
+    }
+
+    console.log(`✅ Using Page ID: ${pageId}`);
+    return pageId;
+
+  } catch (error: any) {
+    console.error("❌ Error getting Page ID:", error.message);
+    throw error;
+  }
+}
 
 function extractAllImagesFromPost(post: FacebookPost): string[] {
   const images: string[] = [];
@@ -522,20 +505,26 @@ async function getAccessToken(): Promise<string> {
     }
 
     const pages = data.pages || {};
+    const pageId = data.pageId; // ✅ Get from saved config instead of hardcoded
+
+    if (!pageId) {
+      throw new Error("No Page ID configured. Please add your Page ID in settings.");
+    }
+
     const pageIds = Object.keys(pages);
 
     console.log(`📄 Found ${pageIds.length} page(s) in token data`);
-    console.log(`🎯 Target PAGE_ID: ${PAGE_ID}`);
+    console.log(`🎯 Target PAGE_ID: ${pageId}`);
 
-    if (pages[PAGE_ID] && pages[PAGE_ID].access_token) {
-      console.log(`✅ Using page token for ${PAGE_ID}`);
-      return pages[PAGE_ID].access_token;
+    if (pages[pageId] && pages[pageId].access_token) {
+      console.log(`✅ Using page token for ${pageId}`);
+      return pages[pageId].access_token;
     }
 
     if (pageIds.length > 0) {
       const firstPageId = pageIds[0];
       const firstPageToken = pages[firstPageId].access_token;
-      console.warn(`⚠️ Page ${PAGE_ID} not found in saved pages`);
+      console.warn(`⚠️ Page ${pageId} not found in saved pages`);
       console.warn(`⚠️ Using first available page: ${firstPageId}`);
       return firstPageToken;
     }
@@ -558,13 +547,17 @@ async function getAccessToken(): Promise<string> {
 async function fetchFacebookPosts(): Promise<FacebookPost[]> {
   try {
     console.log("🔍 Fetching Facebook posts...");
+    
+    // ✅ Get Page ID from config instead of hardcoded constant
+    const PAGE_ID = await getPageId();
+    
     console.log("📍 Page ID:", PAGE_ID);
     console.log("📍 API Version:", FB_API_VERSION);
 
     const accessToken = await getAccessToken();
     console.log("✅ Access token retrieved");
 
-    // ✅ Calculate start of current month (midnight on the 1st)
+    // Calculate start of current month (midnight on the 1st)
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     startOfMonth.setHours(0, 0, 0, 0);
@@ -580,8 +573,8 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
     const url = `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}/posts`;
     const params = {
       fields: "message,created_time,full_picture,permalink_url,attachments",
-      since: sinceTimestamp.toString(), // ✅ Only posts since start of this month
-      limit: 100, // ✅ Increased limit to get more posts
+      since: sinceTimestamp.toString(),
+      limit: 100,
       access_token: accessToken,
     };
 
@@ -600,7 +593,7 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
     console.log("✅ Facebook API response status:", response.status);
     console.log("✅ Posts received:", response.data.data?.length || 0);
 
-    // ✅ Filter out posts before this month (double-check on our side)
+    // Filter out posts before this month (double-check on our side)
     const filteredPosts = (response.data.data || []).filter((post) => {
       const postDate = new Date(post.created_time);
       const isThisMonth = postDate >= startOfMonth;
@@ -622,7 +615,7 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
       }`
     );
 
-    // ✅ Log date range of fetched posts
+    // Log date range of fetched posts
     if (filteredPosts.length > 0) {
       const dates = filteredPosts.map((p) => new Date(p.created_time));
       const oldest = new Date(Math.min(...dates.map((d) => d.getTime())));
@@ -1044,6 +1037,7 @@ function extractDeadlines(message: string): string | null {
 // ============================================================================
 
 interface ExtractedAdmissionData {
+  type: string | null; // ✅ NEW: "CMUCAT" | "GSAT" | "SLHSAT" | null
   title: string;
   content: string;
   steps: string[];
@@ -1052,6 +1046,7 @@ interface ExtractedAdmissionData {
   academicYear: { start: number; end?: number } | null;
   schedules: Array<{ date: string; dayOfWeek: string; locations: string[] }>;
 }
+
 
 interface ExtractedScholarshipData {
   name: string;
@@ -1097,20 +1092,21 @@ ${
     : ""
 }
 
-CRITICAL INSTRUCTIONS FOR SCHEDULES:
-1. Ignore generic header text like "Central Mindanao University" and "CMUCAT Schedule"
-2. Extract SPECIFIC location information for EACH date
-3. Look for city names, school names, and venue details
-4. For "In-Campus" entries, include the time information
-5. Each date can have MULTIPLE locations - list them all
-6. Format: {"date": "OCT 4", "dayOfWeek": "SATURDAY", "year": "2025", "locations": ["Kalilangan, Bukidnon", "Impasug-ong, Bukidnon"], "time": ""}
+CRITICAL INSTRUCTIONS:
+1. Determine the admission TYPE by looking for these keywords:
+   - CMUCAT (Central Mindanao University College Admission Test)
+   - GSAT (Graduate School Admission Test)  
+   - SLHSAT (School of Law and Hospitality Studies Admission Test)
+   - If no specific test is mentioned, set type to null
 
-Examples of what to extract:
-- "OCT 4 SATURDAY" with "Kalilangan, Bukidnon" and "Impasug-ong, Bukidnon" → 2 separate locations
-- "NOV 8 SATURDAY" with "Butuan, Agusan del Norte" and "Surigao, Surigao del Norte" → 2 separate locations  
-- "OCT 26 SUNDAY In-Campus (Central Mindanao University) 9-11 am | 1-3 pm" → location: "In-Campus (Central Mindanao University)", time: "9-11 am | 1-3 pm"
+2. For schedules, ignore generic header text like "Central Mindanao University" and "CMUCAT Schedule"
+3. Extract SPECIFIC location information for EACH date
+4. Look for city names, school names, and venue details
+5. For "In-Campus" entries, include the time information
+6. Each date can have MULTIPLE locations - list them all
 
 Extract these fields:
+- type: "CMUCAT" | "GSAT" | "SLHSAT" | null (based on test type mentioned)
 - title: A short descriptive title (max 100 chars)
 - content: The full announcement content including image text
 - steps: Array of enrollment/application steps
@@ -1121,6 +1117,7 @@ Extract these fields:
 
 Respond ONLY in this JSON format:
 {
+  "type": "CMUCAT",
   "title": "CMUCAT Schedule AY 2026-2027",
   "content": "string with image text",
   "steps": ["step1", "step2"],
@@ -1129,7 +1126,6 @@ Respond ONLY in this JSON format:
   "academicYear": {"start": 2026, "end": 2027},
   "schedules": [
     {"date": "OCT 4", "dayOfWeek": "SATURDAY", "year": "2025", "locations": ["Kalilangan, Bukidnon", "Impasug-ong, Bukidnon"], "time": ""},
-    {"date": "OCT 11", "dayOfWeek": "SATURDAY", "year": "2025", "locations": ["Quezon, Bukidnon", "Malaybalay City, Bukidnon"], "time": ""},
     {"date": "OCT 26", "dayOfWeek": "SUNDAY", "year": "2025", "locations": ["In-Campus (Central Mindanao University)"], "time": "9-11 am | 1-3 pm"}
   ]
 }`;
@@ -1154,6 +1150,23 @@ Respond ONLY in this JSON format:
     const jsonStr = extractJsonFromResponse(text);
     const result = JSON.parse(jsonStr);
 
+    // ✅ Extract type with fallback detection
+    let admissionType = result.type || null;
+    
+    // Fallback: detect type from content if not provided by AI
+    if (!admissionType) {
+      const contentToCheck = `${message} ${ocrText || ''}`.toUpperCase();
+      if (contentToCheck.includes('CMUCAT')) {
+        admissionType = 'CMUCAT';
+      } else if (contentToCheck.includes('GSAT')) {
+        admissionType = 'GSAT';
+      } else if (contentToCheck.includes('SLHSAT')) {
+        admissionType = 'SLHSAT';
+      }
+    }
+
+    console.log(`📋 Detected admission type: ${admissionType || 'Not specified'}`);
+
     let finalSchedules = result.schedules || [];
     if (finalSchedules.length < extractedSchedules.length) {
       console.log(
@@ -1170,6 +1183,7 @@ Respond ONLY in this JSON format:
     }
 
     return {
+      type: admissionType, // ✅ NEW FIELD
       title: result.title || message.substring(0, 100),
       content: enhancedContent,
       steps: Array.isArray(result.steps) ? result.steps : [],
@@ -1182,7 +1196,20 @@ Respond ONLY in this JSON format:
     };
   } catch (error) {
     console.error("Error extracting admission data:", error);
+    
+    // Fallback type detection
+    let detectedType = null;
+    const fullText = `${message} ${ocrText || ''}`.toUpperCase();
+    if (fullText.includes('CMUCAT')) {
+      detectedType = 'CMUCAT';
+    } else if (fullText.includes('GSAT')) {
+      detectedType = 'GSAT';
+    } else if (fullText.includes('SLHSAT')) {
+      detectedType = 'SLHSAT';
+    }
+    
     return {
+      type: detectedType, // ✅ NEW FIELD
       title: message.substring(0, 100),
       content: ocrText ? `${message}\n\n[Image Text]:\n${ocrText}` : message,
       steps: [],
@@ -1373,10 +1400,9 @@ async function createAdmissionFromAnnouncement(
         console.log(`⏭️ Skipping admission for post ${postId} - deleted`);
         return;
       }
-
       console.log(`✅ Admission already exists for post ${postId}`);
-
-      // ✅ Check if Information Bank exists
+      
+      // Check if Information Bank exists
       const infoBankId = `admission_${postId}`;
       const infoBankDoc = await db
         .collection("information_bank")
@@ -1388,9 +1414,7 @@ async function createAdmissionFromAnnouncement(
         return;
       }
 
-      // ✅ Admission exists but Info Bank missing - create it
       console.log(`📋 Creating Information Bank for existing admission...`);
-
       const extractedData = await extractAdmissionData(
         message,
         cohereKey,
@@ -1422,6 +1446,7 @@ async function createAdmissionFromAnnouncement(
     await admissionRef.set({
       id: postId,
       announcementId: postId,
+      type: extractedData.type, // ✅ NEW FIELD
       title: extractedData.title,
       content: extractedData.content,
       source: "Facebook Announcement",
@@ -1439,7 +1464,7 @@ async function createAdmissionFromAnnouncement(
     });
 
     console.log(
-      `✅ Created admission with ${extractedData.schedules.length} schedules`
+      `✅ Created ${extractedData.type || 'general'} admission with ${extractedData.schedules.length} schedules`
     );
 
     await createInfoBankFromCategory(
@@ -3100,24 +3125,17 @@ function formatCategoryAsText(
   categoryType: "admission" | "scholarship" | "placement",
   data: any
 ): string {
-  console.log(`\n📝 ========================================`);
-  console.log(`📝 formatCategoryAsText called`);
-  console.log(`   Category: ${categoryType}`);
-  console.log(`   Data keys: ${Object.keys(data).join(", ")}`);
-  console.log(`📝 ========================================`);
-
   const buffer: string[] = [];
 
   try {
     if (categoryType === "admission") {
-      console.log(`   Processing admission data...`);
-      console.log(`   - Title: ${data.title || "N/A"}`);
-      console.log(`   - Content length: ${(data.content || "").length}`);
-      console.log(`   - Steps: ${data.steps?.length || 0}`);
-      console.log(`   - Requirements: ${data.requirements?.length || 0}`);
-      console.log(`   - Schedules: ${data.schedules?.length || 0}`);
-
       buffer.push("ADMISSION INFORMATION\n");
+      
+      // ✅ Add type if present
+      if (data.type) {
+        buffer.push(`Test Type: ${data.type}\n`);
+      }
+      
       buffer.push(`Title: ${data.title || "Untitled"}\n`);
       buffer.push(`Content: ${data.content || "No content"}\n`);
 
@@ -3128,7 +3146,6 @@ function formatCategoryAsText(
         }
         buffer.push("\n");
       }
-
       if (data.steps && Array.isArray(data.steps) && data.steps.length > 0) {
         buffer.push("Steps:\n");
         data.steps.forEach((step: string, i: number) => {

@@ -32,73 +32,63 @@ class _HumanEscalationState extends State<HumanEscalation>
   final List<String> _filterOptions = ['all', 'pending', 'resolved'];
 
   @override
-  void initState() {
-    super.initState();
+void initState() {
+  super.initState();
 
-    _refreshAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
+  _refreshAnimationController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1000),
+  );
 
-    // Initialize the stream once
-    _escalationsStream =
-        FirebaseFirestore.instance
-            .collection('escalations')
-            .where('category', isEqualTo: widget.serviceUnit)
-            .orderBy('createdAt', descending: true)
-            .snapshots();
+  // Initialize the stream once
+  _escalationsStream = FirebaseFirestore.instance
+      .collection('escalations')
+      .orderBy('createdAt', descending: true)
+      .snapshots();
 
-    _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
-      });
+  _searchController.addListener(() {
+    setState(() {
+      _searchQuery = _searchController.text.toLowerCase();
     });
+  });
 
-    print('📄 HumanEscalation initState:');
-    print('   - initialEscalationId: ${widget.initialEscalationId}');
-    print('   - autoOpen: ${widget.autoOpen}');
-    print('   - serviceUnit: ${widget.serviceUnit}');
+  print('📄 HumanEscalation initState:');
+  print('   - initialEscalationId: ${widget.initialEscalationId}');
+  print('   - autoOpen: ${widget.autoOpen}');
 
-    if (widget.autoOpen && widget.initialEscalationId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        print(
-          '⏰ Post-frame callback: Opening escalation ${widget.initialEscalationId}',
-        );
-        _openEscalationById(widget.initialEscalationId!);
-      });
-    }
+  // ✅ FIX: Only auto-open if BOTH conditions are true
+  if (widget.autoOpen == true && 
+      widget.initialEscalationId != null && 
+      widget.initialEscalationId!.isNotEmpty) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      print('⏰ Post-frame callback: Opening escalation ${widget.initialEscalationId}');
+      _openEscalationById(widget.initialEscalationId!);
+    });
   }
+}
+ @override
+void didUpdateWidget(HumanEscalation oldWidget) {
+  super.didUpdateWidget(oldWidget);
 
-  @override
-  void didUpdateWidget(HumanEscalation oldWidget) {
-    super.didUpdateWidget(oldWidget);
+  print('🔄 HumanEscalation didUpdateWidget:');
+  print('   - old escalationId: ${oldWidget.initialEscalationId}');
+  print('   - new escalationId: ${widget.initialEscalationId}');
+  print('   - old autoOpen: ${oldWidget.autoOpen}');
+  print('   - new autoOpen: ${widget.autoOpen}');
 
-    print('🔄 HumanEscalation didUpdateWidget:');
-    print('   - old escalationId: ${oldWidget.initialEscalationId}');
-    print('   - new escalationId: ${widget.initialEscalationId}');
-    print('   - old autoOpen: ${oldWidget.autoOpen}');
-    print('   - new autoOpen: ${widget.autoOpen}');
+  // ✅ FIX: Only auto-open if ALL conditions are true
+  if (widget.autoOpen == true &&
+      widget.initialEscalationId != null &&
+      widget.initialEscalationId!.isNotEmpty &&
+      widget.initialEscalationId != oldWidget.initialEscalationId) {
+    print('🔄 Escalation changed, opening new escalation');
 
-    // Reinitialize stream if service unit changes
-    if (widget.serviceUnit != oldWidget.serviceUnit) {
-      _escalationsStream =
-          FirebaseFirestore.instance
-              .collection('escalations')
-              .where('category', isEqualTo: widget.serviceUnit)
-              .orderBy('createdAt', descending: true)
-              .snapshots();
-    }
-
-    if (widget.autoOpen &&
-        widget.initialEscalationId != null &&
-        widget.initialEscalationId != oldWidget.initialEscalationId) {
-      print('🔄 Escalation changed, opening new escalation');
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _openEscalationById(widget.initialEscalationId!);
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openEscalationById(widget.initialEscalationId!);
+    });
   }
+}
+
 
   Future<void> _openEscalationById(String escalationId) async {
     try {

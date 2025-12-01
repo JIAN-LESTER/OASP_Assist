@@ -26,37 +26,60 @@ class InformationBankPage extends StatefulWidget {
   State<InformationBankPage> createState() => _InformationBankPageState();
 }
 
+// Replace the _InformationBankPageState class with this optimized version:
+
 class _InformationBankPageState extends State<InformationBankPage> {
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
-  bool isLoading = true;
-    Timer? _debounce;
-    bool _isFiltering = false;
+  bool isLoading = false; // ✅ Changed to false initially
+  Timer? _debounce;
 
   final StatDataManagement statData = StatDataManagement();
 
   InformationBankData? ibData;
-
-  void _onCategoryChanged(String newCategory) {
-    setState(() {
-      selectedCategory = newCategory;
-    });
-  }
+  
+  // ✅ Create the stream once and reuse it
+  late final Stream<QuerySnapshot> _documentsStream;
 
   int currentPage = 1;
   int itemsPerPage = 10;
 
-@override
-void initState() {
-  super.initState();
-  _searchController.addListener(_onSearchChanged);
-  
-  // Load stats AFTER frame is rendered
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    loadStatData();
-  });
-}
+  void _onCategoryChanged(String newCategory) {
+    setState(() {
+      selectedCategory = newCategory;
+      currentPage = 1; // Reset to first page when category changes
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+    
+    // ✅ Initialize the stream once
+    _documentsStream = FirebaseFirestore.instance
+        .collection('information_bank')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+    
+    // ✅ Load stats asynchronously without blocking UI
+    _loadStatsAsync();
+  }
+
+  // ✅ Load stats in background without blocking
+  Future<void> _loadStatsAsync() async {
+    try {
+      final data = await statData.getInformationBankData();
+      if (mounted) {
+        setState(() {
+          ibData = data;
+        });
+      }
+    } catch (e) {
+      print("Error loading information bank data: $e");
+    }
+  }
 
   void _onSearchChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
@@ -69,7 +92,6 @@ void initState() {
     });
   }
 
-
   @override
   void dispose() {
     _debounce?.cancel();
@@ -77,46 +99,6 @@ void initState() {
     _searchController.dispose();
     super.dispose();
   }
-  
-  Future<void> loadStatData() async {
-    if (!mounted) return;
-
-    setState(() {
-      isLoading = true;
-    });
-
-    try {
-      final data = await statData.getInformationBankData();
-
-      if (!mounted) return;
-
-      setState(() {
-        ibData = data;
-        isLoading = false;
-      });
-    } catch (e) {
-      print("Error loading information bank data: $e");
-      if (!mounted) return;
-      setState(() {
-        isLoading = false;
-      });
-    }
-  }
-
-  Stream<QuerySnapshot> _getFilteredStream() {
-  Query query = FirebaseFirestore.instance.collection('information_bank');
-  
-  // Add category filter at database level
-  if (selectedCategory != 'All Categories') {
-    query = query.where('category', isEqualTo: selectedCategory.toLowerCase());
-  }
-  
-  // Order by a field for consistent pagination
-  query = query.orderBy('createdAt', descending: true);
-  
-  return query.snapshots();
-}
-
 
   void _goToPage(int page) {
     setState(() {
@@ -133,7 +115,6 @@ void initState() {
 
   @override
   Widget build(BuildContext context) {
-
     return ResponsiveLayout(
       mobileBody: MobileInformationBank(
         selectedCategory: selectedCategory,
@@ -144,6 +125,7 @@ void initState() {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         ib: ibData,
+        documentsStream: _documentsStream, // ✅ Pass the stream
       ),
       tabletBody: TabletInformationBank(
         selectedCategory: selectedCategory,
@@ -154,6 +136,7 @@ void initState() {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         ib: ibData,
+        documentsStream: _documentsStream, // ✅ Pass the stream
       ),
       desktopBody: DesktopInformationBank(
         selectedCategory: selectedCategory,
@@ -164,10 +147,13 @@ void initState() {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         ib: ibData,
+        documentsStream: _documentsStream, // ✅ Pass the stream
       ),
     );
   }
 }
+
+// ✅ Update all layout classes to accept the stream
 
 class DesktopInformationBank extends StatelessWidget {
   final String selectedCategory;
@@ -178,6 +164,7 @@ class DesktopInformationBank extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final InformationBankData? ib;
+  final Stream<QuerySnapshot> documentsStream; // ✅ Add this
 
   const DesktopInformationBank({
     super.key,
@@ -189,6 +176,7 @@ class DesktopInformationBank extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.ib,
+    required this.documentsStream, // ✅ Add this
   });
 
   @override
@@ -204,6 +192,7 @@ class DesktopInformationBank extends StatelessWidget {
       24.0,
       ib,
       context,
+      documentsStream, // ✅ Pass the stream
     );
   }
 }
@@ -217,6 +206,7 @@ class TabletInformationBank extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final InformationBankData? ib;
+  final Stream<QuerySnapshot> documentsStream; // ✅ Add this
 
   const TabletInformationBank({
     super.key,
@@ -228,6 +218,7 @@ class TabletInformationBank extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.ib,
+    required this.documentsStream, // ✅ Add this
   });
 
   @override
@@ -243,6 +234,7 @@ class TabletInformationBank extends StatelessWidget {
       20.0,
       ib,
       context,
+      documentsStream, // ✅ Pass the stream
     );
   }
 }
@@ -256,6 +248,7 @@ class MobileInformationBank extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final InformationBankData? ib;
+  final Stream<QuerySnapshot> documentsStream; // ✅ Add this
 
   const MobileInformationBank({
     super.key,
@@ -267,6 +260,7 @@ class MobileInformationBank extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.ib,
+    required this.documentsStream, // ✅ Add this
   });
 
   @override
@@ -276,7 +270,6 @@ class MobileInformationBank extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header section
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: _buildMobileHeader(
@@ -286,7 +279,6 @@ class MobileInformationBank extends StatelessWidget {
                 ib,
               ),
             ),
-            // Table section with fixed height
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Container(
@@ -310,10 +302,7 @@ class MobileInformationBank extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream:
-                            FirebaseFirestore.instance
-                                .collection('information_bank')
-                                .snapshots(),
+                        stream: documentsStream, // ✅ Use passed stream
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -359,6 +348,7 @@ class MobileInformationBank extends StatelessWidget {
   }
 }
 
+// ✅ Update mainContent to accept and use the stream
 Widget mainContent(
   final String selectedCategory,
   final ValueChanged<String> onCategoryChanged,
@@ -370,6 +360,7 @@ Widget mainContent(
   final double padding,
   final InformationBankData? ib,
   final BuildContext context,
+  final Stream<QuerySnapshot> documentsStream, // ✅ Add this parameter
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -406,10 +397,7 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream:
-                          FirebaseFirestore.instance
-                              .collection('information_bank')
-                              .snapshots(),
+                      stream: documentsStream, // ✅ Use passed stream
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -452,7 +440,6 @@ Widget mainContent(
     ),
   );
 }
-
 Widget _buildMobileHeader(
   String selectedCategory,
   ValueChanged<String> onCategoryChanged,
@@ -690,30 +677,7 @@ Widget _buildTableHeader() {
   );
 }
 
-void _showTopRightAlert(BuildContext context, String message, AlertType type) {
-  if (!context.mounted) return;
-  final overlay = Overlay.of(context);
-  late OverlayEntry overlayEntry;
-  final screenWidth = MediaQuery.of(context).size.width;
-  final isMobile = screenWidth < 600;
-  final isTablet = screenWidth >= 600 && screenWidth < 1024;
 
-  overlayEntry = OverlayEntry(
-    builder:
-        (context) => TopRightAlert(
-          message: message,
-          type: type,
-          onDismiss: () => overlayEntry.remove(),
-          isMobile: isMobile,
-          isTablet: isTablet,
-        ),
-  );
-  overlay.insert(overlayEntry);
-  Future.delayed(const Duration(seconds: 4), () {
-    if (overlayEntry.mounted) overlayEntry.remove();
-  });
-}
-bool _isFiltering = false;
 
 
 Widget _buildIBList({
@@ -727,9 +691,7 @@ Widget _buildIBList({
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
 
-   if (_isFiltering) {
-    return const Center(child: CircularProgressIndicator());
-  }
+
   final filtered =
       getAllDocuments.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
@@ -792,7 +754,8 @@ Widget _buildIBList({
                         title: data['ib_title'] ?? 'N/A',
                         source: data['source'] ?? 'N/A',
                         category: data['category'] ?? 'General',
-                        content: data['content'],
+                        content: (data['content'] as String).substring(0, 120),
+
                       ),
                     );
                   },

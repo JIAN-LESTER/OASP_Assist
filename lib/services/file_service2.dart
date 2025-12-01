@@ -287,7 +287,9 @@ Future<void> saveToAdmission(Admissions ad) async {
     final sanitizedId = sanitizeId(ad.id);
 
     final Map<String, dynamic> admissionData = {
+      'id': sanitizedId, // ✅ Add id field (required by Cloud Function)
       'admissionID': sanitizedId,
+      'type': ad.type, // ✅ NEW: Save admission type
       'title': ad.title,
       'content': ad.content,
       'source': ad.source,
@@ -302,13 +304,14 @@ Future<void> saveToAdmission(Admissions ad) async {
 
     await firestore.collection('admissions').doc(sanitizedId).set(admissionData);
 
-    print('✅ Admission document saved successfully with ${ad.schedules?.length ?? 0} schedules');
+    print('✅ Admission document saved successfully');
+    print('   Type: ${ad.type ?? "Not specified"}');
+    print('   Schedules: ${ad.schedules?.length ?? 0}');
   } catch (e) {
     print('❌ Error saving admission document: $e');
     rethrow;
   }
 }
-
  Future<void> saveMultipleScholarships(List<Scholarship> scholarships) async {
   try {
     // Use batch write for better performance
@@ -801,10 +804,7 @@ Future<void> _createInfoBankFromAdmission(Admissions admission) async {
 
     for (int i = 0; i < chunks.length; i++) {
       final chunk = chunks[i];
-      final embedding = await _geminiService.embedText(
-        chunk.text,
-       
-      );
+      final embedding = await _geminiService.embedText(chunk.text);
 
       final chunkTitle = chunks.length > 1
           ? '$title (Part ${i + 1}/${chunks.length})'
@@ -833,6 +833,11 @@ Future<void> _createInfoBankFromAdmission(Admissions admission) async {
         'chunkSize': chunk.text.length,
         'createdAt': DateTime.now().toIso8601String(),
         'syncedFromCategory': true,
+        
+        // ✅ NEW: Add type to metadata
+        'admissionType': admission.type ?? 'general',
+        'testType': admission.type ?? 'general',
+        
         'academicYear': admission.academicYear != null 
             ? '${admission.academicYear!['start']}-${admission.academicYear!['end'] ?? ''}'
             : null,
@@ -870,6 +875,8 @@ Future<void> _createInfoBankFromAdmission(Admissions admission) async {
       'categoryID': 'admission',
       'categoryType': 'admission',
       'categoryDocumentId': admission.id,
+      'admissionType': admission.type ?? 'general', // ✅ NEW
+      'testType': admission.type ?? 'general', // ✅ NEW
       'pinecone_id': parentPineconeId,
       'totalChunks': chunks.length,
       'chunkIds': chunkIds,
@@ -882,6 +889,7 @@ Future<void> _createInfoBankFromAdmission(Admissions admission) async {
     });
 
     print('✅ Information Bank created: ${chunks.length} Pinecone vectors');
+    print('   Admission Type: ${admission.type ?? "general"}');
 
   } catch (e) {
     print('⚠️ Error creating Information Bank from admission: $e');
@@ -1105,6 +1113,12 @@ String _formatAdmissionAsText(Admissions admission) {
   final buffer = StringBuffer();
 
   buffer.writeln('ADMISSION INFORMATION\n');
+  
+  // ✅ Add type if present
+  if (admission.type != null && admission.type!.isNotEmpty) {
+    buffer.writeln('Test Type: ${admission.type}\n');
+  }
+  
   buffer.writeln('Title: ${admission.title}\n');
   buffer.writeln('Content: ${admission.content}\n');
 
@@ -1118,7 +1132,7 @@ String _formatAdmissionAsText(Admissions admission) {
 
   if (admission.steps.isNotEmpty) {
     buffer.writeln('Steps:');
-    for (int i = 0; i < admission.steps!.length; i++) {
+    for (int i = 0; i < admission.steps.length; i++) {
       buffer.writeln('${i + 1}. ${admission.steps[i]}');
     }
     buffer.writeln();

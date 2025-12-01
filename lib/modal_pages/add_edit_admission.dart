@@ -71,6 +71,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
   final TextRecognizer _textRecognizer = TextRecognizer();
   List<Map<String, dynamic>> _extractedSchedules = [];
   List<ScheduleController> _scheduleControllers = [];
+    String? _selectedType;
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
@@ -89,7 +90,6 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
   String? _selectedFileName;
   File? _selectedFile;
   bool _fileUploaded = false;
-
   @override
   void initState() {
     super.initState();
@@ -98,8 +98,13 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     }
   }
 
-  void _loadExistingData() {
+
+   void _loadExistingData() {
     final data = widget.doc!.data() as Map<String, dynamic>;
+    
+    // ✅ Load type
+    _selectedType = data['type']?.toString();
+    
     _titleController.text = data['title'] ?? '';
     _contentController.text = data['content'] ?? '';
     _sourceController.text = data['source'] ?? '';
@@ -517,11 +522,16 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     );
   }
 
-  Future<void> _processExtractedText(String text, String fileName) async {
+ Future<void> _processExtractedText(String text, String fileName) async {
     try {
       final analysisResult = await _cohereService.analyzeAdmission(text);
 
       setState(() {
+        // ✅ Set type
+        if (analysisResult['type'] != null && analysisResult['type'].toString().isNotEmpty) {
+          _selectedType = analysisResult['type'].toString();
+        }
+        
         if (_titleController.text.isEmpty) {
           _titleController.text = fileName.split('.').first;
         }
@@ -811,7 +821,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
     );
   }
 
-  Future<void> _submitForm() async {
+ Future<void> _submitForm() async {
     if (_titleController.text.trim().isEmpty) {
       if (mounted) {
         SnackbarUtil.showWarning(context, 'Please enter a title');
@@ -825,7 +835,6 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
       final uuid = Uuid();
       final docId = widget.isEdit ? widget.doc!.id : uuid.v4();
 
-      // Convert schedule controllers to list of maps
       final schedulesList =
           _scheduleControllers
               .map((sc) => sc.toMap())
@@ -834,6 +843,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
 
       final admission = Admissions(
         id: docId,
+        type: _selectedType, // ✅ NEW FIELD
         title: _titleController.text.trim(),
         content: _contentController.text.trim(),
         source: _sourceController.text.trim(),
@@ -924,32 +934,70 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
       print('⚠️ Failed to log action: $e');
     }
   }
-
-  Widget _buildSectionHeader(String title, IconData icon, bool isMobile) {
-    return Row(
+  
+   Widget _buildTypeDropdown(bool isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Color(0xFF2E7D32).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 20, color: Color(0xFF2E7D32)),
+        Row(
+          children: [
+            Icon(
+              Icons.assignment_outlined,
+              size: 20,
+              color: Color(0xFF2E7D32),
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Admission Test Type',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF374151),
+                letterSpacing: -0.1,
+              ),
+            ),
+          ],
         ),
-        SizedBox(width: 12),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF1F2937),
-            letterSpacing: -0.2,
+        SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: Color(0xFFE5E7EB),
+              width: 1.5,
+            ),
+          ),
+          child: DropdownButtonFormField<String>(
+            value: _selectedType,
+            decoration: InputDecoration(
+              hintText: 'Select test type (optional)',
+              hintStyle: TextStyle(
+                color: Color(0xFF9CA3AF),
+                fontWeight: FontWeight.w400,
+              ),
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+            items: [
+              DropdownMenuItem(value: null, child: Text('Not specified')),
+              DropdownMenuItem(value: 'CMUCAT', child: Text('CMUCAT')),
+              DropdownMenuItem(value: 'GSAT', child: Text('GSAT')),
+              DropdownMenuItem(value: 'SLHSAT', child: Text('SLHSAT')),
+              DropdownMenuItem(value: 'CMUCATFAQ', child: Text('SLHSAT')),
+
+            ],
+            onChanged: (value) {
+              setState(() {
+                _selectedType = value;
+              });
+            },
           ),
         ),
       ],
     );
   }
-
+  
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -1117,6 +1165,9 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
                       icon: Icons.title_outlined,
                     ),
                     SizedBox(height: 16),
+
+                    _buildTypeDropdown(isMobile), // ✅ ADD THIS
+    SizedBox(height: 16),
 
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

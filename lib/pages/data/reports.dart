@@ -813,15 +813,37 @@ List<ChartData> _buildResponseTimeTrend(
     return trendData;
   }
 
-  String _getSeason(int month) {
-    if (month >= 6 && month <= 8) return 'Enrollment'; 
-    if (month >= 1 && month <= 3) return 'CMUCAT and 2nd Sem Midterms';
-    if (month >= 4 && month <= 5) return 'Posting of CMUCAT Scores and 2nd Sem Final Term';
-    if (month == 8) return 'Opening of Classes';
-    if (month >= 11 && month <= 12) return '1st Sem Final Term and Christmas Break';
-    if (month >= 9 && month <= 11) return '1st Sem Midterms';
-    return 'Regular Classes';
+String _getSeason(int month) {
+  switch (month) {
+    case 1:
+      return 'January';
+    case 2:
+      return 'February';
+    case 3:
+      return 'March';
+    case 4:
+      return 'April';
+    case 5:
+      return 'May';
+    case 6:
+      return 'June';
+    case 7:
+      return 'July';
+    case 8:
+      return 'August';
+    case 9:
+      return 'September';
+    case 10:
+      return 'October';
+    case 11:
+      return 'November';
+    case 12:
+      return 'December';
+    default:
+      return 'Invalid Month';
   }
+}
+
 
   List<ChartData>? _generateHourlyUsageTrend(
     List<QueryDocumentSnapshot> sessions,

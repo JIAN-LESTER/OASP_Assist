@@ -867,8 +867,8 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
                       const SizedBox(height: 16),
                       Text(
                         widget.isMobile
-                            ? 'Tap to upload'
-                            : 'Choose upload method below',
+                            ? 'Choose upload method below'
+                            : 'Upload Files',
                         style: TextStyle(
                           fontSize: widget.isMobile ? 15 : 16,
                           color: const Color(0xFF1F2937),
@@ -879,8 +879,8 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
                       const SizedBox(height: 8),
                       Text(
                         widget.isMobile
-                            ? 'Documents or images'
-                            : 'Select an option below to get started',
+                            ? 'Select an option below to get started'
+                            : 'Documents in formats (.doc | .docx | .pdf | .txt)',
                         style: TextStyle(
                           fontSize: widget.isMobile ? 13 : 14,
                           color: const Color(0xFF9CA3AF),

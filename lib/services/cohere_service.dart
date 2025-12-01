@@ -163,6 +163,19 @@ Future<Map<String, dynamic>> analyzeAdmission(String message) async {
     return null;
   }
 
+  // ✅ NEW: Function to detect admission type
+  String? detectAdmissionType(String text) {
+    final upperText = text.toUpperCase();
+    if (upperText.contains('CMUCAT')) {
+      return 'CMUCAT';
+    } else if (upperText.contains('GSAT')) {
+      return 'GSAT';
+    } else if (upperText.contains('SLHSAT')) {
+      return 'SLHSAT';
+    }
+    return null;
+  }
+
   try {
     if (message.trim().isEmpty) {
       print("❌ Empty message provided to analyzeAdmission");
@@ -172,11 +185,17 @@ Future<Map<String, dynamic>> analyzeAdmission(String message) async {
     print("📄 Admission input message length: ${message.length}");
 
     final prompt = '''
-Analyze the following admission document and extract the academic year, ALL contact information, ALL admission steps, ALL requirements, ALL links, and ANY schedules if present.
+Analyze the following admission document and extract the admission type, academic year, ALL contact information, ALL admission steps, ALL requirements, ALL links, and ANY schedules if present.
 
 Admission Document: "$message"
 
 CRITICAL INSTRUCTIONS:
+- First, identify the TYPE of admission test:
+  * CMUCAT (Central Mindanao University College Admission Test)
+  * GSAT (Graduate School Admission Test)
+  * SLHSAT (School of Law and Hospitality Studies Admission Test)
+  * If no specific test is mentioned, set type to null
+
 - Extract EVERY SINGLE step mentioned (usually numbered [1] to [11])
 - Extract ALL requirements (documents needed: Form 137, Form 138, NSO Birth Certificate, Certificate of Good Moral, Medical Certificate, ID Pictures, etc.)
 - Preserve the original order and numbering
@@ -187,6 +206,7 @@ CRITICAL INSTRUCTIONS:
 
 Return valid JSON only in this exact format:
 {
+  "type": "CMUCAT",
   "contacts": [
     {"type": "email", "value": "admissions@cmu.edu.ph"},
     {"type": "phone", "value": "+639123456789"}
@@ -213,16 +233,12 @@ Return valid JSON only in this exact format:
       "date": "OCT 4, 2025",
       "dayOfWeek": "SATURDAY",
       "locations": ["Kalilangan, Bukidnon", "Impasug-ong, Bukidnon"]
-    },
-    {
-      "date": "OCT 11, 2025",
-      "dayOfWeek": "SATURDAY",
-      "locations": ["Quezon, Bukidnon", "Malaybalay City, Bukidnon"]
     }
   ]
 }
 
 If no schedules are found, return an empty schedules array.
+If no specific test type is mentioned, set type to null.
 ''';
 
     final response = await http.post(
@@ -234,31 +250,10 @@ If no schedules are found, return an empty schedules array.
       body: jsonEncode({
         'model': 'command-r-08-2024',
         'message': prompt,
-        'max_tokens': 3500, // Increased for schedules
+        'max_tokens': 3500,
         'temperature': 0.0,
       }),
     );
-
-    
-      // final response = await http.post(
-      //   Uri.parse(chatUrl),
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: jsonEncode({
-      //     'contents': [
-      //       {
-      //         'parts': [
-      //           {'text': prompt}
-      //         ]
-      //       }
-      //     ],
-      //     'generationConfig': {
-      //       'temperature': 0.0,
-      //       'maxOutputTokens': 3500,
-      //     }
-      //   }),
-      // );
 
     print("📡 Cohere API Response Status: ${response.statusCode}");
 
@@ -284,6 +279,12 @@ If no schedules are found, return an empty schedules array.
         return _fallbackAdmissionExtraction(message);
       }
 
+      // ✅ Extract type with fallback
+      String? admissionType = result['type']?.toString();
+      if (admissionType == null || admissionType.isEmpty || admissionType == 'null') {
+        admissionType = detectAdmissionType(message);
+      }
+
       List<Map<String, dynamic>> contacts = _processContacts(result['contacts']);
       List<String> steps = _processSteps(result['steps']);
       List<String> requirements = _processStringList(result['requirements']);
@@ -291,7 +292,6 @@ If no schedules are found, return an empty schedules array.
           ? List<String>.from(result['links'].map((e) => e.toString()))
           : [];
       
-      // ✅ NEW: Process schedules
       List<Map<String, dynamic>> schedules = [];
       if (result['schedules'] is List) {
         for (var schedule in result['schedules']) {
@@ -307,7 +307,6 @@ If no schedules are found, return an empty schedules array.
         }
       }
 
-      // Convert academic year to numeric map
       Map<String, int>? academicYearMap = parseAcademicYear(
         result['academicYear']?.toString(),
         message,
@@ -332,21 +331,21 @@ If no schedules are found, return an empty schedules array.
         links = fallbackResult['links'] as List<String>;
       }
 
-      // ✅ NEW: If no schedules from AI, try fallback extraction
       if (schedules.isEmpty) {
         final fallbackResult = _fallbackAdmissionExtraction(message);
         schedules = fallbackResult['schedules'] as List<Map<String, dynamic>>? ?? [];
       }
 
-      print("✅ Extracted: ${steps.length} steps, ${requirements.length} requirements, ${contacts.length} contacts, ${schedules.length} schedules");
+      print("✅ Extracted: Type=${admissionType ?? 'not specified'}, ${steps.length} steps, ${requirements.length} requirements, ${contacts.length} contacts, ${schedules.length} schedules");
 
       return {
+        'type': admissionType, // ✅ NEW FIELD
         'contacts': contacts,
         'steps': steps,
         'requirements': requirements,
         'academicYear': academicYearMap,
         'links': links,
-        'schedules': schedules, // ✅ NEW
+        'schedules': schedules,
       };
     } else {
       print("❌ Cohere API error: ${response.statusCode}");
@@ -359,10 +358,19 @@ If no schedules are found, return an empty schedules array.
   }
 }
 
-// Updated fallback extraction
 Map<String, dynamic> _fallbackAdmissionExtraction(String text) {
   print("🔧 Using fallback admission extraction");
 
+  // ✅ Detect admission type
+  String? detectedType;
+  final upperText = text.toUpperCase();
+  if (upperText.contains('CMUCAT')) {
+    detectedType = 'CMUCAT';
+  } else if (upperText.contains('GSAT')) {
+    detectedType = 'GSAT';
+  } else if (upperText.contains('SLHSAT')) {
+    detectedType = 'SLHSAT';
+  }
   List<String> steps = <String>[];
   List<String> requirements = <String>[];
   List<Map<String, dynamic>> contacts = <Map<String, dynamic>>[];
@@ -487,17 +495,19 @@ Map<String, dynamic> _fallbackAdmissionExtraction(String text) {
     });
   }
 
-  print("🔧 Fallback extracted ${steps.length} steps, ${requirements.length} requirements, ${contacts.length} contacts, ${schedules.length} schedules");
+  print("🔧 Fallback extracted type=${detectedType ?? 'not specified'}, ${steps.length} steps, ${requirements.length} requirements, ${contacts.length} contacts, ${schedules.length} schedules");
 
   return {
+    'type': detectedType, // ✅ NEW FIELD
     'contacts': contacts,
     'steps': steps,
     'requirements': requirements,
     'academicYear': academicYear,
     'links': links,
-    'schedules': schedules, // ✅ NEW
+    'schedules': schedules,
   };
 }
+
   String _extractJsonFromResponse(String response) {
     // Remove markdown code blocks and extra text
     String cleaned = response
