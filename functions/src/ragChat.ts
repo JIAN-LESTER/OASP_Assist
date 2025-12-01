@@ -231,12 +231,22 @@ function buildContextAwarePrompt(
     knowledgeSection += `Document ${idx + 1}: ${ctx.title}\n${ctx.content}\n\n`;
   });
 
-  // ✅ Improved: Better instructions for using conversation history
   const historySection = conversationHistory 
     ? `Previous conversation context (use this to understand follow-up questions and maintain continuity):\n${conversationHistory}\n\n`
     : "";
 
+  // ✅ NEW: Add current date and time for real-time awareness
+  const now = new Date();
+  const dateInfo = `Current Date and Time: ${now.toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  })}, ${now.toLocaleTimeString('en-US')}`;
+
   return `You are OASP Assist, the official AI assistant for Central Mindanao University's Office of Admissions, Scholarships, and Placement (OASP).
+
+${dateInfo}
 
 ${historySection}Current question: "${query}"
 
@@ -244,30 +254,46 @@ Knowledge Base Documents:
 ${knowledgeSection}
 
 CRITICAL INSTRUCTIONS:
-1. **Context Awareness**: 
+1. **Real-time Awareness**: 
+   - You know the current date and time shown above
+   - Use this information to provide context-aware responses about deadlines, dates, and time-sensitive matters
+   - Calculate relative dates (e.g., "in 2 weeks", "next month") based on current date
+
+2. **Context Awareness**: 
    - If this is a follow-up question (indicated by conversation history), reference previous discussion
    - Use pronouns and context clues from history to understand what "it", "that", "those" refer to
    - Maintain continuity in your responses based on what was discussed before
 
-2. **Comprehensiveness**: Provide detailed, thorough answers using ALL relevant information from the documents
+3. **Intelligent Fallback**:
+   - If the knowledge base has SOME relevant information, provide it comprehensively
+   - If the knowledge base lacks specific details but you can infer or provide general guidance, do so
+   - ONLY suggest contacting OASP if the question requires truly specific information not available
 
-3. **Accuracy**: Only use information directly stated in the knowledge base - never make assumptions
+4. **Comprehensiveness**: Provide detailed, thorough answers using ALL relevant information from the documents
 
-4. **Structure**: Organize complex answers with clear explanations, including:
+5. **Accuracy**: Prioritize information from the knowledge base, but use general knowledge when appropriate for:
+   - Date calculations and calendar information
+   - General university processes and procedures
+   - Common academic terminology and concepts
+
+6. **Structure**: Organize complex answers with clear explanations, including:
    - Step-by-step procedures when applicable
    - Specific requirements, dates, and deadlines
    - All relevant details (fees, contacts, locations, etc.)
 
-5. **Natural Language**: Write as a knowledgeable university assistant would - friendly but professional
+7. **Natural Language**: Write as a knowledgeable university assistant would - friendly but professional
 
-6. **NO DISCLAIMERS**: Do NOT suggest contacting OASP unless information is genuinely not in the documents
-
-7. **Completeness**: Give FULL answers with all details when information is available
+8. **NO UNNECESSARY DISCLAIMERS**: 
+   - Don't say "I don't have information" if you can provide helpful general guidance
+   - Don't suggest contacting OASP for information you can reasonably answer
+   - Be helpful and resourceful with the information available
 
 If this is a follow-up question, acknowledge the previous context naturally in your response.
 
 Answer:`;
 }
+
+
 
 function buildPartialInfoPrompt(
   query: string,
@@ -283,7 +309,18 @@ function buildPartialInfoPrompt(
     ? `Recent conversation (use for context):\n${conversationHistory}\n\n`
     : "";
 
+  // ✅ NEW: Add current date for partial info prompt too
+  const now = new Date();
+  const dateInfo = `Current Date: ${now.toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  })}`;
+
   return `You are OASP Assist for Central Mindanao University.
+
+${dateInfo}
 
 ${historySection}Question: "${query}"
 
@@ -291,14 +328,18 @@ Available Information:
 ${knowledgeSection}
 
 Instructions:
-1. If this is a follow-up question, use conversation history to understand the full context
-2. Provide whatever specific information IS available from the documents
-3. Be thorough with what you CAN answer
-4. Only if truly critical information is missing, briefly mention that OASP staff can provide additional details
-5. Maintain natural conversation flow if there's prior context
+1. **Real-time Context**: You know today's date - use it to provide relevant time-based information
+2. If this is a follow-up question, use conversation history to understand the full context
+3. Provide whatever specific information IS available from the documents
+4. Be thorough with what you CAN answer
+5. If you can provide helpful general guidance even without specific details, do so
+6. Use your knowledge of university processes to supplement available information when appropriate
+7. Only suggest contacting OASP if truly critical specific information is genuinely unavailable
+8. Maintain natural conversation flow if there's prior context
 
 Answer:`;
 }
+
 async function retrieveRelevantDocuments(
   query: string,
   queryEmbedding: number[],
@@ -483,24 +524,80 @@ export const generateAnswer = onRequest(
         minSimilarityScore
       );
 
+      // ✅ FIX 3: Use AI fallback instead of hard "no information" message
       if (results.length === 0) {
-        console.log("❌ No documents found");
-        const errorMsg = "I don't have information on that specific topic in my knowledge base. Please reach out to the OASP staff directly for accurate information.";
+        console.log("⚠️ No documents found - using AI fallback");
         
+        const conversationContext = buildConversationContext(conversationHistory);
+        const now = new Date();
+        const dateInfo = `Current Date: ${now.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        })}`;
+
+        const fallbackPrompt = `You are OASP Assist for Central Mindanao University.
+
+${dateInfo}
+
+${conversationContext ? `Recent conversation:\n${conversationContext}\n\n` : ""}Question: "${query}"
+
+IMPORTANT: My knowledge base doesn't have specific documents about this topic, but I should still try to help.
+
+Instructions:
+1. Use your general knowledge about universities, admissions, scholarships, and student services
+2. Provide helpful, accurate general information when possible
+3. Use the current date for time-sensitive queries
+4. If this is truly specific to CMU OASP policies I cannot answer, politely suggest contacting OASP staff
+5. Be helpful and professional
+6. Don't say "I don't have information" - try to provide useful guidance first
+
+Answer:`;
+
         if (stream) {
           res.setHeader("Content-Type", "text/event-stream");
-          res.write(`data: ${JSON.stringify({ 
-            type: "content-delta", 
-            delta: { message: { content: { text: errorMsg } } } 
-          })}\n\n`);
-          res.write(`data: ${JSON.stringify({ 
-            type: "message-end", 
-            metadata: { source: "no_documents" } 
-          })}\n\n`);
-          res.write("data: [DONE]\n\n");
-          res.end();
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+
+          try {
+            for await (const chunk of generateGeminiResponseStream(fallbackPrompt, geminiKey)) {
+              if (chunk && chunk.length > 0) {
+                res.write(`data: ${JSON.stringify({ 
+                  type: "content-delta", 
+                  delta: { message: { content: { text: chunk } } } 
+                })}\n\n`);
+              }
+            }
+
+            res.write(`data: ${JSON.stringify({ 
+              type: "message-end", 
+              metadata: { source: "ai_fallback" } 
+            })}\n\n`);
+            res.write("data: [DONE]\n\n");
+            res.end();
+          } catch (error) {
+            console.error("❌ AI fallback streaming failed:", error);
+            const errorMsg = "I'm having trouble processing your request. Please contact OASP staff directly for assistance.";
+            res.write(`data: ${JSON.stringify({ 
+              type: "content-delta", 
+              delta: { message: { content: { text: errorMsg } } } 
+            })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: "message-end" })}\n\n`);
+            res.write("data: [DONE]\n\n");
+            res.end();
+          }
         } else {
-          res.json({ answer: errorMsg, source: "no_documents" });
+          try {
+            const answer = await generateGeminiResponse(fallbackPrompt, geminiKey);
+            res.json({ answer: answer.trim(), source: "ai_fallback" });
+          } catch (error) {
+            console.error("❌ AI fallback failed:", error);
+            res.json({ 
+              answer: "I'm having trouble processing your request. Please contact OASP staff directly for assistance.",
+              source: "error" 
+            });
+          }
         }
         return;
       }
@@ -584,8 +681,6 @@ export const generateAnswer = onRequest(
         });
       }
 
-      
-
     } catch (error: any) {
       console.error("❌ Error:", error);
       res.status(500).json({ 
@@ -594,10 +689,7 @@ export const generateAnswer = onRequest(
         source: "error" 
       });
     }
-
-    
   }
-  
 );
 
 export async function generateGeminiResponse(
