@@ -54,7 +54,7 @@ interface CohereResult {
 async function getPageId(): Promise<string> {
   try {
     const tokenDoc = await db
-      .collection("fb_tokens")
+      .collection("fb_tokens")  
       .doc("facebook_admin")
       .get();
 

@@ -31,10 +31,14 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   final TextEditingController _searchController = TextEditingController();
   final _cohere = CohereService();
 
+    TokenStatus? _tokenStatus;
+  bool _hasCheckedToken = false;
+
   @override
   void initState() {
     super.initState();
     loadAnnouncements();
+     _checkTokenStatus();
   }
 
   Future<void> loadAnnouncements() async {
@@ -58,6 +62,229 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
   }
 
+Future<void> _checkTokenStatus() async {
+    try {
+      final status = await FacebookSyncService.getTokenStatus();
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _tokenStatus = status;
+        _hasCheckedToken = true;
+      });
+    } catch (e) {
+      print('❌ Error checking token status: $e');
+    }
+  }
+
+  // ✅ NEW: Show token status tooltip with detailed info
+  String _getTokenStatusTooltip() {
+    if (_tokenStatus == null || !_tokenStatus!.configured) {
+      return 'Configure Facebook Token\n(Click to setup)';
+    }
+
+    if (_tokenStatus!.expired) {
+      return '⚠️ Token Expired!\nClick to renew now';
+    }
+
+    final daysLeft = _tokenStatus!.daysLeft ?? 0;
+    
+    if (daysLeft <= 7) {
+      return '🔴 Token expires in $daysLeft days\nRenew urgently!';
+    } else if (daysLeft <= 30) {
+      return '🟠 Token expires in $daysLeft days\nConsider renewing soon';
+    } else {
+      return '✅ Token active ($daysLeft days left)\nClick to view/renew';
+    }
+  }
+
+  // ✅ NEW: Get status color based on days left
+  Color _getTokenStatusColor() {
+    if (_tokenStatus == null || !_tokenStatus!.configured) {
+      return Colors.grey[400]!;
+    }
+
+    if (_tokenStatus!.expired) {
+      return Colors.red[700]!;
+    }
+
+    final daysLeft = _tokenStatus!.daysLeft ?? 0;
+    
+    if (daysLeft <= 7) {
+      return Colors.red[700]!;
+    } else if (daysLeft <= 30) {
+      return Colors.orange[700]!;
+    } else {
+      return Colors.green[600]!;
+    }
+  }
+
+  // ✅ NEW: Show detailed status dialog when clicking the indicator
+  void _showTokenStatusDialog() {
+    if (_tokenStatus == null || !_tokenStatus!.configured) {
+      _showTokenInputModal();
+      return;
+    }
+
+    final daysLeft = _tokenStatus!.daysLeft ?? 0;
+    final isUrgent = daysLeft <= 30;
+    final isExpired = _tokenStatus!.expired;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _getTokenStatusColor().withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isExpired 
+                    ? Icons.error 
+                    : isUrgent 
+                        ? Icons.warning_amber_rounded 
+                        : Icons.check_circle,
+                color: _getTokenStatusColor(),
+                size: 32,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                isExpired 
+                    ? 'Token Expired' 
+                    : isUrgent 
+                        ? 'Token Expiring Soon' 
+                        : 'Token Status',
+                style: TextStyle(fontSize: 20),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Status info
+            _buildStatusInfoRow(
+              Icons.access_time,
+              'Days Remaining',
+              isExpired ? 'Expired' : '$daysLeft days',
+              _getTokenStatusColor(),
+            ),
+            SizedBox(height: 12),
+            _buildStatusInfoRow(
+              Icons.calendar_today,
+              'Expires On',
+              _tokenStatus!.expiresAt != null
+                  ? DateFormat('MMM d, yyyy').format(
+                      DateTime.fromMillisecondsSinceEpoch(_tokenStatus!.expiresAt!)
+                    )
+                  : 'Unknown',
+              Colors.grey[700]!,
+            ),
+            if (_tokenStatus!.pageId != null) ...[
+              SizedBox(height: 12),
+              _buildStatusInfoRow(
+                Icons.tag,
+                'Page ID',
+                _tokenStatus!.pageId!,
+                Colors.grey[700]!,
+              ),
+            ],
+            
+            // Warning message
+            if (isExpired || isUrgent) ...[
+              SizedBox(height: 16),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _getTokenStatusColor().withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _getTokenStatusColor().withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isExpired ? Icons.error_outline : Icons.info_outline,
+                      color: _getTokenStatusColor(),
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isExpired
+                            ? 'Your token has expired. Renew it now to continue syncing posts.'
+                            : 'Your token will expire soon. Renew it to avoid interruption.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _getTokenStatusColor(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          if (!isExpired && !isUrgent)
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Close'),
+            ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _showTokenInputModal();
+            },
+            icon: Icon(isExpired ? Icons.vpn_key : Icons.refresh),
+            label: Text(isExpired ? 'Renew Now' : 'Renew Token'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _getTokenStatusColor(),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusInfoRow(IconData icon, String label, String value, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[600],
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
   // Manual refresh button (keep as is for manual sync)
   Future<void> _refreshFromFacebook() async {
     if (isRefreshing) {
@@ -106,23 +333,14 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
   }
 
- Future<void> _showTokenInputModal() async {
+Future<void> _showTokenInputModal() async {
   final TextEditingController tokenController = TextEditingController();
-  final TextEditingController pageIdController = TextEditingController(); // ✅ NEW
+  final TextEditingController pageIdController = TextEditingController();
   bool isExchanging = false;
 
-  // ✅ Load existing Page ID if available
-  try {
-    final doc = await FirebaseFirestore.instance
-        .collection('fb_tokens')
-        .doc('facebook_admin')
-        .get();
-    
-    if (doc.exists && doc.data()?['pageId'] != null) {
-      pageIdController.text = doc.data()!['pageId'];
-    }
-  } catch (e) {
-    print('Could not load existing Page ID: $e');
+  // Load existing Page ID if available
+  if (_tokenStatus?.pageId != null) {
+    pageIdController.text = _tokenStatus!.pageId!;
   }
 
   showDialog(
@@ -152,148 +370,94 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header
-                Padding(
+                // ✅ ENHANCED: Header with status
+                Container(
                   padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Facebook Integration',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[900],
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: Icon(
-                          Icons.close_rounded,
-                          color: Colors.grey[600],
-                        ),
-                        style: IconButton.styleFrom(
-                          padding: const EdgeInsets.all(8),
-                        ),
-                      ),
-                    ],
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                   ),
-                ),
-
-                // Content
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Instructions Section
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'SETUP INSTRUCTIONS',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[500],
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              _buildInstructionStep(
-                                '1',
-                                'Visit developers.facebook.com and log in',
-                              ),
-                              const SizedBox(height: 12),
-
-                              _buildInstructionStep(
-                                '2',
-                                'Click "My Apps" → "Create App"',
-                              ),
-                              const SizedBox(height: 12),
-
-                              _buildInstructionStep(
-                                '3',
-                                'Choose "Manage everything on your Page" as the use case, and select "Business" as the App Type.',
-                              ),
-                              const SizedBox(height: 12),
-
-                              _buildInstructionStep(
-                                '4',
-                                'In the left sidebar, open "Use Cases" and select your created app and enable required permissions in Use Cases',
-                              ),
-                              const SizedBox(height: 12),
-
-                              _buildInstructionStep(
-                                '5',
-                                'Go to Tools → Graph API Explorer → Select your app and check the same permissions.',
-                              ),
-                              const SizedBox(height: 12),
-
-                              _buildInstructionStep(
-                                '6',
-                                'Generate and copy your Access Token',
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // ✅ NEW: Page ID instruction
-                              _buildInstructionStep(
-                                '7',
-                                'Get your Page ID: Go to your Facebook Page → About → Page transparency → Page ID',
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              // Required Permissions
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.grey[300]!,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Facebook Integration',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[900],
                                   ),
                                 ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: Icon(
+                              Icons.close_rounded,
+                              color: Colors.grey[600],
+                            ),
+                            style: IconButton.styleFrom(
+                              padding: const EdgeInsets.all(8),
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      // ✅ Status Banner
+                      if (_tokenStatus != null && _tokenStatus!.configured) ...[
+                        SizedBox(height: 12),
+                        Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _getTokenStatusColor().withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _getTokenStatusColor().withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _tokenStatus!.expired
+                                    ? Icons.error
+                                    : _tokenStatus!.needsRenewal
+                                        ? Icons.warning_amber_rounded
+                                        : Icons.check_circle,
+                                color: _getTokenStatusColor(),
+                                size: 24,
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.check_circle_outline,
-                                          size: 16,
-                                          color: Colors.grey[600],
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Required Permissions',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.grey[700],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
                                     Text(
-                                      'pages_read_engagement, pages_manage_posts, pages_show_list, pages_read_user_content, pages_manage_metadata',
+                                      _tokenStatus!.expired
+                                          ? 'Token Expired'
+                                          : _tokenStatus!.needsRenewal
+                                              ? 'Token Expiring Soon'
+                                              : 'Token Active',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: _getTokenStatusColor(),
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      _tokenStatus!.expired
+                                          ? 'Renew your token to continue syncing'
+                                          : 'Expires in ${_tokenStatus!.daysLeft} days',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey[600],
-                                        height: 1.5,
+                                        color: _getTokenStatusColor(),
                                       ),
                                     ),
                                   ],
@@ -302,322 +466,444 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                             ],
                           ),
                         ),
-
-                        const SizedBox(height: 20),
-
-                        // ✅ NEW: Page ID Input Section
-                        Text(
-                          'FACEBOOK PAGE ID',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[500],
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        TextField(
-                          controller: pageIdController,
-                          enabled: !isExchanging,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(fontSize: 14),
-                          decoration: InputDecoration(
-                            hintText: 'Enter your Facebook Page ID (e.g., 730995450096065)',
-                            hintStyle: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 14,
+                      ],
+                    ],
+                  ),
+                ),
+                  // Content
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Instructions Section
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            prefixIcon: Icon(
-                              Icons.tag,
-                              color: Colors.grey[600],
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: Colors.grey[300]!,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: Colors.grey[300]!,
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF2E7D32),
-                                width: 2,
-                              ),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[50],
-                            contentPadding: const EdgeInsets.all(16),
-                          ),
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // Token Input Section
-                        Text(
-                          'ACCESS TOKEN',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[500],
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        TextField(
-                          controller: tokenController,
-                          maxLines: 3,
-                          enabled: !isExchanging,
-                          style: const TextStyle(fontSize: 14),
-                          decoration: InputDecoration(
-                            hintText: 'Paste your Facebook access token here...',
-                            hintStyle: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 14,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: Colors.grey[300]!,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: Colors.grey[300]!,
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF2E7D32),
-                                width: 2,
-                              ),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[50],
-                            contentPadding: const EdgeInsets.all(16),
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // Paste Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: isExchanging
-                                ? null
-                                : () async {
-                                    final data = await Clipboard.getData('text/plain');
-                                    if (data?.text != null) {
-                                      tokenController.text = data!.text!;
-                                      SnackbarUtil.showSuccess(
-                                        context,
-                                        '✅ Token pasted from clipboard',
-                                      );
-                                    }
-                                  },
-                            icon: const Icon(
-                              Icons.content_paste_rounded,
-                              size: 22,
-                            ),
-                            label: const Text(
-                              'Paste from Clipboard',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF2E7D32),
-                              side: BorderSide(
-                                color: isExchanging
-                                    ? Colors.grey.shade300
-                                    : const Color(0xFF2E7D32),
-                                width: 1.5,
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 18,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // Action Buttons
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: isExchanging ? null : () => Navigator.pop(context),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.grey[700],
-                                  side: BorderSide(
-                                    color: Colors.grey[300]!,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 18,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Cancel',
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'SETUP INSTRUCTIONS',
                                   style: TextStyle(
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 16,
+                                    color: Colors.grey[500],
+                                    letterSpacing: 0.5,
                                   ),
+                                ),
+                                const SizedBox(height: 16),
+                                _buildInstructionStep(
+                                  '1',
+                                  'Visit developers.facebook.com and log in',
+                                ),
+                                const SizedBox(height: 12),
+                                _buildInstructionStep(
+                                  '2',
+                                  'Click "My Apps" → "Create App"',
+                                ),
+                                const SizedBox(height: 12),
+                                _buildInstructionStep(
+                                  '3',
+                                  'Choose "Manage everything on your Page" as the use case, and select "Business" as the App Type.',
+                                ),
+                                const SizedBox(height: 12),
+                                _buildInstructionStep(
+                                  '4',
+                                  'In the left sidebar, open "Use Cases" and select your created app and enable required permissions',
+                                ),
+                                const SizedBox(height: 12),
+                                _buildInstructionStep(
+                                  '5',
+                                  'Go to Tools → Graph API Explorer → Select your app and check the same permissions',
+                                ),
+                                const SizedBox(height: 12),
+                                _buildInstructionStep(
+                                  '6',
+                                  'Generate and copy your Access Token',
+                                ),
+                                const SizedBox(height: 12),
+                                _buildInstructionStep(
+                                  '7',
+                                  'Get your Page ID: Go to your Facebook Page → About → Page transparency → Page ID',
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Required Permissions
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.grey[300]!,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.check_circle_outline,
+                                            size: 16,
+                                            color: Colors.grey[600],
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Required Permissions',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.grey[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'pages_read_engagement, pages_manage_posts, pages_show_list, pages_read_user_content, pages_manage_metadata',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // ✅ Page ID Input Section
+                          Text(
+                            'FACEBOOK PAGE ID',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[500],
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          TextField(
+                            controller: pageIdController,
+                            enabled: !isExchanging,
+                            keyboardType: TextInputType.number,
+                            style: const TextStyle(fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: 'Enter your Facebook Page ID (e.g., 730995450096065)',
+                              hintStyle: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 14,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.tag,
+                                color: Colors.grey[600],
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF2E7D32),
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              contentPadding: const EdgeInsets.all(16),
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // Token Input Section
+                          Text(
+                            'ACCESS TOKEN',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[500],
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          TextField(
+                            controller: tokenController,
+                            maxLines: 3,
+                            enabled: !isExchanging,
+                            style: const TextStyle(fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: 'Paste your Facebook access token here...',
+                              hintStyle: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 14,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF2E7D32),
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              contentPadding: const EdgeInsets.all(16),
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Paste Button
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: isExchanging
+                                  ? null
+                                  : () async {
+                                      final data = await Clipboard.getData('text/plain');
+                                      if (data?.text != null) {
+                                        tokenController.text = data!.text!;
+                                        SnackbarUtil.showSuccess(
+                                          context,
+                                          '✅ Token pasted from clipboard',
+                                        );
+                                      }
+                                    },
+                              icon: const Icon(
+                                Icons.content_paste_rounded,
+                                size: 22,
+                              ),
+                              label: const Text(
+                                'Paste from Clipboard',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF2E7D32),
+                                side: BorderSide(
+                                  color: isExchanging
+                                      ? Colors.grey.shade300
+                                      : const Color(0xFF2E7D32),
+                                  width: 1.5,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 18,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: isExchanging
-                                    ? null
-                                    : () async {
-                                        final token = tokenController.text.trim();
-                                        final pageId = pageIdController.text.trim(); // ✅ NEW
+                          ),
 
-                                        // ✅ Validate Page ID
-                                        if (pageId.isEmpty) {
-                                          SnackbarUtil.showError(
-                                            context,
-                                            'Please enter your Facebook Page ID',
-                                          );
-                                          return;
-                                        }
+                          const SizedBox(height: 24),
 
-                                        if (!RegExp(r'^\d+$').hasMatch(pageId)) {
-                                          SnackbarUtil.showError(
-                                            context,
-                                            'Page ID should only contain numbers',
-                                          );
-                                          return;
-                                        }
+                          // Action Buttons
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: isExchanging ? null : () => Navigator.pop(context),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.grey[700],
+                                    side: BorderSide(
+                                      color: Colors.grey[300]!,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 18,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Cancel',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: isExchanging
+                                      ? null
+                                      : () async {
+                                          final token = tokenController.text.trim();
+                                          final pageId = pageIdController.text.trim();
 
-                                        if (token.isEmpty) {
-                                          SnackbarUtil.showError(
-                                            context,
-                                            'Please enter a token',
-                                          );
-                                          return;
-                                        }
-
-                                        if (token.length < 50) {
-                                          SnackbarUtil.showError(
-                                            context,
-                                            'Token seems too short',
-                                          );
-                                          return;
-                                        }
-
-                                        setDialogState(() => isExchanging = true);
-
-                                        try {
-                                          print('🔄 Exchanging token with Page ID: $pageId');
-                                          
-                                          // ✅ Pass Page ID to exchangeToken
-                                          final result = await FacebookSyncService.exchangeToken(
-                                            token,
-                                            pageId: pageId, // ✅ NEW PARAMETER
-                                          );
-
-                                          if (!context.mounted) return;
-
-                                          if (result['success'] == true || result['ok'] == true) {
-                                            final expiresIn = result['expires_in'] ?? 0;
-                                            final daysValid = (expiresIn / 86400).round();
-
-                                            Navigator.pop(context);
-                                            SnackbarUtil.showSuccess(
+                                          // ✅ Validate Page ID
+                                          if (pageId.isEmpty) {
+                                            SnackbarUtil.showError(
                                               context,
-                                              'Token and Page ID saved! Valid for ~$daysValid days.',
+                                              'Please enter your Facebook Page ID',
                                             );
-                                            await _autoSyncAfterTokenSave();
                                             return;
                                           }
 
-                                          throw Exception(
-                                            result['message'] ?? result['error'],
-                                          );
-                                        } catch (e) {
-                                          print('❌ Error: $e');
+                                          if (!RegExp(r'^\d+$').hasMatch(pageId)) {
+                                            SnackbarUtil.showError(
+                                              context,
+                                              'Page ID should only contain numbers',
+                                            );
+                                            return;
+                                          }
 
-                                          if (!context.mounted) return;
+                                          if (token.isEmpty) {
+                                            SnackbarUtil.showError(
+                                              context,
+                                              'Please enter a token',
+                                            );
+                                            return;
+                                          }
 
-                                          setDialogState(() => isExchanging = false);
-                                          final errorMessage =
-                                              FacebookSyncService.parseErrorMessage(e);
-                                          SnackbarUtil.showError(
-                                            context,
-                                            'Failed to save: $errorMessage',
-                                          );
-                                        }
-                                      },
-                                icon: isExchanging
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          if (token.length < 50) {
+                                            SnackbarUtil.showError(
+                                              context,
+                                              'Token seems too short',
+                                            );
+                                            return;
+                                          }
+
+                                          setDialogState(() => isExchanging = true);
+
+                                          try {
+                                            print('🔄 Exchanging token with Page ID: $pageId');
+                                            
+                                            // ✅ Pass Page ID to exchangeToken
+                                            final result = await FacebookSyncService.exchangeToken(
+                                              token,
+                                              pageId: pageId,
+                                            );
+
+                                            if (!context.mounted) return;
+
+                                            if (result['success'] == true || result['ok'] == true) {
+                                              final expiresIn = result['expires_in'] ?? 0;
+                                              final daysValid = (expiresIn / 86400).round();
+
+                                              // ✅ Hide any existing banners
+                                              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+
+                                              Navigator.pop(context);
+                                              SnackbarUtil.showSuccess(
+                                                context,
+                                                'Token and Page ID saved! Valid for ~$daysValid days.',
+                                              );
+                                              
+                                              // ✅ Refresh token status
+                                              await _checkTokenStatus();
+                                              
+                                              await _autoSyncAfterTokenSave();
+                                              return;
+                                            }
+
+                                            throw Exception(
+                                              result['message'] ?? result['error'],
+                                            );
+                                          } catch (e) {
+                                            print('❌ Error: $e');
+
+                                            if (!context.mounted) return;
+
+                                            setDialogState(() => isExchanging = false);
+                                            final errorMessage =
+                                                FacebookSyncService.parseErrorMessage(e);
+                                            SnackbarUtil.showError(
+                                              context,
+                                              'Failed to save: $errorMessage',
+                                            );
+                                          }
+                                        },
+                                  icon: isExchanging
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.check_circle,
+                                          size: 22,
                                         ),
-                                      )
-                                    : const Icon(
-                                        Icons.check_circle,
-                                        size: 22,
-                                      ),
-                                label: Text(
-                                  isExchanging ? 'Saving...' : 'Save & Connect',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
+                                  label: Text(
+                                    isExchanging ? 'Saving...' : 'Save & Connect',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                    ),
                                   ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2E7D32),
-                                  foregroundColor: Colors.white,
-                                  disabledBackgroundColor: Colors.grey.shade400,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 18,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2E7D32),
+                                    foregroundColor: Colors.white,
+                                    disabledBackgroundColor: Colors.grey.shade400,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 18,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
-    ),
-  );
-}
+          );
+        },
+      ),
+    );
+  }
 
-  Widget _buildInstructionStep(String number, String text) {
+    Widget _buildInstructionStep(String number, String text) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1018,38 +1304,102 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     );
   }
 
-  Widget _buildRefreshButton({required bool isDesktop}) {
+ Widget _buildPulsingDot() {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 1000),
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: 0.5 + (value * 0.5), // Pulse between 0.5 and 1.0
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.5),
+              shape: BoxShape.circle,
+            ),
+          ),
+        );
+      },
+      onEnd: () {
+        // Rebuild to restart animation
+        if (mounted) {
+          setState(() {});
+        }
+      },
+    );
+  }
+
+    Widget _buildRefreshButton({required bool isDesktop}) {
     return Row(
       children: [
-        // Test button
-        SizedBox(width: 8),
-
-        // Facebook Token Config Button
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.blue[50],
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.blue[200]!),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: _showTokenInputModal,
-              child: Tooltip(
-                message: 'Configure Facebook Token (Auto-syncs after save)',
-                child: Padding(
-                  padding: EdgeInsets.all(isDesktop ? 12 : 10),
-                  child: Icon(
-                    Icons.vpn_key,
-                    color: Colors.blue[700],
-                    size: isDesktop ? 24 : 20,
+        // ✅ IMPROVED: Token Status Indicator with Badge
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () {
+                    // Show status dialog or open token modal
+                    if (_tokenStatus?.needsRenewal == true || _tokenStatus?.expired == true) {
+                      _showTokenStatusDialog();
+                    } else {
+                      _showTokenInputModal();
+                    }
+                  },
+                  child: Tooltip(
+                    message: _getTokenStatusTooltip(),
+                    child: Padding(
+                      padding: EdgeInsets.all(isDesktop ? 12 : 10),
+                      child: Icon(
+                        Icons.vpn_key,
+                        color: Colors.blue[700],
+                        size: isDesktop ? 24 : 20,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+            
+            // ✅ Status Badge
+            if (_hasCheckedToken && _tokenStatus?.configured == true) 
+              Positioned(
+                top: -4,
+                right: -4,
+                child: GestureDetector(
+                  onTap: _showTokenStatusDialog,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: _getTokenStatusColor(),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    // Add pulsing animation for urgent warnings
+                    child: _tokenStatus!.daysLeft != null && _tokenStatus!.daysLeft! <= 7
+                        ? _buildPulsingDot()
+                        : null,
+                  ),
+                ),
+              ),
+          ],
         ),
+        
         SizedBox(width: 8),
 
         // Manual Sync Button
@@ -1070,23 +1420,22 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                 message: 'Manual Sync Facebook Posts',
                 child: Padding(
                   padding: EdgeInsets.all(isDesktop ? 12 : 10),
-                  child:
-                      isRefreshing
-                          ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.grey[600]!,
-                              ),
+                  child: isRefreshing
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.grey[600]!,
                             ),
-                          )
-                          : Icon(
-                            Icons.sync_rounded,
-                            color: Colors.green[700],
-                            size: isDesktop ? 24 : 20,
                           ),
+                        )
+                      : Icon(
+                          Icons.sync_rounded,
+                          color: Colors.green[700],
+                          size: isDesktop ? 24 : 20,
+                        ),
                 ),
               ),
             ),
@@ -1095,6 +1444,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       ],
     );
   }
+
 
   // SEARCH FIELD
   Widget _buildSearchField() {

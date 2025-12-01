@@ -9,7 +9,7 @@ const FB_APP_SECRET = defineSecret("FB_APP_SECRET");
 
 const db = admin.firestore();
 const FB_API_VERSION = "v24.0";
-const PAGE_ID = "730995450096065";
+// const PAGE_ID = "730995450096065";
 
 
 async function verifyAuthToken(authHeader: string | undefined): Promise<string | null> {
@@ -86,9 +86,16 @@ async function getUserPages(longUserToken: string): Promise<any> {
   return resp.data as any;
 }
 
-async function exchangeTokenLogic(uid: string, shortToken: string): Promise<any> {
+async function exchangeTokenLogic(
+  uid: string, 
+  shortToken: string, 
+  pageId?: string  // ✅ NEW: Optional pageId parameter
+): Promise<any> {
   try {
     console.log(`🔄 Exchanging token for uid: ${uid}`);
+    if (pageId) {
+      console.log(`📍 Page ID provided: ${pageId}`);
+    }
 
     const appId = FB_APP_ID.value();
     const appSecret = FB_APP_SECRET.value();
@@ -152,6 +159,7 @@ async function exchangeTokenLogic(uid: string, shortToken: string): Promise<any>
       expires_at: expiresAt,
       expires_in: expiresIn || null,
       pages: pagesObj,
+      pageId: pageId || null, // ✅ NEW: Store the provided Page ID
       updated_at: now,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
     };
@@ -160,6 +168,7 @@ async function exchangeTokenLogic(uid: string, shortToken: string): Promise<any>
       ...saveData,
       long_token: "***",
       short_token: "***",
+      pageId: pageId || "not provided",
       expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
     });
     
@@ -178,6 +187,7 @@ async function exchangeTokenLogic(uid: string, shortToken: string): Promise<any>
       expires_at: expiresAt, 
       fbUserId: fbUserId,
       pagesCount: Object.keys(pagesObj).length,
+      pageId: pageId || null, // ✅ Return the Page ID in response
       message: `Token saved successfully. Valid for ~${daysValid} days.`,
     };
   } catch (error: any) {
@@ -322,7 +332,7 @@ export const exchangeTokenHttp = onRequest(
       console.log(`✅ Authenticated as: ${userId}`);
       
       const { data } = req.body;
-      const { uid, short_token } = data || {};
+      const { uid, short_token, pageId } = data || {}; // ✅ Extract pageId
       
       if (!uid || !short_token) {
         res.status(400).json({ 
@@ -332,7 +342,8 @@ export const exchangeTokenHttp = onRequest(
         return;
       }
 
-      const result = await exchangeTokenLogic(uid, short_token);
+      // ✅ Pass pageId to exchangeTokenLogic
+      const result = await exchangeTokenLogic(uid, short_token, pageId);
       
       console.log("✅ Token exchange successful");
       res.json({ result });
@@ -366,13 +377,14 @@ export const exchangeToken = onCall(
         throw new HttpsError("unauthenticated", "Authentication required");
       }
 
-      const { uid, short_token } = request.data;
+      const { uid, short_token, pageId } = request.data; // ✅ Extract pageId
       
       if (!uid || !short_token) {
         throw new HttpsError("invalid-argument", "Missing uid or short_token");
       }
 
-      const result = await exchangeTokenLogic(uid, short_token);
+      // ✅ Pass pageId to exchangeTokenLogic
+      const result = await exchangeTokenLogic(uid, short_token, pageId);
       
       console.log("✅ Token exchange successful");
       return result;
@@ -392,178 +404,111 @@ export const exchangeToken = onCall(
   }
 );
 
-export const testFacebookConnection = onCall(
+
+export const checkTokenExpiration = onSchedule(
+  {
+    schedule: "every 24 hours",
+    timeZone: "Asia/Manila",
+    secrets: [],
+  },
+  async (event) => {
+    const now = Date.now();
+    const twoMonthsInMs = 60 * 24 * 60 * 60 * 1000; // 60 days
+    const warningThreshold = now + twoMonthsInMs;
+
+    console.log("🔍 Checking token expiration...");
+
+    const snapshot = await db.collection("fb_tokens")
+      .where("provider", "==", "facebook")
+      .get();
+
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const expiresAt = data.expires_at;
+      
+      if (!expiresAt) continue;
+
+      const daysLeft = Math.round((expiresAt - now) / (1000 * 60 * 60 * 24));
+      
+      // ✅ Create warning if expiring within 60 days
+      if (expiresAt <= warningThreshold && expiresAt > now) {
+        console.log(`⚠️ Token for ${doc.id} expires in ${daysLeft} days`);
+        
+        // Store warning in Firestore
+        await db.collection("fb_tokens").doc(doc.id).update({
+          expirationWarning: true,
+          expirationWarningDate: now,
+          daysUntilExpiration: daysLeft,
+        });
+        
+        // ✅ Optional: Send notification (implement your notification system)
+        // await sendNotificationToAdmin(`Facebook token expires in ${daysLeft} days`);
+      } else if (expiresAt <= now) {
+        console.log(`❌ Token for ${doc.id} has expired`);
+        
+        await db.collection("fb_tokens").doc(doc.id).update({
+          expired: true,
+          expiredAt: now,
+          needs_reauth: true,
+        });
+      } else {
+        // Clear warning if more than 60 days left
+        if (data.expirationWarning) {
+          await db.collection("fb_tokens").doc(doc.id).update({
+            expirationWarning: false,
+            expirationWarningDate: null,
+            daysUntilExpiration: null,
+          });
+        }
+      }
+    }
+
+    console.log("✅ Token expiration check complete");
+  }
+);
+
+// ============================================================================
+// ✅ NEW: Get Token Status (for frontend to check)
+// ============================================================================
+
+export const getTokenStatus = onCall(
   {
     cors: true,
-    secrets: [FB_APP_ID, FB_APP_SECRET],
+    secrets: [],
   },
   async (request) => {
-    console.log("🧪 Testing Facebook connection...");
-    
     try {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+
       const tokenDoc = await db.collection('fb_tokens').doc('facebook_admin').get();
       
       if (!tokenDoc.exists) {
         return {
-          success: false,
-          error: "No token configured",
-          message: "Please configure Facebook token first",
-          tokenInfo: {
-            hasToken: false,
-          }
+          configured: false,
+          message: "No Facebook token configured",
         };
       }
       
-      const tokenData = tokenDoc.data();
-      const expiresAt = tokenData?.expires_at || 0;
+      const data = tokenDoc.data()!;
+      const expiresAt = data.expires_at || 0;
       const now = Date.now();
       const daysLeft = Math.round((expiresAt - now) / (1000 * 60 * 60 * 24));
       
-      try {
-        const response = await axios.get(
-          `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}`,
-          {
-            params: {
-              access_token: tokenData?.long_token,
-              fields: "id,name,about"
-            }
-          }
-        );
-        
-        return {
-          success: true,
-          message: "Connection successful",
-          tokenInfo: {
-            hasToken: true,
-            expiresAt: expiresAt,
-            daysLeft: daysLeft,
-            pages: tokenData?.pages || {},
-            pagesCount: Object.keys(tokenData?.pages || {}).length,
-          },
-          pageInfo: response.data,
-          targetPageId: PAGE_ID,
-        };
-      } catch (apiError: any) {
-        return {
-          success: false,
-          error: apiError.response?.data?.error?.message || apiError.message,
-          errorCode: apiError.response?.data?.error?.code,
-          message: "Token exists but API call failed",
-          tokenInfo: {
-            hasToken: true,
-            daysLeft: daysLeft,
-          }
-        };
-      }
-      
-    } catch (error: any) {
-      console.error("❌ Test failed:", error);
       return {
-        success: false,
-        error: error.message,
-        message: "Test failed"
+        configured: true,
+        expiresAt: expiresAt,
+        daysLeft: daysLeft,
+        expired: expiresAt <= now,
+        expirationWarning: data.expirationWarning || false,
+        pageId: data.pageId || null,
+        needsRenewal: daysLeft <= 60 && daysLeft > 0,
       };
-    }
-  }
-);
-
-export const testFacebookConnectionHttp = onRequest(
-  {
-    cors: true,
-    secrets: [FB_APP_ID, FB_APP_SECRET],
-  },
-  async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-    if (req.method === "OPTIONS") {
-      res.status(204).send("");
-      return;
-    }
-
-    try {
-      console.log("🧪 Testing Facebook connection (HTTP)...");
-      
-      const authHeader = req.headers.authorization as string | undefined;
-      const userId = await verifyAuthToken(authHeader);
-      
-      if (!userId) {
-        res.status(401).json({ 
-          error: "unauthenticated",
-          message: "Please log in first"
-        });
-        return;
-      }
-      
-      console.log(`✅ Authenticated as: ${userId}`);
-      
-      const tokenDoc = await db.collection('fb_tokens').doc('facebook_admin').get();
-      
-      if (!tokenDoc.exists) {
-        res.json({
-          success: false,
-          error: "No token configured",
-          message: "Please configure Facebook token first",
-          tokenInfo: {
-            hasToken: false,
-          }
-        });
-        return;
-      }
-      
-      const tokenData = tokenDoc.data();
-      const expiresAt = tokenData?.expires_at || 0;
-      const now = Date.now();
-      const daysLeft = Math.round((expiresAt - now) / (1000 * 60 * 60 * 24));
-      
-      try {
-        const response = await axios.get(
-          `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}`,
-          {
-            params: {
-              access_token: tokenData?.long_token,
-              fields: "id,name,about"
-            },
-            timeout: 10000,
-          }
-        );
-        
-        res.json({
-          success: true,
-          message: "Connection successful",
-          tokenInfo: {
-            hasToken: true,
-            expiresAt: expiresAt,
-            daysLeft: daysLeft,
-            pages: tokenData?.pages || {},
-            pagesCount: Object.keys(tokenData?.pages || {}).length,
-          },
-          pageInfo: response.data,
-          targetPageId: PAGE_ID,
-        });
-      } catch (apiError: any) {
-        console.error("❌ Facebook API test failed:", apiError.response?.data || apiError.message);
-        
-        res.json({
-          success: false,
-          error: apiError.response?.data?.error?.message || apiError.message,
-          errorCode: apiError.response?.data?.error?.code,
-          message: "Token exists but API call failed",
-          tokenInfo: {
-            hasToken: true,
-            daysLeft: daysLeft,
-          }
-        });
-      }
-      
     } catch (error: any) {
-      console.error("❌ Test failed:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-        message: "Test failed"
-      });
+      console.error("❌ Error getting token status:", error);
+      throw new HttpsError("internal", error.message);
     }
   }
 );
+

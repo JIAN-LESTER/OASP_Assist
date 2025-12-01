@@ -39,8 +39,7 @@ export {
   refreshTokensDaily,
   exchangeToken,
   exchangeTokenHttp,
-  testFacebookConnection,
-  testFacebookConnectionHttp,
+
 } from "./facebookToken";
 
 // Notification Functions

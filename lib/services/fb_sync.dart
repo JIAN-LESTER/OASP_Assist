@@ -5,6 +5,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ============================================================================
 // CONFIGURATION
@@ -24,20 +25,55 @@ class FbSyncConfig {
 }
 
 // ============================================================================
+// ✅ NEW: Token Status Model
+// ============================================================================
+class TokenStatus {
+  final bool configured;
+  final int? expiresAt;
+  final int? daysLeft;
+  final bool expired;
+  final bool expirationWarning;
+  final String? pageId;
+  final bool needsRenewal;
+  final String? message;
+
+  TokenStatus({
+    required this.configured,
+    this.expiresAt,
+    this.daysLeft,
+    this.expired = false,
+    this.expirationWarning = false,
+    this.pageId,
+    this.needsRenewal = false,
+    this.message,
+  });
+
+  factory TokenStatus.fromMap(Map<String, dynamic> map) {
+    return TokenStatus(
+      configured: map['configured'] ?? false,
+      expiresAt: map['expiresAt'],
+      daysLeft: map['daysLeft'],
+      expired: map['expired'] ?? false,
+      expirationWarning: map['expirationWarning'] ?? false,
+      pageId: map['pageId'],
+      needsRenewal: map['needsRenewal'] ?? false,
+      message: map['message'],
+    );
+  }
+}
+
+// ============================================================================
 // FACEBOOK SYNC SERVICE
 // ============================================================================
 class FacebookSyncService {
   // Determine which method to use based on platform
   static bool get _shouldUseHttp {
-    // Always use HTTP on Windows
     if (!kIsWeb && Platform.isWindows) {
       return true;
     }
-    // Use HTTP on web for reliability
     if (kIsWeb) {
       return true;
     }
-    // Use Cloud Functions SDK on mobile
     return false;
   }
 
@@ -55,19 +91,25 @@ class FacebookSyncService {
   }
 
   // ============================================================================
-  // EXCHANGE TOKEN
+  // ✅ UPDATED: Exchange Token with Page ID
   // ============================================================================
   
-  static Future<Map<String, dynamic>> exchangeToken(String shortToken) async {
+  static Future<Map<String, dynamic>> exchangeToken(
+    String shortToken, {
+    String? pageId, // ✅ NEW: Optional pageId parameter
+  }) async {
     print('🔄 Exchanging Facebook token...');
+    if (pageId != null) {
+      print('📍 With Page ID: $pageId');
+    }
     print('📱 Platform: ${_getPlatformName()}');
     print('🔧 Using: ${_shouldUseHttp ? "HTTP" : "Cloud Functions SDK"}');
     
     try {
       if (_shouldUseHttp) {
-        return await _exchangeTokenViaHttp(shortToken);
+        return await _exchangeTokenViaHttp(shortToken, pageId: pageId);
       } else {
-        return await _exchangeTokenViaCloudFunctions(shortToken);
+        return await _exchangeTokenViaCloudFunctions(shortToken, pageId: pageId);
       }
     } catch (e) {
       print('❌ Token exchange failed: $e');
@@ -75,7 +117,10 @@ class FacebookSyncService {
     }
   }
 
-  static Future<Map<String, dynamic>> _exchangeTokenViaHttp(String shortToken) async {
+  static Future<Map<String, dynamic>> _exchangeTokenViaHttp(
+    String shortToken, {
+    String? pageId,
+  }) async {
     print('📡 Using HTTP endpoint...');
     
     final authToken = await _getAuthToken();
@@ -94,6 +139,7 @@ class FacebookSyncService {
           'data': {
             'uid': 'facebook_admin',
             'short_token': shortToken,
+            if (pageId != null) 'pageId': pageId, // ✅ Include pageId if provided
           }
         }),
       ).timeout(Duration(seconds: 30));
@@ -106,6 +152,9 @@ class FacebookSyncService {
         
         if (result['success'] == true || result['ok'] == true) {
           print('✅ Token exchanged successfully');
+          if (pageId != null) {
+            print('✅ Page ID saved: $pageId');
+          }
           return result;
         }
         
@@ -126,7 +175,10 @@ class FacebookSyncService {
     }
   }
 
-  static Future<Map<String, dynamic>> _exchangeTokenViaCloudFunctions(String shortToken) async {
+  static Future<Map<String, dynamic>> _exchangeTokenViaCloudFunctions(
+    String shortToken, {
+    String? pageId,
+  }) async {
     print('📞 Using Cloud Functions SDK...');
     
     try {
@@ -135,6 +187,7 @@ class FacebookSyncService {
       final result = await callable.call(<String, dynamic>{
         'uid': 'facebook_admin',
         'short_token': shortToken,
+        if (pageId != null) 'pageId': pageId, // ✅ Include pageId if provided
       }).timeout(Duration(seconds: 30));
       
       final data = result.data as Map<String, dynamic>;
@@ -147,14 +200,66 @@ class FacebookSyncService {
       throw Exception(data['message'] ?? data['error'] ?? 'Token exchange failed');
     } catch (e) {
       print('❌ Cloud Functions call failed: $e');
-      // If Cloud Functions fails, try HTTP as fallback
       print('🔄 Falling back to HTTP...');
-      return await _exchangeTokenViaHttp(shortToken);
+      return await _exchangeTokenViaHttp(shortToken, pageId: pageId);
     }
   }
 
   // ============================================================================
-  // SYNC POSTS
+  // ✅ NEW: Get Token Status
+  // ============================================================================
+  
+  static Future<TokenStatus> getTokenStatus() async {
+    print('🔍 Checking token status...');
+    
+    try {
+      if (_shouldUseHttp) {
+        // Use direct Firestore access for HTTP platforms
+        final doc = await FirebaseFirestore.instance
+            .collection('fb_tokens')
+            .doc('facebook_admin')
+            .get();
+        
+        if (!doc.exists) {
+          return TokenStatus(
+            configured: false,
+            message: 'No Facebook token configured',
+          );
+        }
+        
+        final data = doc.data()!;
+        final expiresAt = data['expires_at'] as int?;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final daysLeft = expiresAt != null 
+            ? ((expiresAt - now) / (1000 * 60 * 60 * 24)).round()
+            : null;
+        
+        return TokenStatus(
+          configured: true,
+          expiresAt: expiresAt,
+          daysLeft: daysLeft,
+          expired: expiresAt != null && expiresAt <= now,
+          expirationWarning: data['expirationWarning'] ?? false,
+          pageId: data['pageId'],
+          needsRenewal: daysLeft != null && daysLeft <= 60 && daysLeft > 0,
+        );
+      } else {
+        // Use Cloud Functions for mobile
+        final callable = FirebaseFunctions.instance.httpsCallable('getTokenStatus');
+        final result = await callable.call();
+        return TokenStatus.fromMap(result.data as Map<String, dynamic>);
+      }
+    } catch (e) {
+      print('❌ Error getting token status: $e');
+      return TokenStatus(
+        configured: false,
+        message: 'Error checking token status',
+      );
+    }
+  }
+
+  // ============================================================================
+  // SYNC POSTS (unchanged)
   // ============================================================================
   
   static Future<Map<String, dynamic>> syncPosts() async {
@@ -240,14 +345,13 @@ class FacebookSyncService {
       throw Exception(data['message'] ?? data['error'] ?? 'Sync failed');
     } catch (e) {
       print('❌ Cloud Functions call failed: $e');
-      // If Cloud Functions fails, try HTTP as fallback
       print('🔄 Falling back to HTTP...');
       return await _syncViaHttp();
     }
   }
 
   // ============================================================================
-  // TEST CONNECTION
+  // TEST CONNECTION (unchanged)
   // ============================================================================
   
   static Future<Map<String, dynamic>> testConnection() async {
@@ -316,7 +420,6 @@ class FacebookSyncService {
       return result.data as Map<String, dynamic>;
     } catch (e) {
       print('❌ Cloud Functions call failed: $e');
-      // If Cloud Functions fails, try HTTP as fallback
       print('🔄 Falling back to HTTP...');
       return await _testViaHttp();
     }
@@ -339,10 +442,8 @@ class FacebookSyncService {
   static String parseErrorMessage(dynamic error) {
     String errorMessage = error.toString();
     
-    // Remove "Exception: " prefix
     errorMessage = errorMessage.replaceFirst('Exception: ', '');
     
-    // Handle Cloud Functions errors
     if (errorMessage.contains('[firebase_functions/')) {
       final match = RegExp(r'\] (.+)$').firstMatch(errorMessage);
       if (match != null) {
@@ -350,7 +451,6 @@ class FacebookSyncService {
       }
     }
     
-    // Handle specific error types
     if (errorMessage.contains('unauthenticated')) {
       return 'Please log in to continue.';
     } else if (errorMessage.contains('permission-denied')) {

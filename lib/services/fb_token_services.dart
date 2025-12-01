@@ -157,7 +157,7 @@ class _FacebookTokenPageState extends State<FacebookTokenPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _buildCurrentTokenCard(),
+                      // _buildCurrentTokenCard(),
                       SizedBox(height: 24),
                       _buildInstructionsCard(),
                       SizedBox(height: 24),
@@ -170,139 +170,139 @@ class _FacebookTokenPageState extends State<FacebookTokenPage> {
     );
   }
 
-  Widget _buildCurrentTokenCard() {
-    if (_currentTokenInfo == null) {
-      return _buildCard(
-        title: 'Current Status',
-        icon: Icons.warning_amber_rounded,
-        iconColor: Colors.orange,
-        child: Column(
-          children: [
-            Icon(Icons.token, size: 64, color: Colors.grey[400]),
-            SizedBox(height: 16),
-            Text(
-              'No Token Configured',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Please add a Facebook access token below',
-              style: TextStyle(color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
-    }
+  // Widget _buildCurrentTokenCard() {
+  //   if (_currentTokenInfo == null) {
+  //     return _buildCard(
+  //       title: 'Current Status',
+  //       icon: Icons.warning_amber_rounded,
+  //       iconColor: Colors.orange,
+  //       child: Column(
+  //         children: [
+  //           Icon(Icons.token, size: 64, color: Colors.grey[400]),
+  //           SizedBox(height: 16),
+  //           Text(
+  //             'No Token Configured',
+  //             style: TextStyle(
+  //               fontSize: 20,
+  //               fontWeight: FontWeight.bold,
+  //               color: Colors.grey[700],
+  //             ),
+  //           ),
+  //           SizedBox(height: 8),
+  //           Text(
+  //             'Please add a Facebook access token below',
+  //             style: TextStyle(color: Colors.grey[600]),
+  //             textAlign: TextAlign.center,
+  //           ),
+  //         ],
+  //       ),
+  //     );
+  //   }
 
-    final expiresAt = _currentTokenInfo!['expires_at'] as int?;
-    final updatedAt = _currentTokenInfo!['updated_at'] as int?;
+  //   final expiresAt = _currentTokenInfo!['expires_at'] as int?;
+  //   final updatedAt = _currentTokenInfo!['updated_at'] as int?;
     
-    DateTime? expiryDate;
-    int? daysRemaining;
-    bool isExpiringSoon = false;
-    bool isExpired = false;
+  //   DateTime? expiryDate;
+  //   int? daysRemaining;
+  //   bool isExpiringSoon = false;
+  //   bool isExpired = false;
 
-    if (expiresAt != null) {
-      expiryDate = DateTime.fromMillisecondsSinceEpoch(expiresAt);
-      daysRemaining = expiryDate.difference(DateTime.now()).inDays;
-      isExpiringSoon = daysRemaining < 7;
-      isExpired = daysRemaining < 0;
-    }
+  //   if (expiresAt != null) {
+  //     expiryDate = DateTime.fromMillisecondsSinceEpoch(expiresAt);
+  //     daysRemaining = expiryDate.difference(DateTime.now()).inDays;
+  //     isExpiringSoon = daysRemaining < 7;
+  //     isExpired = daysRemaining < 0;
+  //   }
 
-    return _buildCard(
-      title: 'Current Token Status',
-      icon: isExpired ? Icons.error : (isExpiringSoon ? Icons.warning : Icons.check_circle),
-      iconColor: isExpired ? Colors.red : (isExpiringSoon ? Colors.orange : Colors.green),
-      child: Column(
-        children: [
-          _buildInfoRow(
-            'Status',
-            isExpired
-                ? 'Expired'
-                : isExpiringSoon
-                    ? 'Expiring Soon'
-                    : 'Active',
-            color: isExpired ? Colors.red : (isExpiringSoon ? Colors.orange : Colors.green),
-          ),
-          Divider(height: 24),
-          if (expiryDate != null) ...[
-            _buildInfoRow(
-              'Expires',
-              DateFormat('MMM dd, yyyy hh:mm a').format(expiryDate),
-            ),
-            Divider(height: 24),
-          ],
-          if (daysRemaining != null)
-            _buildInfoRow(
-              'Days Remaining',
-              '$daysRemaining days',
-              color: isExpiringSoon ? Colors.orange : null,
-            ),
-          if (updatedAt != null) ...[
-            Divider(height: 24),
-            _buildInfoRow(
-              'Last Updated',
-              _formatTimeAgo(updatedAt),
-            ),
-          ],
-          if (isExpiringSoon && !isExpired) ...[
-            SizedBox(height: 16),
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info, color: Colors.orange[700], size: 20),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Token expires soon. Consider refreshing.',
-                      style: TextStyle(color: Colors.orange[900]),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          if (isExpired) ...[
-            SizedBox(height: 16),
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.error, color: Colors.red[700], size: 20),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Token has expired. Please refresh immediately.',
-                      style: TextStyle(
-                        color: Colors.red[900],
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+  //   return _buildCard(
+  //     title: 'Current Token Status',
+  //     icon: isExpired ? Icons.error : (isExpiringSoon ? Icons.warning : Icons.check_circle),
+  //     iconColor: isExpired ? Colors.red : (isExpiringSoon ? Colors.orange : Colors.green),
+  //     child: Column(
+  //       children: [
+  //         _buildInfoRow(
+  //           'Status',
+  //           isExpired
+  //               ? 'Expired'
+  //               : isExpiringSoon
+  //                   ? 'Expiring Soon'
+  //                   : 'Active',
+  //           color: isExpired ? Colors.red : (isExpiringSoon ? Colors.orange : Colors.green),
+  //         ),
+  //         Divider(height: 24),
+  //         if (expiryDate != null) ...[
+  //           _buildInfoRow(
+  //             'Expires',
+  //             DateFormat('MMM dd, yyyy hh:mm a').format(expiryDate),
+  //           ),
+  //           Divider(height: 24),
+  //         ],
+  //         if (daysRemaining != null)
+  //           _buildInfoRow(
+  //             'Days Remaining',
+  //             '$daysRemaining days',
+  //             color: isExpiringSoon ? Colors.orange : null,
+  //           ),
+  //         if (updatedAt != null) ...[
+  //           Divider(height: 24),
+  //           _buildInfoRow(
+  //             'Last Updated',
+  //             _formatTimeAgo(updatedAt),
+  //           ),
+  //         ],
+  //         if (isExpiringSoon && !isExpired) ...[
+  //           SizedBox(height: 16),
+  //           Container(
+  //             padding: EdgeInsets.all(12),
+  //             decoration: BoxDecoration(
+  //               color: Colors.orange[50],
+  //               borderRadius: BorderRadius.circular(8),
+  //               border: Border.all(color: Colors.orange[200]!),
+  //             ),
+  //             child: Row(
+  //               children: [
+  //                 Icon(Icons.info, color: Colors.orange[700], size: 20),
+  //                 SizedBox(width: 12),
+  //                 Expanded(
+  //                   child: Text(
+  //                     'Token expires soon. Consider refreshing.',
+  //                     style: TextStyle(color: Colors.orange[900]),
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //           ),
+  //         ],
+  //         if (isExpired) ...[
+  //           SizedBox(height: 16),
+  //           Container(
+  //             padding: EdgeInsets.all(12),
+  //             decoration: BoxDecoration(
+  //               color: Colors.red[50],
+  //               borderRadius: BorderRadius.circular(8),
+  //               border: Border.all(color: Colors.red[200]!),
+  //             ),
+  //             child: Row(
+  //               children: [
+  //                 Icon(Icons.error, color: Colors.red[700], size: 20),
+  //                 SizedBox(width: 12),
+  //                 Expanded(
+  //                   child: Text(
+  //                     'Token has expired. Please refresh immediately.',
+  //                     style: TextStyle(
+  //                       color: Colors.red[900],
+  //                       fontWeight: FontWeight.bold,
+  //                     ),
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //           ),
+  //         ],
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildInstructionsCard() {
     return _buildCard(
