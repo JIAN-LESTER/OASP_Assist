@@ -77,7 +77,7 @@ class ChatProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
-  static const int MAX_DAILY_MESSAGES = 5;
+  static const int MAX_DAILY_MESSAGES = 10;
 
   StreamSubscription<DocumentSnapshot>? _userMessageCountSubscription;
 
@@ -102,41 +102,51 @@ class ChatProvider extends ChangeNotifier {
     "recommend speaking with",
   ];
 
- void listenToUserMessageCount() {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
-  if (userId == null) return;
+  void listenToUserMessageCount() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
 
-  _userMessageCountSubscription?.cancel();
+    _userMessageCountSubscription?.cancel();
 
-  _userMessageCountSubscription = _firestore
-      .collection('users')
-      .doc(userId)
-      .snapshots()
-      .listen((snapshot) {
-        if (snapshot.exists) {
-          final data = snapshot.data()!;
-          final newCount = data['dailyMessageCount'] ?? 0;
-          final newResetDate = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+    _userMessageCountSubscription = _firestore
+        .collection('users')
+        .doc(userId)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            if (snapshot.exists) {
+              final data = snapshot.data()!;
+              final newCount = data['dailyMessageCount'] ?? 0;
+              final newResetDate =
+                  (data['lastMessageResetDate'] as Timestamp?)?.toDate();
 
-          // ✅ Only update if values actually changed
-          if (newCount != _userDailyMessageCount || newResetDate != _userLastResetDate) {
-            _userDailyMessageCount = newCount;
-            _userLastResetDate = newResetDate;
+              // ✅ Only update if values actually changed
+              if (newCount != _userDailyMessageCount ||
+                  newResetDate != _userLastResetDate) {
+                _userDailyMessageCount = newCount;
+                _userLastResetDate = newResetDate;
 
-            print('📊 Real-time update: User message count = $_userDailyMessageCount');
-            notifyListeners();
-          }
-        } else {
-          // Document doesn't exist yet - initialize
-          print('⚠️ User document not found - will be created on first message');
-          _userDailyMessageCount = 0;
-          _userLastResetDate = null;
-          notifyListeners();
-        }
-      }, onError: (error) {
-        print('❌ Error in message count listener: $error');
-      });
-}
+                print(
+                  '📊 Real-time update: User message count = $_userDailyMessageCount',
+                );
+                notifyListeners();
+              }
+            } else {
+              // Document doesn't exist yet - initialize
+              print(
+                '⚠️ User document not found - will be created on first message',
+              );
+              _userDailyMessageCount = 0;
+              _userLastResetDate = null;
+              notifyListeners();
+            }
+          },
+          onError: (error) {
+            print('❌ Error in message count listener: $error');
+          },
+        );
+  }
+
   void setScrollCallback(VoidCallback callback) {
     _onMessageAdded = callback;
   }
@@ -146,48 +156,47 @@ class ChatProvider extends ChangeNotifier {
   }
 
   bool get canSendMessage {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
-  if (userId == null) return false;
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return false;
 
-  final now = DateTime.now();
+    final now = DateTime.now();
 
-  // ✅ NEW USER CHECK: If count is 0 and no reset date, they can send
-  // (This is a brand new user who hasn't been initialized yet)
-  if (_userDailyMessageCount == 0 && _userLastResetDate == null) {
-    print('ℹ️ New user detected - allowing first message');
-    return true;
-  }
-
-  // ✅ RESET CHECK: If we need to reset, allow sending
-  if (_userLastResetDate != null) {
-    final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
-
-    final shouldReset =
-        now.isAfter(resetTime) &&
-        (_userLastResetDate!.isBefore(resetTime) ||
-            _userLastResetDate!.day != now.day);
-
-    if (shouldReset) {
-      print('ℹ️ Reset time reached - allowing message');
+    // ✅ NEW USER CHECK: If count is 0 and no reset date, they can send
+    // (This is a brand new user who hasn't been initialized yet)
+    if (_userDailyMessageCount == 0 && _userLastResetDate == null) {
+      print('ℹ️ New user detected - allowing first message');
       return true;
     }
+
+    // ✅ RESET CHECK: If we need to reset, allow sending
+    if (_userLastResetDate != null) {
+      final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
+
+      final shouldReset =
+          now.isAfter(resetTime) &&
+          (_userLastResetDate!.isBefore(resetTime) ||
+              _userLastResetDate!.day != now.day);
+
+      if (shouldReset) {
+        print('ℹ️ Reset time reached - allowing message');
+        return true;
+      }
+    }
+
+    // ✅ LIMIT CHECK: Can send if count is LESS than limit
+    // With MAX = 5: counts 0,1,2,3,4 can send → total 5 messages allowed
+    final canSend = _userDailyMessageCount < MAX_DAILY_MESSAGES;
+
+    print('🔍 Message limit check:');
+    print('   Current count: $_userDailyMessageCount');
+    print('   Max allowed: $MAX_DAILY_MESSAGES');
+    print('   Can send: $canSend');
+
+    return canSend;
   }
 
-  // ✅ LIMIT CHECK: Can send if count is LESS than limit
-  // With MAX = 5: counts 0,1,2,3,4 can send → total 5 messages allowed
-  final canSend = _userDailyMessageCount < MAX_DAILY_MESSAGES;
-  
-  print('🔍 Message limit check:');
-  print('   Current count: $_userDailyMessageCount');
-  print('   Max allowed: $MAX_DAILY_MESSAGES');
-  print('   Can send: $canSend');
-  
-  return canSend;
-}
-
-// Keep the old getter for backward compatibility but use the new logic
-bool get isMessageLimitReached => !canSendMessage;
-
+  // Keep the old getter for backward compatibility but use the new logic
+  bool get isMessageLimitReached => !canSendMessage;
 
   // // Replace the isMessageLimitReached getter in chat_provider.dart with this:
 
@@ -243,108 +252,112 @@ bool get isMessageLimitReached => !canSendMessage;
     return nextReset.difference(now);
   }
 
- Future<void> loadUserMessageCount() async {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
-  if (userId == null) return;
+  Future<void> loadUserMessageCount() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
 
-  try {
-    final userDoc = await _firestore.collection('users').doc(userId).get();
+    try {
+      final userDoc = await _firestore.collection('users').doc(userId).get();
 
-    if (userDoc.exists) {
-      final data = userDoc.data()!;
-      _userDailyMessageCount = data['dailyMessageCount'] ?? 0;
-      _userLastResetDate =
-          (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        _userDailyMessageCount = data['dailyMessageCount'] ?? 0;
+        _userLastResetDate =
+            (data['lastMessageResetDate'] as Timestamp?)?.toDate();
 
-      print('✅ Loaded user message count: $_userDailyMessageCount/$MAX_DAILY_MESSAGES');
-    } else {
-      // ✅ NEW: Initialize brand new users properly
-      _userDailyMessageCount = 0;
-      _userLastResetDate = null;
-      
-      // Create the document with initial values
-      await _firestore.collection('users').doc(userId).set({
-        'dailyMessageCount': 0,
-        'lastMessageResetDate': Timestamp.now(),
-      }, SetOptions(merge: true));
+        print(
+          '✅ Loaded user message count: $_userDailyMessageCount/$MAX_DAILY_MESSAGES',
+        );
+      } else {
+        // ✅ NEW: Initialize brand new users properly
+        _userDailyMessageCount = 0;
+        _userLastResetDate = null;
 
-      print('✅ Initialized new user with message count: 0/$MAX_DAILY_MESSAGES');
-    }
+        // Create the document with initial values
+        await _firestore.collection('users').doc(userId).set({
+          'dailyMessageCount': 0,
+          'lastMessageResetDate': Timestamp.now(),
+        }, SetOptions(merge: true));
 
-    notifyListeners();
-  } catch (e) {
-    print('❌ Error loading user message count: $e');
-  }
-}
+        print(
+          '✅ Initialized new user with message count: 0/$MAX_DAILY_MESSAGES',
+        );
+      }
 
- Future<void> _updateUserMessageCount() async {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
-  if (userId == null) return;
-
-  try {
-    final now = DateTime.now();
-    final userRef = _firestore.collection('users').doc(userId);
-
-    // Get current data
-    final userDoc = await userRef.get();
-    
-    if (!userDoc.exists) {
-      // ✅ Brand new user - create document and set count to 1
-      await userRef.set({
-        'dailyMessageCount': 1,
-        'lastMessageResetDate': Timestamp.now(),
-      }, SetOptions(merge: true));
-
-      _userDailyMessageCount = 1;
-      _userLastResetDate = now;
-      
-      print('✅ New user first message - count set to 1');
       notifyListeners();
-      return;
+    } catch (e) {
+      print('❌ Error loading user message count: $e');
     }
-
-    // Existing user - check if reset needed
-    final data = userDoc.data()!;
-    final currentCount = data['dailyMessageCount'] ?? 0;
-    final lastReset = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
-
-    final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
-    final shouldReset =
-        lastReset == null ||
-        (now.isAfter(resetTime) &&
-            (lastReset.isBefore(resetTime) || lastReset.day != now.day));
-
-    if (shouldReset) {
-      // ✅ Reset and set to 1 (current message)
-      await userRef.update({
-        'dailyMessageCount': 1,
-        'lastMessageResetDate': Timestamp.now(),
-      });
-
-      _userDailyMessageCount = 1;
-      _userLastResetDate = now;
-
-      print('✅ Message count reset to 1');
-    } else {
-      // ✅ Increment using transaction to avoid race conditions
-      await _firestore.runTransaction((transaction) async {
-        final snapshot = await transaction.get(userRef);
-        final currentCount = snapshot.data()?['dailyMessageCount'] ?? 0;
-        final newCount = currentCount + 1;
-        
-        transaction.update(userRef, {'dailyMessageCount': newCount});
-      });
-
-      _userDailyMessageCount = currentCount + 1;
-
-      print('✅ User message count incremented to $_userDailyMessageCount');
-    }
-
-    notifyListeners();
-  } catch (e) {
-    print('❌ Error updating user message count: $e');
   }
-}
+
+  Future<void> _updateUserMessageCount() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final now = DateTime.now();
+      final userRef = _firestore.collection('users').doc(userId);
+
+      // Get current data
+      final userDoc = await userRef.get();
+
+      if (!userDoc.exists) {
+        // ✅ Brand new user - create document and set count to 1
+        await userRef.set({
+          'dailyMessageCount': 1,
+          'lastMessageResetDate': Timestamp.now(),
+        }, SetOptions(merge: true));
+
+        _userDailyMessageCount = 1;
+        _userLastResetDate = now;
+
+        print('✅ New user first message - count set to 1');
+        notifyListeners();
+        return;
+      }
+
+      // Existing user - check if reset needed
+      final data = userDoc.data()!;
+      final currentCount = data['dailyMessageCount'] ?? 0;
+      final lastReset = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+
+      final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
+      final shouldReset =
+          lastReset == null ||
+          (now.isAfter(resetTime) &&
+              (lastReset.isBefore(resetTime) || lastReset.day != now.day));
+
+      if (shouldReset) {
+        // ✅ Reset and set to 1 (current message)
+        await userRef.update({
+          'dailyMessageCount': 1,
+          'lastMessageResetDate': Timestamp.now(),
+        });
+
+        _userDailyMessageCount = 1;
+        _userLastResetDate = now;
+
+        print('✅ Message count reset to 1');
+      } else {
+        // ✅ Increment using transaction to avoid race conditions
+        await _firestore.runTransaction((transaction) async {
+          final snapshot = await transaction.get(userRef);
+          final currentCount = snapshot.data()?['dailyMessageCount'] ?? 0;
+          final newCount = currentCount + 1;
+
+          transaction.update(userRef, {'dailyMessageCount': newCount});
+        });
+
+        _userDailyMessageCount = currentCount + 1;
+
+        print('✅ User message count incremented to $_userDailyMessageCount');
+      }
+
+      notifyListeners();
+    } catch (e) {
+      print('❌ Error updating user message count: $e');
+    }
+  }
 
   StreamSubscription<QuerySnapshot>? _messagesSubscription;
   bool _isSettingConversation = false;
@@ -2029,133 +2042,133 @@ Future<void> _showEscalationSuccessDialog(BuildContext context) async {
   }
 
   Future<void> _checkAndPromoteToFAQOptimized(
-  String question,
-  List<double> currentEmbedding,
-  String botAnswer,
-  String category,
-) async {
-  try {
-    // Only process if answer and question are worthy
-    if (!_isAnswerWorthyOfFAQ(botAnswer) ||
-        !_isQuestionWorthyOfFAQ(question)) {
-      return;
-    }
-
-    // Calculate date 30 days ago
-    final oneMonthAgo = DateTime.now().subtract(Duration(days: 30));
-    final oneMonthAgoTimestamp = Timestamp.fromDate(oneMonthAgo);
-
-    // Query messages from the last 30 days only
-    final querySnapshot =
-        await _firestore
-            .collectionGroup('messages')
-            .where('sender', isEqualTo: 'user')
-            .where('isAnswered', isEqualTo: true)
-            .where('category', isEqualTo: category)
-            .where('sent_at', isGreaterThanOrEqualTo: oneMonthAgoTimestamp)
-            .orderBy('sent_at', descending: true)
-            .limit(100)
-            .get();
-
-    Map<String, QuestionGroup> questionGroups = {};
-
-    for (var doc in querySnapshot.docs) {
-      final data = doc.data();
-      final pastQuestion = data['content'] as String?;
-      final pastEmbeddingData = data['embedding'];
-
-      if (pastQuestion == null || pastEmbeddingData == null) continue;
-      if (!_isQuestionWorthyOfFAQ(pastQuestion)) continue;
-
-      try {
-        final pastEmbedding =
-            (pastEmbeddingData as List)
-                .map((e) => (e as num).toDouble())
-                .toList();
-
-        if (pastEmbedding.length != currentEmbedding.length) continue;
-
-        final similarity = cosineSimilarity(currentEmbedding, pastEmbedding);
-
-        if (similarity > 0.88) {
-          final contextKey = _extractContextualKey(pastQuestion);
-          final groupKey = '${category}_$contextKey';
-
-          questionGroups.putIfAbsent(groupKey, () => QuestionGroup());
-          questionGroups[groupKey]!.addQuestion(
-            pastQuestion,
-            data,
-            similarity,
-          );
-        }
-      } catch (e) {
-        continue;
+    String question,
+    List<double> currentEmbedding,
+    String botAnswer,
+    String category,
+  ) async {
+    try {
+      // Only process if answer and question are worthy
+      if (!_isAnswerWorthyOfFAQ(botAnswer) ||
+          !_isQuestionWorthyOfFAQ(question)) {
+        return;
       }
-    }
 
-    // ✅ FIX 2: Changed threshold from 10 to 3
-    final batch = _firestore.batch();
-    bool hasBatchOperations = false;
+      // Calculate date 30 days ago
+      final oneMonthAgo = DateTime.now().subtract(Duration(days: 30));
+      final oneMonthAgoTimestamp = Timestamp.fromDate(oneMonthAgo);
 
-    for (var group in questionGroups.values) {
-      // ✅ NEW THRESHOLD: More than 3 questions with avg similarity > 0.90
-      if (group.questionCount > 3 && group.averageSimilarity > 0.90) {
-        final representativeQuestion = group.getMostRepresentativeQuestion();
+      // Query messages from the last 30 days only
+      final querySnapshot =
+          await _firestore
+              .collectionGroup('messages')
+              .where('sender', isEqualTo: 'user')
+              .where('isAnswered', isEqualTo: true)
+              .where('category', isEqualTo: category)
+              .where('sent_at', isGreaterThanOrEqualTo: oneMonthAgoTimestamp)
+              .orderBy('sent_at', descending: true)
+              .limit(100)
+              .get();
 
-        final existing =
-            await _firestore
-                .collection('faqs')
-                .where('question', isEqualTo: representativeQuestion)
-                .limit(1)
-                .get();
+      Map<String, QuestionGroup> questionGroups = {};
 
-        if (existing.docs.isEmpty) {
-          final faqRef = _firestore.collection('faqs').doc();
-          final faqData = {
-            'question': representativeQuestion,
-            'answer': botAnswer,
-            'category': category,
-            'isPredefined': false,
-            'createdAt': Timestamp.now(),
-            'embedding': currentEmbedding,
-            'promotionReason':
-                'Auto-promoted: ${group.questionCount} similar questions in last 30 days',
-            'similarityCount': group.questionCount,
-            'averageSimilarity': group.averageSimilarity,
-            'promotionPeriod': '30_days',
-            'promotionDate': Timestamp.now(),
-          };
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        final pastQuestion = data['content'] as String?;
+        final pastEmbeddingData = data['embedding'];
 
-          batch.set(faqRef, faqData);
-          hasBatchOperations = true;
+        if (pastQuestion == null || pastEmbeddingData == null) continue;
+        if (!_isQuestionWorthyOfFAQ(pastQuestion)) continue;
 
-          print('🎯 Auto-adding FAQ: $representativeQuestion');
-          print('   Questions in group: ${group.questionCount}');
+        try {
+          final pastEmbedding =
+              (pastEmbeddingData as List)
+                  .map((e) => (e as num).toDouble())
+                  .toList();
+
+          if (pastEmbedding.length != currentEmbedding.length) continue;
+
+          final similarity = cosineSimilarity(currentEmbedding, pastEmbedding);
+
+          if (similarity > 0.88) {
+            final contextKey = _extractContextualKey(pastQuestion);
+            final groupKey = '${category}_$contextKey';
+
+            questionGroups.putIfAbsent(groupKey, () => QuestionGroup());
+            questionGroups[groupKey]!.addQuestion(
+              pastQuestion,
+              data,
+              similarity,
+            );
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      // ✅ FIX 2: Changed threshold from 10 to 3
+      final batch = _firestore.batch();
+      bool hasBatchOperations = false;
+
+      for (var group in questionGroups.values) {
+        // ✅ NEW THRESHOLD: More than 3 questions with avg similarity > 0.90
+        if (group.questionCount > 3 && group.averageSimilarity > 0.90) {
+          final representativeQuestion = group.getMostRepresentativeQuestion();
+
+          final existing =
+              await _firestore
+                  .collection('faqs')
+                  .where('question', isEqualTo: representativeQuestion)
+                  .limit(1)
+                  .get();
+
+          if (existing.docs.isEmpty) {
+            final faqRef = _firestore.collection('faqs').doc();
+            final faqData = {
+              'question': representativeQuestion,
+              'answer': botAnswer,
+              'category': category,
+              'isPredefined': false,
+              'createdAt': Timestamp.now(),
+              'embedding': currentEmbedding,
+              'promotionReason':
+                  'Auto-promoted: ${group.questionCount} similar questions in last 30 days',
+              'similarityCount': group.questionCount,
+              'averageSimilarity': group.averageSimilarity,
+              'promotionPeriod': '30_days',
+              'promotionDate': Timestamp.now(),
+            };
+
+            batch.set(faqRef, faqData);
+            hasBatchOperations = true;
+
+            print('🎯 Auto-adding FAQ: $representativeQuestion');
+            print('   Questions in group: ${group.questionCount}');
+            print(
+              '   Average similarity: ${group.averageSimilarity.toStringAsFixed(3)}',
+            );
+            print('   Category: $category');
+          }
+        } else if (group.questionCount > 2) {
+          // Log groups approaching threshold
+          print('📊 Question group approaching threshold:');
+          print('   Context: ${_extractContextualKey(group.questions.first)}');
+          print('   Count: ${group.questionCount}/4 (need >3)');
           print(
-            '   Average similarity: ${group.averageSimilarity.toStringAsFixed(3)}',
+            '   Avg similarity: ${group.averageSimilarity.toStringAsFixed(3)}',
           );
-          print('   Category: $category');
         }
-      } else if (group.questionCount > 2) {
-        // Log groups approaching threshold
-        print('📊 Question group approaching threshold:');
-        print('   Context: ${_extractContextualKey(group.questions.first)}');
-        print('   Count: ${group.questionCount}/4 (need >3)');
-        print(
-          '   Avg similarity: ${group.averageSimilarity.toStringAsFixed(3)}',
-        );
       }
-    }
 
-    if (hasBatchOperations) {
-      await batch.commit();
-      FAQCache.lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(0);
-      print('✅ FAQ promotion batch committed successfully');
+      if (hasBatchOperations) {
+        await batch.commit();
+        FAQCache.lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(0);
+        print('✅ FAQ promotion batch committed successfully');
+      }
+    } catch (e) {
+      print('❌ Error in FAQ promotion: $e');
     }
-  } catch (e) {
-    print('❌ Error in FAQ promotion: $e');
   }
-}
 
   String _extractContextualKey(String question) {
     final lowercaseQuestion = question.toLowerCase();
@@ -2280,12 +2293,12 @@ Future<void> _showEscalationSuccessDialog(BuildContext context) async {
     return cleanAnswer.length >= 20;
   }
 
-Future<bool> canUserInteract() async {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
-  if (userId == null) return false;
+  Future<bool> canUserInteract() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return false;
 
-  return canSendMessage;
-}
+    return canSendMessage;
+  }
 
   Future<void> _incrementFAQSimilarityCountAsync(String faqQuestion) async {
     try {
@@ -2521,34 +2534,33 @@ $question
   }
 
   Future<void> incrementFAQSimilarityCount(String faqQuestion) async {
-  try {
-    // ✅ NEW: Check if user can interact before incrementing
-    final canInteract = await canUserInteract();
-    if (!canInteract) {
-      print('⏭️ Skipping FAQ similarity increment - user at message limit');
-      return;
+    try {
+      // ✅ NEW: Check if user can interact before incrementing
+      final canInteract = await canUserInteract();
+      if (!canInteract) {
+        print('⏭️ Skipping FAQ similarity increment - user at message limit');
+        return;
+      }
+
+      final faqSnapshot =
+          await _firestore
+              .collection('faqs')
+              .where('question', isEqualTo: faqQuestion)
+              .get();
+
+      if (faqSnapshot.docs.isNotEmpty) {
+        final faqDoc = faqSnapshot.docs.first;
+        await faqDoc.reference.update({
+          'similarityCount': FieldValue.increment(1),
+          'lastAsked': Timestamp.now(),
+        });
+
+        print('✅ Incremented similarity count for FAQ: $faqQuestion');
+      }
+    } catch (e) {
+      print('❌ Error incrementing FAQ similarity count: $e');
     }
-
-    final faqSnapshot =
-        await _firestore
-            .collection('faqs')
-            .where('question', isEqualTo: faqQuestion)
-            .get();
-
-    if (faqSnapshot.docs.isNotEmpty) {
-      final faqDoc = faqSnapshot.docs.first;
-      await faqDoc.reference.update({
-        'similarityCount': FieldValue.increment(1),
-        'lastAsked': Timestamp.now(),
-      });
-
-      print('✅ Incremented similarity count for FAQ: $faqQuestion');
-    }
-  } catch (e) {
-    print('❌ Error incrementing FAQ similarity count: $e');
   }
-}
-
 
   void handleFAQSelection(String question) {
     incrementFAQSimilarityCount(question);

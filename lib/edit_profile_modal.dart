@@ -95,6 +95,26 @@ class _EditProfileModalState extends State<EditProfileModal> {
     'Graduate',
   ];
 
+  String? _studentId;
+  String? _lrn;
+  String? _studentType; // 'undergraduate' or 'graduate'
+  String? _graduateType; // 'masteral' or 'not_masteral'
+  String? _graduatedCollege;
+  String? _graduatedProgram;
+  String? _isIncomingFreshman; // for LRN validation
+  List<String> _colleges = [];
+  Map<String, String> _collegesMap = {}; // college name → college ID
+  Map<String, List<String>> _programsByCollege = {};
+
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+
+  String? _selectedCollege;
+  String? _selectedCollegeId;
+  String? _graduatedCollegeId;
+  String? _customAffiliation;
+  bool _customAffiliationConfirmed = false;
+
   @override
   void initState() {
     super.initState();
@@ -109,6 +129,8 @@ class _EditProfileModalState extends State<EditProfileModal> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     super.dispose();
   }
 
@@ -126,13 +148,48 @@ class _EditProfileModalState extends State<EditProfileModal> {
 
         if (doc.exists) {
           final data = doc.data() as Map<String, dynamic>;
+
+          // Split name into first and last name
+          final fullName = data['name'] ?? '';
+          final nameParts = fullName.trim().split(' ');
+
           setState(() {
-            _nameController.text = data['name'] ?? '';
+            _firstNameController.text =
+                data['firstName'] ?? (nameParts.isNotEmpty ? nameParts[0] : '');
+            _lastNameController.text =
+                data['lastName'] ??
+                (nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '');
+            _nameController.text = fullName;
             _emailController.text = data['email'] ?? '';
             _selectedYear = data['year'];
             _selectedProgram = data['program'];
             _selectedAffiliation = data['affiliation'];
             _selectedScholarship = data['scholarship'];
+            _selectedCollege = data['college'];
+            _selectedCollegeId = data['collegeId'];
+            _graduatedCollegeId = data['graduatedCollegeId'];
+
+            _studentId = data['studentId'];
+            _lrn = data['lrn'];
+            _studentType = data['studentType'];
+            _graduateType = data['graduateType'];
+            _graduatedCollege = data['graduatedCollege'];
+            _graduatedCollegeId = data['graduatedCollegeId'];
+            _graduatedProgram = data['graduatedProgram'];
+
+            // Check if custom affiliation
+            if (_selectedAffiliation != null &&
+                _selectedAffiliation!.isNotEmpty &&
+                ![
+                  'Parent',
+                  'Faculty',
+                  'CMU Staff',
+                  'Incoming Freshman Applicant',
+                ].contains(_selectedAffiliation)) {
+              _customAffiliation = _selectedAffiliation;
+              _customAffiliationConfirmed = true;
+              _selectedAffiliation = 'Others';
+            }
 
             _hasAffiliation =
                 data['affiliation'] != null &&
@@ -143,6 +200,12 @@ class _EditProfileModalState extends State<EditProfileModal> {
 
             bool isEnrolled = data['isEnrolled'] ?? true;
             _enrollmentStatus = isEnrolled ? 'enrolled' : 'not_enrolled';
+
+            _isIncomingFreshman =
+                data['affiliation']?.toLowerCase() ==
+                        'incoming freshman applicant'
+                    ? 'yes'
+                    : 'no';
           });
         }
       }
@@ -155,17 +218,51 @@ class _EditProfileModalState extends State<EditProfileModal> {
 
   Future<void> _loadDropdownData() async {
     try {
+      // Load colleges
+      final collegesSnapshot =
+          await FirebaseFirestore.instance.collection('colleges').get();
+      Map<String, String> collegesMap = {};
+      for (var doc in collegesSnapshot.docs) {
+        final name = doc.data()['name']?.toString().trim();
+        if (name != null && name.isNotEmpty) {
+          collegesMap[name] = doc.id;
+        }
+      }
+
+      // Load programs by college with category
+      final programsSnapshot =
+          await FirebaseFirestore.instance.collection('programs').get();
+      Map<String, List<String>> programsByCollegeMap = {};
+      for (var doc in programsSnapshot.docs) {
+        final programName = doc.data()['name']?.toString().trim();
+        final collegeId = doc.data()['collegeId']?.toString();
+        final category = doc.data()['category']?.toString();
+
+        if (programName != null &&
+            programName.isNotEmpty &&
+            collegeId != null &&
+            category != null) {
+          final key = '${collegeId}_$category';
+
+          if (!programsByCollegeMap.containsKey(key)) {
+            programsByCollegeMap[key] = [];
+          }
+          programsByCollegeMap[key]!.add(programName);
+        }
+      }
+
+      // Load affiliations and scholarships
       final futures = await Future.wait([
-        _getDropdownItems('programs'),
         _getDropdownItems('affiliations'),
         _getDropdownItems('scholarships'),
       ]);
 
       setState(() {
-        // ✅ Ensure no duplicates when adding 'Others'
-        _programs = [...futures[0].toSet(), 'Others'];
-        _affiliations = futures[1].toSet().toList();
-        _scholarships = [...futures[2].toSet(), 'Others'];
+        _collegesMap = collegesMap;
+        _colleges = collegesMap.keys.toList();
+        _programsByCollege = programsByCollegeMap;
+        _affiliations = [...futures[0].toSet(), 'Others'];
+        _scholarships = [...futures[1].toSet(), 'Others'];
       });
     } catch (e) {
       print('Error loading dropdown data: $e');
@@ -214,10 +311,12 @@ class _EditProfileModalState extends State<EditProfileModal> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        bool passwordUpdated = false; // ← Track if password was updated
+
         if (_passwordController.text.trim().isNotEmpty) {
           try {
             await user.updatePassword(_passwordController.text.trim());
-            SnackbarUtil.showSuccess(context, 'Password updated successfully!');
+            passwordUpdated = true; // ← Set flag instead of showing snackbar
           } catch (passwordError) {
             if (passwordError.toString().contains('requires-recent-login')) {
               SnackbarUtil.showError(
@@ -232,27 +331,90 @@ class _EditProfileModalState extends State<EditProfileModal> {
           }
         }
 
+        final fullName =
+            '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
+
         Map<String, dynamic> updateData = {
-          'name': _nameController.text.trim(),
+          'name': fullName.trim(),
+          'firstName': _firstNameController.text.trim(),
+          'lastName': _lastNameController.text.trim(),
           'email': _emailController.text.trim(),
           'profileCompleted': true,
           'updatedAt': FieldValue.serverTimestamp(),
         };
 
         if (_role == 'user') {
+          // Determine affiliation value
+          final affiliationValue =
+              _hasAffiliation
+                  ? (_selectedAffiliation == 'Others'
+                      ? _customAffiliation
+                      : _selectedAffiliation)
+                  : null;
+
           updateData.addAll({
             'isEnrolled': _enrollmentStatus == 'enrolled',
-            'affiliation': _hasAffiliation ? _selectedAffiliation : null,
+            'affiliation': affiliationValue,
             'scholarship': _hasScholarship ? _selectedScholarship : null,
           });
 
           if (_enrollmentStatus == 'enrolled') {
             updateData.addAll({
-              'year': _selectedYear,
-              'program': _selectedProgram,
+              'studentType': _studentType,
+              'college': _selectedCollege,
+              'collegeId': _selectedCollegeId,
+              'lrn': null, // Clear LRN for enrolled students
             });
+
+            if (_studentType == 'undergraduate') {
+              updateData.addAll({
+                'studentId': _studentId,
+                'year': _selectedYear,
+                'program': _selectedProgram,
+                'graduateType': null,
+                'graduatedCollege': null,
+                'graduatedCollegeId': null,
+                'graduatedProgram': null,
+              });
+            } else if (_studentType == 'graduate') {
+              updateData.addAll({
+                'studentId': null, // No Student ID for graduates
+                'graduateType': _graduateType,
+              });
+
+              if (_graduateType == 'masteral') {
+                updateData.addAll({
+                  'year': 'Graduate',
+                  'program': _selectedProgram,
+                  'graduatedCollege': null,
+                  'graduatedCollegeId': null,
+                  'graduatedProgram': null,
+                });
+              } else {
+                updateData.addAll({
+                  'year': null,
+                  'program': null,
+                  'graduatedCollege': _graduatedCollege,
+                  'graduatedCollegeId': _graduatedCollegeId,
+                  'graduatedProgram': _graduatedProgram,
+                });
+              }
+            }
           } else {
-            updateData.addAll({'year': 'Incoming', 'program': null});
+            // Not enrolled
+            updateData.addAll({
+              'year': 'Incoming',
+              'program': null,
+              'college': null,
+              'collegeId': null,
+              'studentId': null,
+              'studentType': null,
+              'graduateType': null,
+              'graduatedCollege': null,
+              'graduatedCollegeId': null,
+              'graduatedProgram': null,
+              'lrn': _isIncomingFreshman == 'yes' ? _lrn : null,
+            });
           }
         }
 
@@ -261,7 +423,16 @@ class _EditProfileModalState extends State<EditProfileModal> {
             .doc(user.uid)
             .update(updateData);
 
-        SnackbarUtil.showSuccess(context, 'Profile updated successfully!');
+        //  SINGLE SUCCESS MESSAGE (modified based on what was updated)
+        if (passwordUpdated) {
+          SnackbarUtil.showSuccess(
+            context,
+            'Profile and password updated successfully!',
+          );
+        } else {
+          SnackbarUtil.showSuccess(context, 'Profile updated successfully!');
+        }
+
         await Future.delayed(const Duration(milliseconds: 800));
 
         if (mounted) {
@@ -282,7 +453,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
     } finally {
       setState(() => _isSaving = false);
     }
-  }
+  } // here
 
   void _navigateBackToProfile() {
     final navigatorContext = Navigator.of(context);
@@ -510,11 +681,13 @@ class _EditProfileModalState extends State<EditProfileModal> {
     String? Function(String?)? validator,
     TextInputType? keyboardType,
     bool enabled = true,
+    ValueChanged<String>? onChanged, // added ni
   }) {
     return TextFormField(
       controller: controller,
       enabled: enabled,
       keyboardType: keyboardType,
+      onChanged: onChanged,
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
@@ -949,19 +1122,41 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                     child: Column(
                                       children: [
                                         _buildInfoField(
-                                          label: 'Full Name',
+                                          label: 'First Name',
                                           isMobile: isMobile,
                                           child: _buildTextFormField(
-                                            controller: _nameController,
-                                            hintText: 'Enter your full name',
+                                            controller: _firstNameController,
+                                            hintText: 'Enter your first name',
                                             icon: Icons.person_outline_rounded,
+                                            onChanged: (value) {
+                                              _nameController.text =
+                                                  '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
+                                            },
                                             validator: (value) {
                                               if (value == null ||
                                                   value.trim().isEmpty) {
-                                                return 'Please enter your full name';
+                                                return 'Please enter your first name';
                                               }
-                                              if (value.trim().length < 2) {
-                                                return 'Name must be at least 2 characters';
+                                              return null;
+                                            },
+                                          ),
+                                        ),
+
+                                        _buildInfoField(
+                                          label: 'Last Name',
+                                          isMobile: isMobile,
+                                          child: _buildTextFormField(
+                                            controller: _lastNameController,
+                                            hintText: 'Enter your last name',
+                                            icon: Icons.person_outline_rounded,
+                                            onChanged: (value) {
+                                              _nameController.text =
+                                                  '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
+                                            },
+                                            validator: (value) {
+                                              if (value == null ||
+                                                  value.trim().isEmpty) {
+                                                return 'Please enter your last name';
                                               }
                                               return null;
                                             },
@@ -978,6 +1173,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                             icon: Icons.email_outlined,
                                             keyboardType:
                                                 TextInputType.emailAddress,
+                                            enabled: false, // Disables editing
                                             validator: (value) {
                                               if (value == null ||
                                                   value.trim().isEmpty) {
@@ -1121,8 +1317,186 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                             ),
                                           ),
 
+                                          // ✅ NEW: Student Type Selection (for enrolled students)
                                           if (_enrollmentStatus ==
                                               'enrolled') ...[
+                                            _buildInfoField(
+                                              label: 'Student Type',
+                                              isMobile: isMobile,
+                                              child: Column(
+                                                children: [
+                                                  _buildRadioOption(
+                                                    title: 'Undergraduate',
+                                                    subtitle:
+                                                        'Bachelor\'s degree program',
+                                                    value: 'undergraduate',
+                                                    groupValue: _studentType,
+                                                    onChanged: (value) {
+                                                      setState(() {
+                                                        _studentType = value;
+                                                        if (value ==
+                                                            'graduate') {
+                                                          _studentId = null;
+                                                        }
+                                                      });
+                                                    },
+                                                  ),
+                                                  _buildRadioOption(
+                                                    title: 'Graduate',
+                                                    subtitle:
+                                                        'Master\'s or Doctoral program',
+                                                    value: 'graduate',
+                                                    groupValue: _studentType,
+                                                    onChanged: (value) {
+                                                      setState(() {
+                                                        _studentType = value;
+                                                        if (value ==
+                                                            'graduate') {
+                                                          _studentId = null;
+                                                        }
+                                                      });
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            // ✅ Student ID (only for undergraduates)
+                                            if (_studentType ==
+                                                'undergraduate') ...[
+                                              _buildInfoField(
+                                                label: 'Student ID',
+                                                isMobile: isMobile,
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Builder(
+                                                      builder: (context) {
+                                                        final controller =
+                                                            TextEditingController(
+                                                              text:
+                                                                  _studentId ??
+                                                                  '',
+                                                            );
+                                                        return _buildTextFormField(
+                                                          controller:
+                                                              controller,
+                                                          hintText:
+                                                              'Enter your Student ID',
+                                                          icon:
+                                                              Icons
+                                                                  .badge_outlined,
+                                                          onChanged: (value) {
+                                                            _studentId = value;
+                                                          },
+                                                          validator: (value) {
+                                                            if (_enrollmentStatus ==
+                                                                    'enrolled' &&
+                                                                _studentType ==
+                                                                    'undergraduate' &&
+                                                                (value ==
+                                                                        null ||
+                                                                    value
+                                                                        .trim()
+                                                                        .isEmpty)) {
+                                                              return 'Student ID is required for undergraduate students';
+                                                            }
+                                                            if (value != null &&
+                                                                value
+                                                                    .trim()
+                                                                    .isNotEmpty &&
+                                                                value
+                                                                        .trim()
+                                                                        .length <
+                                                                    5) {
+                                                              return 'Student ID must be at least 5 characters';
+                                                            }
+                                                            return null;
+                                                          },
+                                                        );
+                                                      },
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    Text(
+                                                      'Your unique CMU student identification number',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color:
+                                                            Colors
+                                                                .grey
+                                                                .shade600,
+                                                        fontStyle:
+                                                            FontStyle.italic,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+
+                                            // ✅ Graduate Type Selection (for graduate students)
+                                            if (_studentType == 'graduate') ...[
+                                              _buildInfoField(
+                                                label: 'Graduate Status',
+                                                isMobile: isMobile,
+                                                child: Column(
+                                                  children: [
+                                                    _buildRadioOption(
+                                                      title: 'Taking Masteral',
+                                                      subtitle:
+                                                          'Currently enrolled in a Master\'s program',
+                                                      value: 'masteral',
+                                                      groupValue: _graduateType,
+                                                      onChanged: (value) {
+                                                        setState(() {
+                                                          _graduateType = value;
+                                                          _selectedCollege =
+                                                              null;
+                                                          _selectedCollegeId =
+                                                              null;
+                                                          _selectedProgram =
+                                                              null;
+                                                          _graduatedCollege =
+                                                              null;
+                                                          _graduatedCollegeId =
+                                                              null;
+                                                          _graduatedProgram =
+                                                              null;
+                                                        });
+                                                      },
+                                                    ),
+                                                    _buildRadioOption(
+                                                      title:
+                                                          'Already Graduated',
+                                                      subtitle:
+                                                          'Not currently taking a Master\'s program',
+                                                      value: 'not_masteral',
+                                                      groupValue: _graduateType,
+                                                      onChanged: (value) {
+                                                        setState(() {
+                                                          _graduateType = value;
+                                                          _selectedCollege =
+                                                              null;
+                                                          _selectedCollegeId =
+                                                              null;
+                                                          _selectedProgram =
+                                                              null;
+                                                          _graduatedCollege =
+                                                              null;
+                                                          _graduatedCollegeId =
+                                                              null;
+                                                          _graduatedProgram =
+                                                              null;
+                                                        });
+                                                      },
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+
+                                            // Year Level field
                                             _buildInfoField(
                                               label: 'Year Level',
                                               isMobile: isMobile,
@@ -1138,101 +1512,483 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                                 icon: Icons.school_outlined,
                                               ),
                                             ),
+
+                                            // College field (for enrolled students)
+                                            if (_enrollmentStatus ==
+                                                    'enrolled' &&
+                                                _studentType != null) ...[
+                                              // Show college for undergraduates
+                                              if (_studentType ==
+                                                  'undergraduate') ...[
+                                                _buildInfoField(
+                                                  label: 'College',
+                                                  isMobile: isMobile,
+                                                  child: _buildDropdownField(
+                                                    value: _selectedCollege,
+                                                    items: _colleges,
+                                                    onChanged: (value) {
+                                                      setState(() {
+                                                        _selectedCollege =
+                                                            value;
+                                                        _selectedCollegeId =
+                                                            _collegesMap[value];
+                                                        _selectedProgram = null;
+                                                      });
+                                                    },
+                                                    hint: 'Select your college',
+                                                    icon:
+                                                        Icons
+                                                            .account_balance_outlined,
+                                                  ),
+                                                ),
+                                              ],
+
+                                              // Show college for graduate students taking masteral
+                                              if (_studentType == 'graduate' &&
+                                                  _graduateType ==
+                                                      'masteral') ...[
+                                                _buildInfoField(
+                                                  label: 'College',
+                                                  isMobile: isMobile,
+                                                  child: _buildDropdownField(
+                                                    value: _selectedCollege,
+                                                    items: _colleges,
+                                                    onChanged: (value) {
+                                                      setState(() {
+                                                        _selectedCollege =
+                                                            value;
+                                                        _selectedCollegeId =
+                                                            _collegesMap[value];
+                                                        _selectedProgram = null;
+                                                      });
+                                                    },
+                                                    hint: 'Select your college',
+                                                    icon:
+                                                        Icons
+                                                            .account_balance_outlined,
+                                                  ),
+                                                ),
+                                              ],
+
+                                              // Show graduated college for graduate students not taking masteral
+                                              if (_studentType == 'graduate' &&
+                                                  _graduateType ==
+                                                      'not_masteral') ...[
+                                                _buildInfoField(
+                                                  label: 'Graduated College',
+                                                  isMobile: isMobile,
+                                                  child: _buildDropdownField(
+                                                    value: _graduatedCollege,
+                                                    items: _colleges,
+                                                    onChanged: (value) {
+                                                      setState(() {
+                                                        _graduatedCollege =
+                                                            value;
+                                                        _graduatedCollegeId =
+                                                            _collegesMap[value];
+                                                        _graduatedProgram =
+                                                            null;
+                                                      });
+                                                    },
+                                                    hint:
+                                                        'Select graduated college',
+                                                    icon:
+                                                        Icons
+                                                            .account_balance_outlined,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+
+                                            // Program field (filtered by college)
+                                            if (_enrollmentStatus ==
+                                                    'enrolled' &&
+                                                _selectedCollegeId != null) ...[
+                                              // Program for undergraduates
+                                              if (_studentType ==
+                                                  'undergraduate') ...[
+                                                _buildInfoField(
+                                                  label: 'Program',
+                                                  isMobile: isMobile,
+                                                  child: Builder(
+                                                    builder: (context) {
+                                                      final key =
+                                                          '${_selectedCollegeId}_Bachelor';
+                                                      final availablePrograms =
+                                                          _programsByCollege[key] ??
+                                                          [];
+
+                                                      return _buildDropdownField(
+                                                        value:
+                                                            (_selectedProgram !=
+                                                                        null &&
+                                                                    availablePrograms
+                                                                        .contains(
+                                                                          _selectedProgram,
+                                                                        ))
+                                                                ? _selectedProgram
+                                                                : null,
+                                                        items:
+                                                            availablePrograms,
+                                                        onChanged:
+                                                            (value) => setState(
+                                                              () =>
+                                                                  _selectedProgram =
+                                                                      value,
+                                                            ),
+                                                        hint:
+                                                            availablePrograms
+                                                                    .isEmpty
+                                                                ? 'No bachelor programs available'
+                                                                : 'Select your program',
+                                                        icon:
+                                                            Icons.book_outlined,
+                                                      );
+                                                    },
+                                                  ),
+                                                ),
+                                              ],
+
+                                              // Program for graduate students taking masteral
+                                              if (_studentType == 'graduate' &&
+                                                  _graduateType ==
+                                                      'masteral') ...[
+                                                _buildInfoField(
+                                                  label: 'Masteral Program',
+                                                  isMobile: isMobile,
+                                                  child: Builder(
+                                                    builder: (context) {
+                                                      final key =
+                                                          '${_selectedCollegeId}_Masters';
+                                                      final availablePrograms =
+                                                          _programsByCollege[key] ??
+                                                          [];
+
+                                                      return _buildDropdownField(
+                                                        value:
+                                                            (_selectedProgram !=
+                                                                        null &&
+                                                                    availablePrograms
+                                                                        .contains(
+                                                                          _selectedProgram,
+                                                                        ))
+                                                                ? _selectedProgram
+                                                                : null,
+                                                        items:
+                                                            availablePrograms,
+                                                        onChanged:
+                                                            (value) => setState(
+                                                              () =>
+                                                                  _selectedProgram =
+                                                                      value,
+                                                            ),
+                                                        hint:
+                                                            availablePrograms
+                                                                    .isEmpty
+                                                                ? 'No masteral programs available'
+                                                                : 'Select your program',
+                                                        icon:
+                                                            Icons.book_outlined,
+                                                      );
+                                                    },
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+
+                                            // Graduated program (for graduates not taking masteral)
+                                            if (_enrollmentStatus ==
+                                                    'enrolled' &&
+                                                _studentType == 'graduate' &&
+                                                _graduateType ==
+                                                    'not_masteral' &&
+                                                _graduatedCollegeId !=
+                                                    null) ...[
+                                              _buildInfoField(
+                                                label: 'Graduated Program',
+                                                isMobile: isMobile,
+                                                child: Builder(
+                                                  builder: (context) {
+                                                    final key =
+                                                        '${_graduatedCollegeId}_Bachelor';
+                                                    final availablePrograms =
+                                                        _programsByCollege[key] ??
+                                                        [];
+
+                                                    return _buildDropdownField(
+                                                      value:
+                                                          (_graduatedProgram !=
+                                                                      null &&
+                                                                  availablePrograms
+                                                                      .contains(
+                                                                        _graduatedProgram,
+                                                                      ))
+                                                              ? _graduatedProgram
+                                                              : null,
+                                                      items: availablePrograms,
+                                                      onChanged:
+                                                          (value) => setState(
+                                                            () =>
+                                                                _graduatedProgram =
+                                                                    value,
+                                                          ),
+                                                      hint:
+                                                          availablePrograms
+                                                                  .isEmpty
+                                                              ? 'No programs available'
+                                                              : 'Select graduated program',
+                                                      icon: Icons.book_outlined,
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            ],
+
+                                            // Affiliation field
                                             _buildInfoField(
-                                              label: 'Program',
+                                              label: 'Affiliation',
                                               isMobile: isMobile,
-                                              child: _buildDropdownField(
-                                                value: _selectedProgram,
-                                                items: _programs,
-                                                onChanged:
-                                                    (value) => setState(
-                                                      () =>
-                                                          _selectedProgram =
-                                                              value,
+                                              child: Column(
+                                                children: [
+                                                  _buildYesNoRadio(
+                                                    label:
+                                                        'Do you have an affiliation?',
+                                                    value: _hasAffiliation,
+                                                    onChanged: (value) {
+                                                      setState(() {
+                                                        _hasAffiliation = value;
+                                                        if (!value) {
+                                                          _selectedAffiliation =
+                                                              null;
+                                                          _customAffiliation =
+                                                              '';
+                                                          _customAffiliationConfirmed =
+                                                              false;
+                                                        }
+                                                      });
+                                                    },
+                                                  ),
+                                                  if (_hasAffiliation) ...[
+                                                    const SizedBox(height: 12),
+                                                    _buildDropdownField(
+                                                      value:
+                                                          _selectedAffiliation,
+                                                      items: _affiliations,
+                                                      onChanged: (value) {
+                                                        setState(() {
+                                                          _selectedAffiliation =
+                                                              value;
+                                                          if (value !=
+                                                              'Others') {
+                                                            _customAffiliation =
+                                                                '';
+                                                            _customAffiliationConfirmed =
+                                                                false;
+                                                          }
+                                                        });
+                                                      },
+                                                      hint:
+                                                          'Select your affiliation',
+                                                      icon:
+                                                          Icons.people_outline,
                                                     ),
-                                                hint: 'Select your program',
-                                                icon: Icons.book_outlined,
+                                                  ],
+
+                                                  // Custom Affiliation Input
+                                                  if (_hasAffiliation &&
+                                                      _selectedAffiliation ==
+                                                          'Others') ...[
+                                                    const SizedBox(height: 12),
+                                                    Builder(
+                                                      builder: (context) {
+                                                        final controller =
+                                                            TextEditingController(
+                                                              text:
+                                                                  _customAffiliation ??
+                                                                  '',
+                                                            );
+                                                        return Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            _buildTextFormField(
+                                                              controller:
+                                                                  controller,
+                                                              hintText:
+                                                                  'Enter your affiliation',
+                                                              icon:
+                                                                  Icons
+                                                                      .edit_outlined,
+                                                              onChanged: (
+                                                                value,
+                                                              ) {
+                                                                _customAffiliation =
+                                                                    value;
+                                                                _customAffiliationConfirmed =
+                                                                    false;
+                                                              },
+                                                              validator: (
+                                                                value,
+                                                              ) {
+                                                                if (_selectedAffiliation ==
+                                                                        'Others' &&
+                                                                    (value ==
+                                                                            null ||
+                                                                        value
+                                                                            .trim()
+                                                                            .isEmpty)) {
+                                                                  return 'Please specify your affiliation';
+                                                                }
+                                                                return null;
+                                                              },
+                                                            ),
+                                                            const SizedBox(
+                                                              height: 6,
+                                                            ),
+                                                            Text(
+                                                              'Please specify your association with CMU',
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color:
+                                                                    Colors
+                                                                        .grey
+                                                                        .shade600,
+                                                                fontStyle:
+                                                                    FontStyle
+                                                                        .italic,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        );
+                                                      },
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            ),
+
+                                            // LRN Field (for incoming freshman)
+                                            if (_enrollmentStatus ==
+                                                    'not_enrolled' &&
+                                                _selectedAffiliation
+                                                        ?.toLowerCase() ==
+                                                    'incoming freshman applicant') ...[
+                                              _buildInfoField(
+                                                label:
+                                                    'Learner Reference Number (LRN)',
+                                                isMobile: isMobile,
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Builder(
+                                                      builder: (context) {
+                                                        final controller =
+                                                            TextEditingController(
+                                                              text: _lrn ?? '',
+                                                            );
+                                                        return _buildTextFormField(
+                                                          controller:
+                                                              controller,
+                                                          hintText:
+                                                              'Enter your 12-digit LRN',
+                                                          icon:
+                                                              Icons
+                                                                  .numbers_outlined,
+                                                          keyboardType:
+                                                              TextInputType
+                                                                  .number,
+                                                          onChanged: (value) {
+                                                            _lrn = value;
+                                                          },
+                                                          validator: (value) {
+                                                            if (_selectedAffiliation
+                                                                        ?.toLowerCase() ==
+                                                                    'incoming freshman applicant' &&
+                                                                (value ==
+                                                                        null ||
+                                                                    value
+                                                                        .trim()
+                                                                        .isEmpty)) {
+                                                              return 'LRN is required for incoming freshman applicants';
+                                                            }
+                                                            if (value != null &&
+                                                                value
+                                                                    .trim()
+                                                                    .isNotEmpty &&
+                                                                value
+                                                                        .trim()
+                                                                        .length !=
+                                                                    12) {
+                                                              return 'LRN must be exactly 12 digits';
+                                                            }
+                                                            return null;
+                                                          },
+                                                        );
+                                                      },
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    Text(
+                                                      'Your Learner Reference Number from DepEd',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color:
+                                                            Colors
+                                                                .grey
+                                                                .shade600,
+                                                        fontStyle:
+                                                            FontStyle.italic,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+
+                                            // Scholarship field
+                                            _buildInfoField(
+                                              label: 'Scholarship',
+                                              isMobile: isMobile,
+                                              child: Column(
+                                                children: [
+                                                  _buildYesNoRadio(
+                                                    label:
+                                                        'Do you have a scholarship?',
+                                                    value: _hasScholarship,
+                                                    onChanged: (value) {
+                                                      setState(() {
+                                                        _hasScholarship = value;
+                                                        if (!value) {
+                                                          _selectedScholarship =
+                                                              null;
+                                                        }
+                                                      });
+                                                    },
+                                                  ),
+                                                  if (_hasScholarship) ...[
+                                                    const SizedBox(height: 12),
+                                                    _buildDropdownField(
+                                                      value:
+                                                          _selectedScholarship,
+                                                      items: _scholarships,
+                                                      onChanged:
+                                                          (value) => setState(
+                                                            () =>
+                                                                _selectedScholarship =
+                                                                    value,
+                                                          ),
+                                                      hint:
+                                                          'Select your scholarship',
+                                                      icon:
+                                                          Icons
+                                                              .card_membership_outlined,
+                                                    ),
+                                                  ],
+                                                ],
                                               ),
                                             ),
                                           ],
-
-                                          _buildInfoField(
-                                            label: 'Affiliation',
-                                            isMobile: isMobile,
-                                            child: Column(
-                                              children: [
-                                                _buildYesNoRadio(
-                                                  label:
-                                                      'Do you have an affiliation?',
-                                                  value: _hasAffiliation,
-                                                  onChanged: (value) {
-                                                    setState(() {
-                                                      _hasAffiliation = value;
-                                                      if (!value)
-                                                        _selectedAffiliation =
-                                                            null;
-                                                    });
-                                                  },
-                                                ),
-                                                if (_hasAffiliation) ...[
-                                                  const SizedBox(height: 12),
-                                                  _buildDropdownField(
-                                                    value: _selectedAffiliation,
-                                                    items: _affiliations,
-                                                    onChanged:
-                                                        (value) => setState(
-                                                          () =>
-                                                              _selectedAffiliation =
-                                                                  value,
-                                                        ),
-                                                    hint:
-                                                        'Select your affiliation',
-                                                    icon: Icons.people_outline,
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ),
-
-                                          _buildInfoField(
-                                            label: 'Scholarship',
-                                            isMobile: isMobile,
-                                            child: Column(
-                                              children: [
-                                                _buildYesNoRadio(
-                                                  label:
-                                                      'Do you have a scholarship?',
-                                                  value: _hasScholarship,
-                                                  onChanged: (value) {
-                                                    setState(() {
-                                                      _hasScholarship = value;
-                                                      if (!value)
-                                                        _selectedScholarship =
-                                                            null;
-                                                    });
-                                                  },
-                                                ),
-                                                if (_hasScholarship) ...[
-                                                  const SizedBox(height: 12),
-                                                  _buildDropdownField(
-                                                    value: _selectedScholarship,
-                                                    items: _scholarships,
-                                                    onChanged:
-                                                        (value) => setState(
-                                                          () =>
-                                                              _selectedScholarship =
-                                                                  value,
-                                                        ),
-                                                    hint:
-                                                        'Select your scholarship',
-                                                    icon:
-                                                        Icons
-                                                            .card_membership_outlined,
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ),
                                         ],
                                       ],
                                     ),
