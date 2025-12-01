@@ -86,85 +86,86 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   bool _isSettingUpConversation = false;
 
   Future<void> _initializeConversation() async {
-    if (_isSettingUpConversation) {
-      print('⚠️ Already setting up conversation');
+  if (_isSettingUpConversation) {
+    print('⚠️ Already setting up conversation');
+    return;
+  }
+
+  _isSettingUpConversation = true;
+
+  try {
+    print('🚀 Initializing conversation: ${widget.conversationId}');
+
+    if (mounted) {
+      setState(() {
+        _isLoadingConversation = true;
+      });
+    }
+
+    if (widget.conversationId.isEmpty) {
+      chatProvider.clearMessages();
+      if (mounted) {
+        setState(() {
+          _showFAQs = true;
+          _isLoadingConversation = false;
+          _currentLoadedConversationId = null;
+        });
+      }
       return;
     }
 
-    _isSettingUpConversation = true;
-
-    try {
-      print('🚀 Initializing conversation: ${widget.conversationId}');
-
-      if (mounted) {
-        setState(() {
-          _isLoadingConversation = true;
-        });
-      }
-
-      if (widget.conversationId.isEmpty) {
-        chatProvider.clearMessages();
-        if (mounted) {
-          setState(() {
-            _showFAQs = true;
-            _isLoadingConversation = false;
-            _currentLoadedConversationId = null;
-          });
-        }
-        return;
-      }
-
-      if (_currentLoadedConversationId == widget.conversationId) {
-        print('ℹ️ Conversation already loaded: ${widget.conversationId}');
-        if (mounted) {
-          setState(() {
-            _isLoadingConversation = false;
-          });
-        }
-        _isSettingUpConversation = false;
-        return;
-      }
-
-      await chatProvider.setConversationId(widget.conversationId);
-      await Future.delayed(Duration(milliseconds: 800));
-
-      _initialMessageIds.clear();
-      for (var message in chatProvider.messages) {
-        _initialMessageIds.add(message.id);
-      }
-
-      final hasMessages = chatProvider.messages.isNotEmpty;
-
-      if (mounted) {
-        setState(() {
-          _selectedConversationId = widget.conversationId;
-          _currentLoadedConversationId = widget.conversationId;
-          _showFAQs = !hasMessages;
-          _isLoadingConversation = false;
-        });
-      }
-
-      if (hasMessages) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToBottomSmooth();
-        });
-      }
-
-      print('✅ Conversation initialized: ${widget.conversationId}');
-      print('   - Messages: ${chatProvider.messages.length}');
-      print('   - Show FAQs: $_showFAQs');
-    } catch (e) {
-      print('❌ Error initializing conversation: $e');
+    if (_currentLoadedConversationId == widget.conversationId) {
+      print('ℹ️ Conversation already loaded: ${widget.conversationId}');
       if (mounted) {
         setState(() {
           _isLoadingConversation = false;
-          _showFAQs = true;
         });
       }
-    } finally {
       _isSettingUpConversation = false;
+      return;
     }
+
+    await chatProvider.setConversationId(widget.conversationId);
+    await Future.delayed(Duration(milliseconds: 800));
+
+    _initialMessageIds.clear();
+    for (var message in chatProvider.messages) {
+      _initialMessageIds.add(message.id);
+    }
+
+    final hasMessages = chatProvider.messages.isNotEmpty;
+
+    if (mounted) {
+      setState(() {
+        _selectedConversationId = widget.conversationId;
+        _currentLoadedConversationId = widget.conversationId;
+        _showFAQs = !hasMessages;
+        _isLoadingConversation = false;
+      });
+    }
+
+    // ✅ Use instant scroll for initial load (no animation)
+    if (hasMessages) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottomInstant(); // Instant jump to bottom on load
+      });
+    }
+
+    print('✅ Conversation initialized: ${widget.conversationId}');
+    print('   - Messages: ${chatProvider.messages.length}');
+    print('   - Show FAQs: $_showFAQs');
+  } catch (e) {
+    print('❌ Error initializing conversation: $e');
+    if (mounted) {
+      setState(() {
+        _isLoadingConversation = false;
+        _showFAQs = true;
+      });
+    }
+  } finally {
+    _isSettingUpConversation = false;
   }
+}
 
   @override
   void initState() {
@@ -214,6 +215,11 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
         _isInitialized = true;
       }
     });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+    chatProvider.loadUserMessageCount();
+    chatProvider.listenToUserMessageCount(); // Start listening to real-time updates
+  });
   }
 
   bool _userIsScrolling = false;
@@ -351,29 +357,29 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   }
 
   void _onFAQSelected(String question) {
-    print('📝 FAQ selected: $question');
+  print('📝 FAQ selected: $question');
 
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    chatProvider.incrementFAQSimilarityCount(question);
+  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  chatProvider.incrementFAQSimilarityCount(question);
 
-    // ✅ Set the question in the controller
-    _controller.text = question;
+  // Set the question in the controller
+  _controller.text = question;
 
-    // ✅ Close FAQs immediately
-    if (mounted) {
-      setState(() {
-        _expandedCategory = null;
-        _showFAQs = false;
-      });
-    }
-
-    // ✅ Send the message after a short delay
-    Future.delayed(Duration(milliseconds: 150), () {
-      if (mounted && !chatProvider.isLoading) {
-        _sendMessage(chatProvider);
-      }
+  // Close FAQs immediately
+  if (mounted) {
+    setState(() {
+      _expandedCategory = null;
+      _showFAQs = false;
     });
   }
+
+  // Send the message after a short delay
+  Future.delayed(Duration(milliseconds: 150), () {
+    if (mounted && !chatProvider.isLoading) {
+      _sendMessage(chatProvider);
+    }
+  });
+}
 
   Widget _buildMessageBubble(Message message, bool isUser) {
     return FutureBuilder<String?>(
@@ -836,40 +842,60 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     );
   }
 
-  void _scrollToBottomAnimated({int delay = 100}) {
-    Future.delayed(Duration(milliseconds: delay), () {
-      if (!mounted || !_scrollController.hasClients) return;
+  void _scrollToBottomSmooth() {
+  if (!_scrollController.hasClients) return;
 
+  // Get current and target positions
+  final double currentPosition = _scrollController.position.pixels;
+  final double targetPosition = _scrollController.position.maxScrollExtent;
+  
+  // If already at bottom (within 50px), no need to scroll
+  if ((targetPosition - currentPosition).abs() < 50) {
+    return;
+  }
+
+  // Calculate distance and duration
+  final double distance = (targetPosition - currentPosition).abs();
+  final int duration = (distance / 2).clamp(200, 800).toInt(); // Dynamic duration based on distance
+
+  // Smooth animated scroll
+  _scrollController.animateTo(
+    targetPosition,
+    duration: Duration(milliseconds: duration),
+    curve: Curves.easeOutCubic,
+  );
+}
+
+void _scrollToBottomAnimated({int delay = 100}) {
+  Future.delayed(Duration(milliseconds: delay), () {
+    if (!mounted || !_scrollController.hasClients) return;
+    
+    final double currentPosition = _scrollController.position.pixels;
+    final double targetPosition = _scrollController.position.maxScrollExtent;
+    final double distance = (targetPosition - currentPosition).abs();
+
+    // Only animate if there's significant distance
+    if (distance > 50) {
+      final int duration = (distance / 2).clamp(200, 600).toInt();
+      
       _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: Duration(milliseconds: 400),
+        targetPosition,
+        duration: Duration(milliseconds: duration),
         curve: Curves.easeOutCubic,
       );
-    });
-  }
+    }
+  });
+}
 
-  // Replace the existing _scrollToBottomSmooth method with this:
-  void _scrollToBottomSmooth() {
-    if (!_scrollController.hasClients) return;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        final double targetPosition =
-            _scrollController.position.maxScrollExtent;
-        final double currentPosition = _scrollController.position.pixels;
-        final double distance = (targetPosition - currentPosition).abs();
-
-        // Adjust duration based on distance for smoother experience
-        final int duration = distance > 500 ? 500 : 300;
-
-        _scrollController.animateTo(
-          targetPosition,
-          duration: Duration(milliseconds: duration),
-          curve: Curves.easeOutCubic,
-        );
-      }
-    });
-  }
+ void _scrollToBottomInstant() {
+  if (!_scrollController.hasClients) return;
+  
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    }
+  });
+}
 
   Future<Map<String, dynamic>?> _getEscalationStatus(String messageId) async {
     try {
@@ -2423,64 +2449,58 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   }
 
   void _sendMessage(ChatProvider chatProvider) async {
-    final text = _controller.text.trim();
-    if (text.isEmpty || chatProvider.isLoading) return;
+  final text = _controller.text.trim();
+  if (text.isEmpty || chatProvider.isLoading) return;
 
-    // ✅ NEW: Check message limit
-    if (chatProvider.isMessageLimitReached) {
-      final timeUntilReset = chatProvider.getTimeUntilReset();
+  // ✅ Check message limit
+  if (chatProvider.isMessageLimitReached) {
+    final timeUntilReset = chatProvider.getTimeUntilReset();
 
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder:
-            (context) => MessageLimitDialog(timeUntilReset: timeUntilReset),
-      );
-      return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => MessageLimitDialog(timeUntilReset: timeUntilReset),
+    );
+    return;
+  }
+
+  _controller.clear();
+
+  if (_showFAQs && mounted) {
+    setState(() {
+      _showFAQs = false;
+    });
+  }
+
+  try {
+    await chatProvider.askQuestionWithStreaming(context, text);
+    
+    // ✅ Smooth scroll after message is added
+    await Future.delayed(Duration(milliseconds: 100));
+    if (mounted && _scrollController.hasClients) {
+      _scrollToBottomSmooth(); // Use smooth scroll instead of animated
     }
-
-    _controller.clear();
-
-    if (_showFAQs && mounted) {
-      setState(() {
-        _showFAQs = false;
-      });
-    }
-
-    try {
-      await chatProvider.askQuestionWithStreaming(context, text);
-      await Future.delayed(Duration(milliseconds: 150));
-
-      if (mounted && _scrollController.hasClients) {
-        _scrollToBottomAnimated(delay: 100);
-      }
-    } catch (e) {
-      debugPrint('Error sending message: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  Icons.error_outline_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                SizedBox(width: 12),
-                Expanded(child: Text('Error sending message: ${e.toString()}')),
-              ],
-            ),
-            backgroundColor: Colors.red.shade400,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: EdgeInsets.all(16),
+  } catch (e) {
+    debugPrint('Error sending message: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Expanded(child: Text('Error sending message: ${e.toString()}')),
+            ],
           ),
-        );
-      }
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: EdgeInsets.all(16),
+        ),
+      );
     }
   }
+}
 
   @override
   void dispose() {

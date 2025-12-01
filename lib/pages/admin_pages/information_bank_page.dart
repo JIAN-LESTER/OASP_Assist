@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:capstone_project/pages/data/charts.dart';
 import 'package:capstone_project/pages/data/statcard_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -29,6 +31,8 @@ class _InformationBankPageState extends State<InformationBankPage> {
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
   bool isLoading = true;
+    Timer? _debounce;
+    bool _isFiltering = false;
 
   final StatDataManagement statData = StatDataManagement();
 
@@ -43,20 +47,37 @@ class _InformationBankPageState extends State<InformationBankPage> {
   int currentPage = 1;
   int itemsPerPage = 10;
 
-  @override
-  void initState() {
-    super.initState();
-    _searchController.addListener(_onSearchChanged);
+@override
+void initState() {
+  super.initState();
+  _searchController.addListener(_onSearchChanged);
+  
+  // Load stats AFTER frame is rendered
+  WidgetsBinding.instance.addPostFrameCallback((_) {
     loadStatData();
+  });
+}
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          currentPage = 1;
+        });
+      }
+    });
   }
+
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
-
+  
   Future<void> loadStatData() async {
     if (!mounted) return;
 
@@ -82,11 +103,20 @@ class _InformationBankPageState extends State<InformationBankPage> {
     }
   }
 
-  void _onSearchChanged() {
-    setState(() {
-      currentPage = 1;
-    });
+  Stream<QuerySnapshot> _getFilteredStream() {
+  Query query = FirebaseFirestore.instance.collection('information_bank');
+  
+  // Add category filter at database level
+  if (selectedCategory != 'All Categories') {
+    query = query.where('category', isEqualTo: selectedCategory.toLowerCase());
   }
+  
+  // Order by a field for consistent pagination
+  query = query.orderBy('createdAt', descending: true);
+  
+  return query.snapshots();
+}
+
 
   void _goToPage(int page) {
     setState(() {
@@ -103,9 +133,7 @@ class _InformationBankPageState extends State<InformationBankPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+
     return ResponsiveLayout(
       mobileBody: MobileInformationBank(
         selectedCategory: selectedCategory,
@@ -685,6 +713,8 @@ void _showTopRightAlert(BuildContext context, String message, AlertType type) {
     if (overlayEntry.mounted) overlayEntry.remove();
   });
 }
+bool _isFiltering = false;
+
 
 Widget _buildIBList({
   required BuildContext context,
@@ -696,6 +726,10 @@ Widget _buildIBList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
+
+   if (_isFiltering) {
+    return const Center(child: CircularProgressIndicator());
+  }
   final filtered =
       getAllDocuments.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
@@ -750,6 +784,7 @@ Widget _buildIBList({
                     ).format(date);
 
                     return Padding(
+                      key: ValueKey(doc.id),
                       padding: const EdgeInsets.only(bottom: 8),
                       child: _buildIBRow(
                         context: context,
