@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:capstone_project/pages/admin_pages/buttons/affiliation.dart';
 import 'package:capstone_project/pages/admin_pages/buttons/program.dart';
 import 'package:capstone_project/profile.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
 
 void showEditProfileModal(
   BuildContext context, {
@@ -161,9 +162,10 @@ class _EditProfileModalState extends State<EditProfileModal> {
       ]);
 
       setState(() {
-        _programs = [...futures[0], 'Others'];
-        _affiliations = [...futures[1]];
-        _scholarships = [...futures[2], 'Others'];
+        // ✅ Ensure no duplicates when adding 'Others'
+        _programs = [...futures[0].toSet(), 'Others'];
+        _affiliations = futures[1].toSet().toList();
+        _scholarships = [...futures[2].toSet(), 'Others'];
       });
     } catch (e) {
       print('Error loading dropdown data: $e');
@@ -171,9 +173,23 @@ class _EditProfileModalState extends State<EditProfileModal> {
   }
 
   Future<List<String>> _getDropdownItems(String collection) async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection(collection).get();
-    return snapshot.docs.map((doc) => doc['name'] as String).toList();
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection(collection).get();
+
+      // ✅ Filter out empty/null values and remove duplicates
+      return snapshot.docs
+          .map((doc) {
+            final name = doc.data()['name'];
+            return name?.toString().trim() ?? '';
+          })
+          .where((name) => name.isNotEmpty)
+          .toSet() // ✅ Convert to Set to remove duplicates
+          .toList();
+    } catch (e) {
+      print('Error getting dropdown items from $collection: $e');
+      return [];
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -181,13 +197,13 @@ class _EditProfileModalState extends State<EditProfileModal> {
 
     if (_role == 'user') {
       if (_enrollmentStatus == null) {
-        _showSnackBar('Please select your enrollment status', isError: true);
+        SnackbarUtil.showError(context, 'Please select your enrollment status');
         return;
       }
 
       if (_enrollmentStatus == 'enrolled' &&
           (_selectedYear == null || _selectedProgram == null)) {
-        _showSnackBar('Please select both year and program', isError: true);
+        SnackbarUtil.showError(context, 'Please select both year and program');
         return;
       }
     }
@@ -201,12 +217,12 @@ class _EditProfileModalState extends State<EditProfileModal> {
         if (_passwordController.text.trim().isNotEmpty) {
           try {
             await user.updatePassword(_passwordController.text.trim());
-            _showSnackBar('Password updated successfully!');
+            SnackbarUtil.showSuccess(context, 'Password updated successfully!');
           } catch (passwordError) {
             if (passwordError.toString().contains('requires-recent-login')) {
-              _showSnackBar(
+              SnackbarUtil.showError(
+                context,
                 'Please log out and log in again to change your password',
-                isError: true,
               );
               setState(() => _isSaving = false);
               return;
@@ -245,7 +261,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
             .doc(user.uid)
             .update(updateData);
 
-        _showSnackBar('Profile updated successfully!');
+        SnackbarUtil.showSuccess(context, 'Profile updated successfully!');
         await Future.delayed(const Duration(milliseconds: 800));
 
         if (mounted) {
@@ -259,9 +275,9 @@ class _EditProfileModalState extends State<EditProfileModal> {
       }
     } catch (e) {
       print('Error saving profile: $e');
-      _showSnackBar(
+      SnackbarUtil.showError(
+        context,
         'Failed to update profile. Please try again.',
-        isError: true,
       );
     } finally {
       setState(() => _isSaving = false);
@@ -285,19 +301,6 @@ class _EditProfileModalState extends State<EditProfileModal> {
     } else {
       Navigator.of(context).pop();
     }
-  }
-
-  void _showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor:
-            isError ? Colors.red.shade600 : const Color(0xFF2E7D32),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
   }
 
   void _loadUserRole() async {
@@ -619,9 +622,21 @@ class _EditProfileModalState extends State<EditProfileModal> {
     required String hint,
     required IconData icon,
   }) {
+    // ✅ FIX: Remove duplicates and empty values
+    final uniqueItems =
+        items.where((item) => item.trim().isNotEmpty).toSet().toList();
+
+    // ✅ FIX: Validate the current value
+    final validValue =
+        (value != null &&
+                value.trim().isNotEmpty &&
+                uniqueItems.contains(value))
+            ? value
+            : null;
+
     return DropdownButtonFormField<String>(
       isExpanded: true,
-      value: value,
+      value: validValue, // ✅ Use validated value
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
@@ -650,7 +665,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
         ),
       ),
       items:
-          items.map((item) {
+          uniqueItems.map((item) {
             return DropdownMenuItem<String>(
               value: item,
               child: Text(
@@ -1287,7 +1302,7 @@ class _ManagementModalState extends State<ManagementModal> {
       });
     } catch (e) {
       setState(() => isLoading = false);
-      _showSnackBar('Failed to load ${widget.type}: $e', isError: true);
+      SnackbarUtil.showError(context, 'Failed to load ${widget.type}: $e');
     }
   }
 
@@ -1298,19 +1313,6 @@ class _ManagementModalState extends State<ManagementModal> {
       final name = data['name']?.toString().toLowerCase() ?? '';
       return name.contains(searchQuery.toLowerCase());
     }).toList();
-  }
-
-  void _showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor:
-            isError ? Colors.red.shade600 : const Color(0xFF2E7D32),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
   }
 
   void _showAddDialog() {
@@ -1388,9 +1390,9 @@ class _ManagementModalState extends State<ManagementModal> {
           .delete();
       _fetchItems();
       widget.onUpdated();
-      _showSnackBar('$displayName deleted successfully');
+      SnackbarUtil.showSuccess(context, '$displayName deleted successfully');
     } catch (e) {
-      _showSnackBar('Failed to delete $displayName: $e', isError: true);
+      SnackbarUtil.showError(context, 'Failed to delete $displayName: $e');
     }
   }
 
@@ -1743,24 +1745,16 @@ class _AddEditDialogState extends State<AddEditDialog> {
       widget.onSaved();
       Navigator.of(context).pop();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '$displayName ${isEditing ? 'updated' : 'created'} successfully!',
-          ),
-          backgroundColor: const Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-        ),
+      // ✅ Use SnackbarUtil
+      SnackbarUtil.showSuccess(
+        context,
+        '$displayName ${isEditing ? 'updated' : 'created'} successfully!',
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Failed to ${isEditing ? 'update' : 'create'} $displayName: $e',
-          ),
-          backgroundColor: Colors.red.shade600,
-          behavior: SnackBarBehavior.floating,
-        ),
+      // ✅ Use SnackbarUtil
+      SnackbarUtil.showError(
+        context,
+        'Failed to ${isEditing ? 'update' : 'create'} $displayName: $e',
       );
     } finally {
       setState(() => _isSubmitting = false);
