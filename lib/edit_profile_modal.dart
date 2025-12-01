@@ -214,10 +214,12 @@ class _EditProfileModalState extends State<EditProfileModal> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        bool passwordUpdated = false; // ← Track if password was updated
+
         if (_passwordController.text.trim().isNotEmpty) {
           try {
             await user.updatePassword(_passwordController.text.trim());
-            SnackbarUtil.showSuccess(context, 'Password updated successfully!');
+            passwordUpdated = true; // ← Set flag instead of showing snackbar
           } catch (passwordError) {
             if (passwordError.toString().contains('requires-recent-login')) {
               SnackbarUtil.showError(
@@ -261,7 +263,16 @@ class _EditProfileModalState extends State<EditProfileModal> {
             .doc(user.uid)
             .update(updateData);
 
-        SnackbarUtil.showSuccess(context, 'Profile updated successfully!');
+        // ← SINGLE SUCCESS MESSAGE (modified based on what was updated)
+        if (passwordUpdated) {
+          SnackbarUtil.showSuccess(
+            context,
+            'Profile and password updated successfully!',
+          );
+        } else {
+          SnackbarUtil.showSuccess(context, 'Profile updated successfully!');
+        }
+
         await Future.delayed(const Duration(milliseconds: 800));
 
         if (mounted) {
@@ -978,6 +989,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
                                             icon: Icons.email_outlined,
                                             keyboardType:
                                                 TextInputType.emailAddress,
+                                            enabled: false, // Disables editing
                                             validator: (value) {
                                               if (value == null ||
                                                   value.trim().isEmpty) {
