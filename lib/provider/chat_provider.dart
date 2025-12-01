@@ -102,31 +102,41 @@ class ChatProvider extends ChangeNotifier {
     "recommend speaking with",
   ];
 
-  void listenToUserMessageCount() {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
+ void listenToUserMessageCount() {
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  if (userId == null) return;
 
-    _userMessageCountSubscription?.cancel();
+  _userMessageCountSubscription?.cancel();
 
-    _userMessageCountSubscription = _firestore
-        .collection('users')
-        .doc(userId)
-        .snapshots()
-        .listen((snapshot) {
-          if (snapshot.exists) {
-            final data = snapshot.data()!;
-            _userDailyMessageCount = data['dailyMessageCount'] ?? 0;
-            _userLastResetDate =
-                (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+  _userMessageCountSubscription = _firestore
+      .collection('users')
+      .doc(userId)
+      .snapshots()
+      .listen((snapshot) {
+        if (snapshot.exists) {
+          final data = snapshot.data()!;
+          final newCount = data['dailyMessageCount'] ?? 0;
+          final newResetDate = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
 
-            print(
-              '📊 Real-time update: User message count = $_userDailyMessageCount',
-            );
+          // ✅ Only update if values actually changed
+          if (newCount != _userDailyMessageCount || newResetDate != _userLastResetDate) {
+            _userDailyMessageCount = newCount;
+            _userLastResetDate = newResetDate;
+
+            print('📊 Real-time update: User message count = $_userDailyMessageCount');
             notifyListeners();
           }
-        });
-  }
-
+        } else {
+          // Document doesn't exist yet - initialize
+          print('⚠️ User document not found - will be created on first message');
+          _userDailyMessageCount = 0;
+          _userLastResetDate = null;
+          notifyListeners();
+        }
+      }, onError: (error) {
+        print('❌ Error in message count listener: $error');
+      });
+}
   void setScrollCallback(VoidCallback callback) {
     _onMessageAdded = callback;
   }
@@ -135,44 +145,88 @@ class ChatProvider extends ChangeNotifier {
     _onMessageAdded = null;
   }
 
-  // Replace the isMessageLimitReached getter in chat_provider.dart with this:
+  bool get canSendMessage {
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  if (userId == null) return false;
 
-  bool get isMessageLimitReached {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return false;
+  final now = DateTime.now();
 
-    final now = DateTime.now();
-
-    // ✅ CRITICAL FIX: If values haven't been loaded yet (both are initial values),
-    // assume user can send messages (don't block new users)
-    if (_userDailyMessageCount == 0 && _userLastResetDate == null) {
-      return false; // Brand new user or data not loaded yet
-    }
-
-    // If we have a reset date, check if we need to reset
-    if (_userLastResetDate != null) {
-      final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
-
-      // Check if it's past 6 AM and the last reset was before today's 6 AM
-      final shouldReset =
-          now.isAfter(resetTime) &&
-          (_userLastResetDate!.isBefore(resetTime) ||
-              _userLastResetDate!.day != now.day);
-
-      if (shouldReset) {
-        return false; // Time to reset, allow messages
-      }
-    }
-
-    // If we have a non-zero count but no reset date (edge case from old data),
-    // allow reset
-    if (_userDailyMessageCount > 0 && _userLastResetDate == null) {
-      return false; // Reset needed
-    }
-
-    // Check if limit reached
-    return _userDailyMessageCount >= MAX_DAILY_MESSAGES;
+  // ✅ NEW USER CHECK: If count is 0 and no reset date, they can send
+  // (This is a brand new user who hasn't been initialized yet)
+  if (_userDailyMessageCount == 0 && _userLastResetDate == null) {
+    print('ℹ️ New user detected - allowing first message');
+    return true;
   }
+
+  // ✅ RESET CHECK: If we need to reset, allow sending
+  if (_userLastResetDate != null) {
+    final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
+
+    final shouldReset =
+        now.isAfter(resetTime) &&
+        (_userLastResetDate!.isBefore(resetTime) ||
+            _userLastResetDate!.day != now.day);
+
+    if (shouldReset) {
+      print('ℹ️ Reset time reached - allowing message');
+      return true;
+    }
+  }
+
+  // ✅ LIMIT CHECK: Can send if count is LESS than limit
+  // With MAX = 5: counts 0,1,2,3,4 can send → total 5 messages allowed
+  final canSend = _userDailyMessageCount < MAX_DAILY_MESSAGES;
+  
+  print('🔍 Message limit check:');
+  print('   Current count: $_userDailyMessageCount');
+  print('   Max allowed: $MAX_DAILY_MESSAGES');
+  print('   Can send: $canSend');
+  
+  return canSend;
+}
+
+// Keep the old getter for backward compatibility but use the new logic
+bool get isMessageLimitReached => !canSendMessage;
+
+
+  // // Replace the isMessageLimitReached getter in chat_provider.dart with this:
+
+  // bool get isMessageLimitReached {
+  //   final userId = FirebaseAuth.instance.currentUser?.uid;
+  //   if (userId == null) return false;
+
+  //   final now = DateTime.now();
+
+  //   // ✅ CRITICAL FIX: If values haven't been loaded yet (both are initial values),
+  //   // assume user can send messages (don't block new users)
+  //   if (_userDailyMessageCount == 0 && _userLastResetDate == null) {
+  //     return false; // Brand new user or data not loaded yet
+  //   }
+
+  //   // If we have a reset date, check if we need to reset
+  //   if (_userLastResetDate != null) {
+  //     final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
+
+  //     // Check if it's past 6 AM and the last reset was before today's 6 AM
+  //     final shouldReset =
+  //         now.isAfter(resetTime) &&
+  //         (_userLastResetDate!.isBefore(resetTime) ||
+  //             _userLastResetDate!.day != now.day);
+
+  //     if (shouldReset) {
+  //       return false; // Time to reset, allow messages
+  //     }
+  //   }
+
+  //   // If we have a non-zero count but no reset date (edge case from old data),
+  //   // allow reset
+  //   if (_userDailyMessageCount > 0 && _userLastResetDate == null) {
+  //     return false; // Reset needed
+  //   }
+
+  //   // Check if limit reached
+  //   return _userDailyMessageCount >= MAX_DAILY_MESSAGES;
+  // }
 
   Duration getTimeUntilReset() {
     final now = DateTime.now();
@@ -189,72 +243,108 @@ class ChatProvider extends ChangeNotifier {
     return nextReset.difference(now);
   }
 
-  Future<void> loadUserMessageCount() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
+ Future<void> loadUserMessageCount() async {
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  if (userId == null) return;
 
-    try {
-      final userDoc = await _firestore.collection('users').doc(userId).get();
+  try {
+    final userDoc = await _firestore.collection('users').doc(userId).get();
 
-      if (userDoc.exists) {
-        final data = userDoc.data()!;
-        _userDailyMessageCount = data['dailyMessageCount'] ?? 0;
-        _userLastResetDate =
-            (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+    if (userDoc.exists) {
+      final data = userDoc.data()!;
+      _userDailyMessageCount = data['dailyMessageCount'] ?? 0;
+      _userLastResetDate =
+          (data['lastMessageResetDate'] as Timestamp?)?.toDate();
 
-        print(
-          '✅ Loaded user message count: $_userDailyMessageCount/$MAX_DAILY_MESSAGES',
-        );
+      print('✅ Loaded user message count: $_userDailyMessageCount/$MAX_DAILY_MESSAGES');
+    } else {
+      // ✅ NEW: Initialize brand new users properly
+      _userDailyMessageCount = 0;
+      _userLastResetDate = null;
+      
+      // Create the document with initial values
+      await _firestore.collection('users').doc(userId).set({
+        'dailyMessageCount': 0,
+        'lastMessageResetDate': Timestamp.now(),
+      }, SetOptions(merge: true));
 
-        notifyListeners();
-      }
-    } catch (e) {
-      print('❌ Error loading user message count: $e');
+      print('✅ Initialized new user with message count: 0/$MAX_DAILY_MESSAGES');
     }
+
+    notifyListeners();
+  } catch (e) {
+    print('❌ Error loading user message count: $e');
   }
+}
 
-  Future<void> _updateUserMessageCount() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
+ Future<void> _updateUserMessageCount() async {
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  if (userId == null) return;
 
-    try {
-      final now = DateTime.now();
+  try {
+    final now = DateTime.now();
+    final userRef = _firestore.collection('users').doc(userId);
 
-      // Check if we need to reset (it's past 6 AM of next day)
-      final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
-      final shouldReset =
-          _userLastResetDate == null ||
-          (now.isAfter(resetTime) &&
-              (_userLastResetDate!.isBefore(resetTime) ||
-                  _userLastResetDate!.day != now.day));
+    // Get current data
+    final userDoc = await userRef.get();
+    
+    if (!userDoc.exists) {
+      // ✅ Brand new user - create document and set count to 1
+      await userRef.set({
+        'dailyMessageCount': 1,
+        'lastMessageResetDate': Timestamp.now(),
+      }, SetOptions(merge: true));
 
-      final userRef = _firestore.collection('users').doc(userId);
-
-      if (shouldReset) {
-        // Reset counter
-        await userRef.update({
-          'dailyMessageCount': 0,
-          'lastMessageResetDate': Timestamp.now(),
-        });
-
-        _userDailyMessageCount = 0;
-        _userLastResetDate = now;
-
-        print('✅ User message count reset to 0');
-      } else {
-        // Increment counter
-        await userRef.update({'dailyMessageCount': FieldValue.increment(1)});
-
-        _userDailyMessageCount++;
-
-        print('✅ User message count incremented to $_userDailyMessageCount');
-      }
-
+      _userDailyMessageCount = 1;
+      _userLastResetDate = now;
+      
+      print('✅ New user first message - count set to 1');
       notifyListeners();
-    } catch (e) {
-      print('❌ Error updating user message count: $e');
+      return;
     }
+
+    // Existing user - check if reset needed
+    final data = userDoc.data()!;
+    final currentCount = data['dailyMessageCount'] ?? 0;
+    final lastReset = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+
+    final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
+    final shouldReset =
+        lastReset == null ||
+        (now.isAfter(resetTime) &&
+            (lastReset.isBefore(resetTime) || lastReset.day != now.day));
+
+    if (shouldReset) {
+      // ✅ Reset and set to 1 (current message)
+      await userRef.update({
+        'dailyMessageCount': 1,
+        'lastMessageResetDate': Timestamp.now(),
+      });
+
+      _userDailyMessageCount = 1;
+      _userLastResetDate = now;
+
+      print('✅ Message count reset to 1');
+    } else {
+      // ✅ Increment using transaction to avoid race conditions
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(userRef);
+        final currentCount = snapshot.data()?['dailyMessageCount'] ?? 0;
+        final newCount = currentCount + 1;
+        
+        transaction.update(userRef, {'dailyMessageCount': newCount});
+      });
+
+      _userDailyMessageCount = currentCount + 1;
+
+      print('✅ User message count incremented to $_userDailyMessageCount');
+    }
+
+    notifyListeners();
+  } catch (e) {
+    print('❌ Error updating user message count: $e');
   }
+}
 
   StreamSubscription<QuerySnapshot>? _messagesSubscription;
   bool _isSettingConversation = false;
@@ -1655,16 +1745,11 @@ Return ONLY the category name (Admission, Scholarship, Placement, or General):''
     return cleanAnswer.length >= 20;
   }
 
-  Future<bool> canUserInteract() async {
+Future<bool> canUserInteract() async {
   final userId = FirebaseAuth.instance.currentUser?.uid;
   if (userId == null) return false;
 
-  // Check if message limit is reached
-  if (isMessageLimitReached) {
-    return false;
-  }
-
-  return true;
+  return canSendMessage;
 }
 
   Future<void> _incrementFAQSimilarityCountAsync(String faqQuestion) async {
