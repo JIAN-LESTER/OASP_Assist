@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:capstone_project/responsive/user_constant.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
+import 'package:capstone_project/provider/chat_provider.dart';
 
 typedef OnFAQSelected = void Function(String question);
 
@@ -1017,280 +1018,293 @@ class FAQInputSection extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(color: surfaceColor),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: horizontalPadding,
-            vertical: verticalPadding,
-          ),
-          child: Container(
-            constraints: BoxConstraints(maxWidth: 900),
-            child: Row(
-              children: [
-                // FAQ Toggle Button
-                Tooltip(
-                  message: showFAQs ? 'Hide FAQs' : 'Show FAQs',
-                  preferBelow: true,
-                  verticalOffset: 12,
-                  textStyle: TextStyle(
-                    color: Colors.white,
-                    fontSize: fontSize - 2,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade800,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Container(
-                    width: buttonSize,
-                    height: buttonSize,
-                    decoration: BoxDecoration(
-                      color: Color(0xFFF5F5F5),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Color(0xFFE0E0E0), width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 8,
-                          offset: Offset(0, 2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Original input section
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: verticalPadding,
+              ),
+              child: Container(
+                constraints: BoxConstraints(maxWidth: 900),
+                child: Row(
+                  children: [
+                    // FAQ Toggle Button
+                    Tooltip(
+                      message: showFAQs ? 'Hide FAQs' : 'Show FAQs',
+                      preferBelow: true,
+                      verticalOffset: 12,
+                      textStyle: TextStyle(
+                        color: Colors.white,
+                        fontSize: fontSize - 2,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade800,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Container(
+                        width: buttonSize,
+                        height: buttonSize,
+                        decoration: BoxDecoration(
+                          color: Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Color(0xFFE0E0E0),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap:
-                            isLoading
-                                ? null
-                                : () {
-                                  HapticFeedback.lightImpact();
-                                  onFAQToggle();
-                                },
-                        borderRadius: BorderRadius.circular(8),
-                        splashColor: Colors.grey.withOpacity(0.1),
-                        highlightColor: Colors.grey.withOpacity(0.05),
-                        child: Center(
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              showFAQs
-                                  ? Icons.chat_bubble_outline_rounded
-                                  : Icons.help_outline_rounded,
-                              key: ValueKey(showFAQs),
-                              color:
-                                  isLoading
-                                      ? Color(0xFFCCCCCC)
-                                      : Color(0xFF666666),
-                              size: iconSize,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap:
+                                isLoading
+                                    ? null
+                                    : () {
+                                      HapticFeedback.lightImpact();
+                                      onFAQToggle();
+                                    },
+                            borderRadius: BorderRadius.circular(8),
+                            splashColor: Colors.grey.withOpacity(0.1),
+                            highlightColor: Colors.grey.withOpacity(0.05),
+                            child: Center(
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                child: Icon(
+                                  showFAQs
+                                      ? Icons.chat_bubble_outline_rounded
+                                      : Icons.help_outline_rounded,
+                                  key: ValueKey(showFAQs),
+                                  color:
+                                      isLoading
+                                          ? Color(0xFFCCCCCC)
+                                          : Color(0xFF666666),
+                                  size: iconSize,
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-                SizedBox(width: 10),
-                // Text Input Field
-                Expanded(
-                  child: Container(
-                    constraints: BoxConstraints(
-                      minHeight: buttonSize,
-                      maxHeight: 100,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isLoading ? Colors.grey.shade100 : Colors.white,
-                      borderRadius: BorderRadius.circular(borderRadius),
-                      border: Border.all(
-                        color: isLoading ? Colors.grey.shade200 : borderColor,
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
+                    SizedBox(width: 10),
+                    // Text Input Field
+                    Expanded(
+                      child: Container(
+                        constraints: BoxConstraints(
+                          minHeight: buttonSize,
+                          maxHeight: 100,
                         ),
-                      ],
-                    ),
-                    child: TextField(
-                      controller: controller,
-                      enabled: !isLoading,
-                      maxLines: null,
-                      minLines: 1,
-                      textAlignVertical: TextAlignVertical.center,
-                      style: TextStyle(
-                        fontSize: fontSize,
-                        fontWeight: FontWeight.w500,
-                        color:
-                            isLoading
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade900,
-                        height: 1.4,
-                      ),
-                      decoration: InputDecoration(
-                        hintText:
-                            isLoading
-                                ? 'Sending message...'
-                                : 'Ask something...',
-                        hintStyle: TextStyle(
-                          color: Colors.grey.shade400,
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.w400,
+                        decoration: BoxDecoration(
+                          color:
+                              isLoading ? Colors.grey.shade100 : Colors.white,
+                          borderRadius: BorderRadius.circular(borderRadius),
+                          border: Border.all(
+                            color:
+                                isLoading ? Colors.grey.shade200 : borderColor,
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 12,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
+                        child: TextField(
+                          controller: controller,
+                          enabled: !isLoading,
+                          maxLines: null,
+                          minLines: 1,
+                          textAlignVertical: TextAlignVertical.center,
+                          style: TextStyle(
+                            fontSize: fontSize,
+                            fontWeight: FontWeight.w500,
+                            color:
+                                isLoading
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade900,
+                            height: 1.4,
+                          ),
+                          decoration: InputDecoration(
+                            hintText:
+                                isLoading
+                                    ? 'Sending message...'
+                                    : 'Ask something...',
+                            hintStyle: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            isDense: true,
+                          ),
+                          onSubmitted:
+                              isLoading ? null : (_) => onSendMessage(),
                         ),
-                        isDense: true,
                       ),
-                      onSubmitted: isLoading ? null : (_) => onSendMessage(),
                     ),
-                  ),
-                ),
-                SizedBox(width: 10),
-                // Microphone Button
-                if (onMicrophoneTap != null)
-                  Tooltip(
-                    message: isListening ? 'Stop listening' : 'Voice input',
-                    preferBelow: true,
-                    verticalOffset: 12,
-                    textStyle: TextStyle(
-                      color: Colors.white,
-                      fontSize: fontSize - 2,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade800,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Container(
+                    SizedBox(width: 10),
+                    // Microphone Button
+                    if (onMicrophoneTap != null)
+                      Tooltip(
+                        message: isListening ? 'Stop listening' : 'Voice input',
+                        preferBelow: true,
+                        verticalOffset: 12,
+                        textStyle: TextStyle(
+                          color: Colors.white,
+                          fontSize: fontSize - 2,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade800,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Container(
+                          width: buttonSize,
+                          height: buttonSize,
+                          decoration: BoxDecoration(
+                            color:
+                                isListening
+                                    ? primaryColor
+                                    : isLoading
+                                    ? Color(0xFFEEEEEE)
+                                    : Color(0xFFF5F5F5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color:
+                                  isListening
+                                      ? primaryColor
+                                      : isLoading
+                                      ? Color(0xFFDDDDDD)
+                                      : Color(0xFFE0E0E0),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    isListening
+                                        ? primaryColor.withOpacity(0.3)
+                                        : Colors.black.withOpacity(0.06),
+                                blurRadius: isListening ? 12 : 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap:
+                                  isLoading
+                                      ? null
+                                      : () {
+                                        HapticFeedback.mediumImpact();
+                                        onMicrophoneTap!();
+                                      },
+                              borderRadius: BorderRadius.circular(8),
+                              splashColor:
+                                  isListening
+                                      ? Colors.white.withOpacity(0.2)
+                                      : Colors.grey.withOpacity(0.1),
+                              highlightColor:
+                                  isListening
+                                      ? Colors.white.withOpacity(0.1)
+                                      : Colors.grey.withOpacity(0.05),
+                              child: Center(
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 200),
+                                  child: Icon(
+                                    isListening ? Icons.mic : Icons.mic_none,
+                                    key: ValueKey(isListening),
+                                    color:
+                                        isListening
+                                            ? Colors.white
+                                            : isLoading
+                                            ? Color(0xFFCCCCCC)
+                                            : Color(0xFF666666),
+                                    size: iconSize,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    SizedBox(width: 10),
+                    // Send Button with Loading State
+                    Container(
                       width: buttonSize,
                       height: buttonSize,
                       decoration: BoxDecoration(
-                        color:
-                            isListening
-                                ? primaryColor
-                                : isLoading
-                                ? Color(0xFFEEEEEE)
-                                : Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color:
-                              isListening
-                                  ? primaryColor
-                                  : isLoading
-                                  ? Color(0xFFDDDDDD)
-                                  : Color(0xFFE0E0E0),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                isListening
-                                    ? primaryColor.withOpacity(0.3)
-                                    : Colors.black.withOpacity(0.06),
-                            blurRadius: isListening ? 12 : 8,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
+                        color: isLoading ? Colors.grey.shade400 : primaryColor,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow:
+                            isLoading
+                                ? []
+                                : [
+                                  BoxShadow(
+                                    color: primaryColor.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
                       ),
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
-                          onTap:
-                              isLoading
-                                  ? null
-                                  : () {
-                                    HapticFeedback.mediumImpact();
-                                    onMicrophoneTap!();
-                                  },
-                          borderRadius: BorderRadius.circular(8),
-                          splashColor:
-                              isListening
-                                  ? Colors.white.withOpacity(0.2)
-                                  : Colors.grey.withOpacity(0.1),
-                          highlightColor:
-                              isListening
-                                  ? Colors.white.withOpacity(0.1)
-                                  : Colors.grey.withOpacity(0.05),
+                          onTap: isLoading ? null : onSendMessage,
+                          borderRadius: BorderRadius.circular(10),
+                          splashColor: Colors.white.withOpacity(0.2),
+                          highlightColor: Colors.white.withOpacity(0.1),
                           child: Center(
                             child: AnimatedSwitcher(
                               duration: const Duration(milliseconds: 200),
-                              child: Icon(
-                                isListening ? Icons.mic : Icons.mic_none,
-                                key: ValueKey(isListening),
-                                color:
-                                    isListening
-                                        ? Colors.white
-                                        : isLoading
-                                        ? Color(0xFFCCCCCC)
-                                        : Color(0xFF666666),
-                                size: iconSize,
-                              ),
+                              child:
+                                  isLoading
+                                      ? SizedBox(
+                                        width: iconSize - 4,
+                                        height: iconSize - 4,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
+                                        ),
+                                      )
+                                      : Icon(
+                                        Icons.arrow_forward_rounded,
+                                        color: Colors.white,
+                                        size: iconSize,
+                                        key: ValueKey('send'),
+                                      ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                SizedBox(width: 10),
-                // Send Button with Loading State
-                Container(
-                  width: buttonSize,
-                  height: buttonSize,
-                  decoration: BoxDecoration(
-                    color: isLoading ? Colors.grey.shade400 : primaryColor,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow:
-                        isLoading
-                            ? []
-                            : [
-                              BoxShadow(
-                                color: primaryColor.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: isLoading ? null : onSendMessage,
-                      borderRadius: BorderRadius.circular(10),
-                      splashColor: Colors.white.withOpacity(0.2),
-                      highlightColor: Colors.white.withOpacity(0.1),
-                      child: Center(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          child:
-                              isLoading
-                                  ? SizedBox(
-                                    width: iconSize - 4,
-                                    height: iconSize - 4,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                  : Icon(
-                                    Icons.arrow_forward_rounded,
-                                    color: Colors.white,
-                                    size: iconSize,
-                                    key: ValueKey('send'),
-                                  ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

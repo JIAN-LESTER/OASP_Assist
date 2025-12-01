@@ -589,10 +589,8 @@ class ChatUtilities {
 class MessageLimitDialog extends StatefulWidget {
   final Duration timeUntilReset;
 
-  const MessageLimitDialog({
-    Key? key,
-    required this.timeUntilReset,
-  }) : super(key: key);
+  const MessageLimitDialog({Key? key, required this.timeUntilReset})
+    : super(key: key);
 
   @override
   State<MessageLimitDialog> createState() => _MessageLimitDialogState();
@@ -618,7 +616,7 @@ class _MessageLimitDialogState extends State<MessageLimitDialog> {
 
       setState(() {
         _remainingTime = _remainingTime - Duration(seconds: 1);
-        
+
         if (_remainingTime.isNegative) {
           timer.cancel();
           Navigator.of(context).pop();
@@ -631,7 +629,7 @@ class _MessageLimitDialogState extends State<MessageLimitDialog> {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
-    
+
     if (hours > 0) {
       return '${hours}h ${minutes}m ${seconds}s';
     } else if (minutes > 0) {
@@ -650,9 +648,7 @@ class _MessageLimitDialogState extends State<MessageLimitDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       elevation: 8,
       child: Container(
         constraints: const BoxConstraints(maxWidth: 400),
@@ -702,11 +698,8 @@ class _MessageLimitDialogState extends State<MessageLimitDialog> {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'You\'ve used all 5 messages today',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.white70,
-                          ),
+                          'You\'ve used all 10 messages today',
+                          style: TextStyle(fontSize: 13, color: Colors.white70),
                         ),
                       ],
                     ),
@@ -764,9 +757,9 @@ class _MessageLimitDialogState extends State<MessageLimitDialog> {
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   // Info
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -785,7 +778,7 @@ class _MessageLimitDialogState extends State<MessageLimitDialog> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'This limit helps us provide quality service to all users. You can send 5 more messages after the reset.',
+                            'This limit helps us provide quality service to all users. You can send 10 more messages after the reset.',
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.blue.shade900,
@@ -818,12 +811,247 @@ class _MessageLimitDialogState extends State<MessageLimitDialog> {
                   ),
                   child: const Text(
                     'Got it',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                   ),
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MessageLimitWarningDialog extends StatelessWidget {
+  final int remainingMessages;
+  final Duration timeUntilReset;
+
+  const MessageLimitWarningDialog({
+    Key? key,
+    required this.remainingMessages,
+    required this.timeUntilReset,
+  }) : super(key: key);
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    } else {
+      return '${minutes}m';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 8,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.amber.shade600, Colors.orange.shade400],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Running Low on Messages',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'You\'re approaching your daily limit',
+                          style: TextStyle(fontSize: 13, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  // Remaining messages indicator
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.amber.shade200),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 48,
+                          color: Colors.amber.shade700,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          '$remainingMessages message${remainingMessages == 1 ? '' : 's'} left',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'out of 10 daily messages',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Reset info
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.refresh,
+                          color: Colors.blue.shade700,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Resets in ${_formatDuration(timeUntilReset)}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue.shade900,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Limit resets daily at 6:00 AM',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Close button
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: Row(
+                children: [
+                  //  Cancel button
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed:
+                          () =>
+                              Navigator.of(context).pop(false), // Returns false
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(
+                          color: Colors.grey.shade300,
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  //  MODIFIED: Send anyway button
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed:
+                          () => Navigator.of(context).pop(true), // Returns true
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E7D32),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text(
+                        'Send Anyway',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
