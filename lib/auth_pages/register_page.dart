@@ -987,7 +987,7 @@ class _RegisterPageState extends State<RegisterPage> {
               hintText: "Confirm Password",
               obscureText: true,
               isPasswordField: true,
-              onSubmitted: (_) => _submitWithEnter(),
+              onSubmitted: (_) => registerUser(),
             ),
             _buildErrorText(_confirmPasswordError, fontSizeMultiplier),
 
