@@ -28,65 +28,79 @@ class _HumanEscalationState extends State<HumanEscalation>
 
   final List<String> _filterOptions = ['all', 'pending', 'resolved'];
 
+  // ✅ Track if we've already auto-opened to prevent re-opening
   bool _hasAutoOpened = false;
 
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  _refreshAnimationController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1000),
-  );
+    _refreshAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
 
-  // Initialize the stream once
-  _escalationsStream = FirebaseFirestore.instance
-      .collection('escalations')
-      .orderBy('createdAt', descending: true)
-      .snapshots();
+    // Initialize the stream once
+    _escalationsStream = FirebaseFirestore.instance
+        .collection('escalations')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
 
-  _searchController.addListener(() {
-    setState(() {
-      _searchQuery = _searchController.text.toLowerCase();
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.toLowerCase();
+      });
     });
-  });
 
-  print('📄 HumanEscalation initState:');
-  print('   - initialEscalationId: ${widget.initialEscalationId}');
-  print('   - autoOpen: ${widget.autoOpen}');
+    print('📄 HumanEscalation initState:');
+    print('   - initialEscalationId: ${widget.initialEscalationId}');
+    print('   - autoOpen: ${widget.autoOpen}');
+    print('   - _hasAutoOpened: $_hasAutoOpened');
 
-  // ✅ FIX: Only auto-open if BOTH conditions are true
-  if (widget.autoOpen == true && 
-      widget.initialEscalationId != null && 
-      widget.initialEscalationId!.isNotEmpty) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      print('⏰ Post-frame callback: Opening escalation ${widget.initialEscalationId}');
-      _openEscalationById(widget.initialEscalationId!);
-    });
+    // ✅ Only auto-open if we haven't already done so
+    if (!_hasAutoOpened &&
+        widget.autoOpen == true && 
+        widget.initialEscalationId != null && 
+        widget.initialEscalationId!.isNotEmpty) {
+      _hasAutoOpened = true; // ✅ Mark as opened
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        print('⏰ Post-frame callback: Opening escalation ${widget.initialEscalationId}');
+        _openEscalationById(widget.initialEscalationId!);
+      });
+    }
   }
-}
- @override
-void didUpdateWidget(HumanEscalation oldWidget) {
-  super.didUpdateWidget(oldWidget);
 
-  print('🔄 HumanEscalation didUpdateWidget:');
-  print('   - old escalationId: ${oldWidget.initialEscalationId}');
-  print('   - new escalationId: ${widget.initialEscalationId}');
-  print('   - old autoOpen: ${oldWidget.autoOpen}');
-  print('   - new autoOpen: ${widget.autoOpen}');
+  @override
+  void didUpdateWidget(HumanEscalation oldWidget) {
+    super.didUpdateWidget(oldWidget);
 
-  // ✅ FIX: Only auto-open if ALL conditions are true
-  if (widget.autoOpen == true &&
-      widget.initialEscalationId != null &&
-      widget.initialEscalationId!.isNotEmpty &&
-      widget.initialEscalationId != oldWidget.initialEscalationId) {
-    print('🔄 Escalation changed, opening new escalation');
+    print('🔄 HumanEscalation didUpdateWidget:');
+    print('   - old escalationId: ${oldWidget.initialEscalationId}');
+    print('   - new escalationId: ${widget.initialEscalationId}');
+    print('   - old autoOpen: ${oldWidget.autoOpen}');
+    print('   - new autoOpen: ${widget.autoOpen}');
+    print('   - _hasAutoOpened: $_hasAutoOpened');
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _openEscalationById(widget.initialEscalationId!);
-    });
+    // ✅ Reset _hasAutoOpened if the escalation ID actually changed to a new non-null value
+    if (widget.initialEscalationId != oldWidget.initialEscalationId &&
+        widget.initialEscalationId != null) {
+      _hasAutoOpened = false;
+    }
+
+    // ✅ Only auto-open if we haven't already and conditions are met
+    if (!_hasAutoOpened &&
+        widget.autoOpen == true &&
+        widget.initialEscalationId != null &&
+        widget.initialEscalationId!.isNotEmpty &&
+        widget.initialEscalationId != oldWidget.initialEscalationId) {
+      print('🔄 Escalation changed, opening new escalation');
+      _hasAutoOpened = true; // ✅ Mark as opened
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openEscalationById(widget.initialEscalationId!);
+      });
+    }
   }
-}
 
   Future<void> _openEscalationById(String escalationId) async {
     try {

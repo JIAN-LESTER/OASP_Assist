@@ -39,6 +39,10 @@ class AdminMainPage extends StatefulWidget {
 class _AdminMainPageState extends State<AdminMainPage> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
+  
+  // ✅ Add state variables to track escalation parameters
+  String? _currentEscalationId;
+  bool _shouldAutoOpen = false;
 
   @override
   void initState() {
@@ -50,28 +54,26 @@ class _AdminMainPageState extends State<AdminMainPage> {
       print('🎯 Admin initial tab set to: $_selectedIndex');
     }
 
-    // ✅ Handle escalation auto-open after build
+    // ✅ Copy escalation parameters to state (they'll be cleared after use)
     if (widget.autoOpen && widget.escalationId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _handleEscalationAutoOpen();
-      });
+      _currentEscalationId = widget.escalationId;
+      _shouldAutoOpen = true;
     }
-  }
-
-  void _handleEscalationAutoOpen() {
-    print('🔓 Auto-opening escalation: ${widget.escalationId}');
-    // Add your escalation auto-open logic here
-    // This would typically involve opening a dialog or navigating to detail
   }
 
   // Create a method to handle navigation
   void _navigateToPage(int index) {
     setState(() {
       _selectedIndex = index;
+      // ✅ Clear escalation parameters when navigating away from escalation page
+      if (index != 5) { // 5 is the index of HumanEscalation page
+        _currentEscalationId = null;
+        _shouldAutoOpen = false;
+      }
     });
   }
 
-  // Update the _pages list to pass the callback and handle escalation
+  // Update the _pages list to use state variables
   List<Widget> get _pages => [
     const DashboardPage(),
     const ReportsPage(),
@@ -79,10 +81,11 @@ class _AdminMainPageState extends State<AdminMainPage> {
     const FaqManagementPage(),
     const AnnouncementPage(),
 
-    // ✅ Pass escalation parameters to HumanEscalation page
+    // ✅ Pass state variables instead of widget properties
     HumanEscalation(
-      initialEscalationId: widget.escalationId,
-      autoOpen: widget.autoOpen,
+      key: ValueKey('escalation_${_currentEscalationId}_$_shouldAutoOpen'), // ✅ Add key to force rebuild
+      initialEscalationId: _currentEscalationId,
+      autoOpen: _shouldAutoOpen,
     ),
 
     UserManagementPage(onNavigateToPage: _navigateToPage),
@@ -115,6 +118,11 @@ class _AdminMainPageState extends State<AdminMainPage> {
   void _onNavigationItemTap(int index) {
     setState(() {
       _selectedIndex = index;
+      // ✅ Clear escalation parameters when navigating away
+      if (index != 5) {
+        _currentEscalationId = null;
+        _shouldAutoOpen = false;
+      }
     });
   }
 
