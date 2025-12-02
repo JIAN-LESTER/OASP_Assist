@@ -39,7 +39,7 @@ class _HomeDashboardState extends State<HomeDashboard>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 200),
       vsync: this,
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -51,18 +51,12 @@ class _HomeDashboardState extends State<HomeDashboard>
     _batchLoadData();
   }
 
-  // Optimized batch loading with priority
   Future<void> _batchLoadData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Priority 1: User data and messages (most important, load first)
-    _loadCriticalData(user);
-
-    // Priority 2: Services data (load after a brief delay)
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) _loadServicesData();
-    });
+    // Load everything in parallel immediately
+    await Future.wait([_loadCriticalData(user), _loadServicesData()]);
   }
 
   // Load critical data first (user info + chat)
@@ -247,8 +241,6 @@ class _HomeDashboardState extends State<HomeDashboard>
                     sliver: _buildServicesGrid(),
                   ),
 
-                
-
                   // Bottom spacing
                   SliverToBoxAdapter(
                     child: SizedBox(height: _isMobile(context) ? 20 : 30),
@@ -391,124 +383,123 @@ class _HomeDashboardState extends State<HomeDashboard>
     );
   }
 
+  Widget _buildChatPreviewSection() {
+    final isMobile = _isMobile(context);
 
-Widget _buildChatPreviewSection() {
-  final isMobile = _isMobile(context);
+    if (!_messagesLoaded) {
+      return _buildChatLoadingSkeleton(isMobile);
+    }
 
-  if (!_messagesLoaded) {
-    return _buildChatLoadingSkeleton(isMobile);
-  }
+    final hasConversation =
+        _cachedMessages != null && _cachedMessages!.isNotEmpty;
 
-  final hasConversation =
-      _cachedMessages != null && _cachedMessages!.isNotEmpty;
-
-  return GestureDetector(
-    onTap: () => _navigateToChatTab(context, hasConversation),
-    child: Container(
-      margin: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 20,
-        vertical: 8,
-      ),
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF2E7D32).withOpacity(0.15),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2E7D32).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: () => _navigateToChatTab(context, hasConversation),
+      child: Container(
+        margin: EdgeInsets.symmetric(
+          horizontal: isMobile ? 16 : 20,
+          vertical: 8,
+        ),
+        padding: EdgeInsets.all(isMobile ? 16 : 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2E7D32).withOpacity(0.15),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2E7D32).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.smart_toy,
+                    color: const Color(0xFF2E7D32),
+                    size: isMobile ? 24 : 28,
+                  ),
                 ),
-                child: Icon(
-                  Icons.smart_toy,
-                  color: const Color(0xFF2E7D32),
-                  size: isMobile ? 24 : 28,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ✅ UPDATED: Using MarkdownBody for bold text
-                    MarkdownBody(
-                      data: '**AI Chat Assistant**',
-                      styleSheet: MarkdownStyleSheet(
-                        p: TextStyle(
-                          fontSize: isMobile ? 16 : 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                        strong: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ✅ UPDATED: Using MarkdownBody for bold text
+                      MarkdownBody(
+                        data: '**AI Chat Assistant**',
+                        styleSheet: MarkdownStyleSheet(
+                          p: TextStyle(
+                            fontSize: isMobile ? 16 : 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                          strong: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Online',
-                          style: TextStyle(
-                            fontSize: isMobile ? 12 : 13,
-                            color: Colors.green,
-                            fontWeight: FontWeight.w500,
+                          const SizedBox(width: 6),
+                          Text(
+                            'Online',
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 13,
+                              color: Colors.green,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            if (!hasConversation)
+              _buildNoMessagesYet(isMobile)
+            else
+              _buildRealChatMessages(_cachedMessages!, isMobile),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _navigateToChatTab(context, hasConversation),
+                icon: const Icon(Icons.arrow_forward, size: 18),
+                label: Text(hasConversation ? 'Continue Chat' : 'Start Chat'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF2E7D32),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Divider(height: 1),
-          const SizedBox(height: 16),
-          if (!hasConversation)
-            _buildNoMessagesYet(isMobile)
-          else
-            _buildRealChatMessages(_cachedMessages!, isMobile),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () => _navigateToChatTab(context, hasConversation),
-              icon: const Icon(Icons.arrow_forward, size: 18),
-              label: Text(hasConversation ? 'Continue Chat' : 'Start Chat'),
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF2E7D32),
-              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildChatLoadingSkeleton(bool isMobile) {
     return Container(
@@ -1240,7 +1231,6 @@ Widget _buildChatPreviewSection() {
                           color: Colors.black87,
                         ),
                       ),
-                    
                     ],
                   ),
                 ),
@@ -1409,13 +1399,14 @@ Widget _buildChatPreviewSection() {
     );
   }
 
-
-  
-
   void _navigateToTab(BuildContext context, int tabIndex) {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => UserMainPage(initialTabIndex: tabIndex),
+      PageRouteBuilder(
+        pageBuilder:
+            (context, animation, secondaryAnimation) =>
+                UserMainPage(initialTabIndex: tabIndex),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
       ),
     );
   }
@@ -1423,24 +1414,26 @@ Widget _buildChatPreviewSection() {
   void _navigateToChatTab(BuildContext context, bool hasConversation) {
     if (hasConversation && _currentConversationId != null) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder:
-              (context) => UserMainPage(
+        PageRouteBuilder(
+          pageBuilder:
+              (context, animation, secondaryAnimation) => UserMainPage(
                 initialTabIndex: 1,
                 conversationId: _currentConversationId,
               ),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
         ),
       );
     } else {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => UserMainPage(initialTabIndex: 1),
+        PageRouteBuilder(
+          pageBuilder:
+              (context, animation, secondaryAnimation) =>
+                  UserMainPage(initialTabIndex: 1),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
         ),
       );
     }
   }
-
-
-
-  
 }

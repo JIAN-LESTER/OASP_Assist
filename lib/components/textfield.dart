@@ -9,6 +9,7 @@ class Textfield extends StatefulWidget {
   final Widget? prefixIcon; // Optional prefix icon
   final Widget? suffixIcon; // Optional suffix icon (like show/hide password)
   final bool isPasswordField; // New parameter to identify password fields
+  final ValueChanged<String>? onSubmitted; // Add this line
 
   const Textfield({
     super.key,
@@ -20,6 +21,7 @@ class Textfield extends StatefulWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.isPasswordField = false, // Default to false
+    this.onSubmitted,
   });
 
   @override
@@ -93,13 +95,14 @@ class _TextfieldState extends State<Textfield> {
         vertical: 10,
       ), // Match button padding
       child: TextFormField(
-        // Use TextFormField for validation support
         controller: widget.controller,
         obscureText: _isObscured,
         validator: widget.validator,
         keyboardType:
             widget.keyboardType ??
             (_isObscured ? TextInputType.text : TextInputType.emailAddress),
+        onFieldSubmitted: widget.onSubmitted,
+
         style: const TextStyle(
           fontFamily: 'Poppins',
           fontSize: 14,

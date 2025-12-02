@@ -127,7 +127,6 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       }
 
       await chatProvider.setConversationId(widget.conversationId);
-      await Future.delayed(Duration(milliseconds: 800));
 
       _initialMessageIds.clear();
       for (var message in chatProvider.messages) {
@@ -201,6 +200,8 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isInitialized) {
         _initializeConversation();
+        chatProvider.loadUserMessageCount();
+        chatProvider.listenToUserMessageCount();
         _isInitialized = true;
       }
     });
@@ -209,20 +210,6 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       if (mounted && !_showFAQs) {
         _scrollToBottomSmooth();
       }
-    });
-
-    // ✅ FIX: Start in loading state
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_isInitialized) {
-        _initializeConversation();
-        _isInitialized = true;
-      }
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      chatProvider.loadUserMessageCount();
-      chatProvider
-          .listenToUserMessageCount(); // Start listening to real-time updates
     });
   }
 
@@ -2600,7 +2587,6 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -2612,26 +2598,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
             children: [
               Expanded(
                 child:
-                    _isLoadingConversation
-                        ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircularProgressIndicator(
-                                color: Color(0xFF2E7D32),
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                'Loading conversation...',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                        : _showFAQs
+                    _showFAQs
                         ? FAQSection(
                           key: _faqSectionKey,
                           onFAQSelected: _onFAQSelected,

@@ -132,6 +132,12 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
+  void _submitWithEnter() {
+    if (_isLoading) return;
+    FocusScope.of(context).unfocus();
+    registerUser();
+  }
+
   Future<bool> _isEmailTaken(String email) async {
     try {
       // Check Firebase Auth first (most authoritative source)
@@ -655,81 +661,84 @@ class _RegisterPageState extends State<RegisterPage> {
                                   print('🔵 Continue to Sign In pressed');
 
                                   try {
-                                    // Sign out user
+                                    // 1. Sign out user first
                                     await FirebaseAuth.instance.signOut();
                                     print('✅ User signed out');
 
-                                    // Clear form fields
+                                    // 2. Clear form fields
                                     emailController.clear();
                                     passwordController.clear();
                                     confirmPasswordController.clear();
 
-                                    // Close dialog
-                                    if (mounted) {
-                                      Navigator.of(
-                                        context,
-                                        rootNavigator: true,
-                                      ).pop();
+                                    // 3. Close dialog using Navigator.pop() without rootNavigator
+                                    if (!mounted) return;
+                                    Navigator.pop(
+                                      context,
+                                    ); // This closes the dialog
 
-                                      // Navigate back to login
-                                      await Future.delayed(
-                                        const Duration(milliseconds: 150),
-                                      );
+                                    // 4. Small delay to let dialog close animation complete
+                                    await Future.delayed(
+                                      const Duration(milliseconds: 100),
+                                    );
 
-                                      if (mounted) {
-                                        Navigator.of(context).pop();
+                                    // 5. Navigate back to login page
+                                    if (!mounted) return;
+                                    Navigator.pop(
+                                      context,
+                                    ); // This goes back to login page
 
-                                        // Show success message
-                                        await Future.delayed(
-                                          const Duration(milliseconds: 200),
-                                        );
+                                    // 6. Show success message after navigation
+                                    await Future.delayed(
+                                      const Duration(milliseconds: 150),
+                                    );
 
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Row(
-                                                children: const [
-                                                  Icon(
-                                                    Icons.check_circle,
-                                                    color: Colors.white,
-                                                  ),
-                                                  SizedBox(width: 12),
-                                                  Expanded(
-                                                    child: Text(
-                                                      'Account created! Please verify your email.',
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              backgroundColor: Colors.green,
-                                              duration: const Duration(
-                                                seconds: 5,
-                                              ),
-                                              behavior:
-                                                  SnackBarBehavior.floating,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Row(
+                                          children: const [
+                                            Icon(
+                                              Icons.check_circle,
+                                              color: Colors.white,
+                                            ),
+                                            SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                'Account created! Please verify your email.',
                                               ),
                                             ),
-                                          );
-                                        }
-                                      }
-                                    }
+                                          ],
+                                        ),
+                                        backgroundColor: Colors.green,
+                                        duration: const Duration(seconds: 5),
+                                        behavior: SnackBarBehavior.floating,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                      ),
+                                    );
                                   } catch (e) {
                                     print('❌ Navigation error: $e');
+                                    // Fallback: try to close everything
                                     if (mounted) {
-                                      try {
-                                        Navigator.of(
-                                          context,
-                                          rootNavigator: true,
-                                        ).pop();
-                                      } catch (_) {}
+                                      // Try to pop dialog
                                       try {
                                         Navigator.of(context).pop();
                                       } catch (_) {}
+
+                                      // Small delay
+                                      await Future.delayed(
+                                        const Duration(milliseconds: 50),
+                                      );
+
+                                      // Try to go back to login
+                                      if (mounted) {
+                                        try {
+                                          Navigator.of(context).pop();
+                                        } catch (_) {}
+                                      }
                                     }
                                   }
                                 },
@@ -955,6 +964,7 @@ class _RegisterPageState extends State<RegisterPage> {
               hintText: "Email",
               obscureText: false,
               keyboardType: TextInputType.emailAddress,
+              onSubmitted: (_) => _submitWithEnter(),
             ),
             _buildErrorText(_emailError, fontSizeMultiplier),
 
@@ -965,6 +975,7 @@ class _RegisterPageState extends State<RegisterPage> {
               hintText: "Password",
               obscureText: true,
               isPasswordField: true,
+              onSubmitted: (_) => _submitWithEnter(),
             ),
             _buildErrorText(_passwordError, fontSizeMultiplier),
 
@@ -975,6 +986,7 @@ class _RegisterPageState extends State<RegisterPage> {
               hintText: "Confirm Password",
               obscureText: true,
               isPasswordField: true,
+              onSubmitted: (_) => registerUser(),
             ),
             _buildErrorText(_confirmPasswordError, fontSizeMultiplier),
 

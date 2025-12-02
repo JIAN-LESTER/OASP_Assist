@@ -2119,6 +2119,7 @@ class UniversalUIComponents {
 
         return Container(
           key: profileKey,
+
           margin: const EdgeInsets.only(top: 8, bottom: 8, right: 8),
           child: PopupMenuButton<String>(
             tooltip: '',
@@ -2133,8 +2134,10 @@ class UniversalUIComponents {
                 showGeneralDialog(
                   context: context,
                   barrierDismissible: true,
+
                   barrierLabel: 'Profile',
                   barrierColor: Colors.black.withOpacity(0.5),
+
                   pageBuilder: (context, animation, secondaryAnimation) {
                     return const ProfileModal();
                   },
@@ -2152,12 +2155,12 @@ class UniversalUIComponents {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: primaryGreen.withOpacity(0.1),
+                            color: Colors.white, // white background
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.person_outline_rounded,
-                            color: primaryGreen,
+                            color: Colors.black, // black icon
                             size: 18,
                           ),
                         ),
@@ -2167,13 +2170,15 @@ class UniversalUIComponents {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF1B5E20),
+                            color: Colors.black, // black text
                           ),
                         ),
                       ],
                     ),
                   ),
+
                   const PopupMenuDivider(),
+
                   PopupMenuItem<String>(
                     value: 'logout',
                     child: Row(
@@ -2181,12 +2186,12 @@ class UniversalUIComponents {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade50,
+                            color: Colors.white, // white background
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
                             Icons.logout_rounded,
-                            color: Colors.red.shade600,
+                            color: Colors.red.shade600, // red icon
                             size: 18,
                           ),
                         ),
@@ -2196,7 +2201,7 @@ class UniversalUIComponents {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: Colors.red.shade600,
+                            color: Colors.red.shade600, // red text
                           ),
                         ),
                       ],
@@ -2208,7 +2213,7 @@ class UniversalUIComponents {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
+                  SizedBox(
                     width: 28,
                     height: 28,
                     child: const Icon(

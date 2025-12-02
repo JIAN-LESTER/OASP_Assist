@@ -438,6 +438,7 @@ class _LoginPageState extends State<LoginPage> {
               hintText: "Email",
               obscureText: false,
               keyboardType: TextInputType.emailAddress,
+              onSubmitted: (_) => signUserIn(),
             ),
             _buildErrorText(_emailError, fontSizeMultiplier),
 
@@ -448,6 +449,7 @@ class _LoginPageState extends State<LoginPage> {
               hintText: "Password",
               obscureText: true,
               isPasswordField: true,
+              onSubmitted: (_) => signUserIn(),
             ),
             _buildErrorText(_passwordError, fontSizeMultiplier),
 
