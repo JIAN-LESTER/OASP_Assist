@@ -159,9 +159,6 @@ class _UserMainPageState extends State<UserMainPage>
         // Clear the flag so it doesn't show again
         await prefs.setBool('should_show_guide', false);
 
-        // ✅ NEW: Set flag for welcome dialog BEFORE starting guide
-        await prefs.setBool('should_show_welcome_dialog', true);
-
         // Wait a bit for the UI to settle
         await Future.delayed(const Duration(milliseconds: 500));
 
@@ -176,39 +173,6 @@ class _UserMainPageState extends State<UserMainPage>
       }
     } catch (e) {
       print('❌ Error checking onboarding guide: $e');
-    }
-  }
-
-  // ✅ PUBLIC METHOD: Check and show welcome dialog (called by OnboardingGuide)
-  Future<void> checkAndShowWelcomeDialog() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final shouldShowWelcome =
-          prefs.getBool('should_show_welcome_dialog') ?? false;
-
-      if (shouldShowWelcome && mounted) {
-        // Clear the flag
-        await prefs.setBool('should_show_welcome_dialog', false);
-
-        // Wait for OnboardingGuide to fully complete
-        await Future.delayed(const Duration(milliseconds: 800));
-
-        // Show the welcome dialog
-        if (mounted) {
-          final chatProvider = Provider.of<ChatProvider>(
-            context,
-            listen: false,
-          );
-          final hasSeenWelcome = await chatProvider.hasSeenWelcome();
-
-          if (!hasSeenWelcome) {
-            await _showWelcomeDialog();
-            await chatProvider.markWelcomeSeen();
-          }
-        }
-      }
-    } catch (e) {
-      print('❌ Error checking welcome dialog: $e');
     }
   }
 
@@ -958,8 +922,10 @@ class _UserMainPageState extends State<UserMainPage>
           profileKey: _profileKey,
           bottomNavKey: _bottomNavKey,
           onFinished: () async {
-            // ✅ NEW: Callback when guide finishes
-            await checkAndShowWelcomeDialog();
+            //  Callback when guide finishes
+            print('✅ Onboarding guide completed');
+            // ✅ Show welcome dialog after onboarding
+            await _showWelcomeDialog();
           },
           child: ResponsiveLayout(
             mobileBody: _buildMobileLayout(_pages),
