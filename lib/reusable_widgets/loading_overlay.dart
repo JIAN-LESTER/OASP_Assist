@@ -33,7 +33,7 @@ Widget buildContentLoadingOverlay(String loadingText) {
           ),
           const SizedBox(height: 24),
           Text(
-            loadingText,   // 👈 Dynamic wording here
+            loadingText,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -44,10 +44,7 @@ Widget buildContentLoadingOverlay(String loadingText) {
           const SizedBox(height: 8),
           Text(
             'Please wait a moment',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
           ),
         ],
       ),

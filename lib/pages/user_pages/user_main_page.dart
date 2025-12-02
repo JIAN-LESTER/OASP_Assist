@@ -611,13 +611,6 @@ class _UserMainPageState extends State<UserMainPage>
   ];
 
   String _navigationLoadingTextForIndex(int index) {
-    if (index == 0) return 'Loading home...';
-    if (index == 1) return 'Loading chat...';
-    if (index == 2) return 'Loading announcements...';
-    if (index == 3) return 'Loading admission info...';
-    if (index == 4) return 'Loading scholarships...';
-    if (index == 5) return 'Loading placement info...';
-
     return 'Loading...';
   }
 
@@ -631,17 +624,18 @@ class _UserMainPageState extends State<UserMainPage>
       return;
     }
 
-    // 🎯 Update wording BEFORE overlay shows
-    _loadingText = _navigationLoadingTextForIndex(index);
+    // ✅ Only show loading for index 1 (Chat)
+    final shouldShowLoading =
+        index == 1 && (_conversationId != null && _conversationId!.isNotEmpty);
 
-    // 🔥 Show loading overlay
-    setState(() {
-      _isNavigating = true;
-    });
+    if (shouldShowLoading) {
+      _loadingText = 'Loading...';
+      setState(() {
+        _isNavigating = true;
+      });
+    }
 
     try {
-      await Future.delayed(Duration(milliseconds: 80));
-
       if (index == 1) {
         final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
@@ -654,7 +648,6 @@ class _UserMainPageState extends State<UserMainPage>
         } else {
           print('🔄 Loading existing conversation $_conversationId');
           await chatProvider.setConversationId(_conversationId!);
-          await Future.delayed(Duration(milliseconds: 400));
 
           final hasMessages = chatProvider.messages.isNotEmpty;
 
@@ -664,8 +657,7 @@ class _UserMainPageState extends State<UserMainPage>
           });
         }
 
-        _tabController.animateTo(1);
-        await Future.delayed(Duration(milliseconds: 250));
+        _tabController.animateTo(1, duration: Duration.zero); // ✅ Instant
       } else {
         print('➡️ Navigating to tab: $index');
 
@@ -674,8 +666,7 @@ class _UserMainPageState extends State<UserMainPage>
           _selectedIndex = index;
         });
 
-        _tabController.animateTo(index);
-        await Future.delayed(Duration(milliseconds: 250));
+        _tabController.animateTo(index, duration: Duration.zero); // ✅ Instant
       }
     } catch (e) {
       print('❌ Navigation error: $e');

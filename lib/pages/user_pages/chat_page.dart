@@ -126,7 +126,6 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       }
 
       await chatProvider.setConversationId(widget.conversationId);
-      await Future.delayed(Duration(milliseconds: 800));
 
       _initialMessageIds.clear();
       for (var message in chatProvider.messages) {
@@ -194,12 +193,12 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     _initChatSpeechToText();
     chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-    // Welcome dialog will be shown by UserMainPage after onboarding
-
-    // ✅ FIX: Only initialize once in postFrameCallback
+    // ✅ Initialize ONCE in postFrameCallback
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isInitialized) {
         _initializeConversation();
+        chatProvider.loadUserMessageCount();
+        chatProvider.listenToUserMessageCount();
         _isInitialized = true;
       }
     });
@@ -208,20 +207,6 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       if (mounted && !_showFAQs) {
         _scrollToBottomSmooth();
       }
-    });
-
-    // ✅ FIX: Start in loading state
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_isInitialized) {
-        _initializeConversation();
-        _isInitialized = true;
-      }
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      chatProvider.loadUserMessageCount();
-      chatProvider
-          .listenToUserMessageCount(); // Start listening to real-time updates
     });
   }
 
@@ -2329,51 +2314,55 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   }
 
   Future<void> _onLinkTap(LinkableElement link) async {
-  final url = link.url;
+    final url = link.url;
 
-  try {
-    if (url.startsWith('tel:')) {
-      // Opens phone dialer or copies number
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      if (url.startsWith('tel:')) {
+        // Opens phone dialer or copies number
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          await Clipboard.setData(
+            ClipboardData(text: url.replaceFirst('tel:', '')),
+          );
+          if (mounted) {
+            _showSnackBar('Phone number copied to clipboard', Icons.phone);
+          }
+        }
+      } else if (url.startsWith('mailto:')) {
+        // Opens email client or copies email
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          await Clipboard.setData(
+            ClipboardData(text: url.replaceFirst('mailto:', '')),
+          );
+          if (mounted) {
+            _showSnackBar('Email copied to clipboard', Icons.email);
+          }
+        }
       } else {
-        await Clipboard.setData(ClipboardData(text: url.replaceFirst('tel:', '')));
-        if (mounted) {
-          _showSnackBar('Phone number copied to clipboard', Icons.phone);
+        // Opens web URLs in external browser
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          await Clipboard.setData(ClipboardData(text: url));
+          if (mounted) {
+            _showSnackBar('Link copied to clipboard', Icons.link);
+          }
         }
       }
-    } else if (url.startsWith('mailto:')) {
-      // Opens email client or copies email
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await Clipboard.setData(ClipboardData(text: url.replaceFirst('mailto:', '')));
-        if (mounted) {
-          _showSnackBar('Email copied to clipboard', Icons.email);
-        }
+    } catch (e) {
+      // Fallback: copy link to clipboard
+      await Clipboard.setData(ClipboardData(text: url));
+      if (mounted) {
+        _showSnackBar('Link copied to clipboard', Icons.content_copy);
       }
-    } else {
-      // Opens web URLs in external browser
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await Clipboard.setData(ClipboardData(text: url));
-        if (mounted) {
-          _showSnackBar('Link copied to clipboard', Icons.link);
-        }
-      }
-    }
-  } catch (e) {
-    // Fallback: copy link to clipboard
-    await Clipboard.setData(ClipboardData(text: url));
-    if (mounted) {
-      _showSnackBar('Link copied to clipboard', Icons.content_copy);
     }
   }
-}
 
   void _showMessageOptions(BuildContext context, Message message) {
     showModalBottomSheet(
@@ -2561,7 +2550,6 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -2573,26 +2561,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
             children: [
               Expanded(
                 child:
-                    _isLoadingConversation
-                        ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircularProgressIndicator(
-                                color: Color(0xFF2E7D32),
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                'Loading conversation...',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                        : _showFAQs
+                    _showFAQs
                         ? FAQSection(
                           key: _faqSectionKey,
                           onFAQSelected: _onFAQSelected,
