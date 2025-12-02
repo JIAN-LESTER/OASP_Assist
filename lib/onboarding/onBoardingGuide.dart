@@ -18,6 +18,7 @@ class OnboardingGuide extends StatefulWidget {
   final GlobalKey? notificationKey;
   final GlobalKey? profileKey;
   final GlobalKey? bottomNavKey;
+  final VoidCallback? onFinished; // ✅ NEW: Callback when guide finishes
 
   const OnboardingGuide({
     super.key,
@@ -26,6 +27,7 @@ class OnboardingGuide extends StatefulWidget {
     this.notificationKey,
     this.profileKey,
     this.bottomNavKey,
+    this.onFinished, // ✅ NEW
   });
 
   @override
@@ -60,40 +62,34 @@ class _OnboardingGuideState extends State<OnboardingGuide>
     _checkFirstTime();
   }
 
+  Future<void> _checkFirstTime() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-Future<void> _checkFirstTime() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenLocal =
+        prefs.getBool('hasSeenOnboarding_${user.uid}') ?? false;
 
-  // ✅ Fetch the user's field from Firestore first
-  final userDoc = await FirebaseFirestore.instance
-      .collection('users')
-      .doc(user.uid)
-      .get();
+    // ✅ Fetch the user's field from Firestore
+    final userDoc =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
 
-  final dbHasSeenOnboarding =
-      userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
+    final dbHasSeenOnboarding =
+        userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
 
-  // ✅ If user has already seen the guide in Firestore, don't show it
-  if (dbHasSeenOnboarding) {
-    return; // Exit early, don't show onboarding
-  }
-
-  // ✅ Check local storage as a fallback
-  final prefs = await SharedPreferences.getInstance();
-  final hasSeenLocal = prefs.getBool('hasSeenOnboarding_${user.uid}') ?? false;
-
-  // ✅ Only show onboarding if BOTH Firestore and local storage say they haven't seen it
-  if (!hasSeenLocal && !dbHasSeenOnboarding) {
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (mounted) {
-      setState(() {
-        _showOnboarding = true;
-      });
-      _showOverlay();
+    if (!hasSeenLocal || dbHasSeenOnboarding) {
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (mounted) {
+        setState(() {
+          _showOnboarding = true;
+        });
+        _showOverlay();
+      }
     }
   }
-}
 
   void _showOverlay() {
     _overlayEntry = _createOverlayEntry();
@@ -209,27 +205,30 @@ Future<void> _checkFirstTime() async {
     await _finishOnboarding();
   }
 
- Future<void> _finishOnboarding() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user != null) {
-    // ✅ Save to local storage
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('hasSeenOnboarding_${user.uid}', true);
+  Future<void> _finishOnboarding() async {
+    // Save per-user
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('hasSeenOnboarding_${user.uid}', true);
 
-    // ✅ Save to Firestore so it syncs across devices
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .set({
-      'hasSeenOnboardingGuide': true,
-    }, SetOptions(merge: true));
+      // ✅ Set flag to show welcome dialog
+      await prefs.setBool('should_show_welcome_dialog', true);
+    }
+
+    _removeOverlay();
+    setState(() {
+      _showOnboarding = false;
+    });
+
+    // ✅ NEW: Trigger callback after guide completes
+    // await Future.delayed(
+    //   const Duration(milliseconds: 500),
+    // ); // Wait for overlay to fully close
+
+    widget.onFinished?.call(); // ✅ Call the callback
   }
 
-  _removeOverlay();
-  setState(() {
-    _showOnboarding = false;
-  });
-}
 
   void showGuide() {
     if (!_showOnboarding) {

@@ -698,7 +698,7 @@ class _MessageLimitDialogState extends State<MessageLimitDialog> {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'You\'ve used all 10 messages today',
+                          'You\'ve used all 5 messages today',
                           style: TextStyle(fontSize: 13, color: Colors.white70),
                         ),
                       ],
@@ -778,7 +778,7 @@ class _MessageLimitDialogState extends State<MessageLimitDialog> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'This limit helps us provide quality service to all users. You can send 10 more messages after the reset.',
+                            'This limit helps us provide quality service to all users. You can send 5 more messages after the reset.',
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.blue.shade900,
@@ -938,7 +938,7 @@ class MessageLimitWarningDialog extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'out of 10 daily messages',
+                          'out of 5 daily messages',
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey.shade600,

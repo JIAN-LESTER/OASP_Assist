@@ -25,6 +25,7 @@ import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/responsive/widgets/menu.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:capstone_project/pages/user_pages/chat_utilities.dart';
 
 class UserMainPage extends StatefulWidget {
   final int? initialTabIndex;
@@ -142,10 +143,11 @@ class _UserMainPageState extends State<UserMainPage>
         print('📱 Already on chat tab with conversation: $_conversationId');
       }
 
-      // ✅ NEW: Check if we should trigger the OnboardingGuide
+      // ✅ Check if we should trigger the OnboardingGuide
       if (widget.shouldShowGuide == true) {
         await _checkAndShowOnboardingGuide();
       }
+      // ✅ Welcome dialog will be triggered by OnboardingGuide completion (no need to check here)
     });
   }
 
@@ -158,6 +160,9 @@ class _UserMainPageState extends State<UserMainPage>
         // Clear the flag so it doesn't show again
         await prefs.setBool('should_show_guide', false);
 
+        // ✅ NEW: Set flag for welcome dialog BEFORE starting guide
+        await prefs.setBool('should_show_welcome_dialog', true);
+
         // Wait a bit for the UI to settle
         await Future.delayed(const Duration(milliseconds: 500));
 
@@ -165,14 +170,56 @@ class _UserMainPageState extends State<UserMainPage>
         if (mounted) {
           final onboardingGuide = OnboardingGuide.of(context);
           if (onboardingGuide != null) {
-            // The guide will start automatically since hasSeenOnboarding will be false
             print('✅ Triggering OnboardingGuide after user onboarding');
+            onboardingGuide.showGuide();
           }
         }
       }
     } catch (e) {
       print('❌ Error checking onboarding guide: $e');
     }
+  }
+
+  // ✅ PUBLIC METHOD: Check and show welcome dialog (called by OnboardingGuide)
+  Future<void> checkAndShowWelcomeDialog() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final shouldShowWelcome =
+          prefs.getBool('should_show_welcome_dialog') ?? false;
+
+      if (shouldShowWelcome && mounted) {
+        // Clear the flag
+        await prefs.setBool('should_show_welcome_dialog', false);
+
+        // Wait for OnboardingGuide to fully complete
+        await Future.delayed(const Duration(milliseconds: 800));
+
+        // Show the welcome dialog
+        if (mounted) {
+          final chatProvider = Provider.of<ChatProvider>(
+            context,
+            listen: false,
+          );
+          final hasSeenWelcome = await chatProvider.hasSeenWelcome();
+
+          if (!hasSeenWelcome) {
+            await _showWelcomeDialog();
+            await chatProvider.markWelcomeSeen();
+          }
+        }
+      }
+    } catch (e) {
+      print('❌ Error checking welcome dialog: $e');
+    }
+  }
+
+  // ✅ NEW METHOD: Show welcome dialog
+  Future<void> _showWelcomeDialog() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const FirstTimeWelcomeDialog(),
+    );
   }
 
   Future<void> _initializeConversationOrShowFAQs() async {
@@ -920,6 +967,10 @@ class _UserMainPageState extends State<UserMainPage>
           notificationKey: _notificationKey,
           profileKey: _profileKey,
           bottomNavKey: _bottomNavKey,
+          onFinished: () async {
+            // ✅ NEW: Callback when guide finishes
+            await checkAndShowWelcomeDialog();
+          },
           child: ResponsiveLayout(
             mobileBody: _buildMobileLayout(_pages),
             tabletBody: _buildTabletDesktopLayout(_pages),
@@ -2059,6 +2110,7 @@ class _UserMainPageState extends State<UserMainPage>
   @override
   void dispose() {
     _bottomNavTimer?.cancel();
+
     UserConstant.dispose();
     super.dispose();
   }
