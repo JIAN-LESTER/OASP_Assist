@@ -754,7 +754,7 @@ Widget _buildIBList({
                         title: data['ib_title'] ?? 'N/A',
                         source: data['source'] ?? 'N/A',
                         category: data['category'] ?? 'General',
-                        content: (data['content'] as String).substring(0, 120),
+                        content: cleanPdfContent((data['content'] as String).substring(0, 120)), // ✅ Clean first
 
                       ),
                     );
