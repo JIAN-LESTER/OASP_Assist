@@ -1129,6 +1129,10 @@ class FAQInputSection extends StatelessWidget {
                           maxLines: null,
                           minLines: 1,
                           textAlignVertical: TextAlignVertical.center,
+
+                          // Make ENTER trigger onSubmitted
+                          textInputAction: TextInputAction.send,
+
                           style: TextStyle(
                             fontSize: fontSize,
                             fontWeight: FontWeight.w500,
@@ -1138,6 +1142,7 @@ class FAQInputSection extends StatelessWidget {
                                     : Colors.grey.shade900,
                             height: 1.4,
                           ),
+
                           decoration: InputDecoration(
                             hintText:
                                 isLoading
@@ -1155,6 +1160,8 @@ class FAQInputSection extends StatelessWidget {
                             ),
                             isDense: true,
                           ),
+
+                          //  ENTER now triggers sendMessage
                           onSubmitted:
                               isLoading ? null : (_) => onSendMessage(),
                         ),

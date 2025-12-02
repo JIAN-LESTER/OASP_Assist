@@ -132,6 +132,12 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
+  void _submitWithEnter() {
+    if (_isLoading) return;
+    FocusScope.of(context).unfocus();
+    registerUser();
+  }
+
   Future<bool> _isEmailTaken(String email) async {
     try {
       // Check Firebase Auth first (most authoritative source)
@@ -677,7 +683,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                       );
 
                                       if (mounted) {
-                                        Navigator.of(context).pop();
+                                        Navigator.of(
+                                          context,
+                                        ).pop(); // return to login page
 
                                         // Show success message
                                         await Future.delayed(
@@ -728,7 +736,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                         ).pop();
                                       } catch (_) {}
                                       try {
-                                        Navigator.of(context).pop();
+                                        Navigator.of(
+                                          context,
+                                        ).pop(); // return to login page
                                       } catch (_) {}
                                     }
                                   }
@@ -955,6 +965,7 @@ class _RegisterPageState extends State<RegisterPage> {
               hintText: "Email",
               obscureText: false,
               keyboardType: TextInputType.emailAddress,
+              onSubmitted: (_) => _submitWithEnter(),
             ),
             _buildErrorText(_emailError, fontSizeMultiplier),
 
@@ -965,6 +976,7 @@ class _RegisterPageState extends State<RegisterPage> {
               hintText: "Password",
               obscureText: true,
               isPasswordField: true,
+              onSubmitted: (_) => _submitWithEnter(),
             ),
             _buildErrorText(_passwordError, fontSizeMultiplier),
 
@@ -975,6 +987,7 @@ class _RegisterPageState extends State<RegisterPage> {
               hintText: "Confirm Password",
               obscureText: true,
               isPasswordField: true,
+              onSubmitted: (_) => _submitWithEnter(),
             ),
             _buildErrorText(_confirmPasswordError, fontSizeMultiplier),
 
