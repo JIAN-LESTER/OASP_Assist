@@ -18,6 +18,7 @@ class OnboardingGuide extends StatefulWidget {
   final GlobalKey? notificationKey;
   final GlobalKey? profileKey;
   final GlobalKey? bottomNavKey;
+  final VoidCallback? onFinished; // ✅ NEW: Callback when guide finishes
 
   const OnboardingGuide({
     super.key,
@@ -26,6 +27,7 @@ class OnboardingGuide extends StatefulWidget {
     this.notificationKey,
     this.profileKey,
     this.bottomNavKey,
+    this.onFinished, // ✅ NEW
   });
 
   @override
@@ -59,33 +61,35 @@ class _OnboardingGuideState extends State<OnboardingGuide>
     _animationController.repeat(reverse: true);
     _checkFirstTime();
   }
-Future<void> _checkFirstTime() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return;
 
-  final prefs = await SharedPreferences.getInstance();
-  final hasSeenLocal =
-      prefs.getBool('hasSeenOnboarding_${user.uid}') ?? false;
+  Future<void> _checkFirstTime() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-  // ✅ Fetch the user's field from Firestore
-  final userDoc = await FirebaseFirestore.instance
-      .collection('users')
-      .doc(user.uid)
-      .get();
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenLocal =
+        prefs.getBool('hasSeenOnboarding_${user.uid}') ?? false;
 
-  final dbHasSeenOnboarding =
-      userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
+    // ✅ Fetch the user's field from Firestore
+    final userDoc =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
 
-  if (!hasSeenLocal || dbHasSeenOnboarding) {
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (mounted) {
-      setState(() {
-        _showOnboarding = true;
-      });
-      _showOverlay();
+    final dbHasSeenOnboarding =
+        userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
+
+    if (!hasSeenLocal || dbHasSeenOnboarding) {
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (mounted) {
+        setState(() {
+          _showOnboarding = true;
+        });
+        _showOverlay();
+      }
     }
   }
-}
 
   void _showOverlay() {
     _overlayEntry = _createOverlayEntry();
@@ -202,17 +206,27 @@ Future<void> _checkFirstTime() async {
   }
 
   Future<void> _finishOnboarding() async {
-    // ✅ FIX: Save per-user
+    // Save per-user
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('hasSeenOnboarding_${user.uid}', true);
+
+      // ✅ Set flag to show welcome dialog
+      await prefs.setBool('should_show_welcome_dialog', true);
     }
 
     _removeOverlay();
     setState(() {
       _showOnboarding = false;
     });
+
+    // ✅ NEW: Trigger callback after guide completes
+    // await Future.delayed(
+    //   const Duration(milliseconds: 500),
+    // ); // Wait for overlay to fully close
+
+    widget.onFinished?.call(); // ✅ Call the callback
   }
 
   void showGuide() {

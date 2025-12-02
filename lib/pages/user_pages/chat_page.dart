@@ -194,6 +194,8 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     _initChatSpeechToText();
     chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
+    // Welcome dialog will be shown by UserMainPage after onboarding
+
     // ✅ FIX: Only initialize once in postFrameCallback
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isInitialized) {
@@ -2246,6 +2248,14 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     );
   }
 
+  Future<void> _showWelcomeDialog() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const FirstTimeWelcomeDialog(),
+    );
+  }
+
   //  Helper method for next steps (if not already in your code)
   Widget _buildNextStepItem({required IconData icon, required String text}) {
     return Row(
@@ -2460,7 +2470,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     final remainingMessages =
         ChatProvider.MAX_DAILY_MESSAGES - chatProvider.userDailyMessageCount;
 
-    if (remainingMessages == 5 || remainingMessages == 1) {
+    if (remainingMessages == 2) {
       // ✅ Show warning dialog and WAIT for confirmation
       final bool? shouldContinue = await showDialog<bool>(
         context: context,
@@ -2692,6 +2702,227 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
           );
         },
       ),
+    );
+  }
+}
+
+class FirstTimeWelcomeDialog extends StatelessWidget {
+  const FirstTimeWelcomeDialog({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1100;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 8,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 24,
+        vertical: isMobile ? 24 : 40,
+      ),
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: isTablet ? 500 : (isMobile ? double.infinity : 450),
+          maxHeight: screenHeight * 0.85, // ✅ Responsive max height
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ✅ Fixed Header (Green, compact)
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(isMobile ? 20 : 24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(isMobile ? 10 : 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.chat_bubble_outline,
+                      color: Colors.white,
+                      size: isMobile ? 24 : 28,
+                    ),
+                  ),
+                  SizedBox(width: isMobile ? 12 : 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Welcome to OASP Assist!',
+                          style: TextStyle(
+                            fontSize: isMobile ? 18 : 20,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: -0.5,
+                            height: 1.2,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Your daily message information',
+                          style: TextStyle(
+                            fontSize: isMobile ? 12 : 13,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.white.withOpacity(0.9),
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ✅ Scrollable Content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(isMobile ? 20 : 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Feature items
+                    _buildFeatureItem(
+                      icon: Icons.chat_bubble_outline,
+                      title: '5 Messages Per Day',
+                      description:
+                          'Ask up to 5 questions daily to get instant answers',
+                      isMobile: isMobile,
+                    ),
+                    SizedBox(height: isMobile ? 14 : 16),
+                    _buildFeatureItem(
+                      icon: Icons.refresh,
+                      title: 'Daily Reset at 6:00 AM',
+                      description: 'Your message limit refreshes every morning',
+                      isMobile: isMobile,
+                    ),
+                    SizedBox(height: isMobile ? 14 : 16),
+                    _buildFeatureItem(
+                      icon: Icons.help_outline,
+                      title: 'Browse FAQs',
+                      description: 'Explore common questions',
+                      isMobile: isMobile,
+                    ),
+                    SizedBox(height: isMobile ? 14 : 16),
+                    _buildFeatureItem(
+                      icon: Icons.support_agent,
+                      title: 'Human Support Available',
+                      description: 'Get escalated to staff if AI can\'t help',
+                      isMobile: isMobile,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ✅ Fixed Footer with Button
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(isMobile ? 16 : 20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
+                ),
+                border: Border(
+                  top: BorderSide(color: Colors.grey.shade200, width: 1),
+                ),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF2E7D32),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: EdgeInsets.symmetric(vertical: isMobile ? 14 : 16),
+                  ),
+                  child: Text(
+                    'Get Started',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: isMobile ? 15 : 16,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureItem({
+    required IconData icon,
+    required String title,
+    required String description,
+    required bool isMobile,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.all(isMobile ? 8 : 10),
+          decoration: BoxDecoration(
+            color: Color(0xFF2E7D32).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: isMobile ? 18 : 20, color: Color(0xFF2E7D32)),
+        ),
+        SizedBox(width: isMobile ? 12 : 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: isMobile ? 14 : 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade900,
+                  height: 1.3,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: isMobile ? 12 : 13,
+                  color: Colors.grey.shade600,
+                  height: 1.4,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

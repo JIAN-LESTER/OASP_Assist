@@ -16,6 +16,8 @@ import 'package:capstone_project/services/answer_retrieval.dart';
 import 'package:capstone_project/services/cohere_service.dart';
 import 'package:provider/provider.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 // Cache classes for better performance
 class FAQCache {
   static Map<String, Map<String, dynamic>> cache = {};
@@ -65,6 +67,17 @@ class ChatProvider extends ChangeNotifier {
 
   ChatProvider(this._retriever);
 
+  //  ADDED TWO METHODS:
+  Future<bool> hasSeenWelcome() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('has_seen_welcome') ?? false;
+  }
+
+  Future<void> markWelcomeSeen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_seen_welcome', true);
+  }
+
   final Map<String, String> _pendingRatingsCache = {};
   String? getCachedRating(String messageId) => _pendingRatingsCache[messageId];
 
@@ -77,7 +90,7 @@ class ChatProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
-  static const int MAX_DAILY_MESSAGES = 10;
+  static const int MAX_DAILY_MESSAGES = 5;
 
   StreamSubscription<DocumentSnapshot>? _userMessageCountSubscription;
 
@@ -1309,170 +1322,372 @@ Return ONLY the category name (Admission, Scholarship, Placement, or General):''
     }
   }
 
- Future<void> checkEscalation(
-  BuildContext context,
-  String answerText,
-  String? userId,
-  String question,
-) async {
-  if (conversationId == null) return;
+  Future<void> checkEscalation(
+    BuildContext context,
+    String answerText,
+    String? userId,
+    String question,
+  ) async {
+    if (conversationId == null) return;
 
-  final lowerAnswer = answerText.toLowerCase();
+    final lowerAnswer = answerText.toLowerCase();
 
-  for (var keyword in escalationResponseKeywords) {
-    if (lowerAnswer.contains(keyword)) {
-      // ✅ NEW: Use same dialog as manual escalation
-      await _showAutoEscalationDialog(context, question, answerText, keyword);
-      break;
+    for (var keyword in escalationResponseKeywords) {
+      if (lowerAnswer.contains(keyword)) {
+        // ✅ NEW: Use same dialog as manual escalation
+        await _showAutoEscalationDialog(context, question, answerText, keyword);
+        break;
+      }
     }
   }
-}
 
-Future<void> _showAutoEscalationDialog(
-  BuildContext context,
-  String question,
-  String answerText,
-  String triggerKeyword,
-) async {
-  String selectedReason = 'Bot response not accurate';
-  String? userReason;
+  Future<void> _showAutoEscalationDialog(
+    BuildContext context,
+    String question,
+    String answerText,
+    String triggerKeyword,
+  ) async {
+    String selectedReason = 'Bot response not accurate';
+    String? userReason;
 
-  try {
-    final Map<String, dynamic>? result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext dialogContext) {
-        final TextEditingController reasonController = TextEditingController();
-        bool isSubmitting = false;
+    try {
+      final Map<String, dynamic>?
+      result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        barrierDismissible: true,
+        builder: (BuildContext dialogContext) {
+          final TextEditingController reasonController =
+              TextEditingController();
+          bool isSubmitting = false;
 
-        return StatefulBuilder(
-          builder: (dialogState, setDialogState) => WillPopScope(
-            onWillPop: () async => !isSubmitting,
-            child: Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              elevation: 8,
-              insetPadding: EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 24,
-              ),
-              child: Container(
-                constraints: BoxConstraints(
-                  maxWidth: 500,
-                  maxHeight: MediaQuery.of(dialogContext).size.height * 0.85,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Header
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF2E7D32),
-                            const Color(0xFF43A047),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(20),
-                          topRight: Radius.circular(20),
-                        ),
+          return StatefulBuilder(
+            builder:
+                (dialogState, setDialogState) => WillPopScope(
+                  onWillPop: () async => !isSubmitting,
+                  child: Dialog(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    elevation: 8,
+                    insetPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 24,
+                    ),
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: 500,
+                        maxHeight:
+                            MediaQuery.of(dialogContext).size.height * 0.85,
                       ),
-                      child: Row(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Header
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  const Color(0xFF2E7D32),
+                                  const Color(0xFF43A047),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(20),
+                                topRight: Radius.circular(20),
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.support_agent,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Row(
                               children: [
-                                Text(
-                                  'Request Staff Assistance',
-                                  style: TextStyle(
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.w700,
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.support_agent,
                                     color: Colors.white,
-                                    letterSpacing: -0.5,
-                                    height: 1.2,
+                                    size: 24,
                                   ),
                                 ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Get personalized help from our team',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w400,
-                                    color: Colors.white70,
-                                    letterSpacing: 0.0,
-                                    height: 1.3,
+                                const SizedBox(width: 12),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Request Staff Assistance',
+                                        style: TextStyle(
+                                          fontSize: 19,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                          letterSpacing: -0.5,
+                                          height: 1.2,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Get personalized help from our team',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w400,
+                                          color: Colors.white70,
+                                          letterSpacing: 0.0,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                    ],
                                   ),
+                                ),
+                                IconButton(
+                                  onPressed:
+                                      isSubmitting
+                                          ? null
+                                          : () => Navigator.of(
+                                            dialogContext,
+                                          ).pop(null),
+                                  icon: Icon(
+                                    Icons.close,
+                                    color:
+                                        isSubmitting
+                                            ? Colors.white38
+                                            : Colors.white70,
+                                    size: 24,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
                                 ),
                               ],
                             ),
                           ),
-                          IconButton(
-                            onPressed: isSubmitting
-                                ? null
-                                : () => Navigator.of(dialogContext).pop(null),
-                            icon: Icon(
-                              Icons.close,
-                              color: isSubmitting ? Colors.white38 : Colors.white70,
-                              size: 24,
-                            ),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ),
-                    ),
 
-                    // Content
-                    Flexible(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Info message
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.blue.shade100),
-                              ),
-                              child: Row(
+                          // Content
+                          Flexible(
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    color: Colors.blue.shade700,
-                                    size: 20,
+                                  // Info message
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade50,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.blue.shade100,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.info_outline,
+                                          color: Colors.blue.shade700,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            'I couldn\'t provide a complete answer to your question. A staff member can provide personalized assistance.',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.grey.shade900,
+                                              height: 1.5,
+                                              letterSpacing: 0.0,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'I couldn\'t provide a complete answer to your question. A staff member can provide personalized assistance.',
-                                      style: TextStyle(
+
+                                  const SizedBox(height: 20),
+
+                                  // Reason selection
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.flag_outlined,
+                                        size: 18,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'What went wrong?',
+                                        style: TextStyle(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey.shade800,
+                                          letterSpacing: -0.1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: Colors.grey.shade300,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _buildReasonTile(
+                                          context: dialogContext,
+                                          title: 'Bot response not accurate',
+                                          icon: Icons.error_outline,
+                                          value: 'Bot response not accurate',
+                                          groupValue: selectedReason,
+                                          onChanged:
+                                              isSubmitting
+                                                  ? (_) {}
+                                                  : (val) {
+                                                    setDialogState(() {
+                                                      selectedReason =
+                                                          val ?? selectedReason;
+                                                    });
+                                                  },
+                                          isFirst: true,
+                                        ),
+                                        Divider(
+                                          height: 1,
+                                          color: Colors.grey.shade300,
+                                        ),
+                                        _buildReasonTile(
+                                          context: dialogContext,
+                                          title:
+                                              'Bot did not understand my question',
+                                          icon: Icons.help_outline,
+                                          value:
+                                              'Bot did not understand my question',
+                                          groupValue: selectedReason,
+                                          onChanged:
+                                              isSubmitting
+                                                  ? (_) {}
+                                                  : (val) {
+                                                    setDialogState(() {
+                                                      selectedReason =
+                                                          val ?? selectedReason;
+                                                    });
+                                                  },
+                                        ),
+                                        Divider(
+                                          height: 1,
+                                          color: Colors.grey.shade300,
+                                        ),
+                                        _buildReasonTile(
+                                          context: dialogContext,
+                                          title:
+                                              'Need clarification from staff',
+                                          icon: Icons.contact_support_outlined,
+                                          value:
+                                              'Need clarification from staff',
+                                          groupValue: selectedReason,
+                                          onChanged:
+                                              isSubmitting
+                                                  ? (_) {}
+                                                  : (val) {
+                                                    setDialogState(() {
+                                                      selectedReason =
+                                                          val ?? selectedReason;
+                                                    });
+                                                  },
+                                          isLast: true,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 20),
+
+                                  // Additional details
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.edit_note,
+                                        size: 18,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Additional details (optional)',
+                                        style: TextStyle(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey.shade800,
+                                          letterSpacing: -0.1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+
+                                  TextField(
+                                    controller: reasonController,
+                                    maxLines: 3,
+                                    maxLength: 200,
+                                    textInputAction: TextInputAction.done,
+                                    enabled: !isSubmitting,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w400,
+                                      color: Colors.grey.shade800,
+                                      height: 1.5,
+                                      letterSpacing: 0.0,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText:
+                                          'Tell us more about what you need help with...',
+                                      hintStyle: TextStyle(
                                         fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.grey.shade900,
-                                        height: 1.5,
+                                        fontWeight: FontWeight.w400,
+                                        color: Colors.grey.shade400,
+                                        letterSpacing: 0.0,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      disabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey.shade200,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF2E7D32),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      filled: true,
+                                      fillColor:
+                                          isSubmitting
+                                              ? Colors.grey.shade100
+                                              : Colors.grey.shade50,
+                                      contentPadding: const EdgeInsets.all(14),
+                                      counterStyle: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w400,
+                                        color: Colors.grey.shade500,
                                         letterSpacing: 0.0,
                                       ),
                                     ),
@@ -1480,515 +1695,380 @@ Future<void> _showAutoEscalationDialog(
                                 ],
                               ),
                             ),
-
-                            const SizedBox(height: 20),
-
-                            // Reason selection
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.flag_outlined,
-                                  size: 18,
-                                  color: Colors.grey.shade700,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'What went wrong?',
-                                  style: TextStyle(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade800,
-                                    letterSpacing: -0.1,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-
-                            Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey.shade300),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _buildReasonTile(
-                                    context: dialogContext,
-                                    title: 'Bot response not accurate',
-                                    icon: Icons.error_outline,
-                                    value: 'Bot response not accurate',
-                                    groupValue: selectedReason,
-                                    onChanged: isSubmitting
-                                        ? (_) {}
-                                        : (val) {
-                                            setDialogState(() {
-                                              selectedReason = val ?? selectedReason;
-                                            });
-                                          },
-                                    isFirst: true,
-                                  ),
-                                  Divider(height: 1, color: Colors.grey.shade300),
-                                  _buildReasonTile(
-                                    context: dialogContext,
-                                    title: 'Bot did not understand my question',
-                                    icon: Icons.help_outline,
-                                    value: 'Bot did not understand my question',
-                                    groupValue: selectedReason,
-                                    onChanged: isSubmitting
-                                        ? (_) {}
-                                        : (val) {
-                                            setDialogState(() {
-                                              selectedReason = val ?? selectedReason;
-                                            });
-                                          },
-                                  ),
-                                  Divider(height: 1, color: Colors.grey.shade300),
-                                  _buildReasonTile(
-                                    context: dialogContext,
-                                    title: 'Need clarification from staff',
-                                    icon: Icons.contact_support_outlined,
-                                    value: 'Need clarification from staff',
-                                    groupValue: selectedReason,
-                                    onChanged: isSubmitting
-                                        ? (_) {}
-                                        : (val) {
-                                            setDialogState(() {
-                                              selectedReason = val ?? selectedReason;
-                                            });
-                                          },
-                                    isLast: true,
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(height: 20),
-
-                            // Additional details
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.edit_note,
-                                  size: 18,
-                                  color: Colors.grey.shade700,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Additional details (optional)',
-                                  style: TextStyle(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade800,
-                                    letterSpacing: -0.1,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-
-                            TextField(
-                              controller: reasonController,
-                              maxLines: 3,
-                              maxLength: 200,
-                              textInputAction: TextInputAction.done,
-                              enabled: !isSubmitting,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w400,
-                                color: Colors.grey.shade800,
-                                height: 1.5,
-                                letterSpacing: 0.0,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: 'Tell us more about what you need help with...',
-                                hintStyle: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400,
-                                  color: Colors.grey.shade400,
-                                  letterSpacing: 0.0,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Colors.grey.shade300),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Colors.grey.shade300),
-                                ),
-                                disabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Colors.grey.shade200),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF2E7D32),
-                                    width: 2,
-                                  ),
-                                ),
-                                filled: true,
-                                fillColor: isSubmitting
-                                    ? Colors.grey.shade100
-                                    : Colors.grey.shade50,
-                                contentPadding: const EdgeInsets.all(14),
-                                counterStyle: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w400,
-                                  color: Colors.grey.shade500,
-                                  letterSpacing: 0.0,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Buttons
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(20),
-                          bottomRight: Radius.circular(20),
-                        ),
-                        border: Border(
-                          top: BorderSide(color: Colors.grey.shade200),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: isSubmitting
-                                  ? null
-                                  : () => Navigator.of(dialogContext).pop(null),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 18),
-                                side: BorderSide(
-                                  color: isSubmitting
-                                      ? Colors.grey.shade200
-                                      : Colors.grey.shade300,
-                                  width: 1.5,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(
-                                'Cancel',
-                                style: TextStyle(
-                                  color: isSubmitting
-                                      ? Colors.grey.shade400
-                                      : Colors.grey.shade700,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15.5,
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                            ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: isSubmitting
-                                  ? null
-                                  : () async {
-                                      setDialogState(() {
-                                        isSubmitting = true;
-                                      });
 
-                                      await Future.delayed(
-                                        Duration(milliseconds: 800),
-                                      );
-
-                                      if (dialogContext.mounted) {
-                                        Navigator.of(dialogContext).pop({
-                                          'submit': true,
-                                          'selectedReason': selectedReason,
-                                          'userReason': reasonController.text.trim(),
-                                        });
-                                      }
-                                    },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isSubmitting
-                                    ? Colors.grey.shade400
-                                    : const Color(0xFF2E7D32),
-                                foregroundColor: Colors.white,
-                                elevation: isSubmitting ? 0 : 2,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 18),
+                          // Buttons
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: const BorderRadius.only(
+                                bottomLeft: Radius.circular(20),
+                                bottomRight: Radius.circular(20),
                               ),
-                              child: isSubmitting
-                                  ? Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.5,
-                                            valueColor: AlwaysStoppedAnimation<Color>(
-                                                Colors.white),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        const Text(
-                                          'Submitting...',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 15.5,
-                                            letterSpacing: -0.2,
-                                          ),
-                                        ),
-                                      ],
-                                    )
-                                  : const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.send, size: 19),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'Submit',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 15.5,
-                                            letterSpacing: -0.2,
-                                          ),
-                                        ),
-                                      ],
+                              border: Border(
+                                top: BorderSide(color: Colors.grey.shade200),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed:
+                                        isSubmitting
+                                            ? null
+                                            : () => Navigator.of(
+                                              dialogContext,
+                                            ).pop(null),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 18,
+                                      ),
+                                      side: BorderSide(
+                                        color:
+                                            isSubmitting
+                                                ? Colors.grey.shade200
+                                                : Colors.grey.shade300,
+                                        width: 1.5,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
                                     ),
+                                    child: Text(
+                                      'Cancel',
+                                      style: TextStyle(
+                                        color:
+                                            isSubmitting
+                                                ? Colors.grey.shade400
+                                                : Colors.grey.shade700,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15.5,
+                                        letterSpacing: -0.2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed:
+                                        isSubmitting
+                                            ? null
+                                            : () async {
+                                              setDialogState(() {
+                                                isSubmitting = true;
+                                              });
+
+                                              await Future.delayed(
+                                                Duration(milliseconds: 800),
+                                              );
+
+                                              if (dialogContext.mounted) {
+                                                Navigator.of(
+                                                  dialogContext,
+                                                ).pop({
+                                                  'submit': true,
+                                                  'selectedReason':
+                                                      selectedReason,
+                                                  'userReason':
+                                                      reasonController.text
+                                                          .trim(),
+                                                });
+                                              }
+                                            },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          isSubmitting
+                                              ? Colors.grey.shade400
+                                              : const Color(0xFF2E7D32),
+                                      foregroundColor: Colors.white,
+                                      elevation: isSubmitting ? 0 : 2,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 18,
+                                      ),
+                                    ),
+                                    child:
+                                        isSubmitting
+                                            ? Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2.5,
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                          Color
+                                                        >(Colors.white),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                const Text(
+                                                  'Submitting...',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 15.5,
+                                                    letterSpacing: -0.2,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                            : const Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.send, size: 19),
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  'Submit',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 15.5,
+                                                    letterSpacing: -0.2,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
+          );
+        },
+      );
+
+      if (result == null || result['submit'] != true || !context.mounted) {
+        print('ℹ️ Auto-escalation cancelled by user');
+        return;
+      }
+
+      selectedReason = result['selectedReason'] as String;
+      userReason = result['userReason'] as String?;
+
+      final fullReason =
+          userReason != null && userReason.isNotEmpty
+              ? '$selectedReason — $userReason'
+              : selectedReason;
+
+      // Get category from current conversation
+      String messageCategory = 'General';
+      for (int i = _messages.length - 1; i >= 0; i--) {
+        if (_messages[i].sender == 'user') {
+          messageCategory = _messages[i].category ?? 'General';
+          print('✅ Found category for auto-escalation: $messageCategory');
+          break;
+        }
+      }
+
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      final escalationRef = _firestore.collection('escalations').doc();
+      final escalationId = escalationRef.id;
+
+      final escalatedData = {
+        'escalationId': escalationId,
+        'userId': userId,
+        'conversationId': conversationId!,
+        'question': question,
+        'botAnswer': answerText,
+        'status': 'pending',
+        'reason': fullReason,
+        'category': messageCategory,
+        'createdAt': Timestamp.now(),
+      };
+
+      await escalationRef.set(escalatedData);
+
+      print('✅ Auto-escalation created: $escalationId');
+      print('📂 Category: $messageCategory');
+      print('📝 Reason: $fullReason');
+
+      // ✅ Show success dialog
+      if (context.mounted) {
+        await _showEscalationSuccessDialog(context);
+      }
+    } catch (e) {
+      print('❌ Error creating auto-escalation: $e');
+    }
+  }
+
+  Widget _buildReasonTile({
+    required BuildContext context,
+    required String title,
+    required IconData icon,
+    required String value,
+    required String groupValue,
+    required Function(String?) onChanged,
+    bool isFirst = false,
+    bool isLast = false,
+  }) {
+    final isSelected = value == groupValue;
+
+    return InkWell(
+      onTap: () => onChanged(value),
+      borderRadius: BorderRadius.vertical(
+        top: isFirst ? const Radius.circular(12) : Radius.zero,
+        bottom: isLast ? const Radius.circular(12) : Radius.zero,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF2E7D32).withOpacity(0.05) : null,
+          borderRadius: BorderRadius.vertical(
+            top: isFirst ? const Radius.circular(12) : Radius.zero,
+            bottom: isLast ? const Radius.circular(12) : Radius.zero,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color:
+                  isSelected ? const Color(0xFF2E7D32) : Colors.grey.shade600,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color:
+                      isSelected
+                          ? const Color(0xFF2E7D32)
+                          : Colors.grey.shade800,
+                ),
+              ),
+            ),
+            Radio<String>(
+              value: value,
+              groupValue: groupValue,
+              onChanged: onChanged,
+              activeColor: const Color(0xFF2E7D32),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ Success dialog (reuse from chat_page.dart)
+  Future<void> _showEscalationSuccessDialog(BuildContext context) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 8,
+          insetPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: 400,
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2E7D32).withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF2E7D32),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.check,
+                              color: Colors.white,
+                              size: 48,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Request Submitted!',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2E7D32),
+                            letterSpacing: -0.8,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Your request has been escalated to our staff team.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.grey.shade700,
+                            height: 1.5,
+                            letterSpacing: 0.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E7D32),
+                          foregroundColor: Colors.white,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                        ),
+                        child: const Text(
+                          'Got it, thanks!',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         );
       },
     );
-
-    if (result == null || result['submit'] != true || !context.mounted) {
-      print('ℹ️ Auto-escalation cancelled by user');
-      return;
-    }
-
-    selectedReason = result['selectedReason'] as String;
-    userReason = result['userReason'] as String?;
-
-    final fullReason = userReason != null && userReason.isNotEmpty
-        ? '$selectedReason — $userReason'
-        : selectedReason;
-
-    // Get category from current conversation
-    String messageCategory = 'General';
-    for (int i = _messages.length - 1; i >= 0; i--) {
-      if (_messages[i].sender == 'user') {
-        messageCategory = _messages[i].category ?? 'General';
-        print('✅ Found category for auto-escalation: $messageCategory');
-        break;
-      }
-    }
-
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    final escalationRef = _firestore.collection('escalations').doc();
-    final escalationId = escalationRef.id;
-
-    final escalatedData = {
-      'escalationId': escalationId,
-      'userId': userId,
-      'conversationId': conversationId!,
-      'question': question,
-      'botAnswer': answerText,
-      'status': 'pending',
-      'reason': fullReason,
-      'category': messageCategory,
-      'createdAt': Timestamp.now(),
-    };
-
-    await escalationRef.set(escalatedData);
-
-    print('✅ Auto-escalation created: $escalationId');
-    print('📂 Category: $messageCategory');
-    print('📝 Reason: $fullReason');
-
-    // ✅ Show success dialog
-    if (context.mounted) {
-      await _showEscalationSuccessDialog(context);
-    }
-  } catch (e) {
-    print('❌ Error creating auto-escalation: $e');
   }
-}
-
-Widget _buildReasonTile({
-  required BuildContext context,
-  required String title,
-  required IconData icon,
-  required String value,
-  required String groupValue,
-  required Function(String?) onChanged,
-  bool isFirst = false,
-  bool isLast = false,
-}) {
-  final isSelected = value == groupValue;
-
-  return InkWell(
-    onTap: () => onChanged(value),
-    borderRadius: BorderRadius.vertical(
-      top: isFirst ? const Radius.circular(12) : Radius.zero,
-      bottom: isLast ? const Radius.circular(12) : Radius.zero,
-    ),
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF2E7D32).withOpacity(0.05) : null,
-        borderRadius: BorderRadius.vertical(
-          top: isFirst ? const Radius.circular(12) : Radius.zero,
-          bottom: isLast ? const Radius.circular(12) : Radius.zero,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 20,
-            color: isSelected ? const Color(0xFF2E7D32) : Colors.grey.shade600,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? const Color(0xFF2E7D32) : Colors.grey.shade800,
-              ),
-            ),
-          ),
-          Radio<String>(
-            value: value,
-            groupValue: groupValue,
-            onChanged: onChanged,
-            activeColor: const Color(0xFF2E7D32),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-// ✅ Success dialog (reuse from chat_page.dart)
-Future<void> _showEscalationSuccessDialog(BuildContext context) async {
-  await showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (BuildContext context) {
-      return Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        elevation: 8,
-        insetPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: 400,
-            maxHeight: MediaQuery.of(context).size.height * 0.85,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2E7D32).withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF2E7D32),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check,
-                            color: Colors.white,
-                            size: 48,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Request Submitted!',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF2E7D32),
-                          letterSpacing: -0.8,
-                          height: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Your request has been escalated to our staff team.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.grey.shade700,
-                          height: 1.5,
-                          letterSpacing: 0.0,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                      ),
-                      child: const Text(
-                        'Got it, thanks!',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    },
-  );
-}
 
   Future<void> _processAutoEscalation(
     String? userId,
