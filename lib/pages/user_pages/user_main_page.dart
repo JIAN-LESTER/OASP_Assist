@@ -5,7 +5,6 @@ import 'package:capstone_project/onboarding/onBoardingGuide.dart';
 import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
 
-import 'package:circle_nav_bar/circle_nav_bar.dart' show CircleNavBar;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';

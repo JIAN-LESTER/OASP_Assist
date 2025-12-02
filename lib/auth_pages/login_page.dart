@@ -196,7 +196,7 @@ class _LoginPageState extends State<LoginPage> {
 
       print("Sign in successful");
     } on FirebaseAuthException catch (e) {
-      print("Firebase Auth Error: ${e.code} - ${e.message}");
+   
 
       switch (e.code) {
         case 'user-not-found':

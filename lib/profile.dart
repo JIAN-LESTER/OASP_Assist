@@ -415,14 +415,23 @@ class _ProfileModalState extends State<ProfileModal> {
                     final data = snapshot.data!;
                     final role = data['role'] ?? 'User';
                     final email = data['email'] ?? '';
-                    final year = data['year'] ?? '';
-                    final program = data['program'] ?? '';
                     final name = data['name'] ?? '';
-                    final scholarship = data['scholarship'] ?? '';
                     final affiliation = data['affiliation'] ?? '';
                     final studentId = data['studentId'] ?? '';
                     final lrn = data['lrn'] ?? '';
                     final serviceUnit = data['serviceUnit'] ?? '';
+                    
+                    // CMU Student fields
+                    final studentType = data['studentType'] ?? '';
+                    final year = data['year'] ?? '';
+                    final college = data['college'] ?? '';
+                    final program = data['program'] ?? '';
+                    final scholarship = data['scholarship'] ?? '';
+                    
+                    // Graduate fields
+                    final graduateType = data['graduateType'] ?? '';
+                    final graduatedCollege = data['graduatedCollege'] ?? '';
+                    final graduatedProgram = data['graduatedProgram'] ?? '';
 
                     return Column(
                       children: [
@@ -450,7 +459,7 @@ class _ProfileModalState extends State<ProfileModal> {
 
                                 // USER ROLE FIELDS
                                 if (role.toLowerCase() == 'user') ...[
-                                  // Show affiliation first
+                                  // Show affiliation
                                   if (affiliation.isNotEmpty)
                                     _buildInfoCard(
                                       label: 'Affiliation',
@@ -459,36 +468,106 @@ class _ProfileModalState extends State<ProfileModal> {
                                       isMobile: isMobile,
                                     ),
 
-                                  // INCOMING FRESHMAN APPLICANT
-                                  if (affiliation.toLowerCase() == 'incoming freshman applicant' && lrn.isNotEmpty)
-                                    _buildInfoCard(
-                                      label: 'LRN',
-                                      value: lrn,
-                                      icon: Icons.numbers_outlined,
-                                      isMobile: isMobile,
-                                    ),
-
-                                  // CMU STUDENT FIELDS
+                                  // CMU STUDENT
                                   if (affiliation.toLowerCase() == 'cmu student') ...[
-                                    if (studentId.isNotEmpty)
+                                    // Student Type
+                                    if (studentType.isNotEmpty)
                                       _buildInfoCard(
-                                        label: 'Student ID',
-                                        value: studentId,
-                                        icon: Icons.badge_outlined,
-                                        isMobile: isMobile,
-                                      ),
-                                    if (year.isNotEmpty)
-                                      _buildInfoCard(
-                                        label: 'Year Level',
-                                        value: year,
+                                        label: 'Student Type',
+                                        value: studentType == 'undergraduate' 
+                                            ? 'Undergraduate' 
+                                            : 'Graduate',
                                         icon: Icons.school_outlined,
                                         isMobile: isMobile,
                                       ),
-                                    if (program.isNotEmpty)
+
+                                    // UNDERGRADUATE FIELDS
+                                    if (studentType == 'undergraduate') ...[
+                                      if (studentId.isNotEmpty)
+                                        _buildInfoCard(
+                                          label: 'Student ID',
+                                          value: studentId,
+                                          icon: Icons.badge_outlined,
+                                          isMobile: isMobile,
+                                        ),
+                                      if (year.isNotEmpty)
+                                        _buildInfoCard(
+                                          label: 'Year Level',
+                                          value: year,
+                                          icon: Icons.calendar_today_outlined,
+                                          isMobile: isMobile,
+                                        ),
+                                      if (college.isNotEmpty)
+                                        _buildInfoCard(
+                                          label: 'College',
+                                          value: college,
+                                          icon: Icons.account_balance_outlined,
+                                          isMobile: isMobile,
+                                        ),
+                                      if (program.isNotEmpty)
+                                        _buildInfoCard(
+                                          label: 'Program',
+                                          value: program,
+                                          icon: Icons.book_outlined,
+                                          isMobile: isMobile,
+                                        ),
+                                      if (scholarship.isNotEmpty)
+                                        _buildInfoCard(
+                                          label: 'Scholarship',
+                                          value: scholarship,
+                                          icon: Icons.card_membership_outlined,
+                                          isMobile: isMobile,
+                                        ),
+                                    ],
+
+                                    // GRADUATE FIELDS
+                                    if (studentType == 'graduate') ...[
+                                      if (graduateType.isNotEmpty)
+                                        _buildInfoCard(
+                                          label: 'Graduate Status',
+                                          value: graduateType == 'masteral' 
+                                              ? 'Taking Masteral' 
+                                              : 'Already Graduated',
+                                          icon: Icons.workspace_premium_outlined,
+                                          isMobile: isMobile,
+                                        ),
+                                      
+                                      // Masteral program
+                                      if (graduateType == 'masteral' && program.isNotEmpty)
+                                        _buildInfoCard(
+                                          label: 'Masteral Program',
+                                          value: program,
+                                          icon: Icons.book_outlined,
+                                          isMobile: isMobile,
+                                        ),
+                                      
+                                      // Already graduated - show graduated college and program
+                                      if (graduateType == 'not_masteral') ...[
+                                        if (graduatedCollege.isNotEmpty)
+                                          _buildInfoCard(
+                                            label: 'Graduated College',
+                                            value: graduatedCollege,
+                                            icon: Icons.account_balance_outlined,
+                                            isMobile: isMobile,
+                                          ),
+                                        if (graduatedProgram.isNotEmpty)
+                                          _buildInfoCard(
+                                            label: 'Graduated Program',
+                                            value: graduatedProgram,
+                                            icon: Icons.book_outlined,
+                                            isMobile: isMobile,
+                                          ),
+                                      ],
+                                    ],
+                                  ],
+
+                                  // INCOMING FRESHMAN APPLICANT
+                                  if (affiliation.toLowerCase() == 'incoming freshman applicant') ...[
+                                    if (lrn.isNotEmpty)
                                       _buildInfoCard(
-                                        label: 'Program',
-                                        value: program,
-                                        icon: Icons.book_outlined,
+                                        label: 'Learner Reference Number (LRN)',
+                                        value: lrn,
+                                        icon: Icons.numbers_outlined,
                                         isMobile: isMobile,
                                       ),
                                     if (scholarship.isNotEmpty)
@@ -499,6 +578,19 @@ class _ProfileModalState extends State<ProfileModal> {
                                         isMobile: isMobile,
                                       ),
                                   ],
+
+                                  // MASTERAL (NOT CMU GRADUATE)
+                                  if (affiliation.toLowerCase() == 'masteral (not cmu graduate)') ...[
+                                    if (program.isNotEmpty)
+                                      _buildInfoCard(
+                                        label: 'Masteral Program',
+                                        value: program,
+                                        icon: Icons.book_outlined,
+                                        isMobile: isMobile,
+                                      ),
+                                  ],
+
+                                  // OTHERS - Just show affiliation (already shown above)
                                 ],
 
                                 // STAFF ROLE FIELDS

@@ -1,3 +1,4 @@
+import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -37,7 +38,8 @@ void showUserInfoModal(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 750),
+          // ✅ UPDATED WIDTH FROM 560 TO 600 TO MATCH EDIT MODAL
+          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 750),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
@@ -170,57 +172,174 @@ void showUserInfoModal(
                                 _formatRole(data['role']),
                                 Icons.admin_panel_settings_outlined,
                               ),
-                              
+
                               // Show affiliation for users
                               if (data['role']?.toString().toLowerCase() == 'user') ...[
-                                const SizedBox(height: 16),
-                                _buildMetadataRow(
-                                  'Affiliation',
-                                  data['affiliation'] ?? 'Not specified',
-                                  Icons.business_outlined,
-                                ),
-                                
-                                // Show LRN for Incoming Freshman Applicants
-                                if (data['affiliation']?.toString().toLowerCase() == 'incoming freshman applicant') ...[
+                                // Show affiliation
+                                if (data['affiliation'] != null) ...[
                                   const SizedBox(height: 16),
                                   _buildMetadataRow(
-                                    'LRN',
-                                    data['lrn'] ?? 'Not specified',
-                                    Icons.numbers_outlined,
+                                    'Affiliation',
+                                    data['affiliation'],
+                                    Icons.business_outlined,
                                   ),
                                 ],
 
-                                // Show Student ID for CMU Students
-                                if (data['affiliation']?.toString().toLowerCase() == 'cmu student') ...[
-                                  const SizedBox(height: 16),
-                                  _buildMetadataRow(
-                                    'Student ID',
-                                    data['studentId'] ?? 'Not specified',
-                                    Icons.badge_outlined,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _buildMetadataRow(
-                                    'Year Level',
-                                    data['year'] ?? 'Not specified',
-                                    Icons.school_outlined,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _buildMetadataRow(
-                                    'Program',
-                                    data['program'] ?? 'Not specified',
-                                    Icons.book_outlined,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _buildMetadataRow(
-                                    'Scholarship',
-                                    data['scholarship'] ?? 'Not specified',
-                                    Icons.school_outlined,
-                                  ),
+                                // CMU STUDENT - Show student fields
+                                if (data['affiliation']?.toString().toLowerCase() ==
+                                    'cmu student') ...[
+                                  if (data['studentType'] != null) ...[
+                                    const SizedBox(height: 16),
+                                    _buildMetadataRow(
+                                      'Student Type',
+                                      data['studentType'] == 'undergraduate'
+                                          ? 'Undergraduate'
+                                          : data['studentType'] == 'graduate'
+                                              ? 'Graduate'
+                                              : data['studentType'],
+                                      Icons.school_outlined,
+                                    ),
+                                  ],
+
+                                  // UNDERGRADUATE
+                                  if (data['studentType'] == 'undergraduate') ...[
+                                    if (data['studentId'] != null) ...[
+                                      const SizedBox(height: 16),
+                                      _buildMetadataRow(
+                                        'Student ID',
+                                        data['studentId'],
+                                        Icons.badge_outlined,
+                                      ),
+                                    ],
+                                    if (data['year'] != null) ...[
+                                      const SizedBox(height: 16),
+                                      _buildMetadataRow(
+                                        'Year Level',
+                                        data['year'],
+                                        Icons.calendar_today_outlined,
+                                      ),
+                                    ],
+                                    if (data['college'] != null) ...[
+                                      const SizedBox(height: 16),
+                                      _buildMetadataRow(
+                                        'College',
+                                        data['college'],
+                                        Icons.account_balance_outlined,
+                                      ),
+                                    ],
+                                    if (data['program'] != null) ...[
+                                      const SizedBox(height: 16),
+                                      _buildMetadataRow(
+                                        'Program',
+                                        data['program'],
+                                        Icons.book_outlined,
+                                      ),
+                                    ],
+                                    if (data['scholarship'] != null) ...[
+                                      const SizedBox(height: 16),
+                                      _buildMetadataRow(
+                                        'Scholarship',
+                                        data['scholarship'],
+                                        Icons.card_membership_outlined,
+                                      ),
+                                    ],
+                                  ],
+
+                                  // GRADUATE
+                                  if (data['studentType'] == 'graduate') ...[
+                                    if (data['graduateType'] != null) ...[
+                                      const SizedBox(height: 16),
+                                      _buildMetadataRow(
+                                        'Graduate Status',
+                                        data['graduateType'] == 'masteral'
+                                            ? 'Taking Masteral'
+                                            : data['graduateType'] == 'not_masteral'
+                                                ? 'Already Graduated'
+                                                : data['graduateType'],
+                                        Icons.school,
+                                      ),
+                                    ],
+
+                                    // MASTERAL GRADUATE
+                                    if (data['graduateType'] == 'masteral') ...[
+                                      if (data['college'] != null) ...[
+                                        const SizedBox(height: 16),
+                                        _buildMetadataRow(
+                                          'College',
+                                          data['college'],
+                                          Icons.account_balance_outlined,
+                                        ),
+                                      ],
+                                      if (data['program'] != null) ...[
+                                        const SizedBox(height: 16),
+                                        _buildMetadataRow(
+                                          'Masteral Program',
+                                          data['program'],
+                                          Icons.book_outlined,
+                                        ),
+                                      ],
+                                    ],
+
+                                    // NOT MASTERAL GRADUATE
+                                    if (data['graduateType'] == 'not_masteral') ...[
+                                      if (data['graduatedCollege'] != null) ...[
+                                        const SizedBox(height: 16),
+                                        _buildMetadataRow(
+                                          'Graduated College',
+                                          data['graduatedCollege'],
+                                          Icons.account_balance_outlined,
+                                        ),
+                                      ],
+                                      if (data['graduatedProgram'] != null) ...[
+                                        const SizedBox(height: 16),
+                                        _buildMetadataRow(
+                                          'Graduated Program',
+                                          data['graduatedProgram'],
+                                          Icons.book_outlined,
+                                        ),
+                                      ],
+                                    ],
+                                  ],
+                                ],
+
+                                // INCOMING FRESHMAN APPLICANT
+                                if (data['affiliation']?.toString().toLowerCase() ==
+                                    'incoming freshman applicant') ...[
+                                  if (data['lrn'] != null) ...[
+                                    const SizedBox(height: 16),
+                                    _buildMetadataRow(
+                                      'LRN',
+                                      data['lrn'],
+                                      Icons.numbers_outlined,
+                                    ),
+                                  ],
+                                  if (data['scholarship'] != null) ...[
+                                    const SizedBox(height: 16),
+                                    _buildMetadataRow(
+                                      'Scholarship',
+                                      data['scholarship'],
+                                      Icons.card_membership_outlined,
+                                    ),
+                                  ],
+                                ],
+
+                                // MASTERAL (NOT CMU GRADUATE)
+                                if (data['affiliation']?.toString().toLowerCase() ==
+                                    'masteral (not cmu graduate)') ...[
+                                  if (data['program'] != null) ...[
+                                    const SizedBox(height: 16),
+                                    _buildMetadataRow(
+                                      'Masteral Program',
+                                      data['program'],
+                                      Icons.book_outlined,
+                                    ),
+                                  ],
                                 ],
                               ],
 
                               // Show service unit for staff
-                              if (data['role']?.toString().toLowerCase() == 'staff') ...[
+                              if (data['role']?.toString().toLowerCase() ==
+                                  'staff') ...[
                                 const SizedBox(height: 16),
                                 _buildMetadataRow(
                                   'Service Unit',
@@ -232,7 +351,9 @@ void showUserInfoModal(
                               const SizedBox(height: 16),
                               _buildMetadataRow(
                                 'Status',
-                                data['isActive'] == true ? 'Active' : 'Inactive',
+                                data['isActive'] == true
+                                    ? 'Active'
+                                    : 'Inactive',
                                 Icons.circle_outlined,
                                 statusColor:
                                     data['isActive'] == true
@@ -276,7 +397,7 @@ void showUserInfoModal(
         ),
       );
     },
-    transitionBuilder: (context, animation, secondaryAnimation, child) {
+   transitionBuilder: (context, animation, secondaryAnimation, child) {
       return SlideTransition(
         position: Tween<Offset>(
           begin: const Offset(0, 0.1),
@@ -300,7 +421,12 @@ Widget _buildActionButtons(
   bool isTablet,
   bool isDesktop,
 ) {
-  double buttonHeight = isMobile ? 40 : isTablet ? 44 : 46;
+  double buttonHeight =
+      isMobile
+          ? 40
+          : isTablet
+          ? 44
+          : 46;
   double fontSize = isMobile ? 14 : 15;
   double borderRadius = 10;
 
@@ -311,7 +437,13 @@ Widget _buildActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: OutlinedButton.icon(
-            onPressed: () => _showDeleteConfirmation(context, doc),
+            onPressed:
+                () => showDeleteConfirmation(
+                  context,
+                  doc,
+                  DeleteConfigs.users,
+                  'users',
+                ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
               'Delete',
@@ -360,295 +492,6 @@ Widget _buildActionButtons(
       ),
     ],
   );
-}
-
-void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
-  final data = doc.data() as Map<String, dynamic>;
-  final screenWidth = MediaQuery.of(context).size.width;
-  final isMobile = screenWidth < 600;
-
-  showGeneralDialog(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'Delete Confirmation',
-    barrierColor: Colors.black.withOpacity(0.6),
-    transitionDuration: const Duration(milliseconds: 250),
-    pageBuilder: (context, animation, secondaryAnimation) {
-      return Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 420),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFEF2F2),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEE2E2),
-                        borderRadius: BorderRadius.circular(32),
-                      ),
-                      child: const Icon(
-                        Icons.warning_amber_rounded,
-                        color: Color(0xFFEF4444),
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Delete User',
-                      style: TextStyle(
-                        fontSize: isMobile ? 20 : 24,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1F2937),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    Text(
-                      'Are you sure you want to delete this user? This action cannot be undone.',
-                      style: TextStyle(
-                        fontSize: isMobile ? 14 : 16,
-                        color: const Color(0xFF6B7280),
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'User:',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF6B7280),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            data['name'] ?? 'Unknown User',
-                            style: TextStyle(
-                              fontSize: isMobile ? 14 : 16,
-                              color: const Color(0xFF1F2937),
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            data['email'] ?? 'No email available',
-                            style: TextStyle(
-                              fontSize: isMobile ? 12 : 14,
-                              color: const Color(0xFF6B7280),
-                              fontWeight: FontWeight.w400,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Action Buttons
-                    _buildDeleteActionButtons(context, doc, isMobile),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-    transitionBuilder: (context, animation, secondaryAnimation, child) {
-      return ScaleTransition(
-        scale: Tween<double>(begin: 0.9, end: 1.0).animate(
-          CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
-        ),
-        child: FadeTransition(
-          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-          child: child,
-        ),
-      );
-    },
-  );
-}
-
-Widget _buildDeleteActionButtons(
-  BuildContext context,
-  DocumentSnapshot doc,
-  bool isMobile,
-) {
-  double buttonHeight = isMobile ? 40 : 46;
-  double fontSize = isMobile ? 14 : 15;
-  double borderRadius = 10;
-
-  return Row(
-    children: [
-      Expanded(
-        child: SizedBox(
-          height: buttonHeight,
-          child: OutlinedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF6B7280),
-              side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
-            ),
-            child: Text(
-              'Cancel',
-              style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: SizedBox(
-          height: buttonHeight,
-          child: ElevatedButton(
-            onPressed: () => _handleDeleteUser(context, doc),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
-            ),
-            child: Text(
-              'Delete',
-              style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-      ),
-    ],
-  );
-}
-
-Future<void> _handleDeleteUser(
-  BuildContext context,
-  DocumentSnapshot doc,
-) async {
-  try {
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-      ),
-    );
-
-    final currentUser = FirebaseAuth.instance.currentUser;
-    String actorName = 'Unknown';
-
-    if (currentUser != null) {
-      final currentUserDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
-      if (currentUserDoc.exists) {
-        final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
-        actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';
-      }
-    }
-
-    final docData = doc.data() as Map<String, dynamic>;
-    String deletedUserName = docData['name'] ?? 'Unknown User';
-    String deletedUserEmail = docData['email'] ?? '';
-
-    // Step 1: Delete from Firebase Authentication using Cloud Function
-    final functionsService = FirebaseFunctionsService();
-    try {
-      await functionsService.deleteUserAuth(doc.id);
-      print('✅ User deleted from Firebase Authentication');
-    } catch (e) {
-      print('⚠️ Failed to delete from Authentication: $e');
-      // Continue with Firestore deletion even if Auth deletion fails
-    }
-
-    // Step 2: Delete user document from Firestore
-    await FirebaseFirestore.instance.collection('users').doc(doc.id).delete();
-    print('✅ User document deleted from Firestore');
-
-    // Step 3: Log the deletion action
-    final logRef = FirebaseFirestore.instance.collection('logs').doc();
-    await logRef.set({
-      'logId': logRef.id,
-      'user': actorName,
-      'action': 'Deleted User: $deletedUserName ($deletedUserEmail)',
-      'time': Timestamp.now(),
-    });
-    print('✅ Deletion logged successfully');
-
-    if (context.mounted) {
-      // Close loading dialog
-      Navigator.of(context).pop();
-      // Close confirmation dialog
-      Navigator.of(context).pop();
-      // Close info modal
-      Navigator.of(context).pop();
-
-      SnackbarUtil.showSuccess(context, 'User deleted successfully');
-    }
-  } catch (error) {
-    print('❌ Error deleting user: $error');
-    if (context.mounted) {
-      // Close loading dialog
-      Navigator.of(context).pop();
-
-      SnackbarUtil.showError(context, 'Delete failed: $error');
-    }
-  }
 }
 
 Widget _buildSectionHeader(String title, IconData icon) {

@@ -578,49 +578,7 @@ Widget _buildHeader(
               ),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: isMobile
-                ? Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    children: [
-                      buildStatCard(
-                        'Total Colleges',
-                        '${program?.totalProgram}',
-                        Colors.blue,
-                        Icons.account_balance,
-                      ),
-                      buildStatCard(
-                        'College with Most Programs',
-                        '${program?.dominantProgram}',
-                        Colors.green,
-                        Icons.check_circle,
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: buildStatCard(
-                          'Total Colleges',
-                          '${program?.totalProgram}',
-                          Colors.blue,
-                          Icons.account_balance,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: buildStatCard(
-                          'College with Most Programs',
-                          '${program?.dominantProgram}',
-                          Colors.green,
-                          Icons.check_circle,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
+    const SizedBox(height: 40,),
           buildSearchField('Search colleges by name', searchController),
         ],
       );

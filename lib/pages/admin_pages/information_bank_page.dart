@@ -32,15 +32,12 @@ class _InformationBankPageState extends State<InformationBankPage> {
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
-  bool isLoading = false; // ✅ Changed to false initially
-  Timer? _debounce;
+  bool isLoading = false;
+
 
   final StatDataManagement statData = StatDataManagement();
 
   InformationBankData? ibData;
-  
-  // ✅ Create the stream once and reuse it
-  late final Stream<QuerySnapshot> _documentsStream;
 
   int currentPage = 1;
   int itemsPerPage = 10;
@@ -56,14 +53,8 @@ class _InformationBankPageState extends State<InformationBankPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    
-    // ✅ Initialize the stream once
-    _documentsStream = FirebaseFirestore.instance
-        .collection('information_bank')
-        .orderBy('createdAt', descending: true)
-        .snapshots();
-    
-    // ✅ Load stats asynchronously without blocking UI
+
+
     _loadStatsAsync();
   }
 
@@ -82,19 +73,16 @@ class _InformationBankPageState extends State<InformationBankPage> {
   }
 
   void _onSearchChanged() {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      if (mounted) {
+
         setState(() {
           currentPage = 1;
-        });
-      }
+    
     });
   }
 
   @override
   void dispose() {
-    _debounce?.cancel();
+   
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
@@ -115,6 +103,11 @@ class _InformationBankPageState extends State<InformationBankPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+
     return ResponsiveLayout(
       mobileBody: MobileInformationBank(
         selectedCategory: selectedCategory,
@@ -125,7 +118,7 @@ class _InformationBankPageState extends State<InformationBankPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         ib: ibData,
-        documentsStream: _documentsStream, // ✅ Pass the stream
+        // ✅ Pass the stream
       ),
       tabletBody: TabletInformationBank(
         selectedCategory: selectedCategory,
@@ -136,7 +129,7 @@ class _InformationBankPageState extends State<InformationBankPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         ib: ibData,
-        documentsStream: _documentsStream, // ✅ Pass the stream
+        // ✅ Pass the stream
       ),
       desktopBody: DesktopInformationBank(
         selectedCategory: selectedCategory,
@@ -147,7 +140,7 @@ class _InformationBankPageState extends State<InformationBankPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         ib: ibData,
-        documentsStream: _documentsStream, // ✅ Pass the stream
+        // ✅ Pass the stream
       ),
     );
   }
@@ -164,7 +157,6 @@ class DesktopInformationBank extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final InformationBankData? ib;
-  final Stream<QuerySnapshot> documentsStream; // ✅ Add this
 
   const DesktopInformationBank({
     super.key,
@@ -176,7 +168,6 @@ class DesktopInformationBank extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.ib,
-    required this.documentsStream, // ✅ Add this
   });
 
   @override
@@ -192,7 +183,6 @@ class DesktopInformationBank extends StatelessWidget {
       24.0,
       ib,
       context,
-      documentsStream, // ✅ Pass the stream
     );
   }
 }
@@ -206,7 +196,6 @@ class TabletInformationBank extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final InformationBankData? ib;
-  final Stream<QuerySnapshot> documentsStream; // ✅ Add this
 
   const TabletInformationBank({
     super.key,
@@ -218,7 +207,6 @@ class TabletInformationBank extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.ib,
-    required this.documentsStream, // ✅ Add this
   });
 
   @override
@@ -234,7 +222,6 @@ class TabletInformationBank extends StatelessWidget {
       20.0,
       ib,
       context,
-      documentsStream, // ✅ Pass the stream
     );
   }
 }
@@ -248,7 +235,6 @@ class MobileInformationBank extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final InformationBankData? ib;
-  final Stream<QuerySnapshot> documentsStream; // ✅ Add this
 
   const MobileInformationBank({
     super.key,
@@ -260,7 +246,6 @@ class MobileInformationBank extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.ib,
-    required this.documentsStream, // ✅ Add this
   });
 
   @override
@@ -302,7 +287,11 @@ class MobileInformationBank extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream: documentsStream, // ✅ Use passed stream
+                        stream:
+                            FirebaseFirestore.instance
+                                .collection('information_bank')
+                                .orderBy('createdAt', descending: true)
+                                .snapshots(),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -360,7 +349,6 @@ Widget mainContent(
   final double padding,
   final InformationBankData? ib,
   final BuildContext context,
-  final Stream<QuerySnapshot> documentsStream, // ✅ Add this parameter
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -397,7 +385,11 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream: documentsStream, // ✅ Use passed stream
+                      stream:
+                          FirebaseFirestore.instance
+                              .collection('information_bank')
+                              .orderBy('createdAt', descending: true)
+                              .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -440,6 +432,7 @@ Widget mainContent(
     ),
   );
 }
+
 Widget _buildMobileHeader(
   String selectedCategory,
   ValueChanged<String> onCategoryChanged,
@@ -605,7 +598,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 20,),
+              SizedBox(width: 20),
               Expanded(
                 flex: 3,
                 child: Text(
@@ -677,9 +670,6 @@ Widget _buildTableHeader() {
   );
 }
 
-
-
-
 Widget _buildIBList({
   required BuildContext context,
   required List<DocumentSnapshot> getAllDocuments,
@@ -690,8 +680,6 @@ Widget _buildIBList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-
-
   final filtered =
       getAllDocuments.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
@@ -754,8 +742,9 @@ Widget _buildIBList({
                         title: data['ib_title'] ?? 'N/A',
                         source: data['source'] ?? 'N/A',
                         category: data['category'] ?? 'General',
-                        content: cleanPdfContent((data['content'] as String).substring(0, 120)), // ✅ Clean first
-
+                        content: cleanPdfContent(
+                          (data['content'] as String).substring(0, 120),
+                        ), // ✅ Clean first
                       ),
                     );
                   },
@@ -819,10 +808,7 @@ Widget _buildIBRow({
               ],
             ),
           ),
-         if (isMobile)...[
-          const SizedBox(width: 20,)
-         ],
-
+          if (isMobile) ...[const SizedBox(width: 20)],
 
           // Content - flex: 4 (only on tablet/desktop)
           if (!isMobile)
@@ -835,10 +821,9 @@ Widget _buildIBRow({
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-          
+
           // Spacing to match header
-          if (!isMobile)
-            const SizedBox(width: 100),
+          if (!isMobile) const SizedBox(width: 100),
 
           // Category - flex: 3
           Expanded(
@@ -862,10 +847,10 @@ Widget _buildIBRow({
               ),
             ),
           ),
-          
+
           // Spacing before action button
           SizedBox(width: isTablet ? 40 : 5),
-          
+
           // Action button - Fixed width 40
           SizedBox(
             width: 40,
@@ -880,32 +865,33 @@ Widget _buildIBRow({
                     doc,
                     DeleteConfigs.document,
                     'information_bank',
-                    customDeleteHandler: handleInformationBankDelete
+                    customDeleteHandler: handleInformationBankDelete,
                   );
                 }
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
             ),
           ),
         ],

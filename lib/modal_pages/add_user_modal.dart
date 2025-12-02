@@ -1,4 +1,3 @@
-
 import 'package:capstone_project/pages/admin_pages/scholarship_management.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -51,72 +50,49 @@ class AddUserModal extends StatelessWidget {
     );
   }
 
-  Widget _buildModal(
-    BuildContext context,
-    bool isMobile,
-    bool isTablet,
-    bool isDesktop,
-  ) {
-    final screenSize = MediaQuery.of(context).size;
-    final screenWidth = screenSize.width;
-    final screenHeight = screenSize.height;
-
-    // Responsive dimensions
-    double modalWidth;
-    double modalHeight;
-    EdgeInsets modalPadding;
-
-    if (isMobile) {
-      modalWidth = screenWidth * 0.95;
-      modalHeight = screenHeight * 0.90;
-      modalPadding = const EdgeInsets.all(16);
-    } else if (isTablet) {
-      modalWidth = screenWidth * 0.80;
-      modalHeight = screenHeight * 0.85;
-      modalPadding = const EdgeInsets.all(24);
-    } else {
-      modalWidth = 700;
-      modalHeight = screenHeight * 0.80;
-      modalPadding = const EdgeInsets.all(32);
-    }
-
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: modalPadding,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          width: modalWidth,
-          height: modalHeight,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 32,
-                offset: const Offset(0, 16),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-            child: AddUserContent(
-              isMobile: isMobile,
-              isTablet: isTablet,
-              isDesktop: isDesktop,
-              onNavigateToPage: onNavigateToPage,
+Widget _buildModal(
+  BuildContext context,
+  bool isMobile,
+  bool isTablet,
+  bool isDesktop,
+) {
+  return Dialog(
+    backgroundColor: Colors.transparent,
+    insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
+    child: Material(
+      color: Colors.transparent,
+      child: Container(
+        // ✅ UPDATED DIMENSIONS TO MATCH EDIT MODAL
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 750),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 32,
+              offset: const Offset(0, 16),
             ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: AddUserContent(
+            isMobile: isMobile,
+            isTablet: isTablet,
+            isDesktop: isDesktop,
+            onNavigateToPage: onNavigateToPage,
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class AddUserContent extends StatefulWidget {
@@ -156,6 +132,22 @@ class _AddUserContentState extends State<AddUserContent> {
   bool _isConfirmPasswordVisible = false;
   bool _isSubmitting = false;
 
+  String _selectedStudentType = 'N/A'; // 'undergraduate' or 'graduate'
+  String _selectedGraduateType = 'N/A'; // 'masteral' or 'not_masteral'
+  String _graduatedCollege = 'N/A';
+  String _graduatedCollegeId = '';
+  String _graduatedProgram = 'N/A';
+  String _selectedCollege = 'N/A';
+  String _selectedCollegeId = '';
+  Map<String, String> _collegesMap = {};
+  Map<String, List<String>> _programsByCollege = {};
+  List<String> _masteralPrograms = [];
+  String _notEnrolledType = 'N/A'; // 'incoming_freshman', 'masteral', 'others'
+  String _customScholarship = '';
+  bool _customScholarshipConfirmed = false;
+
+  final _customScholarshipController = TextEditingController();
+
   final List<String> _programs = ['N/A'];
   final List<String> _affiliations = [
     'N/A',
@@ -164,33 +156,30 @@ class _AddUserContentState extends State<AddUserContent> {
     'Parent',
     'Faculty',
     'CMU Staff',
-    'Alumni',
+    'Masteral (Not CMU Graduate)', // Changed from 'Alumni'
   ];
-
   final List<String> _scholarships = ['N/A'];
   bool isLoadingPrograms = true;
   bool isLoadingAffiliations = true;
   bool isLoadingScholarships = true;
 
   final _studentIdController = TextEditingController();
-final _lrnController = TextEditingController();
+  final _lrnController = TextEditingController();
 
-// Add these new state variables
-String _selectedServiceUnit = 'N/A';
-final List<String> _serviceUnits = ['N/A', 'Admission', 'Scholarship', 'Placement'];
-
+  // Add these new state variables
+  String _selectedServiceUnit = 'N/A';
+  final List<String> _serviceUnits = [
+    'N/A',
+    'Admission',
+    'Scholarship',
+    'Placement',
+  ];
 
   final roles = ['admin', 'user', 'staff'];
   List<String> get displayRoles =>
       roles.map((role) => role[0].toUpperCase() + role.substring(1)).toList();
 
-  final years = [
-    'N/A',
-    '1st Year',
-    '2nd Year',
-    '3rd Year',
-    '4th Year',
-  ];
+  final years = ['N/A', '1st Year', '2nd Year', '3rd Year', '4th Year'];
 
   @override
   void initState() {
@@ -200,81 +189,202 @@ final List<String> _serviceUnits = ['N/A', 'Admission', 'Scholarship', 'Placemen
     _fetchScholarships();
   }
 
-@override
-void dispose() {
-  _firstNameController.dispose();
-  _lastNameController.dispose();
-  _emailController.dispose();
-  _passwordController.dispose();
-  _confirmPasswordController.dispose();
-  _affiliationController.dispose();
-  _scholarshipController.dispose();
-  _studentIdController.dispose();
-  _lrnController.dispose();
-  super.dispose();
+
+Future<bool> _isStudentIdUnique(String studentId, {String? excludeUserId}) async {
+  try {
+    final query = await FirebaseFirestore.instance
+        .collection('users')
+        .where('studentId', isEqualTo: studentId.trim())
+        .get();
+
+    if (query.docs.isEmpty) return true;
+    
+    // If excluding a user (for edit), check if the only match is that user
+    if (excludeUserId != null) {
+      return query.docs.every((doc) => doc.id == excludeUserId);
+    }
+    
+    return false;
+  } catch (e) {
+    print('Error checking student ID uniqueness: $e');
+    return false;
+  }
 }
 
-bool get shouldShowAffiliation {
-  return _selectedRole.toLowerCase() == 'user';
+Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
+  try {
+    final query = await FirebaseFirestore.instance
+        .collection('users')
+        .where('lrn', isEqualTo: lrn.trim())
+        .get();
+
+    if (query.docs.isEmpty) return true;
+    
+    // If excluding a user (for edit), check if the only match is that user
+    if (excludeUserId != null) {
+      return query.docs.every((doc) => doc.id == excludeUserId);
+    }
+    
+    return false;
+  } catch (e) {
+    print('Error checking LRN uniqueness: $e');
+    return false;
+  }
 }
 
-bool get shouldShowStudentFields {
-  return _selectedRole.toLowerCase() == 'user' && 
-         _selectedAffiliation.toLowerCase() == 'cmu student';
-}
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _affiliationController.dispose();
+    _scholarshipController.dispose();
+    _studentIdController.dispose();
+    _lrnController.dispose();
+    super.dispose();
+  }
 
-bool get shouldShowLRNField {
-  return _selectedRole.toLowerCase() == 'user' && 
-         _selectedAffiliation.toLowerCase() == 'incoming freshman applicant';
-}
+  bool get shouldShowAffiliation {
+    return _selectedRole.toLowerCase() == 'user';
+  }
 
-bool get shouldShowServiceUnit {
-  return _selectedRole.toLowerCase() == 'staff';
-}
+  bool get shouldShowStudentFields {
+    return _selectedRole.toLowerCase() == 'user' &&
+        _selectedAffiliation.toLowerCase() == 'cmu student';
+  }
+
+  bool get shouldShowStudentTypeSelection {
+    return shouldShowStudentFields;
+  }
+
+  bool get shouldShowUndergraduateFields {
+    return shouldShowStudentFields && _selectedStudentType == 'undergraduate';
+  }
+
+  bool get shouldShowGraduateFields {
+    return shouldShowStudentFields && _selectedStudentType == 'graduate';
+  }
+
+  bool get shouldShowGraduateTypeSelection {
+    return shouldShowGraduateFields;
+  }
+
+  bool get shouldShowMasteralGraduateFields {
+    return shouldShowGraduateFields && _selectedGraduateType == 'masteral';
+  }
+
+  bool get shouldShowNotMasteralGraduateFields {
+    return shouldShowGraduateFields && _selectedGraduateType == 'not_masteral';
+  }
+
+  bool get shouldShowLRNField {
+    return _selectedRole.toLowerCase() == 'user' &&
+        _selectedAffiliation.toLowerCase() == 'incoming freshman applicant';
+  }
+
+  bool get shouldShowMasteralNotCMUFields {
+    return _selectedRole.toLowerCase() == 'user' &&
+        _selectedAffiliation.toLowerCase() == 'masteral (not cmu graduate)';
+  }
+
+  bool get shouldShowServiceUnit {
+    return _selectedRole.toLowerCase() == 'staff';
+  }
+
+  Map<String, String> get _colleges {
+    Map<String, String> collegesWithNA = {'N/A': ''};
+    collegesWithNA.addAll(_collegesMap);
+    return collegesWithNA;
+  }
+
+  List<String> get _undergraduatePrograms {
+    if (_selectedCollege == 'N/A' || _selectedCollegeId.isEmpty) {
+      return ['N/A'];
+    }
+    final key = '${_selectedCollegeId}_Bachelor';
+    return ['N/A', ...(_programsByCollege[key] ?? [])];
+  }
+
+  List<String> get _masteralProgramsList {
+    return ['N/A', ..._masteralPrograms];
+  }
 
   Future<void> _fetchPrograms() async {
-    try {
-      final snapshot =
-          await FirebaseFirestore.instance
-              .collection('programs')
-              .orderBy('name')
-              .get();
-
-      setState(() {
-        _programs.clear();
-        _programs.add('N/A');
-        _programs.addAll(snapshot.docs.map((doc) => doc['name'] as String));
-        isLoadingPrograms = false;
-      });
-    } catch (e) {
-      setState(() {
-        isLoadingPrograms = false;
-      });
-      print('Error fetching programs: $e');
+  try {
+    // Load colleges
+    final collegesSnapshot =
+        await FirebaseFirestore.instance.collection('colleges').get();
+    Map<String, String> collegesMap = {};
+    for (var doc in collegesSnapshot.docs) {
+      final name = doc.data()['name']?.toString().trim();
+      if (name != null && name.isNotEmpty) {
+        collegesMap[name] = doc.id;
+      }
     }
-  }
 
-  Future<void> _fetchAffiliations() async {
-    try {
-      final snapshot =
-          await FirebaseFirestore.instance
-              .collection('affiliations')
-              .orderBy('name')
-              .get();
+    final programsSnapshot =
+        await FirebaseFirestore.instance.collection('programs').get();
+    List<String> masteralPrograms = [];
+    Map<String, List<String>> programsByCollege = {};
 
-      setState(() {
-        _affiliations.clear();
-        _affiliations.add('N/A');
-        _affiliations.addAll(snapshot.docs.map((doc) => doc['name'] as String));
-        isLoadingAffiliations = false;
-      });
-    } catch (e) {
-      setState(() {
-        isLoadingAffiliations = false;
-      });
-      print('Error fetching affiliation: $e');
+    for (var doc in programsSnapshot.docs) {
+      final programName = doc.data()['name']?.toString().trim();
+      final category = doc.data()['category']?.toString();
+      final collegeId = doc.data()['collegeId']?.toString();
+
+      if (programName == null || programName.isEmpty || category == null)
+        continue;
+
+      // Group masteral programs (no college needed)
+      if (category == "Masteral") {
+        masteralPrograms.add(programName);
+      }
+      
+      // Group bachelor programs by college
+      if (category == "Bachelor" && collegeId != null && collegeId.isNotEmpty) {
+        final key = '${collegeId}_Bachelor';
+        if (!programsByCollege.containsKey(key)) {
+          programsByCollege[key] = [];
+        }
+        programsByCollege[key]!.add(programName);
+      }
     }
+
+    setState(() {
+      _collegesMap = collegesMap;
+      _masteralPrograms = masteralPrograms;
+      _programsByCollege = programsByCollege;
+      _programs.clear();
+      _programs.add('N/A');
+      isLoadingPrograms = false;
+    });
+  } catch (e) {
+    setState(() => isLoadingPrograms = false);
+    print('Error fetching programs: $e');
   }
+}
+Future<bool> _isEmailUnique(String email, {String? excludeUserId}) async {
+  try {
+    final query = await FirebaseFirestore.instance
+        .collection('users')
+        .where('email', isEqualTo: email.trim().toLowerCase())
+        .get();
+
+    if (query.docs.isEmpty) return true;
+    
+    if (excludeUserId != null) {
+      return query.docs.every((doc) => doc.id == excludeUserId);
+    }
+    
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+
 
   Future<void> _fetchScholarships() async {
     try {
@@ -296,17 +406,6 @@ bool get shouldShowServiceUnit {
       });
       print('Error fetching scholarships: $e');
     }
-  }
-
-  bool get isYearEnabled {
-    return _selectedRole.toLowerCase() == 'user';
-  }
-
-  bool get isProgramEnabled {
-    return _selectedRole.toLowerCase() == 'user' &&
-        _selectedYear != 'N/A' &&
-        _selectedYear != 'Incoming' &&
-        _selectedYear != 'Graduate';
   }
 
  Future<void> _saveUser() async {
@@ -335,13 +434,23 @@ bool get shouldShowServiceUnit {
     return;
   }
 
+  // CHECK EMAIL UNIQUENESS
+  final isEmailUnique = await _isEmailUnique(_emailController.text.trim());
+  if (!isEmailUnique) {
+    SnackbarUtil.showWarning(
+      context,
+      'This email is already registered',
+    );
+    return;
+  }
+
   if (_passwordController.text.trim().isEmpty) {
     SnackbarUtil.showWarning(context, 'Please enter password');
     return;
   }
 
   if (_passwordController.text.length < 6) {
-    SnackbarUtil.showWarning(context, 'Password must be 6 characters');
+    SnackbarUtil.showWarning(context, 'Password must be at least 6 characters');
     return;
   }
 
@@ -358,23 +467,104 @@ bool get shouldShowServiceUnit {
     }
 
     if (_selectedAffiliation.toLowerCase() == 'cmu student') {
-      if (_studentIdController.text.trim().isEmpty) {
-        SnackbarUtil.showWarning(context, 'Please enter student ID');
+      if (_selectedStudentType == 'N/A') {
+        SnackbarUtil.showWarning(context, 'Please select student type');
         return;
       }
-      if (_selectedYear == 'N/A') {
-        SnackbarUtil.showWarning(context, 'Please select year level');
-        return;
+
+      if (_selectedStudentType == 'undergraduate') {
+        if (_studentIdController.text.trim().isEmpty) {
+          SnackbarUtil.showWarning(context, 'Please enter student ID');
+          return;
+        }
+
+        final isStudentIdUnique = await _isStudentIdUnique(
+          _studentIdController.text.trim(),
+        );
+        if (!isStudentIdUnique) {
+          SnackbarUtil.showWarning(
+            context,
+            'This Student ID is already registered',
+          );
+          return;
+        }
+
+        if (_selectedYear == 'N/A') {
+          SnackbarUtil.showWarning(context, 'Please select year level');
+          return;
+        }
+
+        if (_selectedCollege == 'N/A') {
+          SnackbarUtil.showWarning(context, 'Please select a college');
+          return;
+        }
+
+        if (_selectedProgram == 'N/A') {
+          SnackbarUtil.showWarning(context, 'Please select a program');
+          return;
+        }
       }
-      if (isProgramEnabled && _selectedProgram == 'N/A') {
-        SnackbarUtil.showWarning(context, 'Please select a program');
-        return;
+
+      if (_selectedStudentType == 'graduate') {
+        if (_selectedGraduateType == 'N/A') {
+          SnackbarUtil.showWarning(context, 'Please select graduate type');
+          return;
+        }
+
+        if (_selectedGraduateType == 'masteral') {
+          if (_selectedProgram == 'N/A') {
+            SnackbarUtil.showWarning(context, 'Please select a masteral program');
+            return;
+          }
+        } else if (_selectedGraduateType == 'not_masteral') {
+          if (_graduatedCollege == 'N/A') {
+            SnackbarUtil.showWarning(context, 'Please select graduated college');
+            return;
+          }
+          if (_graduatedProgram == 'N/A') {
+            SnackbarUtil.showWarning(context, 'Please select graduated program');
+            return;
+          }
+        }
       }
     }
 
     if (_selectedAffiliation.toLowerCase() == 'incoming freshman applicant') {
       if (_lrnController.text.trim().isEmpty) {
         SnackbarUtil.showWarning(context, 'Please enter LRN');
+        return;
+      }
+
+      final isLrnUnique = await _isLRNUnique(_lrnController.text.trim());
+      if (!isLrnUnique) {
+        SnackbarUtil.showWarning(
+          context,
+          'This LRN is already registered',
+        );
+        return;
+      }
+
+      if (_selectedScholarship == 'N/A') {
+        SnackbarUtil.showWarning(
+          context,
+          'Please select a scholarship',
+        );
+        return;
+      }
+
+      if (_selectedScholarship == 'Others' &&
+          _customScholarship.trim().isEmpty) {
+        SnackbarUtil.showWarning(
+          context,
+          'Please specify scholarship name',
+        );
+        return;
+      }
+    }
+
+    if (_selectedAffiliation.toLowerCase() == 'masteral (not cmu graduate)') {
+      if (_selectedProgram == 'N/A') {
+        SnackbarUtil.showWarning(context, 'Please select a masteral program');
         return;
       }
     }
@@ -400,16 +590,13 @@ bool get shouldShowServiceUnit {
     final functionsService = FirebaseFunctionsService();
     String uid;
 
-    // Create user in Authentication
     try {
       uid = await functionsService.createUserAuth(
         email: email,
         password: password,
         displayName: fullName,
       );
-      print('✅ User created in Authentication with UID: $uid');
     } catch (e) {
-      print('❌ Failed to create user in Authentication: $e');
       SnackbarUtil.showError(
         context,
         'Failed to create user account: ${e.toString()}',
@@ -420,43 +607,130 @@ bool get shouldShowServiceUnit {
       return;
     }
 
-    // Prepare user data based on role
     Map<String, dynamic> userData = {
       'name': fullName,
       'email': email,
       'role': _selectedRole.toLowerCase().trim(),
       'isActive': true,
       'createdAt': Timestamp.now(),
+      'profileCompleted': true,
+      'onboardingCompleted': true,
+      'isVerified': true,
+      'emailVerified': true,
+      'verifiedAt': Timestamp.now(),
     };
 
-    // Add role-specific fields
     if (_selectedRole.toLowerCase() == 'user') {
       userData['affiliation'] = _selectedAffiliation;
+      userData['isEnrolled'] =
+          _selectedAffiliation.toLowerCase() == 'cmu student';
 
       if (_selectedAffiliation.toLowerCase() == 'cmu student') {
-        userData['studentId'] = _studentIdController.text.trim();
-        userData['year'] = _selectedYear;
-        userData['program'] = _selectedProgram;
-        userData['scholarship'] = _selectedScholarship;
-      } else if (_selectedAffiliation.toLowerCase() == 'incoming freshman applicant') {
+        userData['studentType'] = _selectedStudentType;
+
+        if (_selectedStudentType == 'undergraduate') {
+          userData['studentId'] = _studentIdController.text.trim();
+          userData['year'] = _selectedYear;
+          userData['college'] = _selectedCollege;
+          userData['collegeId'] = _selectedCollegeId;
+          userData['program'] = _selectedProgram;
+          userData['scholarship'] =
+              _selectedScholarship == 'Others'
+                  ? _customScholarship
+                  : (_selectedScholarship != 'N/A'
+                      ? _selectedScholarship
+                      : null);
+          userData['graduateType'] = null;
+          userData['graduatedCollege'] = null;
+          userData['graduatedCollegeId'] = null;
+          userData['graduatedProgram'] = null;
+          userData['lrn'] = null;
+        } else if (_selectedStudentType == 'graduate') {
+          userData['graduateType'] = _selectedGraduateType;
+          userData['studentId'] = null;
+
+          if (_selectedGraduateType == 'masteral') {
+            userData['program'] = _selectedProgram;
+            userData['year'] = 'Graduate';
+            userData['scholarship'] = null;
+            userData['college'] = null;
+            userData['collegeId'] = null;
+            userData['graduatedCollege'] = null;
+            userData['graduatedCollegeId'] = null;
+            userData['graduatedProgram'] = null;
+          } else {
+            userData['graduatedCollege'] = _graduatedCollege;
+            userData['graduatedCollegeId'] = _graduatedCollegeId;
+            userData['graduatedProgram'] = _graduatedProgram;
+            userData['college'] = null;
+            userData['collegeId'] = null;
+            userData['program'] = null;
+            userData['year'] = null;
+            userData['scholarship'] = null;
+          }
+          userData['lrn'] = null;
+        }
+      } else if (_selectedAffiliation.toLowerCase() ==
+          'incoming freshman applicant') {
         userData['lrn'] = _lrnController.text.trim();
+        userData['scholarship'] =
+            _selectedScholarship == 'Others'
+                ? _customScholarship
+                : (_selectedScholarship != 'N/A'
+                    ? _selectedScholarship
+                    : null);
+        userData['studentId'] = null;
+        userData['year'] = null;
+        userData['college'] = null;
+        userData['collegeId'] = null;
+        userData['program'] = null;
+        userData['studentType'] = null;
+        userData['graduateType'] = null;
+        userData['graduatedCollege'] = null;
+        userData['graduatedCollegeId'] = null;
+        userData['graduatedProgram'] = null;
+      } else if (_selectedAffiliation.toLowerCase() ==
+          'masteral (not cmu graduate)') {
+        userData['program'] = _selectedProgram;
+        userData['lrn'] = null;
+        userData['scholarship'] = null;
+        userData['year'] = null;
+        userData['college'] = null;
+        userData['collegeId'] = null;
+        userData['studentId'] = null;
+        userData['studentType'] = null;
+        userData['graduateType'] = null;
+        userData['graduatedCollege'] = null;
+        userData['graduatedCollegeId'] = null;
+        userData['graduatedProgram'] = null;
+      } else {
+        userData['lrn'] = null;
+        userData['scholarship'] = null;
+        userData['year'] = null;
+        userData['college'] = null;
+        userData['collegeId'] = null;
+        userData['program'] = null;
+        userData['studentId'] = null;
+        userData['studentType'] = null;
+        userData['graduateType'] = null;
+        userData['graduatedCollege'] = null;
+        userData['graduatedCollegeId'] = null;
+        userData['graduatedProgram'] = null;
       }
     } else if (_selectedRole.toLowerCase() == 'staff') {
       userData['serviceUnit'] = _selectedServiceUnit;
     }
 
-    // Create Firestore document
     try {
-      await FirebaseFirestore.instance.collection('users').doc(uid).set(userData);
-      print('✅ User document created in Firestore');
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .set(userData);
     } catch (e) {
-      print('❌ Failed to create Firestore document: $e');
-      // Clean up auth user
       try {
         await functionsService.deleteUserAuth(uid);
-        print('✅ Cleaned up auth user after Firestore failure');
       } catch (cleanupError) {
-        print('⚠️ Could not clean up auth user: $cleanupError');
+        // Silent cleanup failure
       }
 
       SnackbarUtil.showError(
@@ -471,10 +745,9 @@ bool get shouldShowServiceUnit {
 
     await _logCreateAction(fullName);
 
-    SnackbarUtil.showSuccess(context, 'User created successfully!');
+    SnackbarUtil.showSuccess(context, 'User created successfully');
     Navigator.of(context).pop(true);
   } catch (e) {
-    print('❌ Unexpected error: $e');
     SnackbarUtil.showError(context, 'Failed to create user: $e');
   } finally {
     if (mounted) {
@@ -485,409 +758,587 @@ bool get shouldShowServiceUnit {
   }
 }
 
-  Future<void> _logCreateAction(String userName) async {
-    try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      String actorName = 'Unknown';
+Future<void> _logCreateAction(String userName) async {
+  try {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    String actorName = 'Unknown';
 
-      if (currentUser != null) {
-        final currentUserDoc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(currentUser.uid)
-                .get();
-        if (currentUserDoc.exists) {
-          final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
-          actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';
-        }
+    if (currentUser != null) {
+      final currentUserDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
+      if (currentUserDoc.exists) {
+        final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
+        actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';
       }
-
-      final logRef = FirebaseFirestore.instance.collection('logs').doc();
-      await logRef.set({
-        'logId': logRef.id,
-        'user': actorName,
-        'action': 'Created new user: $userName',
-        'time': Timestamp.now(),
-      });
-      print('✅ User creation logged successfully');
-    } catch (e) {
-      print('⚠️ Failed to log action: $e');
     }
+
+    final logRef = FirebaseFirestore.instance.collection('logs').doc();
+    await logRef.set({
+      'logId': logRef.id,
+      'user': actorName,
+      'action': 'Created new user: $userName',
+      'time': Timestamp.now(),
+    });
+  } catch (e) {
+    // Silent log failure
   }
+}
+
 
   @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    backgroundColor: Colors.transparent,
-    body: Column(
-      children: [
-        // Header with gradient
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(widget.isMobile ? 20 : 28),
-          decoration: const BoxDecoration(color: Color(0xFF2E7D32)),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Column(
+        children: [
+          // Header with gradient
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(widget.isMobile ? 20 : 28),
+            decoration: const BoxDecoration(color: Color(0xFF2E7D32)),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.person_add_outlined,
+                    color: Colors.white,
+                    size: widget.isMobile ? 24 : 28,
+                  ),
                 ),
-                child: Icon(
-                  Icons.person_add_outlined,
-                  color: Colors.white,
-                  size: widget.isMobile ? 24 : 28,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Add New User',
+                        style: TextStyle(
+                          fontSize: widget.isMobile ? 20 : 24,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Create a new user account',
+                        style: TextStyle(
+                          fontSize: widget.isMobile ? 14 : 16,
+                          color: Colors.white.withOpacity(0.85),
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(24),
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(
+                        Icons.close,
+                        color: Colors.white.withOpacity(0.9),
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Scrollable Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: widget.isMobile ? 20 : 28,
+                vertical: widget.isMobile ? 20 : 28,
               ),
-              const SizedBox(width: 16),
-              Expanded(
+              child: Form(
+                key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Add New User',
-                      style: TextStyle(
-                        fontSize: widget.isMobile ? 20 : 24,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Create a new user account',
-                      style: TextStyle(
-                        fontSize: widget.isMobile ? 14 : 16,
-                        color: Colors.white.withOpacity(0.85),
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(24),
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    child: Icon(
-                      Icons.close,
-                      color: Colors.white.withOpacity(0.9),
-                      size: 24,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // Scrollable Content
-        Expanded(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: widget.isMobile ? 20 : 28,
-              vertical: widget.isMobile ? 20 : 28,
-            ),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Personal Information Section
-                  buildSectionHeader(
-                    'Personal Information',
-                    Icons.person_outline,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Name Fields
-                  if (widget.isMobile) ...[
-                    buildTextField(
-                      controller: _firstNameController,
-                      label: 'First Name',
-                      hint: 'Enter first name...',
-                      icon: Icons.person_outline,
-                      isMobile: false,
+                    // Personal Information Section
+                    buildSectionHeader(
+                      'Personal Information',
+                      Icons.person_outline,
                     ),
                     const SizedBox(height: 16),
+
+                    // Name Fields
+                    if (widget.isMobile) ...[
+                      buildTextField(
+                        controller: _firstNameController,
+                        label: 'First Name',
+                        hint: 'Enter first name...',
+                        icon: Icons.person_outline,
+                        isMobile: false,
+                      ),
+                      const SizedBox(height: 16),
+                      buildTextField(
+                        controller: _lastNameController,
+                        label: 'Last Name',
+                        hint: 'Enter last name...',
+                        icon: Icons.person_outline,
+                        isMobile: false,
+                      ),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: buildTextField(
+                              controller: _firstNameController,
+                              label: 'First Name',
+                              hint: 'Enter first name...',
+                              icon: Icons.person_outline,
+                              isMobile: false,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: buildTextField(
+                              controller: _lastNameController,
+                              label: 'Last Name',
+                              hint: 'Enter last name...',
+                              icon: Icons.person_outline,
+                              isMobile: false,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+
+                    // Email Field
                     buildTextField(
-                      controller: _lastNameController,
-                      label: 'Last Name',
-                      hint: 'Enter last name...',
-                      icon: Icons.person_outline,
+                      controller: _emailController,
+                      label: 'Email Address',
+                      hint: 'Enter email address...',
+                      icon: Icons.email_outlined,
+                      keyboardType: TextInputType.emailAddress,
                       isMobile: false,
                     ),
-                  ] else ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: buildTextField(
-                            controller: _firstNameController,
-                            label: 'First Name',
-                            hint: 'Enter first name...',
-                            icon: Icons.person_outline,
-                            isMobile: false,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildTextField(
-                            controller: _lastNameController,
-                            label: 'Last Name',
-                            hint: 'Enter last name...',
-                            icon: Icons.person_outline,
-                            isMobile: false,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 24),
+
+                    // ========== ACCOUNT INFORMATION SECTION ==========
+                    buildSectionHeader(
+                      'Account Information',
+                      Icons.settings_outlined,
                     ),
-                  ],
+                    const SizedBox(height: 16),
 
-                  const SizedBox(height: 16),
-
-                  // Email Field
-                  buildTextField(
-                    controller: _emailController,
-                    label: 'Email Address',
-                    hint: 'Enter email address...',
-                    icon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                    isMobile: false,
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Account Information Section
-                  buildSectionHeader(
-                    'Account Information',
-                    Icons.settings_outlined,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Role Dropdown
-                  _buildDropdownField(
-                    label: 'Role',
-                    value: _selectedRole,
-                    items: displayRoles,
-                    icon: Icons.badge_outlined,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedRole = value!;
-                        // Reset all conditional fields
-                        _selectedAffiliation = 'N/A';
-                        _selectedYear = 'N/A';
-                        _selectedProgram = 'N/A';
-                        _selectedScholarship = 'N/A';
-                        _selectedServiceUnit = 'N/A';
-                        _studentIdController.clear();
-                        _lrnController.clear();
-                      });
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Conditional Fields Based on Role
-
-                  // USER ROLE FIELDS
-                  if (shouldShowAffiliation) ...[
+                    // Role Dropdown
                     _buildDropdownField(
-                      label: 'Affiliation',
-                      value: _selectedAffiliation,
-                      items: _affiliations,
-                      icon: Icons.business_outlined,
-                      isEnabled: true,
+                      label: 'Role',
+                      value: _selectedRole,
+                      items: displayRoles,
+                      icon: Icons.badge_outlined,
                       onChanged: (value) {
                         setState(() {
-                          _selectedAffiliation = value!;
-                          // Reset student-specific fields
+                          _selectedRole = value!;
+                          // Reset all conditional fields
+                          _selectedAffiliation = 'N/A';
                           _selectedYear = 'N/A';
                           _selectedProgram = 'N/A';
                           _selectedScholarship = 'N/A';
+                          _selectedServiceUnit = 'N/A';
+                          _selectedCollege = 'N/A';
+                          _selectedCollegeId = '';
                           _studentIdController.clear();
                           _lrnController.clear();
+                          _customScholarship = '';
+                          _customScholarshipController.clear();
                         });
                       },
                     ),
                     const SizedBox(height: 16),
-                  ],
 
-                  // CMU STUDENT FIELDS
-                  if (shouldShowStudentFields) ...[
-                    buildTextField(
-                      controller: _studentIdController,
-                      label: 'Student ID',
-                      hint: 'Enter student ID...',
-                      icon: Icons.badge_outlined,
-                      isMobile: false,
-                    ),
-                    const SizedBox(height: 16),
-
-                    _buildDropdownField(
-                      label: 'Year Level',
-                      value: _selectedYear,
-                      items: years,
-                      icon: Icons.school_outlined,
-                      isEnabled: true,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedYear = value!;
-                          if (!isProgramEnabled) {
+                    // ========== USER ROLE FIELDS ==========
+                    if (shouldShowAffiliation) ...[
+                      _buildDropdownField(
+                        label: 'Affiliation',
+                        value: _selectedAffiliation,
+                        items: _affiliations,
+                        icon: Icons.business_outlined,
+                        isEnabled: true,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedAffiliation = value!;
+                            // Reset all fields
+                            _selectedStudentType = 'N/A';
+                            _selectedGraduateType = 'N/A';
+                            _selectedYear = 'N/A';
                             _selectedProgram = 'N/A';
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
+                            _selectedScholarship = 'N/A';
+                            _selectedCollege = 'N/A';
+                            _selectedCollegeId = '';
+                            _graduatedCollege = 'N/A';
+                            _graduatedCollegeId = '';
+                            _graduatedProgram = 'N/A';
+                            _studentIdController.clear();
+                            _lrnController.clear();
+                            _customScholarship = '';
+                            _customScholarshipController.clear();
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: _buildDropdownField(
-                            label: 'Program',
-                            value: _selectedProgram,
-                            items: _programs,
-                            icon: Icons.class_outlined,
-                            isEnabled: isProgramEnabled,
-                            onChanged: (value) =>
-                                setState(() => _selectedProgram = value!),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          height: 46,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                              widget.onNavigateToPage?.call(12);
-                            },
-                            icon: const Icon(Icons.edit, size: 16),
-                            label: const Text('Manage'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2E7D32),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                    // ========== CMU STUDENT FIELDS ==========
+                    if (shouldShowStudentTypeSelection) ...[
+                      _buildDropdownField(
+                        label: 'Student Type',
+                        value: _selectedStudentType,
+                        items: ['N/A', 'undergraduate', 'graduate'],
+
+                        icon: Icons.school_outlined,
+                        isEnabled: true,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedStudentType = value!.toLowerCase();
+                            // Reset dependent fields
+                            _selectedGraduateType = 'N/A';
+                            _selectedYear = 'N/A';
+                            _selectedProgram = 'N/A';
+                            _selectedScholarship = 'N/A';
+                            _selectedCollege = 'N/A';
+                            _selectedCollegeId = '';
+                            _graduatedCollege = 'N/A';
+                            _graduatedCollegeId = '';
+                            _graduatedProgram = 'N/A';
+                            _studentIdController.clear();
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ========== UNDERGRADUATE STUDENT FIELDS ==========
+                    if (shouldShowUndergraduateFields) ...[
+                      buildTextField(
+                        controller: _studentIdController,
+                        label: 'Student ID',
+                        hint: 'Enter student ID...',
+                        icon: Icons.badge_outlined,
+                        isMobile: false,
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildDropdownField(
+                        label: 'Year Level',
+                        value: _selectedYear,
+                        items: years,
+                        icon: Icons.school_outlined,
+                        isEnabled: true,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedYear = value!;
+                            _selectedProgram = 'N/A';
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildDropdownField(
+                        label: 'College',
+                        value: _selectedCollege,
+                        items: _colleges.keys.toList(),
+                        icon: Icons.account_balance_outlined,
+                        isEnabled: true,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedCollege = value!;
+                            _selectedCollegeId = _colleges[value] ?? '';
+                            _selectedProgram = 'N/A';
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: _buildDropdownField(
+                              label: 'Program',
+                              value: _selectedProgram,
+                              items: _undergraduatePrograms,
+                              icon: Icons.class_outlined,
+                              isEnabled:
+                                  _selectedCollege != 'N/A' &&
+                                  _selectedCollegeId.isNotEmpty,
+                              onChanged:
+                                  (value) =>
+                                      setState(() => _selectedProgram = value!),
                             ),
                           ),
+                       
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildDropdownField(
+                        label: 'Scholarship',
+                        value: _selectedScholarship,
+                        items: _scholarships,
+                        icon: Icons.school_outlined,
+                        isEnabled: true,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedScholarship = value!;
+                            if (value != 'Others') {
+                              _customScholarship = '';
+                              _customScholarshipController.clear();
+                            }
+                          });
+                        },
+                      ),
+
+                      if (_selectedScholarship == 'Others') ...[
+                        const SizedBox(height: 16),
+                        buildTextField(
+                          controller: _customScholarshipController,
+                          label: 'Custom Scholarship Name',
+                          hint: 'Enter scholarship name...',
+                          icon: Icons.edit_outlined,
+                          isMobile: false,
+                          onChanged: (value) {
+                            setState(() {
+                              _customScholarship = value.trim();
+                            });
+                          },
                         ),
                       ],
-                    ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ========== GRADUATE STUDENT TYPE SELECTION ==========
+                    if (shouldShowGraduateTypeSelection) ...[
+                      _buildDropdownField(
+                        label: 'Graduate Type',
+                        value: _selectedGraduateType,
+                        items: ['N/A', 'masteral', 'not_masteral'],
+
+                        icon: Icons.school_outlined,
+                        isEnabled: true,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedGraduateType = value!
+                                .toLowerCase()
+                                .replaceAll(' ', '_');
+                            // Reset dependent fields
+                            _selectedProgram = 'N/A';
+                            _selectedCollege = 'N/A';
+                            _selectedCollegeId = '';
+                            _graduatedCollege = 'N/A';
+                            _graduatedCollegeId = '';
+                            _graduatedProgram = 'N/A';
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ========== MASTERAL GRADUATE FIELDS ==========
+                  if (shouldShowMasteralGraduateFields) ...[
+  _buildDropdownField(
+    label: 'Masteral Program',
+    value: _selectedProgram,
+    items: _masteralProgramsList,
+    icon: Icons.class_outlined,
+    isEnabled: true,
+    onChanged: (value) => setState(() => _selectedProgram = value!),
+  ),
+  const SizedBox(height: 16),
+],
+
+// ========== NOT MASTERAL GRADUATE FIELDS (WITH COLLEGE) ==========
+if (shouldShowNotMasteralGraduateFields) ...[
+  _buildDropdownField(
+    label: 'Graduated College',
+    value: _graduatedCollege,
+    items: _colleges.keys.toList(),
+    icon: Icons.account_balance_outlined,
+    isEnabled: true,
+    onChanged: (value) {
+      setState(() {
+        _graduatedCollege = value!;
+        _graduatedCollegeId = _colleges[value] ?? '';
+        _graduatedProgram = 'N/A';
+      });
+    },
+  ),
+  const SizedBox(height: 16),
+
+  _buildDropdownField(
+    label: 'Graduated Program (Bachelor)',
+    value: _graduatedProgram,
+    items: _graduatedCollege != 'N/A' && _graduatedCollegeId.isNotEmpty
+        ? ['N/A', ...(_programsByCollege['${_graduatedCollegeId}_Bachelor'] ?? [])]
+        : ['N/A'],
+    icon: Icons.class_outlined,
+    isEnabled: _graduatedCollege != 'N/A' && _graduatedCollegeId.isNotEmpty,
+    onChanged: (value) => setState(() => _graduatedProgram = value!),
+  ),
+  const SizedBox(height: 16),
+],
+
+                    // ========== INCOMING FRESHMAN APPLICANT FIELDS ==========
+                    if (shouldShowLRNField) ...[
+                      buildTextField(
+                        controller: _lrnController,
+                        label: 'LRN (Learner Reference Number)',
+                        hint: 'Enter LRN...',
+                        icon: Icons.numbers_outlined,
+                        isMobile: false,
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildDropdownField(
+                        label: 'Scholarship',
+                        value: _selectedScholarship,
+                        items: _scholarships,
+                        icon: Icons.school_outlined,
+                        isEnabled: true,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedScholarship = value!;
+                            if (value != 'Others') {
+                              _customScholarship = '';
+                              _customScholarshipController.clear();
+                            }
+                          });
+                        },
+                      ),
+
+                      if (_selectedScholarship == 'Others') ...[
+                        const SizedBox(height: 16),
+                        buildTextField(
+                          controller: _customScholarshipController,
+                          label: 'Custom Scholarship Name',
+                          hint: 'Enter scholarship name...',
+                          icon: Icons.edit_outlined,
+                          isMobile: false,
+                          onChanged: (value) {
+                            setState(() {
+                              _customScholarship = value.trim();
+                            });
+                          },
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ========== MASTERAL (NOT CMU GRADUATE) FIELDS ==========
+                    if (shouldShowMasteralNotCMUFields) ...[
+                      _buildDropdownField(
+                        label: 'Masteral Program',
+                        value: _selectedProgram,
+                        items: _masteralProgramsList,
+                        icon: Icons.class_outlined,
+                        isEnabled: true,
+                        onChanged:
+                            (value) =>
+                                setState(() => _selectedProgram = value!),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ========== STAFF ROLE FIELDS ==========
+                    if (shouldShowServiceUnit) ...[
+                      _buildDropdownField(
+                        label: 'Service Unit',
+                        value: _selectedServiceUnit,
+                        items: _serviceUnits,
+                        icon: Icons.work_outline,
+                        isEnabled: true,
+                        onChanged:
+                            (value) =>
+                                setState(() => _selectedServiceUnit = value!),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    const SizedBox(height: 8),
+
+                    // ========== PASSWORD SECTION ==========
+                    buildSectionHeader('Password', Icons.lock_outlined),
                     const SizedBox(height: 16),
 
-                    _buildDropdownField(
-                      label: 'Scholarship',
-                      value: _selectedScholarship,
-                      items: _scholarships,
-                      icon: Icons.school_outlined,
-                      isEnabled: true,
-                      onChanged: (value) =>
-                          setState(() => _selectedScholarship = value!),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // INCOMING FRESHMAN APPLICANT FIELD
-                  if (shouldShowLRNField) ...[
                     buildTextField(
-                      controller: _lrnController,
-                      label: 'LRN (Learner Reference Number)',
-                      hint: 'Enter LRN...',
-                      icon: Icons.numbers_outlined,
+                      controller: _passwordController,
+                      label: 'Password',
+                      hint: 'Enter password...',
+                      icon: Icons.lock_outlined,
+                      isPassword: true,
+                      isPasswordVisible: _isPasswordVisible,
                       isMobile: false,
+                      onTogglePassword:
+                          () => setState(
+                            () => _isPasswordVisible = !_isPasswordVisible,
+                          ),
                     ),
                     const SizedBox(height: 16),
-                  ],
 
-                  // STAFF ROLE FIELDS
-                  if (shouldShowServiceUnit) ...[
-                    _buildDropdownField(
-                      label: 'Service Unit',
-                      value: _selectedServiceUnit,
-                      items: _serviceUnits,
-                      icon: Icons.work_outline,
-                      isEnabled: true,
-                      onChanged: (value) =>
-                          setState(() => _selectedServiceUnit = value!),
+                    buildTextField(
+                      controller: _confirmPasswordController,
+                      isMobile: false,
+                      label: 'Confirm Password',
+                      hint: 'Confirm password...',
+                      icon: Icons.lock_outlined,
+                      isPassword: true,
+                      isPasswordVisible: _isConfirmPasswordVisible,
+                      onTogglePassword:
+                          () => setState(
+                            () =>
+                                _isConfirmPasswordVisible =
+                                    !_isConfirmPasswordVisible,
+                          ),
+                      validator: (value) {
+                        if (value != _passwordController.text) {
+                          return 'Passwords do not match';
+                        }
+                        return null;
+                      },
                     ),
-                    const SizedBox(height: 16),
                   ],
-
-                  const SizedBox(height: 8),
-
-                  // Password Section
-                  buildSectionHeader('Password', Icons.lock_outlined),
-                  const SizedBox(height: 16),
-
-                  // Password Fields
-                  buildTextField(
-                    controller: _passwordController,
-                    label: 'Password',
-                    hint: 'Enter password...',
-                    icon: Icons.lock_outlined,
-                    isPassword: true,
-                    isPasswordVisible: _isPasswordVisible,
-                    isMobile: false,
-                    onTogglePassword: () =>
-                        setState(() => _isPasswordVisible = !_isPasswordVisible),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  buildTextField(
-                    controller: _confirmPasswordController,
-                    isMobile: false,
-                    label: 'Confirm Password',
-                    hint: 'Confirm password...',
-                    icon: Icons.lock_outlined,
-                    isPassword: true,
-                    isPasswordVisible: _isConfirmPasswordVisible,
-                    onTogglePassword: () => setState(
-                      () => _isConfirmPasswordVisible = !_isConfirmPasswordVisible,
-                    ),
-                    validator: (value) {
-                      if (value != _passwordController.text) {
-                        return 'Passwords do not match';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
 
-        // Fixed Action Buttons at Bottom
-        Container(
-          padding: EdgeInsets.all(widget.isMobile ? 20 : 28),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, -2),
-              ),
-            ],
+          // Fixed Action Buttons at Bottom
+          Container(
+            padding: EdgeInsets.all(widget.isMobile ? 20 : 28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: _buildActionButtons(),
           ),
-          child: _buildActionButtons(),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
   Widget _buildDropdownField({
     required String label,
@@ -940,15 +1391,13 @@ Widget build(BuildContext context) {
                     return DropdownMenuItem<String>(
                       value: item,
                       child: Text(
-                        item,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color:
-                              isEnabled
-                                  ? const Color(0xFF1F2937)
-                                  : const Color(0xFF9CA3AF),
-                        ),
+                        item == 'n/a'
+                            ? 'N/A'
+                            : item
+                                .replaceAll('_', ' ')
+                                .split(' ')
+                                .map((w) => w[0].toUpperCase() + w.substring(1))
+                                .join(' '), // Capitalize each word
                       ),
                     );
                   }).toList(),

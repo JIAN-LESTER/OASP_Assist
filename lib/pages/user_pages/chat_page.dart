@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'package:intl/intl.dart';
 
@@ -21,10 +22,10 @@ import 'package:capstone_project/provider/chat_provider.dart';
 
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:markdown/markdown.dart' as md;
-import 'package:flutter_markdown/flutter_markdown.dart';
 
 import 'faq_section.dart';
 
@@ -194,7 +195,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     _initChatSpeechToText();
     chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-    // Welcome dialog will be shown by UserMainPage after onboarding
+
 
     // ✅ FIX: Only initialize once in postFrameCallback
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2248,13 +2249,47 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _showWelcomeDialog() async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const FirstTimeWelcomeDialog(),
-    );
+ Future<void> _showWelcomeDialog() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  try {
+    // ✅ Check Firestore first
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    final hasSeenOnboardingGuide =
+        userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
+
+    // ✅ Only show welcome dialog if user has NOT seen onboarding
+    if (!hasSeenOnboardingGuide) {
+      // Check SharedPreferences flag
+      final prefs = await SharedPreferences.getInstance();
+      final shouldShowWelcome =
+          prefs.getBool('should_show_welcome_dialog') ?? false;
+
+      if (shouldShowWelcome && mounted) {
+        // Clear the flag so it doesn't show again
+        await prefs.setBool('should_show_welcome_dialog', false);
+
+        // Show the dialog
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const FirstTimeWelcomeDialog(),
+        );
+      }
+    } else {
+      // ✅ User has seen onboarding, clear the flag to prevent showing
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('should_show_welcome_dialog', false);
+    }
+  } catch (e) {
+    print('Error checking welcome dialog status: $e');
   }
+}
 
   //  Helper method for next steps (if not already in your code)
   Widget _buildNextStepItem({required IconData icon, required String text}) {
@@ -2329,51 +2364,55 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   }
 
   Future<void> _onLinkTap(LinkableElement link) async {
-  final url = link.url;
+    final url = link.url;
 
-  try {
-    if (url.startsWith('tel:')) {
-      // Opens phone dialer or copies number
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      if (url.startsWith('tel:')) {
+        // Opens phone dialer or copies number
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          await Clipboard.setData(
+            ClipboardData(text: url.replaceFirst('tel:', '')),
+          );
+          if (mounted) {
+            _showSnackBar('Phone number copied to clipboard', Icons.phone);
+          }
+        }
+      } else if (url.startsWith('mailto:')) {
+        // Opens email client or copies email
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          await Clipboard.setData(
+            ClipboardData(text: url.replaceFirst('mailto:', '')),
+          );
+          if (mounted) {
+            _showSnackBar('Email copied to clipboard', Icons.email);
+          }
+        }
       } else {
-        await Clipboard.setData(ClipboardData(text: url.replaceFirst('tel:', '')));
-        if (mounted) {
-          _showSnackBar('Phone number copied to clipboard', Icons.phone);
+        // Opens web URLs in external browser
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          await Clipboard.setData(ClipboardData(text: url));
+          if (mounted) {
+            _showSnackBar('Link copied to clipboard', Icons.link);
+          }
         }
       }
-    } else if (url.startsWith('mailto:')) {
-      // Opens email client or copies email
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await Clipboard.setData(ClipboardData(text: url.replaceFirst('mailto:', '')));
-        if (mounted) {
-          _showSnackBar('Email copied to clipboard', Icons.email);
-        }
+    } catch (e) {
+      // Fallback: copy link to clipboard
+      await Clipboard.setData(ClipboardData(text: url));
+      if (mounted) {
+        _showSnackBar('Link copied to clipboard', Icons.content_copy);
       }
-    } else {
-      // Opens web URLs in external browser
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await Clipboard.setData(ClipboardData(text: url));
-        if (mounted) {
-          _showSnackBar('Link copied to clipboard', Icons.link);
-        }
-      }
-    }
-  } catch (e) {
-    // Fallback: copy link to clipboard
-    await Clipboard.setData(ClipboardData(text: url));
-    if (mounted) {
-      _showSnackBar('Link copied to clipboard', Icons.content_copy);
     }
   }
-}
 
   void _showMessageOptions(BuildContext context, Message message) {
     showModalBottomSheet(

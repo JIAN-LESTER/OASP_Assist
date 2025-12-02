@@ -613,50 +613,7 @@ Widget _buildHeader(
               ),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child:
-                isMobile
-                    ? Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
-                      children: [
-                        buildStatCard(
-                          'Total Programs',
-                          '${program?.totalProgram}',
-                          Colors.blue,
-                          Icons.school,
-                        ),
-                        buildStatCard(
-                          'Program with Most Students',
-                          '${program?.dominantProgram}',
-                          Colors.green,
-                          Icons.check_circle,
-                        ),
-                      ],
-                    )
-                    : Row(
-                      children: [
-                        Expanded(
-                          child: buildStatCard(
-                            'Total Programs',
-                            '${program?.totalProgram}',
-                            Colors.blue,
-                            Icons.school,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Program with Most Students',
-                            '${program?.dominantProgram}',
-                            Colors.green,
-                            Icons.check_circle,
-                          ),
-                        ),
-                      ],
-                    ),
-          ),
+         const SizedBox(height: 40,),
           buildSearchField('Search programs by name', searchController),
         ],
       );

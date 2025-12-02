@@ -2,7 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/pages/user_pages/user_main_page.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 class HomeDashboard extends StatefulWidget {
   const HomeDashboard({Key? key}) : super(key: key);

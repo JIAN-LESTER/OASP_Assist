@@ -66,28 +66,45 @@ class _OnboardingGuideState extends State<OnboardingGuide>
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    final hasSeenLocal =
-        prefs.getBool('hasSeenOnboarding_${user.uid}') ?? false;
+    try {
+      // ✅ Fetch the user's field from Firestore FIRST
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
 
-    // ✅ Fetch the user's field from Firestore
-    final userDoc =
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
+      final dbHasSeenOnboarding =
+          userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
 
-    final dbHasSeenOnboarding =
-        userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
-
-    if (!hasSeenLocal || dbHasSeenOnboarding) {
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (mounted) {
-        setState(() {
-          _showOnboarding = true;
-        });
-        _showOverlay();
+      // ✅ If user has seen onboarding in Firestore, don't show it (even on new device)
+      if (dbHasSeenOnboarding) {
+        // Sync local SharedPreferences with Firestore value
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('hasSeenOnboarding_${user.uid}', true);
+        // Also prevent welcome dialog from showing on new devices
+        await prefs.setBool('should_show_welcome_dialog', false);
+        return; // Don't show onboarding
       }
+
+      // ✅ Check local SharedPreferences only if Firestore says false
+      final prefs = await SharedPreferences.getInstance();
+      final hasSeenLocal =
+          prefs.getBool('hasSeenOnboarding_${user.uid}') ?? false;
+
+      // ✅ Show onboarding only if both Firestore and local say false
+      if (!hasSeenLocal && !dbHasSeenOnboarding) {
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) {
+          setState(() {
+            _showOnboarding = true;
+          });
+          _showOverlay();
+        }
+      }
+    } catch (e) {
+      print('Error checking onboarding status: $e');
+      // On error, don't show onboarding to be safe
     }
   }
 
@@ -206,14 +223,27 @@ class _OnboardingGuideState extends State<OnboardingGuide>
   }
 
   Future<void> _finishOnboarding() async {
-    // Save per-user
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('hasSeenOnboarding_${user.uid}', true);
+      try {
+        // Save to SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('hasSeenOnboarding_${user.uid}', true);
 
-      // ✅ Set flag to show welcome dialog
-      await prefs.setBool('should_show_welcome_dialog', true);
+        // ✅ Update Firestore so it syncs across devices
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+              'hasSeenOnboardingGuide': true,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+
+        // ✅ Set flag to show welcome dialog
+        await prefs.setBool('should_show_welcome_dialog', true);
+      } catch (e) {
+        print('Error finishing onboarding: $e');
+      }
     }
 
     _removeOverlay();
@@ -221,14 +251,9 @@ class _OnboardingGuideState extends State<OnboardingGuide>
       _showOnboarding = false;
     });
 
-    // ✅ NEW: Trigger callback after guide completes
-    // await Future.delayed(
-    //   const Duration(milliseconds: 500),
-    // ); // Wait for overlay to fully close
-
-    widget.onFinished?.call(); // ✅ Call the callback
+    // ✅ Trigger callback after guide completes
+    widget.onFinished?.call();
   }
-
 
   void showGuide() {
     if (!_showOnboarding) {

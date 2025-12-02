@@ -228,7 +228,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
         _colleges = collegesMap;
         _programsByCollege = programsByCollegeMap;
         _masteralPrograms = masteralPrograms; // ✅ Set masteral programs
-        _scholarships = [...scholarshipsList];
+        _scholarships = [...scholarshipsList, "Others"];
 
         // Debug logs
         print('📚 Loaded ${_colleges.length} colleges');
@@ -508,8 +508,6 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
 
       Map<String, dynamic> updateData = {
         'name': fullName.trim(),
-        'firstName': _firstNameController.text.trim(),
-        'lastName': _lastNameController.text.trim(),
         'profileCompleted': true,
         'onboardingCompleted': true,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -598,7 +596,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
           } else if (_studentType == 'graduate') {
             // Graduate does NOT have Student ID
             updateData['graduateType'] = _graduateType;
-            updateData['studentId'] = null; // No Student ID for graduates
+            updateData['studentId'] = null; 
 
             if (_graduateType == 'masteral') {
               updateData.addAll({
