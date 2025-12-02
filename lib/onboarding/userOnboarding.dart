@@ -228,7 +228,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
         _colleges = collegesMap;
         _programsByCollege = programsByCollegeMap;
         _masteralPrograms = masteralPrograms; // ✅ Set masteral programs
-        _scholarships = [...scholarshipsList, 'Others'];
+        _scholarships = [...scholarshipsList];
 
         // Debug logs
         print('📚 Loaded ${_colleges.length} colleges');
@@ -677,85 +677,95 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
   }
 
   bool _canProceed() {
-  switch (_pages[_currentPage].type) {
-    case UserOnboardingType.welcome:
-      return _firstNameController.text.trim().isNotEmpty &&
-          _lastNameController.text.trim().isNotEmpty;
+    switch (_pages[_currentPage].type) {
+      case UserOnboardingType.welcome:
+        return _firstNameController.text.trim().isNotEmpty &&
+            _lastNameController.text.trim().isNotEmpty;
 
-    case UserOnboardingType.profile:
-      if (_role == 'user') {
-        if (_enrollmentStatus == null) return false;
+      case UserOnboardingType.profile:
+        if (_role == 'user') {
+          if (_enrollmentStatus == null) return false;
 
-        if (_enrollmentStatus == 'not_enrolled') {
-          if (_notEnrolledType == null) return false;
+          if (_enrollmentStatus == 'not_enrolled') {
+            if (_notEnrolledType == null) return false;
 
-          if (_notEnrolledType == 'incoming_freshman') {
-            // LRN confirmed, and scholarship question answered
-            if (!(_lrn.trim().length == 12 && _lrnConfirmed)) return false;
-            if (_hasScholarship == null) return false;
-            if (_hasScholarship == true) {
-              // ✅ FIX: Must have selected a scholarship
-              if (_selectedScholarship == null || _selectedScholarship!.isEmpty || _selectedScholarship == 'N/A') {
+            if (_notEnrolledType == 'incoming_freshman') {
+              // LRN confirmed, and scholarship question answered
+              if (!(_lrn.trim().length == 12 && _lrnConfirmed)) return false;
+              if (_hasScholarship == null) return false;
+              if (_hasScholarship == true) {
+                // ✅ FIX: Must have selected a scholarship
+                if (_selectedScholarship == null ||
+                    _selectedScholarship!.isEmpty ||
+                    _selectedScholarship == 'N/A') {
+                  return false;
+                }
+                // ✅ FIX: If "Others", must confirm custom scholarship
+                if (_selectedScholarship == 'Others') {
+                  return _customScholarship.trim().isNotEmpty &&
+                      _customScholarshipConfirmed;
+                }
+              }
+              return true;
+            } else if (_notEnrolledType == 'masteral') {
+              // College and masteral program selected
+              return _selectedCollege.isNotEmpty && _selectedProgram.isNotEmpty;
+            } else if (_notEnrolledType == 'others') {
+              // Affiliation selected or custom affiliation confirmed
+              if (_selectedAffiliation == 'Others') {
+                return _customAffiliation.trim().isNotEmpty &&
+                    _customAffiliationConfirmed;
+              }
+              return _selectedAffiliation != null &&
+                  _selectedAffiliation!.isNotEmpty;
+            }
+          } else {
+            // ENROLLED checks
+            if (_studentType == null) return false;
+
+            if (_studentType == 'undergraduate') {
+              if (_studentId.trim().length < 5 || !_studentIdConfirmed)
                 return false;
-              }
-              // ✅ FIX: If "Others", must confirm custom scholarship
-              if (_selectedScholarship == 'Others') {
-                return _customScholarship.trim().isNotEmpty && _customScholarshipConfirmed;
-              }
-            }
-            return true;
-          } else if (_notEnrolledType == 'masteral') {
-            // College and masteral program selected
-            return _selectedCollege.isNotEmpty && _selectedProgram.isNotEmpty;
-          } else if (_notEnrolledType == 'others') {
-            // Affiliation selected or custom affiliation confirmed
-            if (_selectedAffiliation == 'Others') {
-              return _customAffiliation.trim().isNotEmpty && _customAffiliationConfirmed;
-            }
-            return _selectedAffiliation != null && _selectedAffiliation!.isNotEmpty;
-          }
-        } else {
-          // ENROLLED checks
-          if (_studentType == null) return false;
-
-          if (_studentType == 'undergraduate') {
-            if (_studentId.trim().length < 5 || !_studentIdConfirmed) return false;
-            if (_selectedYear.isEmpty) return false;
-            if (_selectedCollege.isEmpty) return false;
-            if (_selectedYear != 'Incoming' && _selectedProgram.isEmpty) return false;
-            if (_hasScholarship == null) return false;
-            if (_hasScholarship == true) {
-              // ✅ FIX: Must have selected a scholarship
-              if (_selectedScholarship == null || _selectedScholarship!.isEmpty || _selectedScholarship == 'N/A') {
-                return false;
-              }
-              // ✅ FIX: If "Others", must confirm custom scholarship
-              if (_selectedScholarship == 'Others') {
-                return _customScholarship.trim().isNotEmpty && _customScholarshipConfirmed;
-              }
-            }
-            return true;
-          } else if (_studentType == 'graduate') {
-            if (_graduateType == null) return false;
-
-            if (_graduateType == 'masteral') {
+              if (_selectedYear.isEmpty) return false;
               if (_selectedCollege.isEmpty) return false;
-              if (_selectedProgram.isEmpty) return false;
+              if (_selectedYear != 'Incoming' && _selectedProgram.isEmpty)
+                return false;
+              if (_hasScholarship == null) return false;
+              if (_hasScholarship == true) {
+                // ✅ Must have selected a scholarship
+                if (_selectedScholarship == null ||
+                    _selectedScholarship!.isEmpty ||
+                    _selectedScholarship == 'N/A') {
+                  return false;
+                }
+                // ✅ If "Others", must confirm custom scholarship
+                if (_selectedScholarship == 'Others') {
+                  return _customScholarship.trim().isNotEmpty &&
+                      _customScholarshipConfirmed;
+                }
+              }
               return true;
-            } else {
-              if (_graduatedCollege.isEmpty) return false;
-              if (_graduatedProgram.isEmpty) return false;
-              return true;
+            } else if (_studentType == 'graduate') {
+              if (_graduateType == null) return false;
+
+              if (_graduateType == 'masteral') {
+                if (_selectedCollege.isEmpty) return false;
+                if (_selectedProgram.isEmpty) return false;
+                return true;
+              } else {
+                if (_graduatedCollege.isEmpty) return false;
+                if (_graduatedProgram.isEmpty) return false;
+                return true;
+              }
             }
           }
         }
-      }
-      return true;
+        return true;
 
-    default:
-      return true;
+      default:
+        return true;
+    }
   }
-}
 
   Widget _buildContent({
     required double maxWidth,
@@ -1133,81 +1143,88 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     );
   }
 
-  Widget _buildProfilePage(
-    UserOnboardingPage page,
-    double iconSize,
-    double titleFontSize,
-    double descriptionFontSize,
-    double maxWidth,
-  ) {
-    // Check if all required fields are completed for summary
-    bool allFieldsCompleted = false;
+Widget _buildProfilePage(
+  UserOnboardingPage page,
+  double iconSize,
+  double titleFontSize,
+  double descriptionFontSize,
+  double maxWidth,
+) {
+  // Check if all required fields are completed for summary
+  bool allFieldsCompleted = false;
 
-    if (_role == 'user' && _enrollmentStatus != null) {
-      if (_enrollmentStatus == 'not_enrolled') {
-        if (_notEnrolledType == 'incoming_freshman') {
+  if (_role == 'user' && _enrollmentStatus != null) {
+    if (_enrollmentStatus == 'not_enrolled') {
+      if (_notEnrolledType == 'incoming_freshman') {
+        // ✅ FIX: Check if scholarship is properly handled
+        bool scholarshipComplete = _hasScholarship != null && 
+          (_hasScholarship == false ||
+           (_hasScholarship == true &&
+            _selectedScholarship != null &&
+            _selectedScholarship != 'N/A' &&
+            _selectedScholarship!.isNotEmpty &&
+            // ✅ KEY FIX: If "Others", must be confirmed
+            (_selectedScholarship != 'Others' || _customScholarshipConfirmed)));
+        
+        allFieldsCompleted =
+            _lrn.trim().length == 12 &&
+            _lrnConfirmed &&
+            scholarshipComplete;
+      } else if (_notEnrolledType == 'masteral') {
+        allFieldsCompleted = _selectedProgram.isNotEmpty;
+      } else if (_notEnrolledType == 'others') {
+        if (_selectedAffiliation == 'Others') {
           allFieldsCompleted =
-              _lrn.trim().length == 12 &&
-              _lrnConfirmed &&
-              _hasScholarship != null &&
-              (_hasScholarship == false ||
-                  (_hasScholarship == true &&
-                      _selectedScholarship != null &&
-                      _selectedScholarship != 'N/A' &&
-                      _selectedScholarship!.isNotEmpty));
-        } else if (_notEnrolledType == 'masteral') {
-          allFieldsCompleted = _selectedProgram.isNotEmpty;
-        } else if (_notEnrolledType == 'others') {
-          if (_selectedAffiliation == 'Others') {
-            allFieldsCompleted =
-                _customAffiliation.trim().isNotEmpty &&
-                _customAffiliationConfirmed;
-          } else {
-            allFieldsCompleted =
-                _selectedAffiliation != null &&
-                _selectedAffiliation!.isNotEmpty;
-          }
+              _customAffiliation.trim().isNotEmpty &&
+              _customAffiliationConfirmed;
+        } else {
+          allFieldsCompleted =
+              _selectedAffiliation != null &&
+              _selectedAffiliation!.isNotEmpty;
         }
-      } else {
-        // ENROLLED checks
-        if (_studentType == 'undergraduate') {
-          bool studentIdComplete =
-              _studentId.trim().isNotEmpty && _studentIdConfirmed;
-          bool yearComplete = _selectedYear.isNotEmpty;
-          bool collegeComplete = _selectedCollege.isNotEmpty;
-          bool programComplete =
-              (_selectedYear == 'Incoming') || _selectedProgram.isNotEmpty;
-          bool scholarshipComplete =
-              _hasScholarship != null &&
-              (_hasScholarship == false ||
-                  (_hasScholarship == true &&
-                      _selectedScholarship != null &&
-                      _selectedScholarship != 'N/A' &&
-                      _selectedScholarship!.isNotEmpty));
+      }
+    } else {
+      // ENROLLED checks
+      if (_studentType == 'undergraduate') {
+        bool studentIdComplete =
+            _studentId.trim().isNotEmpty && _studentIdConfirmed;
+        bool yearComplete = _selectedYear.isNotEmpty;
+        bool collegeComplete = _selectedCollege.isNotEmpty;
+        bool programComplete =
+            (_selectedYear == 'Incoming') || _selectedProgram.isNotEmpty;
+        
+        // ✅ FIX: Check if scholarship is properly handled
+        bool scholarshipComplete = _hasScholarship != null &&
+            (_hasScholarship == false ||
+             (_hasScholarship == true &&
+              _selectedScholarship != null &&
+              _selectedScholarship != 'N/A' &&
+              _selectedScholarship!.isNotEmpty &&
+              // ✅ KEY FIX: If "Others", must be confirmed
+              (_selectedScholarship != 'Others' || _customScholarshipConfirmed)));
 
+        allFieldsCompleted =
+            studentIdComplete &&
+            yearComplete &&
+            collegeComplete &&
+            programComplete &&
+            scholarshipComplete;
+      } else if (_studentType == 'graduate') {
+        bool graduateTypeComplete = _graduateType != null;
+
+        if (_graduateType == 'masteral') {
           allFieldsCompleted =
-              studentIdComplete &&
-              yearComplete &&
-              collegeComplete &&
-              programComplete &&
-              scholarshipComplete;
-        } else if (_studentType == 'graduate') {
-          bool graduateTypeComplete = _graduateType != null;
-
-          if (_graduateType == 'masteral') {
-            // ✅ Masteral: Just need college and program
-            allFieldsCompleted =
-                graduateTypeComplete && _selectedProgram.isNotEmpty;
-          } else if (_graduateType == 'not_masteral') {
-            // ✅ Not masteral: Just need graduated college and program
-            allFieldsCompleted =
-                graduateTypeComplete &&
-                _graduatedCollege.isNotEmpty &&
-                _graduatedProgram.isNotEmpty;
-          }
+              graduateTypeComplete && _selectedProgram.isNotEmpty;
+        } else if (_graduateType == 'not_masteral') {
+          allFieldsCompleted =
+              graduateTypeComplete &&
+              _graduatedCollege.isNotEmpty &&
+              _graduatedProgram.isNotEmpty;
         }
       }
     }
+  }
+
 
     // Show summary when complete
     if (allFieldsCompleted) {
@@ -1602,225 +1619,302 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
   }
 
   List<Widget> _buildUndergraduateFlow(double descriptionFontSize) {
-  // Step 1: Year, College, Program selection
-  if (_selectedYear.isEmpty ||
-      _selectedCollege.isEmpty ||
-      (_selectedYear != 'Incoming' && _selectedProgram.isEmpty)) {
-    return [
-      const SizedBox(height: 24),
-      _buildSectionTitle('What year are you in?', descriptionFontSize),
-      const SizedBox(height: 12),
-      _buildDropdownField(
-        value: _selectedYear.isEmpty || !years.contains(_selectedYear) ? null : _selectedYear,
-        items: years.toSet().toList(),
-        onChanged: (value) => setState(() {
-          _selectedYear = value ?? '';
-          if (value == 'Incoming') {
-            _selectedProgram = 'N/A';
-          } else {
-            _selectedProgram = '';
-          }
-        }),
-        hint: 'Select your year level',
-        icon: Icons.school_outlined,
-        fontSize: descriptionFontSize,
-      ),
-      if (_selectedYear.isNotEmpty) ...[
+    // Step 1: Year, College, Program selection
+    if (_selectedYear.isEmpty ||
+        _selectedCollege.isEmpty ||
+        (_selectedYear != 'Incoming' && _selectedProgram.isEmpty)) {
+      return [
         const SizedBox(height: 24),
-        _buildSectionTitle('Select your College', descriptionFontSize),
+        _buildSectionTitle('What year are you in?', descriptionFontSize),
         const SizedBox(height: 12),
         _buildDropdownField(
-          value: _selectedCollege.isEmpty || !_colleges.keys.contains(_selectedCollege)
-              ? null
-              : _selectedCollege,
-          items: _colleges.keys.toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedCollege = value ?? '';
-              _selectedCollegeId = _colleges[value];
-              _selectedProgram = '';
-            });
-          },
-          hint: 'Select your college',
-          icon: Icons.account_balance_outlined,
-          fontSize: descriptionFontSize,
-        ),
-      ],
-      if (_selectedCollege.isNotEmpty && _selectedYear != 'Incoming') ...[
-        const SizedBox(height: 24),
-        _buildSectionTitle('Select your Program', descriptionFontSize),
-        const SizedBox(height: 12),
-        () {
-          final key = '${_selectedCollegeId}_Bachelor';
-          final availablePrograms = _programsByCollege.containsKey(key)
-              ? _programsByCollege[key]!
-              : <String>[];
-
-          return _buildDropdownField(
-            value: _selectedProgram.isEmpty || !availablePrograms.contains(_selectedProgram)
-                ? null
-                : _selectedProgram,
-            items: availablePrograms,
-            onChanged: (value) => setState(() => _selectedProgram = value ?? ''),
-            hint: availablePrograms.isEmpty ? 'No bachelor programs available' : 'Select your program',
-            icon: Icons.book_outlined,
-            fontSize: descriptionFontSize,
-          );
-        }(),
-      ],
-      const SizedBox(height: 16),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _selectedYear = '';
-                _selectedCollege = '';
-                _selectedCollegeId = null;
-                _selectedProgram = '';
-                _studentIdConfirmed = false;
-                _studentId = '';
-              });
-            },
-            icon: const Icon(Icons.arrow_back, size: 18),
-            label: Text('Previous', style: TextStyle(fontSize: descriptionFontSize * 0.85)),
-            style: TextButton.styleFrom(
-              foregroundColor: primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-          ),
-        ],
-      ),
-    ];
-  }
-
-  // Step 2: Ask if they have scholarship (Yes/No)
-  if (_hasScholarship == null) {
-    return [
-      const SizedBox(height: 24),
-      _buildSectionTitle('Do you have any scholarship aside from Unifast?', descriptionFontSize),
-      const SizedBox(height: 12),
-      Row(
-        children: [
-          Expanded(
-            child: _buildRadioOption(
-              title: 'Yes',
-              value: 'yes',
-              groupValue: _hasScholarship == null ? null : (_hasScholarship! ? 'yes' : 'no'),
-              onChanged: (val) {
-                setState(() {
-                  _hasScholarship = val == 'yes';
-                  if (val == 'no') {
-                    _selectedScholarship = 'N/A';
-                    _customScholarship = '';
-                    _customScholarshipController.clear();
-                    _customScholarshipConfirmed = false;
-                  } else {
-                    _selectedScholarship = null;
-                  }
-                });
-              },
-              fontSize: descriptionFontSize,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildRadioOption(
-              title: 'No',
-              value: 'no',
-              groupValue: _hasScholarship == null ? null : (_hasScholarship! ? 'yes' : 'no'),
-              onChanged: (val) {
-                setState(() {
-                  _hasScholarship = val == 'yes';
-                  if (val == 'no') {
-                    _selectedScholarship = 'N/A';
-                    _customScholarship = '';
-                    _customScholarshipController.clear();
-                    _customScholarshipConfirmed = false;
-                  }
-                });
-              },
-              fontSize: descriptionFontSize,
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 16),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _hasScholarship = null;
-                _selectedScholarship = null;
-                _customScholarship = '';
-                _customScholarshipController.clear();
-                _customScholarshipConfirmed = false;
-                if (_selectedYear == 'Incoming') {
-                  _selectedCollege = '';
-                  _selectedCollegeId = null;
+          value:
+              _selectedYear.isEmpty || !years.contains(_selectedYear)
+                  ? null
+                  : _selectedYear,
+          items: years.toSet().toList(),
+          onChanged:
+              (value) => setState(() {
+                _selectedYear = value ?? '';
+                if (value == 'Incoming') {
+                  _selectedProgram = 'N/A';
                 } else {
                   _selectedProgram = '';
                 }
+              }),
+          hint: 'Select your year level',
+          icon: Icons.school_outlined,
+          fontSize: descriptionFontSize,
+        ),
+        if (_selectedYear.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _buildSectionTitle('Select your College', descriptionFontSize),
+          const SizedBox(height: 12),
+          _buildDropdownField(
+            value:
+                _selectedCollege.isEmpty ||
+                        !_colleges.keys.contains(_selectedCollege)
+                    ? null
+                    : _selectedCollege,
+            items: _colleges.keys.toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedCollege = value ?? '';
+                _selectedCollegeId = _colleges[value];
+                _selectedProgram = '';
               });
             },
-            icon: const Icon(Icons.arrow_back, size: 18),
-            label: Text('Previous', style: TextStyle(fontSize: descriptionFontSize * 0.85)),
-            style: TextButton.styleFrom(
-              foregroundColor: primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
+            hint: 'Select your college',
+            icon: Icons.account_balance_outlined,
+            fontSize: descriptionFontSize,
           ),
         ],
-      ),
-    ];
-  }
+        if (_selectedCollege.isNotEmpty && _selectedYear != 'Incoming') ...[
+          const SizedBox(height: 24),
+          _buildSectionTitle('Select your Program', descriptionFontSize),
+          const SizedBox(height: 12),
+          () {
+            final key = '${_selectedCollegeId}_Bachelor';
+            final availablePrograms =
+                _programsByCollege.containsKey(key)
+                    ? _programsByCollege[key]!
+                    : <String>[];
 
-  // Step 3: Show scholarship dropdown (only if they said Yes)
-  if (_hasScholarship == true && 
-      (_selectedScholarship == null || _selectedScholarship!.isEmpty || _selectedScholarship == 'N/A' || 
-       (_selectedScholarship == 'Others' && !_customScholarshipConfirmed))) {
-    return [
-      const SizedBox(height: 24),
-      _buildSectionTitle('Select your scholarship', descriptionFontSize),
-      const SizedBox(height: 12),
-      _buildDropdownField(
-        value: _selectedScholarship,
-        items: _scholarships,
-        onChanged: (value) {
-          setState(() {
-            _selectedScholarship = value;
-            // Don't set as confirmed yet if "Others" is selected
-            if (value != 'Others') {
-              _customScholarship = '';
-              _customScholarshipController.clear();
-              _customScholarshipConfirmed = false;
-            }
-          });
-        },
-        hint: 'Select your scholarship',
-        icon: Icons.card_membership_outlined,
-        fontSize: descriptionFontSize,
-      ),
-      
-      // ✅ Show custom scholarship input RIGHT BELOW dropdown if "Others" is selected
-      if (_selectedScholarship == 'Others') ...[
-        const SizedBox(height: 20),
-        _buildSectionTitle('Please specify your scholarship', descriptionFontSize),
+            return _buildDropdownField(
+              value:
+                  _selectedProgram.isEmpty ||
+                          !availablePrograms.contains(_selectedProgram)
+                      ? null
+                      : _selectedProgram,
+              items: availablePrograms,
+              onChanged:
+                  (value) => setState(() => _selectedProgram = value ?? ''),
+              hint:
+                  availablePrograms.isEmpty
+                      ? 'No bachelor programs available'
+                      : 'Select your program',
+              icon: Icons.book_outlined,
+              fontSize: descriptionFontSize,
+            );
+          }(),
+        ],
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _selectedYear = '';
+                  _selectedCollege = '';
+                  _selectedCollegeId = null;
+                  _selectedProgram = '';
+                  _studentIdConfirmed = false;
+                  _studentId = '';
+                });
+              },
+              icon: const Icon(Icons.arrow_back, size: 18),
+              label: Text(
+                'Previous',
+                style: TextStyle(fontSize: descriptionFontSize * 0.85),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: primaryColor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ];
+    }
+
+    // Step 2: Ask if they have scholarship (Yes/No)
+    if (_hasScholarship == null) {
+      return [
+        const SizedBox(height: 24),
+        _buildSectionTitle(
+          'Do you have any scholarship aside from Unifast?',
+          descriptionFontSize,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildRadioOption(
+                title: 'Yes',
+                value: 'yes',
+                groupValue:
+                    _hasScholarship == null
+                        ? null
+                        : (_hasScholarship! ? 'yes' : 'no'),
+                onChanged: (val) {
+                  setState(() {
+                    _hasScholarship = val == 'yes';
+                    if (val == 'no') {
+                      _selectedScholarship = 'N/A';
+                      _customScholarship = '';
+                      _customScholarshipController.clear();
+                      _customScholarshipConfirmed = false;
+                    } else {
+                      _selectedScholarship = null;
+                    }
+                  });
+                },
+                fontSize: descriptionFontSize,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildRadioOption(
+                title: 'No',
+                value: 'no',
+                groupValue:
+                    _hasScholarship == null
+                        ? null
+                        : (_hasScholarship! ? 'yes' : 'no'),
+                onChanged: (val) {
+                  setState(() {
+                    _hasScholarship = val == 'yes';
+                    if (val == 'no') {
+                      _selectedScholarship = 'N/A';
+                      _customScholarship = '';
+                      _customScholarshipController.clear();
+                      _customScholarshipConfirmed = false;
+                    }
+                  });
+                },
+                fontSize: descriptionFontSize,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _hasScholarship = null;
+                  _selectedScholarship = null;
+                  _customScholarship = '';
+                  _customScholarshipController.clear();
+                  _customScholarshipConfirmed = false;
+                  if (_selectedYear == 'Incoming') {
+                    _selectedCollege = '';
+                    _selectedCollegeId = null;
+                  } else {
+                    _selectedProgram = '';
+                  }
+                });
+              },
+              icon: const Icon(Icons.arrow_back, size: 18),
+              label: Text(
+                'Previous',
+                style: TextStyle(fontSize: descriptionFontSize * 0.85),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: primaryColor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ];
+    }
+
+    // Step 3: Show scholarship dropdown (only if they said Yes AND no selection yet)
+    if (_hasScholarship == true &&
+        (_selectedScholarship == null ||
+            _selectedScholarship!.isEmpty ||
+            _selectedScholarship == 'N/A')) {
+      return [
+        const SizedBox(height: 24),
+        _buildSectionTitle('Select your scholarship', descriptionFontSize),
+        const SizedBox(height: 12),
+        _buildDropdownField(
+          value: _selectedScholarship,
+          items: _scholarships,
+          onChanged: (value) {
+            setState(() {
+              _selectedScholarship = value;
+              if (value != 'Others') {
+                _customScholarship = '';
+                _customScholarshipController.clear();
+                _customScholarshipConfirmed = false;
+              }
+            });
+          },
+          hint: 'Select your scholarship',
+          icon: Icons.card_membership_outlined,
+          fontSize: descriptionFontSize,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _hasScholarship = null;
+                  _selectedScholarship = null;
+                  _customScholarship = '';
+                  _customScholarshipController.clear();
+                  _customScholarshipConfirmed = false;
+                });
+              },
+              icon: const Icon(Icons.arrow_back, size: 18),
+              label: Text(
+                'Previous',
+                style: TextStyle(fontSize: descriptionFontSize * 0.85),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: primaryColor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ];
+    }
+
+    // Step 4: Show custom scholarship input (only if "Others" selected and not confirmed)
+    if (_hasScholarship == true &&
+        _selectedScholarship == 'Others' &&
+        !_customScholarshipConfirmed) {
+      return [
+        const SizedBox(height: 24),
+        _buildSectionTitle(
+          'Please specify your scholarship',
+          descriptionFontSize,
+        ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _customScholarshipController,
           decoration: InputDecoration(
             labelText: 'Scholarship Name',
             hintText: 'Enter your scholarship name',
-            labelStyle: TextStyle(color: primaryColor, fontSize: descriptionFontSize * 0.9),
+            labelStyle: TextStyle(
+              color: primaryColor,
+              fontSize: descriptionFontSize * 0.9,
+            ),
             hintStyle: TextStyle(
               color: textSecondaryColor.withOpacity(0.6),
               fontSize: descriptionFontSize * 0.85,
             ),
-            prefixIcon: const Icon(Icons.card_membership_outlined, color: primaryColor),
+            prefixIcon: const Icon(
+              Icons.card_membership_outlined,
+              color: primaryColor,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -1835,9 +1929,15 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
             ),
             filled: true,
             fillColor: Colors.grey[50],
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
           ),
-          style: TextStyle(fontSize: descriptionFontSize, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: descriptionFontSize,
+            fontWeight: FontWeight.w500,
+          ),
           onChanged: (value) {
             setState(() {
               _customScholarship = value;
@@ -1849,63 +1949,70 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _customScholarshipController.text.trim().isNotEmpty
-                ? () {
-                    setState(() {
-                      _customScholarship = _customScholarshipController.text.trim();
-                      _customScholarshipConfirmed = true;
-                    });
-                  }
-                : null,
+            onPressed:
+                _customScholarshipController.text.trim().isNotEmpty
+                    ? () {
+                      setState(() {
+                        _customScholarship =
+                            _customScholarshipController.text.trim();
+                        _customScholarshipConfirmed = true;
+                      });
+                    }
+                    : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               foregroundColor: backgroundColor,
               disabledBackgroundColor: Colors.grey[300],
               elevation: 2,
               shadowColor: primaryColor.withOpacity(0.3),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             child: Text(
               'Continue',
-              style: TextStyle(fontSize: descriptionFontSize * 0.9, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: descriptionFontSize * 0.9,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
-      ],
-      
-      const SizedBox(height: 16),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _hasScholarship = null;
-                _selectedScholarship = null;
-                _customScholarship = '';
-                _customScholarshipController.clear();
-                _customScholarshipConfirmed = false;
-              });
-            },
-            icon: const Icon(Icons.arrow_back, size: 18),
-            label: Text('Previous', style: TextStyle(fontSize: descriptionFontSize * 0.85)),
-            style: TextButton.styleFrom(
-              foregroundColor: primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _selectedScholarship = null;
+                  _customScholarship = '';
+                  _customScholarshipController.clear();
+                  _customScholarshipConfirmed = false;
+                });
+              },
+              icon: const Icon(Icons.arrow_back, size: 18),
+              label: Text(
+                'Previous',
+                style: TextStyle(fontSize: descriptionFontSize * 0.85),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: primaryColor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
-    ];
+          ],
+        ),
+      ];
+    }
+
+    // All fields completed - show summary (this return [] allows the code to proceed to profile summary)
+    return [];
   }
-
-  // Step 4 is now removed - custom input is shown inline above
-  
-  // All fields completed - show summary
-  return [];
-}
-
 
   List<Widget> _buildGraduateFlow(double descriptionFontSize) {
     if (_graduateType == null) {
@@ -2244,279 +2351,55 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     return [];
   }
 
-List<Widget> _buildIncomingFreshmanFlow(double descriptionFontSize) {
-  // Step 1: LRN entry
-  if (!_lrnConfirmed) {
-    return [
-      const SizedBox(height: 24),
-      Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: primaryColor.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: primaryColor.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline, color: primaryColor, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Enter your LRN to prove authenticity as an incoming freshman applicant',
-                style: TextStyle(
-                  fontSize: descriptionFontSize * 0.85,
-                  color: primaryColor,
-                  fontWeight: FontWeight.w600,
+  List<Widget> _buildIncomingFreshmanFlow(double descriptionFontSize) {
+    // Step 1: LRN entry
+    if (!_lrnConfirmed) {
+      return [
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: primaryColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: primaryColor.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: primaryColor, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Enter your LRN to prove authenticity as an incoming freshman applicant',
+                  style: TextStyle(
+                    fontSize: descriptionFontSize * 0.85,
+                    color: primaryColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 16),
-      _buildSectionTitle('Enter your Learner Reference Number (LRN)', descriptionFontSize),
-      const SizedBox(height: 12),
-      TextFormField(
-        initialValue: _lrn,
-        decoration: InputDecoration(
-          labelText: 'LRN',
-          hintText: 'Enter your 12-digit LRN',
-          labelStyle: TextStyle(color: primaryColor, fontSize: descriptionFontSize * 0.9),
-          hintStyle: TextStyle(
-            color: textSecondaryColor.withOpacity(0.6),
-            fontSize: descriptionFontSize * 0.85,
-          ),
-          prefixIcon: const Icon(Icons.badge_outlined, color: primaryColor),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey[300]!),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey[300]!),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: primaryColor, width: 2),
-          ),
-          filled: true,
-          fillColor: Colors.grey[50],
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        ),
-        style: TextStyle(fontSize: descriptionFontSize, fontWeight: FontWeight.w500),
-        keyboardType: TextInputType.number,
-        maxLength: 12,
-        onChanged: (value) {
-          setState(() {
-            _lrn = value;
-            _lrnConfirmed = false;
-            _lrnError = null;
-            _lrnErrorTimer?.cancel();
-          });
-        },
-      ),
-      if (_lrn.isNotEmpty && _lrn.trim().length < 12) ...[
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.only(left: 12),
-          child: Text(
-            'LRN must be exactly 12 digits (${_lrn.trim().length}/12)',
-            style: TextStyle(fontSize: descriptionFontSize * 0.8, color: Colors.red[700]),
+            ],
           ),
         ),
-      ],
-      _buildInlineError(_lrnError, descriptionFontSize),
-      const SizedBox(height: 16),
-      SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: _lrn.trim().length == 12
-              ? () async {
-                  _lrnErrorTimer?.cancel();
-                  setState(() => _lrnError = null);
-                  setState(() => _isLoading = true);
-                  final isTaken = await _isLrnTaken(_lrn);
-                  setState(() => _isLoading = false);
-                  if (isTaken) {
-                    _setLrnError(
-                      'This LRN is already registered. Please check your LRN or contact support.',
-                    );
-                  } else {
-                    setState(() {
-                      _lrnConfirmed = true;
-                    });
-                  }
-                }
-              : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryColor,
-            foregroundColor: backgroundColor,
-            disabledBackgroundColor: Colors.grey[300],
-            elevation: 2,
-            shadowColor: primaryColor.withOpacity(0.3),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-          ),
-          child: _isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.0),
-                )
-              : Text(
-                  'Confirm LRN',
-                  style: TextStyle(fontSize: descriptionFontSize * 0.9, fontWeight: FontWeight.w700),
-                ),
+        const SizedBox(height: 16),
+        _buildSectionTitle(
+          'Enter your Learner Reference Number (LRN)',
+          descriptionFontSize,
         ),
-      ),
-      const SizedBox(height: 16),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _notEnrolledType = null;
-                _lrn = '';
-                _lrnConfirmed = false;
-                _lrnError = null;
-                _lrnErrorTimer?.cancel();
-              });
-            },
-            icon: const Icon(Icons.arrow_back, size: 18),
-            label: Text('Previous', style: TextStyle(fontSize: descriptionFontSize * 0.85)),
-            style: TextButton.styleFrom(
-              foregroundColor: primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-          ),
-        ],
-      ),
-    ];
-  }
-
-  // Step 2: Ask if they have scholarship (Yes/No)
-  if (_hasScholarship == null) {
-    return [
-      const SizedBox(height: 24),
-      _buildSectionTitle('Do you have any scholarship aside from Unifast?', descriptionFontSize),
-      const SizedBox(height: 12),
-      Row(
-        children: [
-          Expanded(
-            child: _buildRadioOption(
-              title: 'Yes',
-              value: 'yes',
-              groupValue: _hasScholarship == null ? null : (_hasScholarship! ? 'yes' : 'no'),
-              onChanged: (val) {
-                setState(() {
-                  _hasScholarship = val == 'yes';
-                  if (val == 'no') {
-                    _selectedScholarship = 'N/A';
-                    _customScholarship = '';
-                    _customScholarshipController.clear();
-                    _customScholarshipConfirmed = false;
-                  } else {
-                    _selectedScholarship = null;
-                  }
-                });
-              },
-              fontSize: descriptionFontSize,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildRadioOption(
-              title: 'No',
-              value: 'no',
-              groupValue: _hasScholarship == null ? null : (_hasScholarship! ? 'yes' : 'no'),
-              onChanged: (val) {
-                setState(() {
-                  _hasScholarship = val == 'yes';
-                  if (val == 'no') {
-                    _selectedScholarship = 'N/A';
-                    _customScholarship = '';
-                    _customScholarshipController.clear();
-                    _customScholarshipConfirmed = false;
-                  }
-                });
-              },
-              fontSize: descriptionFontSize,
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 16),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _hasScholarship = null;
-                _selectedScholarship = null;
-                _customScholarship = '';
-                _customScholarshipController.clear();
-                _customScholarshipConfirmed = false;
-                _lrnConfirmed = false;
-                _lrn = '';
-              });
-            },
-            icon: const Icon(Icons.arrow_back, size: 18),
-            label: Text('Previous', style: TextStyle(fontSize: descriptionFontSize * 0.85)),
-            style: TextButton.styleFrom(
-              foregroundColor: primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-          ),
-        ],
-      ),
-    ];
-  }
-
-  // Step 3: Show scholarship dropdown with inline custom input (only if they said Yes)
-  if (_hasScholarship == true && 
-      (_selectedScholarship == null || _selectedScholarship!.isEmpty || _selectedScholarship == 'N/A' || 
-       (_selectedScholarship == 'Others' && !_customScholarshipConfirmed))) {
-    return [
-      const SizedBox(height: 24),
-      _buildSectionTitle('Select your scholarship', descriptionFontSize),
-      const SizedBox(height: 12),
-      _buildDropdownField(
-        value: _selectedScholarship,
-        items: _scholarships,
-        onChanged: (value) {
-          setState(() {
-            _selectedScholarship = value;
-            // Reset custom scholarship when changing selection
-            if (value != 'Others') {
-              _customScholarship = '';
-              _customScholarshipController.clear();
-              _customScholarshipConfirmed = false;
-            }
-          });
-        },
-        hint: 'Select your scholarship',
-        icon: Icons.card_membership_outlined,
-        fontSize: descriptionFontSize,
-      ),
-      
-      // ✅ Show custom scholarship input RIGHT BELOW dropdown if "Others" is selected
-      if (_selectedScholarship == 'Others') ...[
-        const SizedBox(height: 20),
-        _buildSectionTitle('Please specify your scholarship', descriptionFontSize),
         const SizedBox(height: 12),
         TextFormField(
-          controller: _customScholarshipController,
+          initialValue: _lrn,
           decoration: InputDecoration(
-            labelText: 'Scholarship Name',
-            hintText: 'Enter your scholarship name',
-            labelStyle: TextStyle(color: primaryColor, fontSize: descriptionFontSize * 0.9),
+            labelText: 'LRN',
+            hintText: 'Enter your 12-digit LRN',
+            labelStyle: TextStyle(
+              color: primaryColor,
+              fontSize: descriptionFontSize * 0.9,
+            ),
             hintStyle: TextStyle(
               color: textSecondaryColor.withOpacity(0.6),
               fontSize: descriptionFontSize * 0.85,
             ),
-            prefixIcon: const Icon(Icons.card_membership_outlined, color: primaryColor),
+            prefixIcon: const Icon(Icons.badge_outlined, color: primaryColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -2531,9 +2414,314 @@ List<Widget> _buildIncomingFreshmanFlow(double descriptionFontSize) {
             ),
             filled: true,
             fillColor: Colors.grey[50],
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
           ),
-          style: TextStyle(fontSize: descriptionFontSize, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: descriptionFontSize,
+            fontWeight: FontWeight.w500,
+          ),
+          keyboardType: TextInputType.number,
+          maxLength: 12,
+          onChanged: (value) {
+            setState(() {
+              _lrn = value;
+              _lrnConfirmed = false;
+              _lrnError = null;
+              _lrnErrorTimer?.cancel();
+            });
+          },
+        ),
+        if (_lrn.isNotEmpty && _lrn.trim().length < 12) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Text(
+              'LRN must be exactly 12 digits (${_lrn.trim().length}/12)',
+              style: TextStyle(
+                fontSize: descriptionFontSize * 0.8,
+                color: Colors.red[700],
+              ),
+            ),
+          ),
+        ],
+        _buildInlineError(_lrnError, descriptionFontSize),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed:
+                _lrn.trim().length == 12
+                    ? () async {
+                      _lrnErrorTimer?.cancel();
+                      setState(() => _lrnError = null);
+                      setState(() => _isLoading = true);
+                      final isTaken = await _isLrnTaken(_lrn);
+                      setState(() => _isLoading = false);
+                      if (isTaken) {
+                        _setLrnError(
+                          'This LRN is already registered. Please check your LRN or contact support.',
+                        );
+                      } else {
+                        setState(() {
+                          _lrnConfirmed = true;
+                        });
+                      }
+                    }
+                    : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: backgroundColor,
+              disabledBackgroundColor: Colors.grey[300],
+              elevation: 2,
+              shadowColor: primaryColor.withOpacity(0.3),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child:
+                _isLoading
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.0,
+                      ),
+                    )
+                    : Text(
+                      'Continue',
+                      style: TextStyle(
+                        fontSize: descriptionFontSize * 0.9,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _notEnrolledType = null;
+                  _lrn = '';
+                  _lrnConfirmed = false;
+                  _lrnError = null;
+                  _lrnErrorTimer?.cancel();
+                });
+              },
+              icon: const Icon(Icons.arrow_back, size: 18),
+              label: Text(
+                'Previous',
+                style: TextStyle(fontSize: descriptionFontSize * 0.85),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: primaryColor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ];
+    }
+
+    // Step 2: Ask if they have scholarship (Yes/No)
+   if (_hasScholarship == null) {
+  return [
+    const SizedBox(height: 24),
+    _buildSectionTitle('Do you have any scholarship aside from Unifast?', descriptionFontSize),
+    const SizedBox(height: 12),
+    Row(
+      children: [
+        Expanded(
+          child: _buildRadioOption(
+            title: 'Yes',
+            value: 'yes',
+            groupValue: _hasScholarship == null ? null : (_hasScholarship! ? 'yes' : 'no'),
+            onChanged: (val) {
+              setState(() {
+                _hasScholarship = val == 'yes';
+                if (val == 'no') {
+                  _selectedScholarship = 'N/A';
+                  _customScholarship = '';
+                  _customScholarshipController.clear();
+                  _customScholarshipConfirmed = false;
+                } else {
+                  _selectedScholarship = null;
+                }
+              });
+            },
+            fontSize: descriptionFontSize,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildRadioOption(
+            title: 'No',
+            value: 'no',
+            groupValue: _hasScholarship == null ? null : (_hasScholarship! ? 'yes' : 'no'),
+            onChanged: (val) {
+              setState(() {
+                _hasScholarship = val == 'yes';
+                if (val == 'no') {
+                  _selectedScholarship = 'N/A';
+                  _customScholarship = '';
+                  _customScholarshipController.clear();
+                  _customScholarshipConfirmed = false;
+                }
+              });
+            },
+            fontSize: descriptionFontSize,
+          ),
+        ),
+      ],
+    ),
+    const SizedBox(height: 16),
+    Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: [
+        TextButton.icon(
+          onPressed: () {
+            setState(() {
+              // ✅ FIX: Only reset scholarship fields, keep LRN confirmed
+              _hasScholarship = null;
+              _selectedScholarship = null;
+              _customScholarship = '';
+              _customScholarshipController.clear();
+              _customScholarshipConfirmed = false;
+              _lrnConfirmed = false; // ✅ This goes back to LRN input
+              // DON'T reset _lrn and _notEnrolledType
+            });
+          },
+          icon: const Icon(Icons.arrow_back, size: 18),
+          label: Text('Previous', style: TextStyle(fontSize: descriptionFontSize * 0.85)),
+          style: TextButton.styleFrom(
+            foregroundColor: primaryColor,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
+        ),
+      ],
+    ),
+  ];
+}
+
+    // Step 3: Show scholarship dropdown (only if they said Yes AND no selection yet)
+    if (_hasScholarship == true &&
+        (_selectedScholarship == null ||
+            _selectedScholarship!.isEmpty ||
+            _selectedScholarship == 'N/A')) {
+      return [
+        const SizedBox(height: 24),
+        _buildSectionTitle('Select your scholarship', descriptionFontSize),
+        const SizedBox(height: 12),
+        _buildDropdownField(
+          value: _selectedScholarship,
+          items: _scholarships,
+          onChanged: (value) {
+            setState(() {
+              _selectedScholarship = value;
+              if (value != 'Others') {
+                _customScholarship = '';
+                _customScholarshipController.clear();
+                _customScholarshipConfirmed = false;
+              }
+            });
+          },
+          hint: 'Select your scholarship',
+          icon: Icons.card_membership_outlined,
+          fontSize: descriptionFontSize,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _hasScholarship = null;
+                  _selectedScholarship = null;
+                  _customScholarship = '';
+                  _customScholarshipController.clear();
+                  _customScholarshipConfirmed = false;
+                });
+              },
+              icon: const Icon(Icons.arrow_back, size: 18),
+              label: Text(
+                'Previous',
+                style: TextStyle(fontSize: descriptionFontSize * 0.85),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: primaryColor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ];
+    }
+
+    // Step 4: Show custom scholarship input (only if "Others" selected and not confirmed)
+    if (_hasScholarship == true &&
+        _selectedScholarship == 'Others' &&
+        !_customScholarshipConfirmed) {
+      return [
+        const SizedBox(height: 24),
+        _buildSectionTitle(
+          'Please specify your scholarship',
+          descriptionFontSize,
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _customScholarshipController,
+          decoration: InputDecoration(
+            labelText: 'Scholarship Name',
+            hintText: 'Enter your scholarship name',
+            labelStyle: TextStyle(
+              color: primaryColor,
+              fontSize: descriptionFontSize * 0.9,
+            ),
+            hintStyle: TextStyle(
+              color: textSecondaryColor.withOpacity(0.6),
+              fontSize: descriptionFontSize * 0.85,
+            ),
+            prefixIcon: const Icon(
+              Icons.card_membership_outlined,
+              color: primaryColor,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: primaryColor, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.grey[50],
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+          ),
+          style: TextStyle(
+            fontSize: descriptionFontSize,
+            fontWeight: FontWeight.w500,
+          ),
           onChanged: (value) {
             setState(() {
               _customScholarship = value;
@@ -2545,60 +2733,71 @@ List<Widget> _buildIncomingFreshmanFlow(double descriptionFontSize) {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _customScholarshipController.text.trim().isNotEmpty
-                ? () {
-                    setState(() {
-                      _customScholarship = _customScholarshipController.text.trim();
-                      _customScholarshipConfirmed = true;
-                    });
-                  }
-                : null,
+            onPressed:
+                _customScholarshipController.text.trim().isNotEmpty
+                    ? () {
+                      setState(() {
+                        _customScholarship =
+                            _customScholarshipController.text.trim();
+                        _customScholarshipConfirmed = true;
+                      });
+                    }
+                    : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               foregroundColor: backgroundColor,
               disabledBackgroundColor: Colors.grey[300],
               elevation: 2,
               shadowColor: primaryColor.withOpacity(0.3),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             child: Text(
-              'Confirm Scholarship',
-              style: TextStyle(fontSize: descriptionFontSize * 0.9, fontWeight: FontWeight.w700),
+              'Continue',
+              style: TextStyle(
+                fontSize: descriptionFontSize * 0.9,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
-      ],
-      
-      const SizedBox(height: 16),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _hasScholarship = null;
-                _selectedScholarship = null;
-                _customScholarship = '';
-                _customScholarshipController.clear();
-                _customScholarshipConfirmed = false;
-              });
-            },
-            icon: const Icon(Icons.arrow_back, size: 18),
-            label: Text('Previous', style: TextStyle(fontSize: descriptionFontSize * 0.85)),
-            style: TextButton.styleFrom(
-              foregroundColor: primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _selectedScholarship = null;
+                  _customScholarship = '';
+                  _customScholarshipController.clear();
+                  _customScholarshipConfirmed = false;
+                });
+              },
+              icon: const Icon(Icons.arrow_back, size: 18),
+              label: Text(
+                'Previous',
+                style: TextStyle(fontSize: descriptionFontSize * 0.85),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: primaryColor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
-    ];
+          ],
+        ),
+      ];
+    }
+
+    // All fields completed - show summary (this return [] allows the code to proceed to profile summary)
+    return [];
   }
 
-  // All fields completed - show summary
-  return [];
-}
 
   List<Widget> _buildMasteralFlow(double descriptionFontSize) {
     if (_selectedProgram.isEmpty) {

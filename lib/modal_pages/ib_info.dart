@@ -213,15 +213,15 @@ void showIBInfoModal(
                           ),
                           child: SingleChildScrollView(
                             padding: const EdgeInsets.all(16),
-                            child: Text(
-                              data['content'] ?? 'No content available.',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF475569),
-                                height: 1.6,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
+                           child: Text(
+  cleanPdfContent(data['content'] ?? 'No content available.'), // ✅ Clean the content
+  style: const TextStyle(
+    fontSize: 14,
+    color: Color(0xFF475569),
+    height: 1.6,
+    fontWeight: FontWeight.w400,
+  ),
+),
                           ),
                         ),
 
@@ -299,6 +299,33 @@ void showIBInfoModal(
       );
     },
   );
+}
+
+String cleanPdfContent(String content) {
+  // Remove single line breaks but keep paragraph breaks (double line breaks)
+  String cleaned = content
+      // Replace single line breaks with space
+      .replaceAll(RegExp(r'(?<!\n)\n(?!\n)'), ' ')
+      // Normalize multiple spaces to single space
+      .replaceAll(RegExp(r' +'), ' ')
+      // Clean up spacing around punctuation
+      .replaceAll(RegExp(r' +([.,;:!?])'), r'$1')
+      // Remove leading/trailing whitespace
+      .trim();
+  
+  return cleaned;
+}
+
+// Alternative: More aggressive cleaning for heavily broken PDFs
+String cleanPdfContentAggressive(String content) {
+  return content
+      // Replace all line breaks with spaces
+      .replaceAll('\n', ' ')
+      // Replace multiple spaces with single space
+      .replaceAll(RegExp(r' +'), ' ')
+      // Clean up spacing around punctuation
+      .replaceAll(RegExp(r' +([.,;:!?])'), r'$1')
+      .trim();
 }
 
 Widget _buildActionButtons(
@@ -560,14 +587,14 @@ void _showFullContentModal(
                               ),
                               child: SingleChildScrollView(
                                 child: SelectableText(
-                                  data['content'] ?? 'No content available.',
-                                  style: TextStyle(
-                                    fontSize: isMobile ? 14 : 16,
-                                    color: const Color(0xFF334155),
-                                    height: 1.6,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
+  cleanPdfContent(data['content'] ?? 'No content available.'), // ✅ Clean the content
+  style: TextStyle(
+    fontSize: isMobile ? 14 : 16,
+    color: const Color(0xFF334155),
+    height: 1.6,
+    fontWeight: FontWeight.w400,
+  ),
+),
                               ),
                             ),
                           ),

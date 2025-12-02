@@ -2319,51 +2319,51 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   }
 
   Future<void> _onLinkTap(LinkableElement link) async {
-    final url = link.url;
+  final url = link.url;
 
-    try {
-      if (url.startsWith('tel:')) {
-        final uri = Uri.parse(url);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          await Clipboard.setData(
-            ClipboardData(text: url.replaceFirst('tel:', '')),
-          );
-          if (mounted) {
-            _showSnackBar('Phone number copied to clipboard', Icons.phone);
-          }
-        }
-      } else if (url.startsWith('mailto:')) {
-        final uri = Uri.parse(url);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          await Clipboard.setData(
-            ClipboardData(text: url.replaceFirst('mailto:', '')),
-          );
-          if (mounted) {
-            _showSnackBar('Email copied to clipboard', Icons.email);
-          }
-        }
+  try {
+    if (url.startsWith('tel:')) {
+      // Opens phone dialer or copies number
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        final uri = Uri.parse(url);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          await Clipboard.setData(ClipboardData(text: url));
-          if (mounted) {
-            _showSnackBar('Link copied to clipboard', Icons.link);
-          }
+        await Clipboard.setData(ClipboardData(text: url.replaceFirst('tel:', '')));
+        if (mounted) {
+          _showSnackBar('Phone number copied to clipboard', Icons.phone);
         }
       }
-    } catch (e) {
-      await Clipboard.setData(ClipboardData(text: url));
-      if (mounted) {
-        _showSnackBar('Link copied to clipboard', Icons.content_copy);
+    } else if (url.startsWith('mailto:')) {
+      // Opens email client or copies email
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await Clipboard.setData(ClipboardData(text: url.replaceFirst('mailto:', '')));
+        if (mounted) {
+          _showSnackBar('Email copied to clipboard', Icons.email);
+        }
+      }
+    } else {
+      // Opens web URLs in external browser
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await Clipboard.setData(ClipboardData(text: url));
+        if (mounted) {
+          _showSnackBar('Link copied to clipboard', Icons.link);
+        }
       }
     }
+  } catch (e) {
+    // Fallback: copy link to clipboard
+    await Clipboard.setData(ClipboardData(text: url));
+    if (mounted) {
+      _showSnackBar('Link copied to clipboard', Icons.content_copy);
+    }
   }
+}
 
   void _showMessageOptions(BuildContext context, Message message) {
     showModalBottomSheet(
