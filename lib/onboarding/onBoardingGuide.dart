@@ -59,15 +59,13 @@ class _OnboardingGuideState extends State<OnboardingGuide>
     _animationController.repeat(reverse: true);
     _checkFirstTime();
   }
+
+
 Future<void> _checkFirstTime() async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
 
-  final prefs = await SharedPreferences.getInstance();
-  final hasSeenLocal =
-      prefs.getBool('hasSeenOnboarding_${user.uid}') ?? false;
-
-  // ✅ Fetch the user's field from Firestore
+  // ✅ Fetch the user's field from Firestore first
   final userDoc = await FirebaseFirestore.instance
       .collection('users')
       .doc(user.uid)
@@ -76,7 +74,17 @@ Future<void> _checkFirstTime() async {
   final dbHasSeenOnboarding =
       userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
 
-  if (!hasSeenLocal || dbHasSeenOnboarding) {
+  // ✅ If user has already seen the guide in Firestore, don't show it
+  if (dbHasSeenOnboarding) {
+    return; // Exit early, don't show onboarding
+  }
+
+  // ✅ Check local storage as a fallback
+  final prefs = await SharedPreferences.getInstance();
+  final hasSeenLocal = prefs.getBool('hasSeenOnboarding_${user.uid}') ?? false;
+
+  // ✅ Only show onboarding if BOTH Firestore and local storage say they haven't seen it
+  if (!hasSeenLocal && !dbHasSeenOnboarding) {
     await Future.delayed(const Duration(milliseconds: 800));
     if (mounted) {
       setState(() {
@@ -201,19 +209,27 @@ Future<void> _checkFirstTime() async {
     await _finishOnboarding();
   }
 
-  Future<void> _finishOnboarding() async {
-    // ✅ FIX: Save per-user
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('hasSeenOnboarding_${user.uid}', true);
-    }
+ Future<void> _finishOnboarding() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    // ✅ Save to local storage
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenOnboarding_${user.uid}', true);
 
-    _removeOverlay();
-    setState(() {
-      _showOnboarding = false;
-    });
+    // ✅ Save to Firestore so it syncs across devices
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .set({
+      'hasSeenOnboardingGuide': true,
+    }, SetOptions(merge: true));
   }
+
+  _removeOverlay();
+  setState(() {
+    _showOnboarding = false;
+  });
+}
 
   void showGuide() {
     if (!_showOnboarding) {

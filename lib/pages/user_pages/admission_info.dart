@@ -45,73 +45,83 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     super.dispose();
   }
 
-  Future<void> _fetchAdmissionProcesses() async {
-    try {
+ Future<void> _fetchAdmissionProcesses() async {
+  try {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final querySnapshot =
+        await _firestore
+            .collection('admissions')
+            .orderBy('createdAt', descending: true)
+            .get();
+
+    if (querySnapshot.docs.isNotEmpty) {
+      final List<Admissions> admissions =
+          querySnapshot.docs
+              .map(
+                (doc) => Admissions.fromJson({...doc.data(), 'id': doc.id}),
+              )
+              .toList();
+
+      // ✅ Filter out entries without a type
+      final validAdmissions = admissions.where((a) => 
+        a.type != null && a.type!.isNotEmpty
+      ).toList();
+
+      // Group by type and keep the most recent one per type
+      final Map<String, Admissions> typeMap = {};
+      for (final admission in validAdmissions) {
+        final type = admission.type!; // ✅ No fallback, type is guaranteed
+        if (!typeMap.containsKey(type)) {
+          typeMap[type] = admission;
+        }
+      }
+
+      // Sort by type name
+      final sortedAdmissions =
+          typeMap.values.toList()..sort((a, b) {
+            return a.type!.compareTo(b.type!); // ✅ No fallback
+          });
+
       setState(() {
-        _isLoading = true;
-        _error = null;
+        _admissionsByType = sortedAdmissions;
+        if (_admissionsByType.isNotEmpty) {
+          _selectedType = _admissionsByType.first.type; // ✅ No fallback
+        }
+        _isLoading = false;
       });
 
-      final querySnapshot =
-          await _firestore
-              .collection('admissions')
-              .orderBy('createdAt', descending: true)
-              .get();
-
-      if (querySnapshot.docs.isNotEmpty) {
-        final List<Admissions> admissions =
-            querySnapshot.docs
-                .map(
-                  (doc) => Admissions.fromJson({...doc.data(), 'id': doc.id}),
-                )
-                .toList();
-
-        // Group by type and keep the most recent one per type
-        final Map<String, Admissions> typeMap = {};
-        for (final admission in admissions) {
-          final type = admission.type ?? 'General Admission';
-          if (!typeMap.containsKey(type)) {
-            typeMap[type] = admission;
-          }
-        }
-
-        // Sort by type name
-        final sortedAdmissions =
-            typeMap.values.toList()..sort((a, b) {
-              final aType = a.type ?? 'General Admission';
-              final bType = b.type ?? 'General Admission';
-              return aType.compareTo(bType);
-            });
-
-        setState(() {
-          _admissionsByType = sortedAdmissions;
-          if (_admissionsByType.isNotEmpty) {
-            _selectedType = _admissionsByType.first.type ?? 'General Admission';
-          }
-          _isLoading = false;
-        });
-
-        _animationController.forward();
-      } else {
-        setState(() {
-          _error = 'No admission information available';
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
+      _animationController.forward();
+    } else {
       setState(() {
-        _error = 'Failed to load admission information: $e';
+        _error = 'No admission information available';
         _isLoading = false;
       });
     }
+  } catch (e) {
+    setState(() {
+      _error = 'Failed to load admission information: $e';
+      _isLoading = false;
+    });
   }
+}
 
-  Admissions? get _selectedAdmission {
+
+ Admissions? get _selectedAdmission {
+  if (_admissionsByType.isEmpty || _selectedType == null) return null;
+  
+  try {
     return _admissionsByType.firstWhere(
-      (admission) => (admission.type ?? 'General Admission') == _selectedType,
-      orElse: () => _admissionsByType.first,
+      (admission) => admission.type == _selectedType,
     );
+  } catch (e) {
+    // If no match found, return the first one
+    return _admissionsByType.isNotEmpty ? _admissionsByType.first : null;
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -245,143 +255,145 @@ class _AdmissionInfoState extends State<AdmissionInfo>
   }
 
   Widget _buildTypeSelector() {
-    if (_admissionsByType.length <= 1) return const SizedBox.shrink();
+  if (_admissionsByType.length <= 1) return const SizedBox.shrink();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: -4,
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey[300]!, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [primaryGreen.withOpacity(0.9), primaryGreen],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+  return Container(
+    margin: const EdgeInsets.only(bottom: 24),
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 24,
+          offset: const Offset(0, 8),
+          spreadRadius: -4,
+        ),
+        BoxShadow(
+          color: Colors.black.withOpacity(0.04),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
+      border: Border.all(color: Colors.grey[300]!, width: 1),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [primaryGreen.withOpacity(0.9), primaryGreen],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryGreen.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryGreen.withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.category_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Text(
-                'Select Admission Type',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.grey[900],
-                  letterSpacing: -0.3,
-                ),
+              child: Icon(
+                Icons.category_rounded,
+                color: Colors.white,
+                size: 20,
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                _admissionsByType.map((admission) {
-                  try {
-                    final type = admission.type ?? 'General Admission';
-                    final isSelected = type == _selectedType;
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Select Admission Type',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey[900],
+                letterSpacing: -0.3,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children:
+              _admissionsByType.map((admission) {
+                try {
+                  final type = admission.type; // ✅ No fallback
+                  if (type == null || type.isEmpty) return const SizedBox.shrink();
+                  
+                  final isSelected = type == _selectedType;
 
-                    return InkWell(
-                      onTap: () {
-                        setState(() {
-                          _selectedType = type;
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
+                  return InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedType = type;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient:
+                            isSelected
+                                ? LinearGradient(
+                                  colors: [
+                                    Colors.green[600]!,
+                                    Colors.green[700]!,
+                                  ],
+                                )
+                                : null,
+                        color: isSelected ? null : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color:
+                              isSelected
+                                  ? Colors.green[700]!
+                                  : Colors.grey[300]!,
                         ),
-                        decoration: BoxDecoration(
-                          gradient:
-                              isSelected
-                                  ? LinearGradient(
-                                    colors: [
-                                      Colors.green[600]!,
-                                      Colors.green[700]!,
-                                    ],
-                                  )
-                                  : null,
-                          color: isSelected ? null : Colors.grey[100],
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color:
-                                isSelected
-                                    ? Colors.green[700]!
-                                    : Colors.grey[300]!,
-                          ),
-                          boxShadow:
-                              isSelected
-                                  ? [
-                                    BoxShadow(
-                                      color: Colors.green[600]!.withOpacity(
-                                        0.4,
-                                      ),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
+                        boxShadow:
+                            isSelected
+                                ? [
+                                  BoxShadow(
+                                    color: Colors.green[600]!.withOpacity(
+                                      0.4,
                                     ),
-                                  ]
-                                  : null,
-                        ),
-                        child: Text(
-                          type,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.grey[700],
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ]
+                                : null,
+                      ),
+                      child: Text(
+                        type,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.grey[700],
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
                         ),
                       ),
-                    );
-                  } catch (e) {
-                    print('Error displaying admission type: $e');
-                    return const SizedBox.shrink();
-                  }
-                }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
+                    ),
+                  );
+                } catch (e) {
+                  print('Error displaying admission type: $e');
+                  return const SizedBox.shrink();
+                }
+              }).toList(),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildScheduleSection() {
     final schedules = _selectedAdmission?.schedules;

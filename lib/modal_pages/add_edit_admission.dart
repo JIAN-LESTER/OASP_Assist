@@ -983,8 +983,8 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
               DropdownMenuItem(value: null, child: Text('Not specified')),
               DropdownMenuItem(value: 'CMUCAT', child: Text('CMUCAT')),
               DropdownMenuItem(value: 'GSAT', child: Text('GSAT')),
-              DropdownMenuItem(value: 'SLHSAT', child: Text('SLHSAT')),
-              DropdownMenuItem(value: 'CMUCATFAQ', child: Text('SLHSAT')),
+              DropdownMenuItem(value: 'ULHSAT', child: Text('ULHSAT')),
+     
 
             ],
             onChanged: (value) {
