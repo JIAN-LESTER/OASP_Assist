@@ -170,8 +170,8 @@ Future<Map<String, dynamic>> analyzeAdmission(String message) async {
       return 'CMUCAT';
     } else if (upperText.contains('GSAT')) {
       return 'GSAT';
-    } else if (upperText.contains('SLHSAT')) {
-      return 'SLHSAT';
+    } else if (upperText.contains('ULHSAT')) {
+      return 'ULHSAT';
     }
     return null;
   }
@@ -193,7 +193,7 @@ CRITICAL INSTRUCTIONS:
 - First, identify the TYPE of admission test:
   * CMUCAT (Central Mindanao University College Admission Test)
   * GSAT (Graduate School Admission Test)
-  * SLHSAT (School of Law and Hospitality Studies Admission Test)
+  * ULHSAT (School of Law and Hospitality Studies Admission Test)
   * If no specific test is mentioned, set type to null
 
 - Extract EVERY SINGLE step mentioned (usually numbered [1] to [11])
@@ -368,8 +368,8 @@ Map<String, dynamic> _fallbackAdmissionExtraction(String text) {
     detectedType = 'CMUCAT';
   } else if (upperText.contains('GSAT')) {
     detectedType = 'GSAT';
-  } else if (upperText.contains('SLHSAT')) {
-    detectedType = 'SLHSAT';
+  } else if (upperText.contains('ULHSAT')) {
+    detectedType = 'ULHSAT';
   }
   List<String> steps = <String>[];
   List<String> requirements = <String>[];

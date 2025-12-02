@@ -12,7 +12,7 @@ class Admissions {
   final String source;
   final DateTime createdAt;
   final List<Map<String, dynamic>>? schedules;
-  final String? type; // ✅ EXISTING: Type field for CMUCAT, GSAT, SLHSAT
+  final String? type; // ✅ EXISTING: Type field for CMUCAT, GSAT, ULHSAT
 
   Admissions({
     required this.id,
@@ -140,11 +140,11 @@ class Admissions {
   // ✅ Helper method to display type in UI
   String get displayType {
     if (type == null || type!.isEmpty) return 'General Admission';
-    return type!; // Returns CMUCAT, GSAT, or SLHSAT
+    return type!; // Returns CMUCAT, GSAT, or ULHSAT
   }
 
   // ✅ Helper to check if this is a specific test type
   bool isCMUCAT() => type?.toUpperCase() == 'CMUCAT';
   bool isGSAT() => type?.toUpperCase() == 'GSAT';
-  bool isSLHSAT() => type?.toUpperCase() == 'SLHSAT';
+  bool isULHSAT() => type?.toUpperCase() == 'ULHSAT';
 }

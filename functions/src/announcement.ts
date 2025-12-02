@@ -1037,7 +1037,7 @@ function extractDeadlines(message: string): string | null {
 // ============================================================================
 
 interface ExtractedAdmissionData {
-  type: string | null; // ✅ NEW: "CMUCAT" | "GSAT" | "SLHSAT" | null
+  type: string | null; // ✅ NEW: "CMUCAT" | "GSAT" | "ULHSAT" | null
   title: string;
   content: string;
   steps: string[];
@@ -1096,7 +1096,7 @@ CRITICAL INSTRUCTIONS:
 1. Determine the admission TYPE by looking for these keywords:
    - CMUCAT (Central Mindanao University College Admission Test)
    - GSAT (Graduate School Admission Test)  
-   - SLHSAT (School of Law and Hospitality Studies Admission Test)
+   - ULHSAT (University Laboratory High School Admission Test)
    - If no specific test is mentioned, set type to null
 
 2. For schedules, ignore generic header text like "Central Mindanao University" and "CMUCAT Schedule"
@@ -1106,7 +1106,7 @@ CRITICAL INSTRUCTIONS:
 6. Each date can have MULTIPLE locations - list them all
 
 Extract these fields:
-- type: "CMUCAT" | "GSAT" | "SLHSAT" | null (based on test type mentioned)
+- type: "CMUCAT" | "GSAT" | "ULHSAT" | null (based on test type mentioned)
 - title: A short descriptive title (max 100 chars)
 - content: The full announcement content including image text
 - steps: Array of enrollment/application steps
@@ -1160,8 +1160,8 @@ Respond ONLY in this JSON format:
         admissionType = 'CMUCAT';
       } else if (contentToCheck.includes('GSAT')) {
         admissionType = 'GSAT';
-      } else if (contentToCheck.includes('SLHSAT')) {
-        admissionType = 'SLHSAT';
+      } else if (contentToCheck.includes('ULHSAT')) {
+        admissionType = 'ULHSAT';
       }
     }
 
@@ -1204,8 +1204,8 @@ Respond ONLY in this JSON format:
       detectedType = 'CMUCAT';
     } else if (fullText.includes('GSAT')) {
       detectedType = 'GSAT';
-    } else if (fullText.includes('SLHSAT')) {
-      detectedType = 'SLHSAT';
+    } else if (fullText.includes('ULHSAT')) {
+      detectedType = 'ULHSAT';
     }
     
     return {
