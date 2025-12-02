@@ -1550,7 +1550,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                         ),
                       )
                       : Text(
-                        'Confirm Student ID',
+                        'Continue',
                         style: TextStyle(
                           fontSize: descriptionFontSize * 0.9,
                           fontWeight: FontWeight.w700,
@@ -1867,7 +1867,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             child: Text(
-              'Confirm Scholarship',
+              'Continue',
               style: TextStyle(fontSize: descriptionFontSize * 0.9, fontWeight: FontWeight.w700),
             ),
           ),
@@ -2474,9 +2474,10 @@ List<Widget> _buildIncomingFreshmanFlow(double descriptionFontSize) {
     ];
   }
 
-  // Step 3: Show scholarship dropdown (only if they said Yes)
+  // Step 3: Show scholarship dropdown with inline custom input (only if they said Yes)
   if (_hasScholarship == true && 
-      (_selectedScholarship == null || _selectedScholarship!.isEmpty || _selectedScholarship == 'N/A')) {
+      (_selectedScholarship == null || _selectedScholarship!.isEmpty || _selectedScholarship == 'N/A' || 
+       (_selectedScholarship == 'Others' && !_customScholarshipConfirmed))) {
     return [
       const SizedBox(height: 24),
       _buildSectionTitle('Select your scholarship', descriptionFontSize),
@@ -2487,7 +2488,7 @@ List<Widget> _buildIncomingFreshmanFlow(double descriptionFontSize) {
         onChanged: (value) {
           setState(() {
             _selectedScholarship = value;
-            // Don't set as confirmed yet if "Others" is selected
+            // Reset custom scholarship when changing selection
             if (value != 'Others') {
               _customScholarship = '';
               _customScholarshipController.clear();
@@ -2499,6 +2500,76 @@ List<Widget> _buildIncomingFreshmanFlow(double descriptionFontSize) {
         icon: Icons.card_membership_outlined,
         fontSize: descriptionFontSize,
       ),
+      
+      // ✅ Show custom scholarship input RIGHT BELOW dropdown if "Others" is selected
+      if (_selectedScholarship == 'Others') ...[
+        const SizedBox(height: 20),
+        _buildSectionTitle('Please specify your scholarship', descriptionFontSize),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _customScholarshipController,
+          decoration: InputDecoration(
+            labelText: 'Scholarship Name',
+            hintText: 'Enter your scholarship name',
+            labelStyle: TextStyle(color: primaryColor, fontSize: descriptionFontSize * 0.9),
+            hintStyle: TextStyle(
+              color: textSecondaryColor.withOpacity(0.6),
+              fontSize: descriptionFontSize * 0.85,
+            ),
+            prefixIcon: const Icon(Icons.card_membership_outlined, color: primaryColor),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: primaryColor, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.grey[50],
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          ),
+          style: TextStyle(fontSize: descriptionFontSize, fontWeight: FontWeight.w500),
+          onChanged: (value) {
+            setState(() {
+              _customScholarship = value;
+              _customScholarshipConfirmed = false;
+            });
+          },
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _customScholarshipController.text.trim().isNotEmpty
+                ? () {
+                    setState(() {
+                      _customScholarship = _customScholarshipController.text.trim();
+                      _customScholarshipConfirmed = true;
+                    });
+                  }
+                : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: backgroundColor,
+              disabledBackgroundColor: Colors.grey[300],
+              elevation: 2,
+              shadowColor: primaryColor.withOpacity(0.3),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child: Text(
+              'Confirm Scholarship',
+              style: TextStyle(fontSize: descriptionFontSize * 0.9, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+      ],
+      
       const SizedBox(height: 16),
       Row(
         mainAxisAlignment: MainAxisAlignment.start,
@@ -2525,100 +2596,7 @@ List<Widget> _buildIncomingFreshmanFlow(double descriptionFontSize) {
     ];
   }
 
-  // Step 4: Show custom scholarship input (only if "Others" was selected)
-  if (_selectedScholarship == 'Others' && !_customScholarshipConfirmed) {
-    return [
-      const SizedBox(height: 24),
-      _buildSectionTitle('Please specify your scholarship', descriptionFontSize),
-      const SizedBox(height: 12),
-      TextFormField(
-        controller: _customScholarshipController,
-        decoration: InputDecoration(
-          labelText: 'Scholarship Name',
-          hintText: 'Enter your scholarship name',
-          labelStyle: TextStyle(color: primaryColor, fontSize: descriptionFontSize * 0.9),
-          hintStyle: TextStyle(
-            color: textSecondaryColor.withOpacity(0.6),
-            fontSize: descriptionFontSize * 0.85,
-          ),
-          prefixIcon: const Icon(Icons.card_membership_outlined, color: primaryColor),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey[300]!),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey[300]!),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: primaryColor, width: 2),
-          ),
-          filled: true,
-          fillColor: Colors.grey[50],
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        ),
-        style: TextStyle(fontSize: descriptionFontSize, fontWeight: FontWeight.w500),
-        onChanged: (value) {
-          setState(() {
-            _customScholarship = value;
-            _customScholarshipConfirmed = false;
-          });
-        },
-      ),
-      const SizedBox(height: 16),
-      SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: _customScholarshipController.text.trim().isNotEmpty
-              ? () {
-                  setState(() {
-                    _customScholarship = _customScholarshipController.text.trim();
-                    _customScholarshipConfirmed = true;
-                  });
-                }
-              : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryColor,
-            foregroundColor: backgroundColor,
-            disabledBackgroundColor: Colors.grey[300],
-            elevation: 2,
-            shadowColor: primaryColor.withOpacity(0.3),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-          ),
-          child: Text(
-            'Confirm Scholarship',
-            style: TextStyle(fontSize: descriptionFontSize * 0.9, fontWeight: FontWeight.w700),
-          ),
-        ),
-      ),
-      const SizedBox(height: 16),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _selectedScholarship = null;
-                _customScholarship = '';
-                _customScholarshipController.clear();
-                _customScholarshipConfirmed = false;
-              });
-            },
-            icon: const Icon(Icons.arrow_back, size: 18),
-            label: Text('Previous', style: TextStyle(fontSize: descriptionFontSize * 0.85)),
-            style: TextButton.styleFrom(
-              foregroundColor: primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-          ),
-        ],
-      ),
-    ];
-  }
-
-  // All fields completed
+  // All fields completed - show summary
   return [];
 }
 
@@ -2807,7 +2785,7 @@ List<Widget> _buildIncomingFreshmanFlow(double descriptionFontSize) {
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             child: Text(
-              'Confirm Affiliation',
+              'Continue',
               style: TextStyle(
                 fontSize: descriptionFontSize * 0.9,
                 fontWeight: FontWeight.w700,
@@ -2873,7 +2851,7 @@ List<Widget> _buildIncomingFreshmanFlow(double descriptionFontSize) {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Confirm Your Information',
+                  'Continue',
                   style: TextStyle(
                     fontSize: fontSize * 1.4,
                     fontWeight: FontWeight.w800,

@@ -26,79 +26,130 @@ class _HumanEscalationState extends State<HumanEscalation>
   String _searchQuery = '';
   late AnimationController _refreshAnimationController;
 
-  // Add stream controllers to prevent rebuilding
+  // ✅ Updated stream to filter by service unit
   late Stream<QuerySnapshot> _escalationsStream;
 
   final List<String> _filterOptions = ['all', 'pending', 'resolved'];
 
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  _refreshAnimationController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1000),
-  );
+    _refreshAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
 
-  // Initialize the stream once
-  _escalationsStream = FirebaseFirestore.instance
-      .collection('escalations')
-      .orderBy('createdAt', descending: true)
-      .snapshots();
+    // ✅ Initialize stream with service unit filter
+    _initializeStream();
 
-  _searchController.addListener(() {
-    setState(() {
-      _searchQuery = _searchController.text.toLowerCase();
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.toLowerCase();
+      });
     });
-  });
 
-  print('📄 HumanEscalation initState:');
-  print('   - initialEscalationId: ${widget.initialEscalationId}');
-  print('   - autoOpen: ${widget.autoOpen}');
+    print('📄 HumanEscalation initState:');
+    print('   - initialEscalationId: ${widget.initialEscalationId}');
+    print('   - autoOpen: ${widget.autoOpen}');
+    print('   - serviceUnit: ${widget.serviceUnit}');
 
-  // ✅ FIX: Only auto-open if BOTH conditions are true
-  if (widget.autoOpen == true && 
-      widget.initialEscalationId != null && 
-      widget.initialEscalationId!.isNotEmpty) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      print('⏰ Post-frame callback: Opening escalation ${widget.initialEscalationId}');
-      _openEscalationById(widget.initialEscalationId!);
-    });
+    if (widget.autoOpen == true && 
+        widget.initialEscalationId != null && 
+        widget.initialEscalationId!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        print('⏰ Post-frame callback: Opening escalation ${widget.initialEscalationId}');
+        _openEscalationById(widget.initialEscalationId!);
+      });
+    }
   }
-}
- @override
-void didUpdateWidget(HumanEscalation oldWidget) {
-  super.didUpdateWidget(oldWidget);
 
-  print('🔄 HumanEscalation didUpdateWidget:');
-  print('   - old escalationId: ${oldWidget.initialEscalationId}');
-  print('   - new escalationId: ${widget.initialEscalationId}');
-  print('   - old autoOpen: ${oldWidget.autoOpen}');
-  print('   - new autoOpen: ${widget.autoOpen}');
-
-  // ✅ FIX: Only auto-open if ALL conditions are true
-  if (widget.autoOpen == true &&
-      widget.initialEscalationId != null &&
-      widget.initialEscalationId!.isNotEmpty &&
-      widget.initialEscalationId != oldWidget.initialEscalationId) {
-    print('🔄 Escalation changed, opening new escalation');
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _openEscalationById(widget.initialEscalationId!);
-    });
+  // ✅ Initialize stream with service unit filter (including "General")
+  void _initializeStream() {
+    // Check if serviceUnit is empty or null
+    if (widget.serviceUnit.isEmpty) {
+      print('⚠️ Service unit is empty, loading all escalations');
+      _escalationsStream = FirebaseFirestore.instance
+          .collection('escalations')
+          .orderBy('createdAt', descending: true)
+          .snapshots();
+    } else {
+      // Use compound query with OR logic
+      print('🔍 Setting up query for service unit: "${widget.serviceUnit}"');
+      
+      _escalationsStream = FirebaseFirestore.instance
+          .collection('escalations')
+          .orderBy('createdAt', descending: true)
+          .snapshots()
+          .map((snapshot) {
+            print('📊 Raw escalations count: ${snapshot.docs.length}');
+            
+            // Filter in-memory to include both service unit and General
+            final filtered = snapshot.docs.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final category = data['category'] as String?;
+              
+              // Include if category matches service unit OR is "General" OR is null/empty
+              final matches = category == widget.serviceUnit || 
+                             category == 'General' ||
+                             category == null ||
+                             category.isEmpty;
+              
+              if (matches) {
+                print('✅ Including escalation ${doc.id}: category = "$category"');
+              }
+              
+              return matches;
+            }).toList();
+            
+            print('📊 Filtered escalations count: ${filtered.length}');
+            
+            // Return a new QuerySnapshot with filtered docs
+            return _FilteredQuerySnapshot(filtered, snapshot);
+          });
+      
+      print('✅ Stream initialized with filter for: "${widget.serviceUnit}" and "General"');
+    }
   }
-}
 
+  @override
+  void didUpdateWidget(HumanEscalation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    print('🔄 HumanEscalation didUpdateWidget:');
+    print('   - old escalationId: ${oldWidget.initialEscalationId}');
+    print('   - new escalationId: ${widget.initialEscalationId}');
+    print('   - old autoOpen: ${oldWidget.autoOpen}');
+    print('   - new autoOpen: ${widget.autoOpen}');
+    print('   - old serviceUnit: ${oldWidget.serviceUnit}');
+    print('   - new serviceUnit: ${widget.serviceUnit}');
+
+    // ✅ Reinitialize stream if service unit changed
+    if (widget.serviceUnit != oldWidget.serviceUnit) {
+      print('🔄 Service unit changed, reinitializing stream');
+      _initializeStream();
+    }
+
+    if (widget.autoOpen == true &&
+        widget.initialEscalationId != null &&
+        widget.initialEscalationId!.isNotEmpty &&
+        widget.initialEscalationId != oldWidget.initialEscalationId) {
+      print('🔄 Escalation changed, opening new escalation');
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openEscalationById(widget.initialEscalationId!);
+      });
+    }
+  }
 
   Future<void> _openEscalationById(String escalationId) async {
     try {
       print('📂 Opening escalation: $escalationId');
 
-      final doc =
-          await FirebaseFirestore.instance
-              .collection('escalations')
-              .doc(escalationId)
-              .get();
+      final doc = await FirebaseFirestore.instance
+          .collection('escalations')
+          .doc(escalationId)
+          .get();
 
       if (!doc.exists) {
         print('❌ Escalation not found: $escalationId');
@@ -108,16 +159,30 @@ void didUpdateWidget(HumanEscalation oldWidget) {
         return;
       }
 
+      // ✅ Verify escalation belongs to staff's service unit or is General
+      final data = doc.data() as Map<String, dynamic>;
+      final escalationCategory = data['category'] as String?;
+      
+      if (escalationCategory != widget.serviceUnit && escalationCategory != 'General') {
+        print('⚠️ Escalation category mismatch: $escalationCategory not in [${widget.serviceUnit}, General]');
+        if (mounted) {
+          SnackbarUtil.showError(
+            context, 
+            'This escalation is not assigned to your service unit'
+          );
+        }
+        return;
+      }
+
       if (mounted) {
         print('✅ Opening escalation modal');
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder:
-              (context) => EscalationDetailModal(
-                escalationId: doc.id,
-                escalationData: doc.data() as Map<String, dynamic>,
-              ),
+          builder: (context) => EscalationDetailModal(
+            escalationId: doc.id,
+            escalationData: data,
+          ),
         );
 
         print('✅ Escalation modal closed');
@@ -244,8 +309,7 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                               Text(
                                 "Escalations",
                                 style: TextStyle(
-                                  fontSize:
-                                      isDesktop ? 26 : (isTablet ? 24 : 20),
+                                  fontSize: isDesktop ? 26 : (isTablet ? 24 : 20),
                                   fontWeight: FontWeight.bold,
                                   color: const Color(0xFF0F172A),
                                 ),
@@ -287,9 +351,7 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                                 return PopupMenuItem<String>(
                                   value: option,
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 8,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
                                     child: Row(
                                       children: [
                                         Container(
@@ -299,18 +361,15 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                                                     ? const Color(0xFF6B7280)
                                                     : _getStatusColor(option))
                                                 .withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
+                                            borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Icon(
                                             option == 'all'
                                                 ? Icons.list_alt
                                                 : _getStatusIcon(option),
-                                            color:
-                                                option == 'all'
-                                                    ? const Color(0xFF6B7280)
-                                                    : _getStatusColor(option),
+                                            color: option == 'all'
+                                                ? const Color(0xFF6B7280)
+                                                : _getStatusColor(option),
                                             size: 16,
                                           ),
                                         ),
@@ -320,14 +379,12 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                                               ? 'All Status'
                                               : option.toUpperCase(),
                                           style: TextStyle(
-                                            fontWeight:
-                                                _selectedFilter == option
-                                                    ? FontWeight.w600
-                                                    : FontWeight.w500,
-                                            color:
-                                                _selectedFilter == option
-                                                    ? const Color(0xFF0F172A)
-                                                    : const Color(0xFF475569),
+                                            fontWeight: _selectedFilter == option
+                                                ? FontWeight.w600
+                                                : FontWeight.w500,
+                                            color: _selectedFilter == option
+                                                ? const Color(0xFF0F172A)
+                                                : const Color(0xFF475569),
                                           ),
                                         ),
                                       ],
@@ -376,28 +433,25 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                             color: const Color(0xFF64748B),
                             size: isTablet ? 22 : 20,
                           ),
-                          suffixIcon:
-                              _searchQuery.isNotEmpty
-                                  ? IconButton(
-                                    icon: Icon(
-                                      Icons.clear,
-                                      color: const Color(0xFF64748B),
-                                      size: isTablet ? 22 : 20,
-                                    ),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() {
-                                        _searchQuery = '';
-                                      });
-                                    },
-                                  )
-                                  : null,
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(
+                                    Icons.clear,
+                                    color: const Color(0xFF64748B),
+                                    size: isTablet ? 22 : 20,
+                                  ),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {
+                                      _searchQuery = '';
+                                    });
+                                  },
+                                )
+                              : null,
                           filled: true,
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              isTablet ? 16 : 14,
-                            ),
+                            borderRadius: BorderRadius.circular(isTablet ? 16 : 14),
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: EdgeInsets.symmetric(
@@ -409,7 +463,7 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                       ),
                     ),
 
-                    // Stats Row - Use the same stream
+                    // Stats Row - Filtered by service unit
                     StreamBuilder<QuerySnapshot>(
                       stream: _escalationsStream,
                       builder: (context, snapshot) {
@@ -419,31 +473,21 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                             margin: EdgeInsets.only(bottom: isTablet ? 24 : 16),
                             decoration: BoxDecoration(
                               color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(
-                                isTablet ? 16 : 12,
-                              ),
+                              borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
                             ),
                           );
                         }
 
                         final docs = snapshot.data!.docs;
                         final total = docs.length;
-                        final pending =
-                            docs
-                                .where(
-                                  (doc) =>
-                                      (doc.data() as Map)['status'] ==
-                                      'pending',
-                                )
-                                .length;
-                        final resolved =
-                            docs
-                                .where(
-                                  (doc) =>
-                                      (doc.data() as Map)['status'] ==
-                                      'resolved',
-                                )
-                                .length;
+                        final pending = docs
+                            .where((doc) =>
+                                (doc.data() as Map)['status'] == 'pending')
+                            .length;
+                        final resolved = docs
+                            .where((doc) =>
+                                (doc.data() as Map)['status'] == 'resolved')
+                            .length;
 
                         return Container(
                           margin: EdgeInsets.only(bottom: isTablet ? 24 : 16),
@@ -456,10 +500,8 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                                   color: const Color(0xFF6366F1),
                                   icon: Icons.inbox,
                                   isSelected: _selectedFilter == 'all',
-                                  onTap:
-                                      () => setState(
-                                        () => _selectedFilter = 'all',
-                                      ),
+                                  onTap: () =>
+                                      setState(() => _selectedFilter = 'all'),
                                   isCompact: !isTablet,
                                 ),
                               ),
@@ -471,10 +513,8 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                                   color: const Color(0xFFF59E0B),
                                   icon: Icons.schedule,
                                   isSelected: _selectedFilter == 'pending',
-                                  onTap:
-                                      () => setState(
-                                        () => _selectedFilter = 'pending',
-                                      ),
+                                  onTap: () =>
+                                      setState(() => _selectedFilter = 'pending'),
                                   isCompact: !isTablet,
                                 ),
                               ),
@@ -486,10 +526,8 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                                   color: const Color(0xFF10B981),
                                   icon: Icons.check_circle,
                                   isSelected: _selectedFilter == 'resolved',
-                                  onTap:
-                                      () => setState(
-                                        () => _selectedFilter = 'resolved',
-                                      ),
+                                  onTap: () =>
+                                      setState(() => _selectedFilter = 'resolved'),
                                   isCompact: !isTablet,
                                 ),
                               ),
@@ -503,7 +541,7 @@ void didUpdateWidget(HumanEscalation oldWidget) {
               ),
             ),
 
-            // Enhanced List - Use the same stream
+            // Enhanced List - Filtered by service unit
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: _escalationsStream,
@@ -527,28 +565,26 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                     );
                   }
 
-                  final escalations =
-                      snapshot.data!.docs.where((doc) {
-                        final data = doc.data() as Map<String, dynamic>;
+                  final escalations = snapshot.data!.docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
 
-                        if (_selectedFilter != 'all') {
-                          if (data['status']?.toString().toLowerCase() !=
-                              _selectedFilter) {
-                            return false;
-                          }
-                        }
+                    if (_selectedFilter != 'all') {
+                      if (data['status']?.toString().toLowerCase() !=
+                          _selectedFilter) {
+                        return false;
+                      }
+                    }
 
-                        return _matchesSearch(data);
-                      }).toList();
+                    return _matchesSearch(data);
+                  }).toList();
 
                   if (escalations.isEmpty) {
                     return _EmptyState(
                       icon: Icons.search_off,
                       title: "No matching escalations",
-                      subtitle:
-                          _searchQuery.isNotEmpty
-                              ? "Try adjusting your search terms"
-                              : "No $_selectedFilter escalations found",
+                      subtitle: _searchQuery.isNotEmpty
+                          ? "Try adjusting your search terms"
+                          : "No $_selectedFilter escalations found",
                       isCompact: !isTablet,
                     );
                   }
@@ -559,16 +595,13 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                     itemBuilder: (context, index) {
                       final doc = escalations[index];
                       final escalation = doc.data() as Map<String, dynamic>;
-                      final status =
-                          escalation['status']?.toString() ?? 'unknown';
+                      final status = escalation['status']?.toString() ?? 'unknown';
 
                       return Container(
                         margin: EdgeInsets.only(bottom: isTablet ? 16 : 12),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(
-                            isTablet ? 16 : 12,
-                          ),
+                          borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.05),
@@ -580,18 +613,15 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(
-                              isTablet ? 16 : 12,
-                            ),
+                            borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
                             onTap: () {
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
-                                builder:
-                                    (context) => EscalationDetailModal(
-                                      escalationId: doc.id,
-                                      escalationData: escalation,
-                                    ),
+                                builder: (context) => EscalationDetailModal(
+                                  escalationId: doc.id,
+                                  escalationData: escalation,
+                                ),
                               );
                             },
                             child: Padding(
@@ -602,12 +632,10 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                                   Container(
                                     padding: EdgeInsets.all(isTablet ? 10 : 8),
                                     decoration: BoxDecoration(
-                                      color: _getStatusColor(
-                                        status,
-                                      ).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(
-                                        isTablet ? 12 : 10,
-                                      ),
+                                      color: _getStatusColor(status)
+                                          .withOpacity(0.1),
+                                      borderRadius:
+                                          BorderRadius.circular(isTablet ? 12 : 10),
                                     ),
                                     child: Icon(
                                       _getStatusIcon(status),
@@ -618,8 +646,7 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                                   SizedBox(width: isTablet ? 16 : 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           escalation['question'] ??
@@ -644,9 +671,8 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                                                 vertical: isTablet ? 5 : 4,
                                               ),
                                               decoration: BoxDecoration(
-                                                color: _getStatusColor(
-                                                  status,
-                                                ).withOpacity(0.15),
+                                                color: _getStatusColor(status)
+                                                    .withOpacity(0.15),
                                                 borderRadius:
                                                     BorderRadius.circular(8),
                                               ),
@@ -655,9 +681,7 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                                                 style: TextStyle(
                                                   fontSize: isTablet ? 11 : 10,
                                                   fontWeight: FontWeight.w700,
-                                                  color: _getStatusColor(
-                                                    status,
-                                                  ),
+                                                  color: _getStatusColor(status),
                                                   letterSpacing: 0.5,
                                                 ),
                                               ),
@@ -677,8 +701,7 @@ void didUpdateWidget(HumanEscalation oldWidget) {
                                                         as Timestamp?,
                                                   ),
                                                   style: TextStyle(
-                                                    fontSize:
-                                                        isTablet ? 13 : 12,
+                                                    fontSize: isTablet ? 13 : 12,
                                                     color: Colors.grey[600],
                                                     fontWeight: FontWeight.w500,
                                                   ),
@@ -882,4 +905,24 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+// ✅ Helper class to wrap filtered documents as QuerySnapshot
+class _FilteredQuerySnapshot implements QuerySnapshot<Map<String, dynamic>> {
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> _docs;
+  final QuerySnapshot<Map<String, dynamic>> _original;
+
+  _FilteredQuerySnapshot(this._docs, this._original);
+
+  @override
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> get docs => _docs;
+
+  @override
+  List<DocumentChange<Map<String, dynamic>>> get docChanges => _original.docChanges;
+
+  @override
+  SnapshotMetadata get metadata => _original.metadata;
+
+  @override
+  int get size => _docs.length;
 }

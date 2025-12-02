@@ -693,8 +693,8 @@ List<Widget> buildInquiryTrendsReport(
           const SizedBox(width: 20),
           Expanded(
             child: buildStatCard(
-              'Unanswered Messages',
-              '${data?.unAnsweredMessages ?? 0}',
+              'Escalated Messages',
+              '${data?.escalatedMessages ?? 0}',
               Colors.red,
               Icons.people,
             ),
@@ -702,8 +702,8 @@ List<Widget> buildInquiryTrendsReport(
           const SizedBox(width: 20),
           Expanded(
             child: buildStatCard(
-              'Escalated Messages',
-              data?.escalatedMessages.toString() ?? '0',
+               'Resolved Messages',
+              data?.resolvedEscalatedMessages.toString() ?? '0',
               Colors.orange,
               Icons.help,
             ),

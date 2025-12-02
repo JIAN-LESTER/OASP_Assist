@@ -1047,7 +1047,7 @@ export const onEscalationCreated = onDocumentCreated(
       }
 
       const notificationTitle = "New Escalated Question";
-      const notificationBody = `${userName} needs help: ${question.substring(
+      const notificationBody = `${userName} needs help on their question: ${question.substring(
         0,
         80
       )}${question.length > 80 ? "..." : ""}`;

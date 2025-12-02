@@ -899,9 +899,6 @@ Widget dashboardContents(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ===========================
-              // HEADER SECTION
-              // ===========================
               _buildHeader(
                 selectedTimeFrame,
                 onTimeFrameChanged,
@@ -912,9 +909,6 @@ Widget dashboardContents(
 
               const SizedBox(height: 32),
 
-              // ===========================
-              // QUICK STATS CARDS
-              // ===========================
               if (isMobile) ...[
                 Column(
                   children: [
@@ -931,8 +925,8 @@ Widget dashboardContents(
                         const SizedBox(width: 12),
                         Expanded(
                           child: buildStatCard(
-                            'Answered',
-                            '$answeredMessages',
+                            'Escalated Messages',
+                            '${inq?.escalatedMessages ?? 0}',
                             Colors.green,
                             Icons.check_circle,
                           ),
@@ -944,8 +938,9 @@ Widget dashboardContents(
                       children: [
                         Expanded(
                           child: buildStatCard(
-                            'Total Users',
-                            '$totalUsers',
+                            'Resolved Messages',
+                            inq?.resolvedEscalatedMessages.toString() ?? '0',
+
                             Colors.red,
                             Icons.people,
                           ),
@@ -968,8 +963,8 @@ Widget dashboardContents(
                     SizedBox(width: isTablet ? 12 : 20),
                     Expanded(
                       child: buildStatCard(
-                        'Answered',
-                        '$answeredMessages',
+                        'Escalated Messages',
+                            '${inq?.escalatedMessages ?? 0}',
                         Colors.green,
                         Icons.check_circle,
                       ),
@@ -977,8 +972,8 @@ Widget dashboardContents(
                     SizedBox(width: isTablet ? 12 : 20),
                     Expanded(
                       child: buildStatCard(
-                        'Total Users',
-                        '$totalUsers',
+                        'Resolved Messages',
+                            inq?.resolvedEscalatedMessages.toString() ?? '0',
                         Colors.red,
                         Icons.people,
                       ),

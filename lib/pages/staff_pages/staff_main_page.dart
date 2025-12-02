@@ -32,7 +32,6 @@ class _StaffMainPageState extends State<StaffMainPage> {
   bool _isSidebarExpanded = true;
   bool _handledInitialArgs = false;
   
-  // ✅ Store escalation details to pass to HumanEscalation
   String? _escalationId;
   String? _conversationId;
   bool _shouldAutoOpen = false;
@@ -52,22 +51,22 @@ class _StaffMainPageState extends State<StaffMainPage> {
   void initState() {
     super.initState();
     
-    // Set initial values from constructor
     _selectedIndex = widget.initialTabIndex ?? 0;
     _escalationId = widget.escalationId;
     _conversationId = widget.conversationId;
     _shouldAutoOpen = widget.autoOpen;
 
-      _fetchStaffServiceUnit();
+    _fetchStaffServiceUnit();
     
-    print('🎯 StaffMainPage initialized with:');
+    print('🎯 StaffMainPage initState:');
     print('   - initialTabIndex: ${widget.initialTabIndex}');
     print('   - escalationId: ${widget.escalationId}');
     print('   - conversationId: ${widget.conversationId}');
     print('   - autoOpen: ${widget.autoOpen}');
+    print('   - _selectedIndex: $_selectedIndex');
   }
 
-    Future<void> _fetchStaffServiceUnit() async {
+  Future<void> _fetchStaffServiceUnit() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -78,6 +77,8 @@ class _StaffMainPageState extends State<StaffMainPage> {
         return;
       }
 
+      print('📡 Fetching service unit for user: ${user.uid}');
+
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -85,94 +86,144 @@ class _StaffMainPageState extends State<StaffMainPage> {
 
       if (userDoc.exists) {
         final data = userDoc.data();
+        final fetchedServiceUnit = data?['serviceUnit'] as String?;
+        
+        print('📦 User document data: $data');
+        print('📦 Service unit field: $fetchedServiceUnit');
+        
         setState(() {
-          _serviceUnit = data?['serviceUnit'] as String;
+          _serviceUnit = fetchedServiceUnit ?? "";
           _isLoadingServiceUnit = false;
         });
         
-        print('✅ Staff service unit loaded: $_serviceUnit');
+        print('✅ Staff service unit loaded: "$_serviceUnit"');
+        
+        if (_serviceUnit.isEmpty) {
+          print('⚠️ WARNING: Service unit is empty!');
+        }
       } else {
         print('⚠️ User document not found');
         setState(() {
           _isLoadingServiceUnit = false;
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ Error fetching service unit: $e');
+      print('Stack trace: $stackTrace');
       setState(() {
         _isLoadingServiceUnit = false;
       });
     }
   }
 
- @override
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+
+    print('📦 didChangeDependencies called');
+    print('   - _handledInitialArgs: $_handledInitialArgs');
 
     if (!_handledInitialArgs) {
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       
+      print('📦 Checking for route arguments...');
+      print('   - args: $args');
+      
       if (args != null) {
-        print('📦 Received navigation arguments: $args');
+        print('📦 ✅ Received navigation arguments:');
+        args.forEach((key, value) {
+          print('     - $key: $value');
+        });
         
         final initialTab = args['initialTab'] as int?;
         final escalationId = args['escalationId'] as String?;
         final conversationId = args['conversationId'] as String?;
         final autoOpen = args['autoOpen'] as bool? ?? false;
 
+        print('📦 Processing arguments:');
+        print('   - initialTab: $initialTab');
+        print('   - escalationId: $escalationId');
+        print('   - conversationId: $conversationId');
+        print('   - autoOpen: $autoOpen');
+
         setState(() {
           if (initialTab != null) {
             _selectedIndex = initialTab;
+            print('✅ Updated _selectedIndex to: $_selectedIndex');
           }
           
-          // ✅ Store escalation details
           if (escalationId != null) {
             _escalationId = escalationId;
             _conversationId = conversationId;
             _shouldAutoOpen = autoOpen;
+            print('✅ Updated escalation details:');
+            print('   - _escalationId: $_escalationId');
+            print('   - _conversationId: $_conversationId');
+            print('   - _shouldAutoOpen: $_shouldAutoOpen');
           }
         });
 
-        print('✅ State updated:');
-        print('   - selectedIndex: $_selectedIndex');
-        print('   - escalationId: $_escalationId');
-        print('   - shouldAutoOpen: $_shouldAutoOpen');
+        print('📦 State updated successfully');
+      } else {
+        print('📦 ❌ No navigation arguments found');
       }
       
       _handledInitialArgs = true;
+      print('📦 Set _handledInitialArgs to true');
+    } else {
+      print('📦 ⏭️ Skipping - already handled initial args');
     }
   }
 
   List<Widget> _getPages() {
-
-     if (_isLoadingServiceUnit) {
+    if (_isLoadingServiceUnit) {
+      print('⏳ Service unit still loading...');
       return [
         const Center(child: CircularProgressIndicator()),
-
+        const Center(child: CircularProgressIndicator()),
+        const Center(child: CircularProgressIndicator()),
+        const Center(child: CircularProgressIndicator()),
+        const Center(child: CircularProgressIndicator()),
       ];
     }
+
+    print('🏗️ Building pages:');
+    print('   - _serviceUnit: "$_serviceUnit"');
+    print('   - _selectedIndex: $_selectedIndex');
+    print('   - _escalationId: $_escalationId');
+    print('   - _shouldAutoOpen: $_shouldAutoOpen');
+    print('   - Is on escalation tab (index 2): ${_selectedIndex == 2}');
+    print('   - Will auto-open: ${_shouldAutoOpen && _selectedIndex == 2}');
+
+    final humanEscalationWidget = HumanEscalation(
+      key: ValueKey('escalation_${_escalationId}_${_shouldAutoOpen}'),
+      initialEscalationId: _escalationId,
+      autoOpen: _shouldAutoOpen && _selectedIndex == 2,
+      serviceUnit: _serviceUnit,
+    );
+
+    print('✅ HumanEscalation widget created with:');
+    print('   - key: escalation_${_escalationId}_${_shouldAutoOpen}');
+    print('   - initialEscalationId: $_escalationId');
+    print('   - autoOpen: ${_shouldAutoOpen && _selectedIndex == 2}');
+    print('   - serviceUnit: "$_serviceUnit"');
 
     return [
       const StaffDashboardPage(),
       const StaffReportsPage(),
-   
-      HumanEscalation(
-        key: ValueKey('escalation_$_escalationId'), // ✅ Force rebuild when escalationId changes
-        initialEscalationId: _escalationId,
-        autoOpen: _shouldAutoOpen && _selectedIndex == 2,
-         serviceUnit: _serviceUnit,
-      ),
+      humanEscalationWidget,
       const StaffAnnouncementPage(),
       const StaffMessageLogsPage(),
     ];
   }
 
   void _onNavigationItemTap(int index) {
+    print('🔄 Navigation item tapped: $index');
     setState(() {
       _selectedIndex = index;
       
-      // ✅ Reset escalation details when navigating away
       if (index != 2) {
+        print('🔄 Clearing escalation details (not on escalation tab)');
         _escalationId = null;
         _conversationId = null;
         _shouldAutoOpen = false;
@@ -188,6 +239,8 @@ class _StaffMainPageState extends State<StaffMainPage> {
 
   @override
   Widget build(BuildContext context) {
+    print('🎨 Building StaffMainPage - selectedIndex: $_selectedIndex');
+    
     return ResponsiveLayout(
       mobileBody: _buildMobileLayout(),
       tabletBody: _buildTabletDesktopLayout(),
