@@ -124,7 +124,7 @@ static Future<Map<String, dynamic>> exchangeToken(
  static Future<Map<String, dynamic>> _exchangeTokenViaHttp(
   String shortToken, {
   String? pageId,
-  String? appId, // ✅ NEW
+  String? appId,
 }) async {
   print('📡 Using HTTP endpoint...');
   
@@ -145,45 +145,49 @@ static Future<Map<String, dynamic>> exchangeToken(
           'uid': 'facebook_admin',
           'short_token': shortToken,
           if (pageId != null) 'pageId': pageId,
-          if (appId != null) 'appId': appId, // ✅ Include appId if provided
+          if (appId != null) 'appId': appId, // ✅ Include appId
         }
       }),
     ).timeout(Duration(seconds: 30));
-      print('📦 Response: ${response.statusCode}');
+    
+    print('📦 Response: ${response.statusCode}');
+    
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final result = data['result'] ?? data;
       
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final result = data['result'] ?? data;
-        
-        if (result['success'] == true || result['ok'] == true) {
-          print('✅ Token exchanged successfully');
-          if (pageId != null) {
-            print('✅ Page ID saved: $pageId');
-          }
-          return result;
+      if (result['success'] == true || result['ok'] == true) {
+        print('✅ Token exchanged successfully');
+        if (pageId != null) {
+          print('✅ Page ID saved: $pageId');
         }
-        
-        throw Exception(result['message'] ?? result['error'] ?? 'Token exchange failed');
-      } else if (response.statusCode == 401) {
-        throw Exception('Authentication failed. Please log in again.');
-      } else if (response.statusCode == 403) {
-        throw Exception('Permission denied. Admin access required.');
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? 'Server error (${response.statusCode})');
+        if (appId != null) {
+          print('✅ App ID saved: $appId');
+        }
+        return result;
       }
-    } catch (e) {
-      if (e is TimeoutException) {
-        throw Exception('Request timed out. Please try again.');
-      }
-      rethrow;
+      
+      throw Exception(result['message'] ?? result['error'] ?? 'Token exchange failed');
+    } else if (response.statusCode == 401) {
+      throw Exception('Authentication failed. Please log in again.');
+    } else if (response.statusCode == 403) {
+      throw Exception('Permission denied. Admin access required.');
+    } else {
+      final errorData = json.decode(response.body);
+      throw Exception(errorData['message'] ?? 'Server error (${response.statusCode})');
     }
+  } catch (e) {
+    if (e is TimeoutException) {
+      throw Exception('Request timed out. Please try again.');
+    }
+    rethrow;
   }
+}
 
- static Future<Map<String, dynamic>> _exchangeTokenViaCloudFunctions(
+static Future<Map<String, dynamic>> _exchangeTokenViaCloudFunctions(
   String shortToken, {
   String? pageId,
-  String? appId, // ✅ NEW
+  String? appId,
 }) async {
   print('📞 Using Cloud Functions SDK...');
   
@@ -194,23 +198,24 @@ static Future<Map<String, dynamic>> exchangeToken(
       'uid': 'facebook_admin',
       'short_token': shortToken,
       if (pageId != null) 'pageId': pageId,
-      if (appId != null) 'appId': appId, // ✅ Include appId if provided
+      if (appId != null) 'appId': appId, // ✅ Include appId
     }).timeout(Duration(seconds: 30));
-      
-      final data = result.data as Map<String, dynamic>;
-      
-      if (data['success'] == true || data['ok'] == true) {
-        print('✅ Token exchanged successfully');
-        return data;
-      }
-      
-      throw Exception(data['message'] ?? data['error'] ?? 'Token exchange failed');
-    } catch (e) {
-      print('❌ Cloud Functions call failed: $e');
-      print('🔄 Falling back to HTTP...');
-      return await _exchangeTokenViaHttp(shortToken, pageId: pageId);
+    
+    final data = result.data as Map<String, dynamic>;
+    
+    if (data['success'] == true || data['ok'] == true) {
+      print('✅ Token exchanged successfully');
+      return data;
     }
+    
+    throw Exception(data['message'] ?? data['error'] ?? 'Token exchange failed');
+  } catch (e) {
+    print('❌ Cloud Functions call failed: $e');
+    print('🔄 Falling back to HTTP...');
+    return await _exchangeTokenViaHttp(shortToken, pageId: pageId, appId: appId);
   }
+}
+
 
   // ============================================================================
   // ✅ NEW: Get Token Status

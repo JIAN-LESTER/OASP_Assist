@@ -510,7 +510,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       DataCollectionItem(
         icon: Icons.account_circle_outlined,
         title: "Profile Information",
-        description: "Name, email, year level, program, affiliation, and scholarship for authentication and user profile.",
+        description: "Name, email, year level, program, affiliation, student ID, LRN, and scholarship for authentication and user profile.",
         color:  Colors.green,
       ),
       DataCollectionItem(

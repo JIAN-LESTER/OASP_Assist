@@ -628,50 +628,7 @@ Widget _buildHeader(
               UploadDocumentButton(formType: 'admission'),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child:
-                isMobile
-                    ? Column(
-                      children: [
-                        // buildStatCard(
-                        //   'Latest Admission Academic Year',
-                        //   '${ad?.latestAdmission}',
-                        //   Colors.blue,
-                        //   Icons.message,
-                        // ),
-                        const SizedBox(height: 12),
-                        buildStatCard(
-                          'Total Admission Documents',
-                          '${ad?.totalAdmission}',
-                          Colors.green,
-                          Icons.check_circle,
-                        ),
-                      ],
-                    )
-                    : Row(
-                      children: [
-                        // Expanded(
-                        //   child: 
-                        //   buildStatCard(
-                        //     'Latest Admission Academic Year',
-                        //     '${ad?.latestAdmission}',
-                        //     Colors.blue,
-                        //     Icons.message,
-                        //   ),
-                        // ),
-                        // const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Total Admission Documents',
-                            '${ad?.totalAdmission}',
-                            Colors.green,
-                            Icons.check_circle,
-                          ),
-                        ),
-                      ],
-                    ),
-          ),
+    const SizedBox(height: 40,),
           isMobile
               ? Column(
                 children: [

@@ -265,19 +265,19 @@ async function exchangeTokenLogic(
     }
 
     const docRef = db.collection("fb_tokens").doc(uid);
-    const saveData = {
-      provider: "facebook",
-      userId: fbUserId,
-      long_token: longToken,
-      short_token: shortToken,
-      expires_at: expiresAt,
-      expires_in: expiresIn || null,
-      pages: pagesObj,
-      pageId: pageId || null,
-      appId: appUsed,
-      updated_at: now,
-      created_at: admin.firestore.FieldValue.serverTimestamp(),
-    };
+   const saveData = {
+  provider: "facebook",
+  userId: fbUserId,
+  long_token: longToken,
+  short_token: shortToken,
+  expires_at: expiresAt,
+  expires_in: expiresIn || null,
+  pages: pagesObj,
+  pageId: pageId || null,
+  appId: appUsed, // ✅ Save the app ID used
+  updated_at: now,
+  created_at: admin.firestore.FieldValue.serverTimestamp(),
+};
     
     console.log(`💾 Saving token data for app: ${appUsed}`);
     await docRef.set(saveData, { merge: true });
