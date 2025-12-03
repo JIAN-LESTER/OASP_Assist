@@ -135,7 +135,7 @@ class _AddFaqContentState extends State<AddFaqContent> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _questionController = TextEditingController();
   final TextEditingController _answerController = TextEditingController();
-  String _selectedCategory = 'General';
+  String _selectedCategory = 'Admission';
   bool _isSubmitting = false;
 
   final String _cohereApiKey = "IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
@@ -178,12 +178,7 @@ class _AddFaqContentState extends State<AddFaqContent> {
     }
   }
 
-  final List<String> _categories = [
-    'Admission',
-    'Scholarship',
-    'Placement',
-    'General',
-  ];
+  final List<String> _categories = ['Admission', 'Scholarship', 'Placement'];
 
   @override
   void dispose() {
