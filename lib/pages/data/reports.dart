@@ -381,15 +381,7 @@ class FirebaseService {
     };
   }
 
-  DateTime _getStartOfWeek(DateTime date) {
-    final daysFromMonday = date.weekday - 1;
-    return DateTime(
-      date.year,
-      date.month,
-      date.day,
-    ).subtract(Duration(days: daysFromMonday));
-  }
-
+  
   InquiryReportsData _processInquiryReportsData({
     required List<QueryDocumentSnapshot> messages,
     required List<QueryDocumentSnapshot> faqs,
@@ -469,12 +461,11 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
   required DateTime startDate,
   required String timeFrame,
 }) {
-  // ✅ FIX 1: Process sessions with better error handling
+  // Process sessions
   double totalSessionDuration = 0;
   int completedSessionsCount = 0;
   final userSessionCounts = <String, int>{};
 
-  // Track UNIQUE users by year/program who have active sessions
   final uniqueUsersByYear = <String, Set<String>>{};
   final uniqueUsersByProgram = <String, Set<String>>{};
 
@@ -485,7 +476,6 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
     final endedAt = data['endedAt'] as Timestamp?;
     final status = data['status'] as String? ?? 'unknown';
 
-    // Get user info from cached lookup
     final userInfo = userLookup[userId];
     if (userInfo != null) {
       final year = userInfo['year'] ?? 'N/A';
@@ -498,24 +488,18 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
       uniqueUsersByProgram[program]!.add(userId);
     }
 
-    // ✅ FIX 2: Better session duration calculation
     if (createdAt != null && endedAt != null && status == 'ended') {
       final duration = endedAt.toDate().difference(createdAt.toDate());
       
-      // Only count reasonable session durations (between 10 seconds and 2 hours)
       if (duration.inSeconds >= 10 && duration.inSeconds <= 7200) {
         totalSessionDuration += duration.inSeconds.toDouble();
         completedSessionsCount++;
-        print('✅ Valid session: ${duration.inSeconds}s');
-      } else {
-        print('⚠️ Skipped invalid session duration: ${duration.inSeconds}s');
       }
     }
 
     userSessionCounts[userId] = (userSessionCounts[userId] ?? 0) + 1;
   }
 
-  // Convert sets to counts
   final sessionYearCounts = <String, int>{};
   uniqueUsersByYear.forEach((year, userIds) {
     sessionYearCounts[year] = userIds.length;
@@ -531,22 +515,15 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
           ? totalSessionDuration / completedSessionsCount
           : 0.0;
 
-  print('📊 Session Stats:');
-  print('   Total sessions: ${sessions.length}');
-  print('   Completed sessions: $completedSessionsCount');
-  print('   Average session length: ${averageSessionLength.toStringAsFixed(2)}s');
-
   final averageMessagesPerUser =
       userSessionCounts.isNotEmpty
           ? sessions.length / userSessionCounts.length.toDouble()
           : 0.0;
 
-  // ✅ FIX 3: Enhanced response time calculation
+  // ✅ FIXED: Response time in SECONDS with proper date grouping
   double totalResponseTime = 0;
   int responseTimeCount = 0;
   final responseTimeByDate = <String, List<double>>{};
-
-  print('📊 Processing ${messages.length} messages for response time');
 
   for (final doc in messages) {
     final data = doc.data() as Map<String, dynamic>;
@@ -554,23 +531,17 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
     final sentAt = data['sent_at'] as Timestamp?;
 
     if (responseTimeMs != null && responseTimeMs is num && responseTimeMs > 0) {
-      final responseTimeSeconds = responseTimeMs.toDouble() / 1000;
+      final responseTimeSeconds = responseTimeMs.toDouble() / 1000; // Convert to seconds
       
-      // ✅ Only count reasonable response times (between 0.1s and 60s)
       if (responseTimeSeconds >= 0.1 && responseTimeSeconds <= 60) {
         totalResponseTime += responseTimeSeconds;
         responseTimeCount++;
         
-        // Group by date for trend
         if (sentAt != null) {
           final dateKey = _getDateKey(sentAt.toDate(), timeFrame);
           responseTimeByDate.putIfAbsent(dateKey, () => []);
           responseTimeByDate[dateKey]!.add(responseTimeSeconds);
         }
-        
-        print('   ✅ Valid response time: ${responseTimeSeconds.toStringAsFixed(2)}s');
-      } else {
-        print('   ⚠️ Skipped outlier: ${responseTimeSeconds.toStringAsFixed(2)}s');
       }
     }
   }
@@ -578,35 +549,29 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
   final averageResponseTime =
       responseTimeCount > 0 ? totalResponseTime / responseTimeCount : 0.0;
 
-  print('📈 Response Time Summary:');
-  print('   Valid messages: $responseTimeCount / ${messages.length}');
-  print('   Average: ${averageResponseTime.toStringAsFixed(2)}s');
-  print('   Total: ${totalResponseTime.toStringAsFixed(2)}s');
-
-  // ✅ FIX 4: Build response time trend data
+  // ✅ FIXED: Build complete response time trend with all dates
   final responseTimeTrend = _buildResponseTimeTrend(
     responseTimeByDate,
     timeFrame,
     startDate,
   );
 
-  return ChatbotUsageReportsData(
+   return ChatbotUsageReportsData(
     totalSessions: sessions.length,
-    averageResponseTime: averageResponseTime, // ✅ Now correctly calculated
+    averageResponseTime: averageResponseTime,
     averageMessagesPerUser: averageMessagesPerUser,
-    averageSessionLength: averageSessionLength, // ✅ Now correctly calculated
+    averageSessionLength: averageSessionLength,
     usageTrendByTimeOfDay: _generateHourlyUsageTrend(sessions) ?? [],
+    
+    // ✅ THIS IS WHAT YOU SHOULD USE FOR THE CHART:
     dailySessions: _generateDailySessionTrend(sessions, timeFrame) ?? [],
+    
     weeklySessions: _generateWeeklySessionTrend(sessions, timeFrame) ?? [],
     monthlySessions: _generateMonthlySessionTrend(sessions, timeFrame) ?? [],
     responseTimeTrend: responseTimeTrend,
     peakUsageByHour: _generatePeakUsageByHour(sessions),
-    usersByYearLevel:
-        sessionYearCounts.isNotEmpty ? sessionYearCounts : <String, int>{},
-    usersByCourse:
-        sessionProgramCounts.isNotEmpty
-            ? sessionProgramCounts
-            : <String, int>{},
+    usersByYearLevel: sessionYearCounts.isNotEmpty ? sessionYearCounts : <String, int>{},
+    usersByCourse: sessionProgramCounts.isNotEmpty ? sessionProgramCounts : <String, int>{},
   );
 }
 
@@ -710,6 +675,14 @@ final affiliationValue = rawAffiliation?.trim();
   }
 }
 
+DateTime _getStartOfWeek(DateTime date) {
+  final daysFromMonday = date.weekday - 1;
+  return DateTime(
+    date.year,
+    date.month,
+    date.day,
+  ).subtract(Duration(days: daysFromMonday));
+}
 Future<Map<String, int>> getQuickStats(String timeFrame) async {
     final startDate = _getStartDate(timeFrame);
 
@@ -756,28 +729,88 @@ List<ChartData> _buildResponseTimeTrend(
     return [];
   }
 
+  final now = DateTime.now();
   final trendData = <ChartData>[];
-  final sortedKeys = responseTimeByDate.keys.toList()..sort();
 
-  for (final key in sortedKeys) {
-    final times = responseTimeByDate[key]!;
-    if (times.isEmpty) continue;
-    
-    // Calculate average for this time period
-    final average = times.reduce((a, b) => a + b) / times.length;
-    
-    // Convert to milliseconds for display (more readable)
-    final averageMs = (average * 1000).round();
-    
-    trendData.add(ChartData(
-      date: key,
-      count: averageMs, // Store as milliseconds
-    ));
-  }
+  switch (timeFrame) {
+    case 'Today':
+      // Generate all 24 hours
+      for (int hour = 0; hour < 24; hour++) {
+        final hourKey = "${hour.toString().padLeft(2, '0')}:00";
+        final times = responseTimeByDate[hourKey] ?? [];
+        
+        if (times.isNotEmpty) {
+          final average = times.reduce((a, b) => a + b) / times.length;
+          trendData.add(ChartData(
+            date: hourKey,
+            count: (average * 100).round(), // Store as centiseconds for precision
+          ));
+        } else {
+          trendData.add(ChartData(date: hourKey, count: 0));
+        }
+      }
+      break;
 
-  print('📈 Response Time Trend: ${trendData.length} data points');
-  for (var data in trendData) {
-    print('   ${data.date}: ${data.count}ms');
+    case 'This Week':
+      // Generate all 7 days of the week with day names
+      final startOfWeek = _getStartOfWeek(now);
+      final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      
+      for (int i = 0; i < 7; i++) {
+        final date = startOfWeek.add(Duration(days: i));
+        final dateKey = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+        final displayKey = dayNames[i]; // Use day name instead of date
+        final times = responseTimeByDate[dateKey] ?? [];
+        
+        if (times.isNotEmpty) {
+          final average = times.reduce((a, b) => a + b) / times.length;
+          trendData.add(ChartData(
+            date: displayKey,
+            count: (average * 100).round(),
+          ));
+        } else {
+          trendData.add(ChartData(date: displayKey, count: 0));
+        }
+      }
+      break;
+
+    case 'This Month':
+      // Generate all weeks of the month
+      for (int week = 1; week <= 5; week++) {
+        final weekKey = "Week $week";
+        final times = responseTimeByDate[weekKey] ?? [];
+        
+        if (times.isNotEmpty) {
+          final average = times.reduce((a, b) => a + b) / times.length;
+          trendData.add(ChartData(
+            date: weekKey,
+            count: (average * 100).round(),
+          ));
+        } else {
+          trendData.add(ChartData(date: weekKey, count: 0));
+        }
+      }
+      break;
+
+    case 'This Year':
+    default:
+      // Generate all 12 months
+      final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      for (int month = 1; month <= 12; month++) {
+        final monthKey = "${now.year}-${month.toString().padLeft(2, '0')}";
+        final times = responseTimeByDate[monthKey] ?? [];
+        
+        if (times.isNotEmpty) {
+          final average = times.reduce((a, b) => a + b) / times.length;
+          trendData.add(ChartData(
+            date: monthNames[month - 1],
+            count: (average * 100).round(),
+          ));
+        } else {
+          trendData.add(ChartData(date: monthNames[month - 1], count: 0));
+        }
+      }
+      break;
   }
 
   return trendData;
@@ -877,93 +910,129 @@ Color getMonthColor(int month) {
     }
   }
 
-  List<ChartData>? _generateDailySessionTrend(
-    List<QueryDocumentSnapshot> sessions,
-    String timeFrame,
-  ) {
-    try {
-      final dailyCounts = <String, int>{};
-      final now = DateTime.now();
+List<ChartData>? _generateDailySessionTrend(
+  List<QueryDocumentSnapshot> sessions,
+  String timeFrame,
+) {
+  try {
+    final now = DateTime.now();
 
-      for (final doc in sessions) {
-        final data = doc.data() as Map<String, dynamic>;
-        final timestamp = data['createdAt'];
-        if (timestamp is Timestamp) {
-          final date = timestamp.toDate();
-          final dateKey =
-              "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-          dailyCounts[dateKey] = (dailyCounts[dateKey] ?? 0) + 1;
-        }
-      }
-
-      switch (timeFrame) {
-        case 'Today':
-          return List.generate(24, (i) {
-            final hour = DateTime(now.year, now.month, now.day, i);
-            final hourKey = "${hour.hour.toString().padLeft(2, '0')}:00";
-            final dayKey =
-                "${hour.year}-${hour.month.toString().padLeft(2, '0')}-${hour.day.toString().padLeft(2, '0')}";
-            return ChartData(date: hourKey, count: dailyCounts[dayKey] ?? 0);
-          });
-
-        case 'This Week':
-          final startOfWeek = _getStartOfWeek(now);
-          return List.generate(7, (i) {
-            final date = startOfWeek.add(Duration(days: i));
-            final dateKey =
-                "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-            return ChartData(
-              date: "${date.day}/${date.month}",
-              count: dailyCounts[dateKey] ?? 0,
-            );
-          });
-
-        case 'This Month':
-          return List.generate(30, (i) {
-            final date = now.subtract(Duration(days: 29 - i));
-            final dateKey =
-                "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-            return ChartData(
-              date: "${date.day}/${date.month}",
-              count: dailyCounts[dateKey] ?? 0,
-            );
-          });
-
-        default:
-          return List.generate(12, (i) {
-            final month = DateTime(now.year, now.month - (11 - i));
-            int monthCount = 0;
-            final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-            for (int day = 1; day <= daysInMonth; day++) {
-              final dayKey =
-                  "${month.year}-${month.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}";
-              monthCount += dailyCounts[dayKey] ?? 0;
+    switch (timeFrame) {
+      case 'Today':
+        // ✅ Show hourly data for today ONLY
+        final hourlyCounts = <int, int>{};
+        
+        for (final doc in sessions) {
+          final data = doc.data() as Map<String, dynamic>;
+          final timestamp = data['createdAt'];
+          if (timestamp is Timestamp) {
+            final date = timestamp.toDate();
+            // CRITICAL: Only count sessions from TODAY
+            if (date.year == now.year && 
+                date.month == now.month && 
+                date.day == now.day) {
+              hourlyCounts[date.hour] = (hourlyCounts[date.hour] ?? 0) + 1;
             }
-            final monthNames = [
-              'Jan',
-              'Feb',
-              'Mar',
-              'Apr',
-              'May',
-              'Jun',
-              'Jul',
-              'Aug',
-              'Sep',
-              'Oct',
-              'Nov',
-              'Dec',
-            ];
-            return ChartData(
-              date: monthNames[month.month - 1],
-              count: monthCount,
-            );
-          });
-      }
-    } catch (e) {
-      print('Error generating daily session trend: $e');
-      return [];
+          }
+        }
+        
+        // Generate all 24 hours
+        return List.generate(24, (hour) {
+          final hourKey = "${hour.toString().padLeft(2, '0')}:00";
+          return ChartData(date: hourKey, count: hourlyCounts[hour] ?? 0);
+        });
+
+      case 'This Week':
+        // ✅ Show daily data for this week ONLY
+        final startOfWeek = _getStartOfWeek(now);
+        final endOfWeek = startOfWeek.add(const Duration(days: 7));
+        final dailyCounts = <int, int>{}; // Use day of week (0-6) as key
+        
+        for (final doc in sessions) {
+          final data = doc.data() as Map<String, dynamic>;
+          final timestamp = data['createdAt'];
+          if (timestamp is Timestamp) {
+            final date = timestamp.toDate();
+            // CRITICAL: Only count sessions from THIS WEEK
+            if (date.isAfter(startOfWeek.subtract(const Duration(seconds: 1))) &&
+                date.isBefore(endOfWeek)) {
+              // Calculate which day of the week (0 = Mon, 6 = Sun)
+              final daysSinceStart = date.difference(startOfWeek).inDays;
+              if (daysSinceStart >= 0 && daysSinceStart < 7) {
+                dailyCounts[daysSinceStart] = (dailyCounts[daysSinceStart] ?? 0) + 1;
+              }
+            }
+          }
+        }
+        
+        // Generate all 7 days with day names
+        final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        return List.generate(7, (i) {
+          return ChartData(
+            date: dayNames[i],
+            count: dailyCounts[i] ?? 0,
+          );
+        });
+
+      case 'This Month':
+        // ✅ Show weekly data for this month ONLY
+        final weeklyCounts = <int, int>{};
+        
+        for (final doc in sessions) {
+          final data = doc.data() as Map<String, dynamic>;
+          final timestamp = data['createdAt'];
+          if (timestamp is Timestamp) {
+            final date = timestamp.toDate();
+            // CRITICAL: Only count sessions from THIS MONTH
+            if (date.year == now.year && date.month == now.month) {
+              final weekOfMonth = ((date.day - 1) ~/ 7) + 1;
+              weeklyCounts[weekOfMonth] = (weeklyCounts[weekOfMonth] ?? 0) + 1;
+            }
+          }
+        }
+        
+        // Generate all 5 possible weeks in a month
+        return List.generate(5, (week) {
+          final weekNumber = week + 1;
+          final weekKey = "Week $weekNumber";
+          return ChartData(date: weekKey, count: weeklyCounts[weekNumber] ?? 0);
+        });
+
+      case 'This Year':
+      default:
+        // ✅ Show monthly data for this year ONLY
+        final monthlyCounts = <int, int>{};
+        final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        
+        for (final doc in sessions) {
+          final data = doc.data() as Map<String, dynamic>;
+          final timestamp = data['createdAt'];
+          if (timestamp is Timestamp) {
+            final date = timestamp.toDate();
+            // CRITICAL: Only count sessions from THIS YEAR
+            if (date.year == now.year) {
+              monthlyCounts[date.month] = (monthlyCounts[date.month] ?? 0) + 1;
+            }
+          }
+        }
+        
+        // Generate all 12 months
+        return List.generate(12, (i) {
+          final month = i + 1;
+          return ChartData(
+            date: monthNames[i],
+            count: monthlyCounts[month] ?? 0,
+          );
+        });
     }
+  } catch (e) {
+    print('Error generating daily session trend: $e');
+    return [];
   }
+}
+
+
 
   List<ChartData>? _generateWeeklySessionTrend(
     List<QueryDocumentSnapshot> sessions,
@@ -1328,6 +1397,22 @@ List<ChartData> _generateYearlyTrend(
       categoryBreakdown: categoryBreakdown,
     );
   });
+}
+
+String _formatChartLabel(String date) {
+  if (date.contains(":")) {
+    int hour = int.tryParse(date.split(":")[0]) ?? 0;
+    if (hour == 0) return "12A";
+    if (hour < 12) return "${hour}A";
+    if (hour == 12) return "12P";
+    return "${hour - 12}P";
+  } else if (date.startsWith("Week")) {
+    return date.replaceAll("Week ", "W");
+  } else if (date.length <= 3) {
+    // If it's already a short label (like "Mon", "Tue", "Jan", "Feb"), return as is
+    return date;
+  }
+  return date;
 }
 
 // Utility functions

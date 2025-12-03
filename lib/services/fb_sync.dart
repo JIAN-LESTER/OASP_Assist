@@ -94,56 +94,61 @@ class FacebookSyncService {
   // ✅ UPDATED: Exchange Token with Page ID
   // ============================================================================
   
-  static Future<Map<String, dynamic>> exchangeToken(
-    String shortToken, {
-    String? pageId, // ✅ NEW: Optional pageId parameter
-  }) async {
-    print('🔄 Exchanging Facebook token...');
-    if (pageId != null) {
-      print('📍 With Page ID: $pageId');
-    }
-    print('📱 Platform: ${_getPlatformName()}');
-    print('🔧 Using: ${_shouldUseHttp ? "HTTP" : "Cloud Functions SDK"}');
-    
-    try {
-      if (_shouldUseHttp) {
-        return await _exchangeTokenViaHttp(shortToken, pageId: pageId);
-      } else {
-        return await _exchangeTokenViaCloudFunctions(shortToken, pageId: pageId);
-      }
-    } catch (e) {
-      print('❌ Token exchange failed: $e');
-      rethrow;
-    }
+static Future<Map<String, dynamic>> exchangeToken(
+  String shortToken, {
+  String? pageId,
+  String? appId, // ✅ NEW: Optional appId parameter
+}) async {
+  print('🔄 Exchanging Facebook token...');
+  if (pageId != null) {
+    print('📍 With Page ID: $pageId');
   }
-
-  static Future<Map<String, dynamic>> _exchangeTokenViaHttp(
-    String shortToken, {
-    String? pageId,
-  }) async {
-    print('📡 Using HTTP endpoint...');
-    
-    final authToken = await _getAuthToken();
-    if (authToken == null) {
-      throw Exception('Not authenticated. Please log in first.');
+  if (appId != null) {
+    print('📱 With App ID: $appId');
+  }
+  print('📱 Platform: ${_getPlatformName()}');
+  print('🔧 Using: ${_shouldUseHttp ? "HTTP" : "Cloud Functions SDK"}');
+  
+  try {
+    if (_shouldUseHttp) {
+      return await _exchangeTokenViaHttp(shortToken, pageId: pageId, appId: appId);
+    } else {
+      return await _exchangeTokenViaCloudFunctions(shortToken, pageId: pageId, appId: appId);
     }
-    
-    try {
-      final response = await http.post(
-        Uri.parse(FbSyncConfig.exchangeTokenUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $authToken',
-        },
-        body: json.encode({
-          'data': {
-            'uid': 'facebook_admin',
-            'short_token': shortToken,
-            if (pageId != null) 'pageId': pageId, // ✅ Include pageId if provided
-          }
-        }),
-      ).timeout(Duration(seconds: 30));
-      
+  } catch (e) {
+    print('❌ Token exchange failed: $e');
+    rethrow;
+  }
+}
+
+ static Future<Map<String, dynamic>> _exchangeTokenViaHttp(
+  String shortToken, {
+  String? pageId,
+  String? appId, // ✅ NEW
+}) async {
+  print('📡 Using HTTP endpoint...');
+  
+  final authToken = await _getAuthToken();
+  if (authToken == null) {
+    throw Exception('Not authenticated. Please log in first.');
+  }
+  
+  try {
+    final response = await http.post(
+      Uri.parse(FbSyncConfig.exchangeTokenUrl),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+      body: json.encode({
+        'data': {
+          'uid': 'facebook_admin',
+          'short_token': shortToken,
+          if (pageId != null) 'pageId': pageId,
+          if (appId != null) 'appId': appId, // ✅ Include appId if provided
+        }
+      }),
+    ).timeout(Duration(seconds: 30));
       print('📦 Response: ${response.statusCode}');
       
       if (response.statusCode == 200) {
@@ -175,20 +180,22 @@ class FacebookSyncService {
     }
   }
 
-  static Future<Map<String, dynamic>> _exchangeTokenViaCloudFunctions(
-    String shortToken, {
-    String? pageId,
-  }) async {
-    print('📞 Using Cloud Functions SDK...');
+ static Future<Map<String, dynamic>> _exchangeTokenViaCloudFunctions(
+  String shortToken, {
+  String? pageId,
+  String? appId, // ✅ NEW
+}) async {
+  print('📞 Using Cloud Functions SDK...');
+  
+  try {
+    final callable = FirebaseFunctions.instance.httpsCallable('exchangeToken');
     
-    try {
-      final callable = FirebaseFunctions.instance.httpsCallable('exchangeToken');
-      
-      final result = await callable.call(<String, dynamic>{
-        'uid': 'facebook_admin',
-        'short_token': shortToken,
-        if (pageId != null) 'pageId': pageId, // ✅ Include pageId if provided
-      }).timeout(Duration(seconds: 30));
+    final result = await callable.call(<String, dynamic>{
+      'uid': 'facebook_admin',
+      'short_token': shortToken,
+      if (pageId != null) 'pageId': pageId,
+      if (appId != null) 'appId': appId, // ✅ Include appId if provided
+    }).timeout(Duration(seconds: 30));
       
       final data = result.data as Map<String, dynamic>;
       

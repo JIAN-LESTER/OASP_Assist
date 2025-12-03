@@ -6,20 +6,34 @@ import 'package:flutter/material.dart';
 // ============================================
 // 🎨 IMPROVED RESPONSE TIME TREND CARD
 // ============================================
+
+import 'package:capstone_project/pages/data/charts.dart';
+import 'package:capstone_project/pages/data/reports.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
+
+// ============================================
+// 🎨 IMPROVED RESPONSE TIME TREND CARD
+// ============================================
 Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
-  // Calculate statistics for better insights
+  // Calculate statistics - values are in centiseconds, convert to seconds
   double avgResponseTime = 0;
   double minResponseTime = double.infinity;
   double maxResponseTime = 0;
   
   if (responseTimeTrend.isNotEmpty) {
+    int validCount = 0;
     for (var data in responseTimeTrend) {
-      final seconds = data.count / 100.0;
-      avgResponseTime += seconds;
-      if (seconds < minResponseTime) minResponseTime = seconds;
-      if (seconds > maxResponseTime) maxResponseTime = seconds;
+      if (data.count > 0) {  // Only count non-zero values
+        final seconds = data.count / 100.0;
+        avgResponseTime += seconds;
+        if (seconds < minResponseTime) minResponseTime = seconds;
+        if (seconds > maxResponseTime) maxResponseTime = seconds;
+        validCount++;
+      }
     }
-    avgResponseTime /= responseTimeTrend.length;
+    avgResponseTime = validCount > 0 ? avgResponseTime / validCount : 0;
+    if (minResponseTime == double.infinity) minResponseTime = 0;
   }
 
   Color getPerformanceColor(double seconds) {
@@ -34,9 +48,6 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-            border: Border(
-        
-      ),
       boxShadow: [
         BoxShadow(
           color: Colors.black.withOpacity(0.06),
@@ -48,7 +59,6 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header with stats
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -76,8 +86,7 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
                 ],
               ),
             ),
-            // Performance indicator
-            if (responseTimeTrend.isNotEmpty)
+            if (avgResponseTime > 0)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -98,7 +107,7 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '${avgResponseTime.toStringAsFixed(2)}s avg',
+                      '${avgResponseTime.toStringAsFixed(1)}s avg',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -111,25 +120,23 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
           ],
         ),
         
-        // Mini stats row
-        if (responseTimeTrend.isNotEmpty) ...[
+        if (avgResponseTime > 0) ...[
           const SizedBox(height: 16),
           Row(
             children: [
-              _buildMiniStat('Min', '${minResponseTime.toStringAsFixed(2)}s', Colors.green),
+              _buildMiniStat('Min', '${minResponseTime.toStringAsFixed(1)}s', Colors.green),
               const SizedBox(width: 16),
-              _buildMiniStat('Max', '${maxResponseTime.toStringAsFixed(2)}s', Colors.red),
+              _buildMiniStat('Max', '${maxResponseTime.toStringAsFixed(1)}s', Colors.red),
               const SizedBox(width: 16),
-              _buildMiniStat('Data Points', '${responseTimeTrend.length}', Colors.blue),
+              _buildMiniStat('Data Points', '${responseTimeTrend.where((d) => d.count > 0).length}', Colors.blue),
             ],
           ),
         ],
         
         const SizedBox(height: 20),
         
-        // Chart
         Expanded(
-          child: responseTimeTrend.isEmpty
+          child: responseTimeTrend.isEmpty || avgResponseTime == 0
               ? _buildEmptyState(
                   icon: Icons.timeline,
                   message: 'No response time data available',
@@ -165,7 +172,7 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
                             reservedSize: 48,
                             interval: _getResponseTimeInterval(responseTimeTrend),
                             getTitlesWidget: (value, meta) {
-                              final seconds = value / 100.0;
+                              final seconds = value / 100.0; // Convert from centiseconds
                               return Container(
                                 padding: const EdgeInsets.only(right: 8),
                                 child: Text(
@@ -191,9 +198,7 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: Text(
-                                    _formatChartLabel(
-                                      responseTimeTrend[value.toInt()].date
-                                    ),
+                                    responseTimeTrend[value.toInt()].date,
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w500,
@@ -223,7 +228,7 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
                       lineTouchData: LineTouchData(
                         enabled: true,
                         touchTooltipData: LineTouchTooltipData(
-                            getTooltipColor: (group) => const Color(0xff1a1a1a),
+                          getTooltipColor: (group) => const Color(0xff1a1a1a),
                           tooltipRoundedRadius: 8,
                           tooltipPadding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -232,7 +237,7 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
                           getTooltipItems: (touchedSpots) {
                             return touchedSpots.map((spot) {
                               final dataPoint = responseTimeTrend[spot.x.toInt()];
-                              final seconds = spot.y / 100.0;
+                              final seconds = spot.y / 100.0; // Convert from centiseconds
                               final color = getPerformanceColor(seconds);
                               
                               return LineTooltipItem(
@@ -244,7 +249,7 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
                                 ),
                                 children: [
                                   TextSpan(
-                                    text: '${seconds.toStringAsFixed(2)}s',
+                                    text: '${seconds.toStringAsFixed(1)}s',
                                     style: TextStyle(
                                       color: color,
                                       fontSize: 14,
@@ -302,11 +307,18 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
                           dotData: FlDotData(
                             show: true,
                             getDotPainter: (spot, percent, barData, index) {
+                              // Only show dots for non-zero values
+                              if (responseTimeTrend[index].count > 0) {
+                                return FlDotCirclePainter(
+                                  radius: 4,
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                  strokeColor: Colors.blue[600]!,
+                                );
+                              }
                               return FlDotCirclePainter(
-                                radius: 4,
-                                color: Colors.white,
-                                strokeWidth: 2,
-                                strokeColor: Colors.blue[600]!,
+                                radius: 0,
+                                color: Colors.transparent,
                               );
                             },
                           ),
@@ -334,8 +346,95 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
   );
 }
 
+
+
+// Helper functions
+Widget _buildMiniStat(String label, String value, Color color) {
+  return Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: color.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildEmptyState({
+  required IconData icon,
+  required String message,
+  required String subtitle,
+}) {
+  return Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            size: 48,
+            color: Colors.grey[400],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          message,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[500],
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    ),
+  );
+}
+
+
+
 // ============================================
-// 🎨 IMPROVED CONVERSATIONS OVER TIME CARD
+// 🎨 FIXED CONVERSATIONS OVER TIME CARD
 // ============================================
 Widget buildConversationsOverTimeCard(
   List<ChartData> conversationTrend,
@@ -365,9 +464,6 @@ Widget buildConversationsOverTimeCard(
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-            border: Border(
-        
-      ),
       boxShadow: [
         BoxShadow(
           color: Colors.black.withOpacity(0.06),
@@ -504,14 +600,15 @@ Widget buildConversationsOverTimeCard(
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
-                            interval: _getBottomTitleInterval(conversationTrend.length),
+                            interval: _getConversationBottomInterval(conversationTrend.length, timeFrame),
                             getTitlesWidget: (value, meta) {
-                              if (value.toInt() < conversationTrend.length) {
-                                final dataPoint = conversationTrend[value.toInt()];
+                              final index = value.toInt();
+                              if (index >= 0 && index < conversationTrend.length) {
+                                final dataPoint = conversationTrend[index];
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 8),
                                   child: Text(
-                                    _formatChartLabel(dataPoint.date),
+                                    dataPoint.date,
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w500,
@@ -541,7 +638,7 @@ Widget buildConversationsOverTimeCard(
                       lineTouchData: LineTouchData(
                         enabled: true,
                         touchTooltipData: LineTouchTooltipData(
-                              getTooltipColor: (group) => const Color(0xff1a1a1a),
+                          getTooltipColor: (group) => const Color(0xff1a1a1a),
                           tooltipRoundedRadius: 8,
                           tooltipPadding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -651,7 +748,63 @@ Widget buildConversationsOverTimeCard(
 }
 
 // ============================================
-// 🎨 IMPROVED PEAK USAGE HOURS CARD
+// 🎨 HELPER FUNCTIONS FOR CONVERSATION CHART
+// ============================================
+
+
+double _getMaxYValue(List<ChartData> data) {
+  if (data.isEmpty) return 10;
+  final maxValue = data.map((e) => e.count).reduce((a, b) => a > b ? a : b);
+  return (maxValue * 1.2).toDouble();
+}
+
+double _getGridInterval(List<ChartData> trendData) {
+  if (trendData.isEmpty) return 1.0;
+  int maxCount = trendData.map((e) => e.count).reduce((a, b) => a > b ? a : b);
+  if (maxCount <= 5) return 1.0;
+  if (maxCount <= 10) return 2.0;
+  if (maxCount <= 25) return 5.0;
+  if (maxCount <= 50) return 10.0;
+  return (maxCount / 5).ceil().toDouble();
+}
+
+// ✅ NEW: Specific interval calculation for conversation bottom titles
+double _getConversationBottomInterval(int dataLength, String timeFrame) {
+  switch (timeFrame) {
+    case 'Today':
+      // Show every 3 hours for 24 hours
+      return dataLength <= 24 ? 3.0 : 4.0;
+    case 'This Week':
+      // Show all 7 days
+      return 1.0;
+    case 'This Month':
+      // Show all weeks
+      return 1.0;
+    case 'This Year':
+      // Show every other month or all months depending on space
+      return dataLength <= 12 ? 1.0 : 2.0;
+    default:
+      if (dataLength <= 7) return 1.0;
+      if (dataLength <= 14) return 2.0;
+      return (dataLength / 6).ceil().toDouble();
+  }
+}
+
+String _getTimeFrameDescription(String timeFrame) {
+  switch (timeFrame) {
+    case 'Today':
+      return 'by hour';
+    case 'This Week':
+      return 'by day';
+    case 'This Month':
+      return 'by week';
+    case 'This Year':
+      return 'by month';
+    default:
+      return 'over time';
+  }
+}
+
 // ============================================
 Widget buildPeakUsageHoursCard(Map<int, int> hourlyData) {
   int totalMessages = hourlyData.values.fold(0, (sum, count) => sum + count);
@@ -1462,87 +1615,6 @@ Widget buildUsersByYearLevelCard(
 // 🎨 HELPER FUNCTIONS
 // ============================================
 
-Widget _buildMiniStat(String label, String value, Color color) {
-  return Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Widget _buildEmptyState({
-  required IconData icon,
-  required String message,
-  required String subtitle,
-}) {
-  return Center(
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            size: 48,
-            color: Colors.grey[400],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          message,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[700],
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          subtitle,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[500],
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    ),
-  );
-}
 
 String _formatChartLabel(String date) {
   if (date.contains(":")) {
@@ -1559,6 +1631,34 @@ String _formatChartLabel(String date) {
   return date;
 }
 
+double _getMaxResponseTime(List<ChartData> data) {
+  if (data.isEmpty) return 500;
+  final validData = data.where((d) => d.count > 0).toList();
+  if (validData.isEmpty) return 500;
+  
+  final maxValue = validData.map((e) => e.count).reduce((a, b) => a > b ? a : b);
+  return (maxValue * 1.2).toDouble();
+}
+
+double _getResponseTimeInterval(List<ChartData> data) {
+  if (data.isEmpty) return 100;
+  final validData = data.where((d) => d.count > 0).toList();
+  if (validData.isEmpty) return 100;
+  
+  final maxValue = validData.map((e) => e.count).reduce((a, b) => a > b ? a : b);
+  if (maxValue <= 100) return 20;  // 0.2s intervals
+  if (maxValue <= 200) return 50;  // 0.5s intervals
+  if (maxValue <= 500) return 100; // 1s intervals
+  if (maxValue <= 1000) return 200; // 2s intervals
+  return (maxValue / 5).ceilToDouble();
+}
+
+double _getBottomTitleInterval(int dataLength) {
+  if (dataLength <= 7) return 1.0;
+  if (dataLength <= 14) return 2.0;
+  if (dataLength <= 30) return 5.0;
+  return (dataLength / 6).ceil().toDouble();
+}
 Color _getHeatmapColor(double intensity) {
   if (intensity >= 0.8) return Colors.red[600]!;
   if (intensity >= 0.6) return Colors.orange[600]!;
@@ -1594,56 +1694,5 @@ Color _getYearLevelColor(int index) {
   return colors[index % colors.length];
 }
 
-double _getMaxYValue(List<ChartData> data) {
-  if (data.isEmpty) return 10;
-  final maxValue = data.map((e) => e.count).reduce((a, b) => a > b ? a : b);
-  return (maxValue * 1.2).toDouble();
-}
 
-double _getGridInterval(List<ChartData> trendData) {
-  if (trendData.isEmpty) return 1.0;
-  int maxCount = trendData.map((e) => e.count).reduce((a, b) => a > b ? a : b);
-  if (maxCount <= 5) return 1.0;
-  if (maxCount <= 10) return 2.0;
-  if (maxCount <= 25) return 5.0;
-  if (maxCount <= 50) return 10.0;
-  return (maxCount / 5).ceil().toDouble();
-}
 
-double _getBottomTitleInterval(int dataLength) {
-  if (dataLength <= 7) return 1.0;
-  if (dataLength <= 14) return 2.0;
-  if (dataLength <= 30) return 5.0;
-  return (dataLength / 6).ceil().toDouble();
-}
-
-String _getTimeFrameDescription(String timeFrame) {
-  switch (timeFrame) {
-    case 'Today':
-      return 'by hour';
-    case 'This Week':
-      return 'by day';
-    case 'This Month':
-      return 'by week';
-    case 'This Year':
-      return 'by month';
-    default:
-      return 'over time';
-  }
-}
-
-double _getMaxResponseTime(List<ChartData> data) {
-  if (data.isEmpty) return 500;
-  final maxValue = data.map((e) => e.count).reduce((a, b) => a > b ? a : b);
-  return (maxValue * 1.2).toDouble();
-}
-
-double _getResponseTimeInterval(List<ChartData> data) {
-  if (data.isEmpty) return 100;
-  final maxValue = data.map((e) => e.count).reduce((a, b) => a > b ? a : b);
-  if (maxValue <= 100) return 20;
-  if (maxValue <= 200) return 50;
-  if (maxValue <= 500) return 100;
-  if (maxValue <= 1000) return 200;
-  return (maxValue / 5).ceilToDouble();
-}

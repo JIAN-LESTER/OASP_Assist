@@ -990,26 +990,10 @@ List<Widget> buildChatbotUsageReport(
   String timeFrame, {
   bool isMobile = false,
 }) {
-  List<ChartData> getConversationTrendData() {
-    if (data == null) return <ChartData>[];
+  // ✅ FIXED: Always use dailySessions (it adapts to timeFrame)
+  final conversationTrend = data?.dailySessions ?? <ChartData>[];
 
-    switch (timeFrame) {
-      case 'Today':
-        return data.dailySessions ?? <ChartData>[];
-      case 'This Week':
-        return data.weeklySessions ?? <ChartData>[];
-      case 'This Month':
-        return data.monthlySessions ?? <ChartData>[];
-      case 'This Year':
-        return data.monthlySessions ?? <ChartData>[];
-      default:
-        return data.dailySessions ?? <ChartData>[];
-    }
-  }
-
-  final conversationTrend = getConversationTrendData();
-
-  //  Format response time display
+  // Format response time display
   String formatResponseTime(double seconds) {
     if (seconds == 0) return 'N/A';
 
@@ -1022,7 +1006,7 @@ List<Widget> buildChatbotUsageReport(
     }
   }
 
-  //  Format session length display
+  // Format session length display
   String formatSessionLength(double seconds) {
     if (seconds == 0) return 'N/A';
 

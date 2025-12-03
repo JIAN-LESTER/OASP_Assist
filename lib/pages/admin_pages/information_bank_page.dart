@@ -54,7 +54,9 @@ class _InformationBankPageState extends State<InformationBankPage> {
     super.initState();
     _searchController.addListener(_onSearchChanged);
 
+    // ✅ Initialize the stream once
 
+    // ✅ Load stats asynchronously without blocking UI
     _loadStatsAsync();
   }
 
@@ -711,6 +713,8 @@ Widget _buildIBList({
     startIndex >= filtered.length ? 0 : endIndex,
   );
 
+
+
   return Column(
     children: [
       Expanded(
@@ -732,6 +736,7 @@ Widget _buildIBList({
                     final String formattedDate = DateFormat(
                       "MMMM d, yyyy 'at' hh:mm a",
                     ).format(date);
+                    final contentStr = data['content'] as String;
 
                     return Padding(
                       key: ValueKey(doc.id),
@@ -742,9 +747,9 @@ Widget _buildIBList({
                         title: data['ib_title'] ?? 'N/A',
                         source: data['source'] ?? 'N/A',
                         category: data['category'] ?? 'General',
-                        content: cleanPdfContent(
-                          (data['content'] as String).substring(0, 120),
-                        ), // ✅ Clean first
+            content: cleanPdfContent(
+  contentStr.length > 50 ? "${contentStr.substring(0, 50)}..." : contentStr,
+),
                       ),
                     );
                   },

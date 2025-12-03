@@ -36,7 +36,6 @@ export {
 
 // Facebook Token Management Functions
 export {
-  refreshTokensDaily,
   exchangeToken,
   exchangeTokenHttp,
 

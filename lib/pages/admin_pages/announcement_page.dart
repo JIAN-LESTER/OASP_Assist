@@ -336,6 +336,7 @@ Future<void> _checkTokenStatus() async {
 Future<void> _showTokenInputModal() async {
   final TextEditingController tokenController = TextEditingController();
   final TextEditingController pageIdController = TextEditingController();
+  final TextEditingController appIdController = TextEditingController(); // ✅ NEW
   bool isExchanging = false;
 
   // Load existing Page ID if available
@@ -528,11 +529,12 @@ Future<void> _showTokenInputModal() async {
                                   '6',
                                   'Generate and copy your Access Token',
                                 ),
-                                const SizedBox(height: 12),
-                                _buildInstructionStep(
-                                  '7',
-                                  'Get your Page ID: Go to your Facebook Page → About → Page transparency → Page ID',
-                                ),
+                               const SizedBox(height: 12),
+_buildInstructionStep(
+  '7',
+  'Page ID: Go to your Facebook Page → About → Page transparency → Page ID. App ID: Find it in your Facebook App dashboard (optional but recommended).',
+),
+                                
                                 const SizedBox(height: 16),
 
                                 // Required Permissions
@@ -583,6 +585,61 @@ Future<void> _showTokenInputModal() async {
                           ),
 
                           const SizedBox(height: 20),
+                          const SizedBox(height: 20),
+
+// ✅ NEW: App ID Input Section
+Text(
+  'FACEBOOK APP ID',
+  style: TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    color: Colors.grey[500],
+    letterSpacing: 0.5,
+  ),
+),
+const SizedBox(height: 12),
+
+TextField(
+  controller: appIdController,
+  enabled: !isExchanging,
+  keyboardType: TextInputType.number,
+  style: const TextStyle(fontSize: 14),
+  decoration: InputDecoration(
+    hintText: 'Enter your Facebook App ID (optional)',
+    hintStyle: TextStyle(
+      color: Colors.grey[400],
+      fontSize: 14,
+    ),
+    prefixIcon: Icon(
+      Icons.apps,
+      color: Colors.grey[600],
+    ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(
+        color: Colors.grey[300]!,
+      ),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(
+        color: Colors.grey[300]!,
+      ),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(
+        color: Color(0xFF2E7D32),
+        width: 2,
+      ),
+    ),
+    filled: true,
+    fillColor: Colors.grey[50],
+    contentPadding: const EdgeInsets.all(16),
+  ),
+),
+
+const SizedBox(height: 20),
 
                           // ✅ Page ID Input Section
                           Text(
@@ -765,95 +822,116 @@ Future<void> _showTokenInputModal() async {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: ElevatedButton.icon(
-                                  onPressed: isExchanging
-                                      ? null
-                                      : () async {
-                                          final token = tokenController.text.trim();
-                                          final pageId = pageIdController.text.trim();
+                             onPressed: isExchanging
+    ? null
+    : () async {
+        final token = tokenController.text.trim();
+        final pageId = pageIdController.text.trim();
+        final appId = appIdController.text.trim(); // ✅ NEW
 
-                                          // ✅ Validate Page ID
-                                          if (pageId.isEmpty) {
-                                            SnackbarUtil.showError(
-                                              context,
-                                              'Please enter your Facebook Page ID',
-                                            );
-                                            return;
-                                          }
+        // ✅ Validate Page ID
+        if (pageId.isEmpty) {
+          SnackbarUtil.showError(
+            context,
+            'Please enter your Facebook Page ID',
+          );
+          return;
+        }
 
-                                          if (!RegExp(r'^\d+$').hasMatch(pageId)) {
-                                            SnackbarUtil.showError(
-                                              context,
-                                              'Page ID should only contain numbers',
-                                            );
-                                            return;
-                                          }
+        if (!RegExp(r'^\d+$').hasMatch(pageId)) {
+          SnackbarUtil.showError(
+            context,
+            'Page ID should only contain numbers',
+          );
+          return;
+        }
 
-                                          if (token.isEmpty) {
-                                            SnackbarUtil.showError(
-                                              context,
-                                              'Please enter a token',
-                                            );
-                                            return;
-                                          }
+        // ✅ Validate App ID if provided
+        if (appId.isNotEmpty && !RegExp(r'^\d+$').hasMatch(appId)) {
+          SnackbarUtil.showError(
+            context,
+            'App ID should only contain numbers',
+          );
+          return;
+        }
 
-                                          if (token.length < 50) {
-                                            SnackbarUtil.showError(
-                                              context,
-                                              'Token seems too short',
-                                            );
-                                            return;
-                                          }
+        if (token.isEmpty) {
+          SnackbarUtil.showError(
+            context,
+            'Please enter a token',
+          );
+          return;
+        }
 
-                                          setDialogState(() => isExchanging = true);
+        if (token.length < 50) {
+          SnackbarUtil.showError(
+            context,
+            'Token seems too short',
+          );
+          return;
+        }
 
-                                          try {
-                                            print('🔄 Exchanging token with Page ID: $pageId');
-                                            
-                                            // ✅ Pass Page ID to exchangeToken
-                                            final result = await FacebookSyncService.exchangeToken(
-                                              token,
-                                              pageId: pageId,
-                                            );
+        setDialogState(() => isExchanging = true);
 
-                                            if (!context.mounted) return;
+        try {
+          print('🔄 Exchanging token with Page ID: $pageId');
+          if (appId.isNotEmpty) {
+            print('📱 Using App ID: $appId');
+          }
+          
+          // ✅ Pass both Page ID and App ID to exchangeToken
+          final result = await FacebookSyncService.exchangeToken(
+            token,
+            pageId: pageId,
+            appId: appId.isNotEmpty ? appId : null, // ✅ NEW
+          );
 
-                                            if (result['success'] == true || result['ok'] == true) {
-                                              final expiresIn = result['expires_in'] ?? 0;
-                                              final daysValid = (expiresIn / 86400).round();
+          if (!context.mounted) return;
 
-                                              // ✅ Hide any existing banners
-                                              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+          if (result['success'] == true || result['ok'] == true) {
+            final expiresIn = result['expires_in'] ?? 0;
+            final daysValid = (expiresIn / 86400).round();
+            final appUsed = result['appId'] ?? appId; // ✅ Get which app was used
 
-                                              Navigator.pop(context);
-                                              SnackbarUtil.showSuccess(
-                                                context,
-                                                'Token and Page ID saved! Valid for ~$daysValid days.',
-                                              );
-                                              
-                                              // ✅ Refresh token status
-                                              await _checkTokenStatus();
-                                              
-                                              await _autoSyncAfterTokenSave();
-                                              return;
-                                            }
+            // ✅ Hide any existing banners
+            ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
 
-                                            throw Exception(
-                                              result['message'] ?? result['error'],
-                                            );
-                                          } catch (e) {
-                                            print('❌ Error: $e');
+            Navigator.pop(context);
+            
+            String successMessage = 'Token and Page ID saved! Valid for ~$daysValid days.';
+            if (appUsed != null && appUsed.isNotEmpty) {
+              successMessage += '\nUsing App ID: $appUsed';
+            }
+            
+            SnackbarUtil.showSuccess(
+              context,
+              successMessage,
+            );
+            
+            // ✅ Refresh token status
+            await _checkTokenStatus();
+            
+            await _autoSyncAfterTokenSave();
+            return;
+          }
 
-                                            if (!context.mounted) return;
+          throw Exception(
+            result['message'] ?? result['error'],
+          );
+        } catch (e) {
+          print('❌ Error: $e');
 
-                                            setDialogState(() => isExchanging = false);
-                                            final errorMessage =
-                                                FacebookSyncService.parseErrorMessage(e);
-                                            SnackbarUtil.showError(
-                                              context,
-                                              'Failed to save: $errorMessage',
-                                            );
-                                          }
-                                        },
+          if (!context.mounted) return;
+
+          setDialogState(() => isExchanging = false);
+          final errorMessage =
+              FacebookSyncService.parseErrorMessage(e);
+          SnackbarUtil.showError(
+            context,
+            'Failed to save: $errorMessage',
+          );
+        }
+      },
                                   icon: isExchanging
                                       ? const SizedBox(
                                           width: 20,
