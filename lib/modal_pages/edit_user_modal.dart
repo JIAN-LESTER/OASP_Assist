@@ -68,14 +68,14 @@ class EditUserModal extends StatefulWidget {
 
 class _EditUserModalState extends State<EditUserModal> {
   final _formKey = GlobalKey<FormState>();
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  final _studentIdController = TextEditingController();
-  final _lrnController = TextEditingController();
-  final _customScholarshipController = TextEditingController();
+  late final TextEditingController _firstNameController;
+  late final TextEditingController _lastNameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
+  late final TextEditingController _confirmPasswordController;
+  late final TextEditingController _studentIdController;
+  late final TextEditingController _lrnController;
+  late final TextEditingController _customScholarshipController;
 
   String _selectedRole = 'User';
   String _selectedYear = 'N/A';
@@ -209,76 +209,85 @@ class _EditUserModalState extends State<EditUserModal> {
     return ['N/A', ..._masteralPrograms];
   }
 
+  Future<bool> _isStudentIdUnique(
+    String studentId, {
+    String? excludeUserId,
+  }) async {
+    try {
+      final query =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('studentId', isEqualTo: studentId.trim())
+              .get();
 
-Future<bool> _isStudentIdUnique(String studentId, {String? excludeUserId}) async {
-  try {
-    final query = await FirebaseFirestore.instance
-        .collection('users')
-        .where('studentId', isEqualTo: studentId.trim())
-        .get();
+      if (query.docs.isEmpty) return true;
 
-    if (query.docs.isEmpty) return true;
-    
-    // If excluding a user (for edit), check if the only match is that user
-    if (excludeUserId != null) {
-      return query.docs.every((doc) => doc.id == excludeUserId);
+      // If excluding a user (for edit), check if the only match is that user
+      if (excludeUserId != null) {
+        return query.docs.every((doc) => doc.id == excludeUserId);
+      }
+
+      return false;
+    } catch (e) {
+      print('Error checking student ID uniqueness: $e');
+      return false;
     }
-    
-    return false;
-  } catch (e) {
-    print('Error checking student ID uniqueness: $e');
-    return false;
   }
-}
 
-Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
-  try {
-    final query = await FirebaseFirestore.instance
-        .collection('users')
-        .where('lrn', isEqualTo: lrn.trim())
-        .get();
+  Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
+    try {
+      final query =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('lrn', isEqualTo: lrn.trim())
+              .get();
 
-    if (query.docs.isEmpty) return true;
-    
-    // If excluding a user (for edit), check if the only match is that user
-    if (excludeUserId != null) {
-      return query.docs.every((doc) => doc.id == excludeUserId);
+      if (query.docs.isEmpty) return true;
+
+      // If excluding a user (for edit), check if the only match is that user
+      if (excludeUserId != null) {
+        return query.docs.every((doc) => doc.id == excludeUserId);
+      }
+
+      return false;
+    } catch (e) {
+      print('Error checking LRN uniqueness: $e');
+      return false;
     }
-    
-    return false;
-  } catch (e) {
-    print('Error checking LRN uniqueness: $e');
-    return false;
   }
-}
-  late TextEditingController firstNameController;
-  late TextEditingController lastNameController;
-  late TextEditingController emailController;
-  final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController =
-      TextEditingController();
 
-  late String selectedRole;
-  late String selectedYear;
-  late String selectedProgram;
+  // late String selectedRole;
+  // late String selectedYear;
+  // late String selectedProgram;
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize controllers first
+    _firstNameController = TextEditingController();
+    _lastNameController = TextEditingController();
+    _emailController = TextEditingController();
+    _passwordController = TextEditingController();
+    _confirmPasswordController = TextEditingController();
+    _studentIdController = TextEditingController();
+    _lrnController = TextEditingController();
+    _customScholarshipController = TextEditingController();
+
     final userData = widget.userDoc.data() as Map<String, dynamic>;
 
     final fullName = userData['name']?.toString().split(' ') ?? [''];
-    firstNameController = TextEditingController(
-      text: fullName.isNotEmpty ? fullName.first : '',
-    );
-    lastNameController = TextEditingController(
-      text: fullName.length > 1 ? fullName.sublist(1).join(' ') : '',
-    );
-    emailController = TextEditingController(text: userData['email'] ?? '');
 
-    selectedRole = userData['role'] ?? 'user';
-    selectedYear = userData['year'] ?? '1st Year';
-    selectedProgram = userData['program'] ?? 'N/A';
+    // Now set the text values
+    _firstNameController.text = fullName.isNotEmpty ? fullName.first : '';
+    _lastNameController.text =
+        fullName.length > 1 ? fullName.sublist(1).join(' ') : '';
+    _emailController.text = userData['email'] ?? '';
+
+    // Use the correct state variables (with underscore)
+    _selectedRole = getDisplayRole(userData['role'] ?? 'user');
+    _selectedYear = userData['year'] ?? 'N/A';
+    _selectedProgram = userData['program'] ?? 'N/A';
     _selectedAffiliation = userData['affiliation'] ?? 'N/A';
     _selectedScholarship = userData['scholarship'] ?? 'N/A';
     _selectedServiceUnit = userData['serviceUnit'] ?? 'N/A';
@@ -291,69 +300,78 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
     _selectedStudentType = userData['studentType'] ?? 'N/A';
     _selectedGraduateType = userData['graduateType'] ?? 'N/A';
     _graduatedCollege = userData['graduatedCollege'] ?? 'N/A';
-    _graduatedCollegeId = userData['graduatedCollegeId'] ?? 'N/A';
+    _graduatedCollegeId = userData['graduatedCollegeId'] ?? '';
     _graduatedProgram = userData['graduatedProgram'] ?? 'N/A';
     _selectedCollege = userData['college'] ?? 'N/A';
-    _selectedCollegeId = userData['collegeId'] ?? 'N/A';
+    _selectedCollegeId = userData['collegeId'] ?? '';
 
     _fetchPrograms();
     _fetchScholarships();
   }
 
   Future<void> _fetchPrograms() async {
-  try {
-    // Load colleges
-    final collegesSnapshot =
-        await FirebaseFirestore.instance.collection('colleges').get();
-    Map<String, String> collegesMap = {};
-    for (var doc in collegesSnapshot.docs) {
-      final name = doc.data()['name']?.toString().trim();
-      if (name != null && name.isNotEmpty) {
-        collegesMap[name] = doc.id;
-      }
-    }
-
-    final programsSnapshot =
-        await FirebaseFirestore.instance.collection('programs').get();
-    List<String> masteralPrograms = [];
-    Map<String, List<String>> programsByCollege = {};
-
-    for (var doc in programsSnapshot.docs) {
-      final programName = doc.data()['name']?.toString().trim();
-      final category = doc.data()['category']?.toString();
-      final collegeId = doc.data()['collegeId']?.toString();
-
-      if (programName == null || programName.isEmpty || category == null)
-        continue;
-
-      // Group masteral programs (no college needed)
-      if (category == "Masteral") {
-        masteralPrograms.add(programName);
-      }
-      
-      // Group bachelor programs by college
-      if (category == "Bachelor" && collegeId != null && collegeId.isNotEmpty) {
-        final key = '${collegeId}_Bachelor';
-        if (!programsByCollege.containsKey(key)) {
-          programsByCollege[key] = [];
+    try {
+      // Load colleges
+      final collegesSnapshot =
+          await FirebaseFirestore.instance.collection('colleges').get();
+      Map<String, String> collegesMap = {};
+      for (var doc in collegesSnapshot.docs) {
+        final name = doc.data()['name']?.toString().trim();
+        if (name != null && name.isNotEmpty) {
+          collegesMap[name] = doc.id;
         }
-        programsByCollege[key]!.add(programName);
       }
-    }
 
-    setState(() {
-      _collegesMap = collegesMap;
-      _masteralPrograms = masteralPrograms;
-      _programsByCollege = programsByCollege;
-      _programs.clear();
-      _programs.add('N/A');
-      isLoadingPrograms = false;
-    });
-  } catch (e) {
-    setState(() => isLoadingPrograms = false);
-    print('Error fetching programs: $e');
+      final programsSnapshot =
+          await FirebaseFirestore.instance.collection('programs').get();
+      List<String> masteralPrograms = [];
+      Map<String, List<String>> programsByCollege = {};
+
+      for (var doc in programsSnapshot.docs) {
+        final programName = doc.data()['name']?.toString().trim();
+        final category = doc.data()['category']?.toString();
+        final collegeId = doc.data()['collegeId']?.toString();
+
+        if (programName == null || programName.isEmpty || category == null)
+          continue;
+
+        // Group masteral programs (no college needed)
+        if (category == "Masteral") {
+          // ✅ FIX: Prevent duplicate masteral programs
+          if (!masteralPrograms.contains(programName)) {
+            masteralPrograms.add(programName);
+          }
+        }
+
+        // Group bachelor programs by college
+        if (category == "Bachelor" &&
+            collegeId != null &&
+            collegeId.isNotEmpty) {
+          final key = '${collegeId}_Bachelor';
+          if (!programsByCollege.containsKey(key)) {
+            programsByCollege[key] = [];
+          }
+          // ✅ FIX: Prevent duplicate bachelor programs
+          if (!programsByCollege[key]!.contains(programName)) {
+            programsByCollege[key]!.add(programName);
+          }
+        }
+      }
+
+      setState(() {
+        _collegesMap = collegesMap;
+        _masteralPrograms = masteralPrograms;
+        _programsByCollege = programsByCollege;
+        _programs.clear();
+        _programs.add('N/A');
+        isLoadingPrograms = false;
+      });
+    } catch (e) {
+      setState(() => isLoadingPrograms = false);
+      print('Error fetching programs: $e');
+    }
   }
-}
+
   Future<void> _fetchScholarships() async {
     try {
       final snapshot =
@@ -362,10 +380,18 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
               .orderBy('name')
               .get();
 
+      // ✅ FIX: Remove duplicates from scholarships
+      final scholarshipNames =
+          snapshot.docs
+              .map((doc) => doc['name'] as String)
+              .where((name) => name.trim().isNotEmpty)
+              .toSet() // Remove duplicates
+              .toList();
+
       setState(() {
         _scholarships.clear();
         _scholarships.add('N/A');
-        _scholarships.addAll(snapshot.docs.map((doc) => doc['name'] as String));
+        _scholarships.addAll(scholarshipNames);
         isLoadingScholarships = false;
 
         if (!_scholarships.contains(_selectedScholarship)) {
@@ -382,13 +408,14 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
 
   @override
   void dispose() {
-    firstNameController.dispose();
-    lastNameController.dispose();
-    emailController.dispose();
-    passwordController.dispose();
-    confirmPasswordController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _studentIdController.dispose();
     _lrnController.dispose();
+    _customScholarshipController.dispose();
     super.dispose();
   }
 
@@ -659,34 +686,33 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
                       ],
 
                       // ========== CMU STUDENT FIELDS ==========
-                    if (shouldShowStudentTypeSelection) ...[
-                      _buildDropdownField(
-                        label: 'Student Type',
-                        value: _selectedStudentType,
-                        items: ['N/A', 'undergraduate', 'graduate'],
+                      if (shouldShowStudentTypeSelection) ...[
+                        _buildDropdownField(
+                          label: 'Student Type',
+                          value: _selectedStudentType,
+                          items: ['N/A', 'undergraduate', 'graduate'],
 
-                        icon: Icons.school_outlined,
-                        isEnabled: true,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedStudentType = value!.toLowerCase();
-                            // Reset dependent fields
-                            _selectedGraduateType = 'N/A';
-                            _selectedYear = 'N/A';
-                            _selectedProgram = 'N/A';
-                            _selectedScholarship = 'N/A';
-                            _selectedCollege = 'N/A';
-                            _selectedCollegeId = '';
-                            _graduatedCollege = 'N/A';
-                            _graduatedCollegeId = '';
-                            _graduatedProgram = 'N/A';
-                            _studentIdController.clear();
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
+                          icon: Icons.school_outlined,
+                          isEnabled: true,
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedStudentType = value!.toLowerCase();
+                              // Reset dependent fields
+                              _selectedGraduateType = 'N/A';
+                              _selectedYear = 'N/A';
+                              _selectedProgram = 'N/A';
+                              _selectedScholarship = 'N/A';
+                              _selectedCollege = 'N/A';
+                              _selectedCollegeId = '';
+                              _graduatedCollege = 'N/A';
+                              _graduatedCollegeId = '';
+                              _graduatedProgram = 'N/A';
+                              _studentIdController.clear();
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
 
                       // ========== UNDERGRADUATE STUDENT FIELDS ==========
                       if (shouldShowUndergraduateFields) ...[
@@ -748,7 +774,6 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
                                     ),
                               ),
                             ),
-                          
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -789,75 +814,87 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
                       ],
 
                       // ========== GRADUATE STUDENT TYPE SELECTION ==========
-                  if (shouldShowGraduateTypeSelection) ...[
-                      _buildDropdownField(
-                        label: 'Graduate Type',
-                        value: _selectedGraduateType,
-                        items: ['N/A', 'masteral', 'not_masteral'],
+                      if (shouldShowGraduateTypeSelection) ...[
+                        _buildDropdownField(
+                          label: 'Graduate Type',
+                          value: _selectedGraduateType,
+                          items: ['N/A', 'masteral', 'not_masteral'],
 
-                        icon: Icons.school_outlined,
-                        isEnabled: true,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedGraduateType = value!
-                                .toLowerCase()
-                                .replaceAll(' ', '_');
-                            // Reset dependent fields
-                            _selectedProgram = 'N/A';
-                            _selectedCollege = 'N/A';
-                            _selectedCollegeId = '';
-                            _graduatedCollege = 'N/A';
-                            _graduatedCollegeId = '';
-                            _graduatedProgram = 'N/A';
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                    ],
+                          icon: Icons.school_outlined,
+                          isEnabled: true,
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedGraduateType = value!
+                                  .toLowerCase()
+                                  .replaceAll(' ', '_');
+                              // Reset dependent fields
+                              _selectedProgram = 'N/A';
+                              _selectedCollege = 'N/A';
+                              _selectedCollegeId = '';
+                              _graduatedCollege = 'N/A';
+                              _graduatedCollegeId = '';
+                              _graduatedProgram = 'N/A';
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
 
                       // ========== MASTERAL GRADUATE FIELDS ==========
                       if (shouldShowMasteralGraduateFields) ...[
-  _buildDropdownField(
-    label: 'Masteral Program',
-    value: _selectedProgram,
-    items: _masteralProgramsList,
-    icon: Icons.class_outlined,
-    isEnabled: true,
-    onChanged: (value) => setState(() => _selectedProgram = value!),
-  ),
-  const SizedBox(height: 16),
-],
+                        _buildDropdownField(
+                          label: 'Masteral Program',
+                          value: _selectedProgram,
+                          items: _masteralProgramsList,
+                          icon: Icons.class_outlined,
+                          isEnabled: true,
+                          onChanged:
+                              (value) =>
+                                  setState(() => _selectedProgram = value!),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
 
                       // ========== NOT MASTERAL GRADUATE FIELDS ==========
-                     if (shouldShowNotMasteralGraduateFields) ...[
-  _buildDropdownField(
-    label: 'Graduated College',
-    value: _graduatedCollege,
-    items: _colleges.keys.toList(),
-    icon: Icons.account_balance_outlined,
-    isEnabled: true,
-    onChanged: (value) {
-      setState(() {
-        _graduatedCollege = value!;
-        _graduatedCollegeId = _colleges[value] ?? '';
-        _graduatedProgram = 'N/A';
-      });
-    },
-  ),
-  const SizedBox(height: 16),
+                      if (shouldShowNotMasteralGraduateFields) ...[
+                        _buildDropdownField(
+                          label: 'Graduated College',
+                          value: _graduatedCollege,
+                          items: _colleges.keys.toList(),
+                          icon: Icons.account_balance_outlined,
+                          isEnabled: true,
+                          onChanged: (value) {
+                            setState(() {
+                              _graduatedCollege = value!;
+                              _graduatedCollegeId = _colleges[value] ?? '';
+                              _graduatedProgram = 'N/A';
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
 
-  _buildDropdownField(
-    label: 'Graduated Program (Bachelor)',
-    value: _graduatedProgram,
-    items: _graduatedCollege != 'N/A' && _graduatedCollegeId.isNotEmpty
-        ? ['N/A', ...(_programsByCollege['${_graduatedCollegeId}_Bachelor'] ?? [])]
-        : ['N/A'],
-    icon: Icons.class_outlined,
-    isEnabled: _graduatedCollege != 'N/A' && _graduatedCollegeId.isNotEmpty,
-    onChanged: (value) => setState(() => _graduatedProgram = value!),
-  ),
-  const SizedBox(height: 16),
-],
+                        _buildDropdownField(
+                          label: 'Graduated Program (Bachelor)',
+                          value: _graduatedProgram,
+                          items:
+                              _graduatedCollege != 'N/A' &&
+                                      _graduatedCollegeId.isNotEmpty
+                                  ? [
+                                    'N/A',
+                                    ...(_programsByCollege['${_graduatedCollegeId}_Bachelor'] ??
+                                        []),
+                                  ]
+                                  : ['N/A'],
+                          icon: Icons.class_outlined,
+                          isEnabled:
+                              _graduatedCollege != 'N/A' &&
+                              _graduatedCollegeId.isNotEmpty,
+                          onChanged:
+                              (value) =>
+                                  setState(() => _graduatedProgram = value!),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       // ========== INCOMING FRESHMAN APPLICANT FIELDS ==========
                       if (shouldShowLRNField) ...[
                         buildTextField(
@@ -953,7 +990,7 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
                       const SizedBox(height: 16),
 
                       buildTextField(
-                        controller: passwordController,
+                        controller: _passwordController,
                         label: 'New Password',
                         hint: 'Enter new password...',
                         icon: Icons.lock_outlined,
@@ -969,7 +1006,7 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
                       const SizedBox(height: 16),
 
                       buildTextField(
-                        controller: confirmPasswordController,
+                        controller: _confirmPasswordController,
                         isMobile: false,
                         label: 'Confirm New Password',
                         hint: 'Confirm new password...',
@@ -1164,410 +1201,421 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
   }
 
   Future<bool> _isEmailUnique(String email, {String? excludeUserId}) async {
-  try {
-    final query = await FirebaseFirestore.instance
-        .collection('users')
-        .where('email', isEqualTo: email.trim().toLowerCase())
-        .get();
+    try {
+      final query =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('email', isEqualTo: email.trim().toLowerCase())
+              .get();
 
-    if (query.docs.isEmpty) return true;
-    
-    if (excludeUserId != null) {
-      return query.docs.every((doc) => doc.id == excludeUserId);
+      if (query.docs.isEmpty) return true;
+
+      if (excludeUserId != null) {
+        return query.docs.every((doc) => doc.id == excludeUserId);
+      }
+
+      return false;
+    } catch (e) {
+      return false;
     }
-    
-    return false;
-  } catch (e) {
-    return false;
-  }
-}
-
-// Updated _saveChanges method with comprehensive validation
-Future<void> _saveChanges() async {
-  if (firstNameController.text.trim().isEmpty) {
-    SnackbarUtil.showWarning(context, 'Please enter first name');
-    return;
   }
 
-  if (lastNameController.text.trim().isEmpty) {
-    SnackbarUtil.showWarning(context, 'Please enter last name');
-    return;
-  }
+  // Updated _saveChanges method with comprehensive validation
+  Future<void> _saveChanges() async {
+    if (_firstNameController.text.trim().isEmpty) {
+      SnackbarUtil.showWarning(context, 'Please enter first name');
+      return;
+    }
 
-  if (emailController.text.trim().isEmpty) {
-    SnackbarUtil.showWarning(context, 'Please enter email address');
-    return;
-  }
+    if (_lastNameController.text.trim().isEmpty) {
+      SnackbarUtil.showWarning(context, 'Please enter last name');
+      return;
+    }
 
-  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-  if (!emailRegex.hasMatch(emailController.text.trim())) {
-    SnackbarUtil.showWarning(context, 'Please enter a valid email address');
-    return;
-  }
+    if (_emailController.text.trim().isEmpty) {
+      SnackbarUtil.showWarning(context, 'Please enter email address');
+      return;
+    }
 
-  // CHECK EMAIL UNIQUENESS (excluding current user)
-  final userData = widget.userDoc.data() as Map<String, dynamic>;
-  final originalEmail = userData['email'] ?? '';
-  final newEmail = emailController.text.trim();
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(_emailController.text.trim())) {
+      SnackbarUtil.showWarning(context, 'Please enter a valid email address');
+      return;
+    }
 
-  if (newEmail != originalEmail) {
-    final isEmailUnique = await _isEmailUnique(
-      newEmail,
-      excludeUserId: widget.userDoc.id,
-    );
-    if (!isEmailUnique) {
-      SnackbarUtil.showWarning(
-        context,
-        'This email is already registered',
+    // CHECK EMAIL UNIQUENESS (excluding current user)
+
+    final userData = widget.userDoc.data() as Map<String, dynamic>;
+    final originalEmail = userData['email'] ?? '';
+    final newEmail = _emailController.text.trim();
+
+    if (newEmail != originalEmail) {
+      final isEmailUnique = await _isEmailUnique(
+        newEmail,
+        excludeUserId: widget.userDoc.id,
       );
-      return;
-    }
-  }
-
-  // Validate password if entered
-  if (passwordController.text.isNotEmpty) {
-    if (passwordController.text.length < 6) {
-      SnackbarUtil.showWarning(
-        context,
-        'Password must be at least 6 characters',
-      );
-      return;
+      if (!isEmailUnique) {
+        SnackbarUtil.showWarning(context, 'This email is already registered');
+        return;
+      }
     }
 
-    if (passwordController.text != confirmPasswordController.text) {
-      SnackbarUtil.showWarning(context, 'Passwords do not match');
-      return;
-    }
-  }
-
-  // Role-specific validations
-  if (selectedRole.toLowerCase() == 'user') {
-    if (_selectedAffiliation == 'N/A') {
-      SnackbarUtil.showWarning(context, 'Please select an affiliation');
-      return;
-    }
-
-    if (_selectedAffiliation.toLowerCase() == 'cmu student') {
-      if (_selectedStudentType == 'N/A') {
-        SnackbarUtil.showWarning(context, 'Please select student type');
+    // Validate password if entered
+    if (_passwordController.text.isNotEmpty) {
+      if (_passwordController.text.length < 6) {
+        SnackbarUtil.showWarning(
+          context,
+          'Password must be at least 6 characters',
+        );
         return;
       }
 
-      if (_selectedStudentType == 'undergraduate') {
-        if (_studentIdController.text.trim().isEmpty) {
-          SnackbarUtil.showWarning(context, 'Please enter student ID');
+      if (_passwordController.text != _confirmPasswordController.text) {
+        SnackbarUtil.showWarning(context, 'Passwords do not match');
+        return;
+      }
+    }
+
+    // Role-specific validations
+    if (_selectedRole.toLowerCase() == 'user') {
+      if (_selectedAffiliation == null || _selectedAffiliation == 'N/A') {
+        SnackbarUtil.showWarning(context, 'Please select an affiliation');
+        return;
+      }
+
+      if (_selectedAffiliation.toLowerCase() == 'cmu student') {
+        if (_selectedStudentType == 'N/A') {
+          SnackbarUtil.showWarning(context, 'Please select student type');
           return;
         }
 
-        final isStudentIdUnique = await _isStudentIdUnique(
-          _studentIdController.text.trim(),
+        if (_selectedStudentType == 'undergraduate') {
+          if (_studentIdController.text.trim().isEmpty ||
+              _studentIdController.text.trim() == 'N/A') {
+            SnackbarUtil.showWarning(context, 'Please enter student ID');
+            return;
+          }
+
+          final isStudentIdUnique = await _isStudentIdUnique(
+            _studentIdController.text.trim(),
+            excludeUserId: widget.userDoc.id,
+          );
+          if (!isStudentIdUnique) {
+            SnackbarUtil.showWarning(
+              context,
+              'This Student ID is already registered',
+            );
+            return;
+          }
+
+          if (_selectedYear == null || _selectedYear == 'N/A') {
+            SnackbarUtil.showWarning(context, 'Please select year level');
+            return;
+          }
+
+          if (_selectedCollege == null || _selectedCollege == 'N/A') {
+            SnackbarUtil.showWarning(context, 'Please select a college');
+            return;
+          }
+
+          if (_selectedProgram == null || _selectedProgram == 'N/A') {
+            SnackbarUtil.showWarning(context, 'Please select a program');
+            return;
+          }
+
+          if (_selectedScholarship == null || _selectedScholarship == 'N/A') {
+            SnackbarUtil.showWarning(
+              context,
+              'Please select a scholarship or choose "Others"',
+            );
+            return;
+          }
+        }
+
+        if (_selectedStudentType == 'graduate') {
+          if (_selectedGraduateType == null || _selectedGraduateType == 'N/A') {
+            SnackbarUtil.showWarning(context, 'Please select graduate type');
+            return;
+          }
+
+          if (_selectedGraduateType == 'masteral') {
+            if (_selectedProgram == null || _selectedProgram == 'N/A') {
+              SnackbarUtil.showWarning(
+                context,
+                'Please select a masteral program',
+              );
+              return;
+            }
+          } else if (_selectedGraduateType == 'not_masteral') {
+            if (_graduatedCollege == null || _graduatedCollege == 'N/A') {
+              SnackbarUtil.showWarning(
+                context,
+                'Please select graduated college',
+              );
+              return;
+            }
+            if (_graduatedProgram == null || _graduatedProgram == 'N/A') {
+              SnackbarUtil.showWarning(
+                context,
+                'Please select graduated program',
+              );
+              return;
+            }
+          }
+        }
+      }
+
+      if (_selectedAffiliation.toLowerCase() == 'incoming freshman applicant') {
+        if (_lrnController.text.trim().isEmpty) {
+          SnackbarUtil.showWarning(context, 'Please enter LRN');
+          return;
+        }
+
+        final isLrnUnique = await _isLRNUnique(
+          _lrnController.text.trim(),
           excludeUserId: widget.userDoc.id,
         );
-        if (!isStudentIdUnique) {
-          SnackbarUtil.showWarning(
+        if (!isLrnUnique) {
+          SnackbarUtil.showWarning(context, 'This LRN is already registered');
+          return;
+        }
+
+        if (_selectedScholarship == null || _selectedScholarship == 'N/A') {
+          SnackbarUtil.showWarning(context, 'Please select a scholarship');
+          return;
+        }
+
+        if (_selectedScholarship == 'Others' &&
+            _customScholarship.trim().isEmpty) {
+          SnackbarUtil.showWarning(context, 'Please specify scholarship name');
+          return;
+        }
+      }
+
+      if (_selectedAffiliation.toLowerCase() == 'masteral (not cmu graduate)') {
+        if (_selectedProgram == null || _selectedProgram == 'N/A') {
+          SnackbarUtil.showWarning(context, 'Please select a masteral program');
+          return;
+        }
+      }
+    }
+
+    if (_selectedRole.toLowerCase() == 'staff') {
+      if (_selectedServiceUnit == null || _selectedServiceUnit == 'N/A') {
+        SnackbarUtil.showWarning(context, 'Please select a service unit');
+        return;
+      }
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final newDisplayName =
+          '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
+
+      // Update email and/or password in Firebase Authentication if changed
+      if (newEmail != originalEmail || _passwordController.text.isNotEmpty) {
+        try {
+          final functionsService = FirebaseFunctionsService();
+          await functionsService.updateUserAuth(
+            uid: widget.userDoc.id,
+            email: newEmail != originalEmail ? newEmail : null,
+            displayName: newDisplayName,
+            password:
+                _passwordController.text.isNotEmpty
+                    ? _passwordController.text.trim()
+                    : null,
+          );
+        } catch (e) {
+          setState(() {
+            _isSubmitting = false;
+          });
+          SnackbarUtil.showError(
             context,
-            'This Student ID is already registered',
+            'Failed to update authentication: ${e.toString()}',
           );
           return;
         }
-
-        if (selectedYear == 'N/A') {
-          SnackbarUtil.showWarning(context, 'Please select year level');
-          return;
-        }
-
-        if (_selectedCollege == 'N/A') {
-          SnackbarUtil.showWarning(context, 'Please select a college');
-          return;
-        }
-
-        if (_selectedProgram == 'N/A') {
-          SnackbarUtil.showWarning(context, 'Please select a program');
-          return;
-        }
       }
 
-      if (_selectedStudentType == 'graduate') {
-        if (_selectedGraduateType == 'N/A') {
-          SnackbarUtil.showWarning(context, 'Please select graduate type');
-          return;
-        }
+      Map<String, dynamic> updateData = {
+        'name': newDisplayName,
+        'email': newEmail,
+        'role': _selectedRole.toLowerCase(),
+        'isActive': isActive,
+        'updatedAt': Timestamp.now(),
+      };
 
-        if (_selectedGraduateType == 'masteral') {
-          if (_selectedProgram == 'N/A') {
-            SnackbarUtil.showWarning(context, 'Please select a masteral program');
-            return;
+      // Add role-specific fields
+      if (_selectedRole.toLowerCase() == 'user') {
+        updateData['affiliation'] = _selectedAffiliation;
+        updateData['isEnrolled'] =
+            _selectedAffiliation.toLowerCase() == 'cmu student';
+
+        if (_selectedAffiliation.toLowerCase() == 'cmu student') {
+          updateData['studentType'] = _selectedStudentType;
+
+          if (_selectedStudentType == 'undergraduate') {
+            updateData['studentId'] = _studentIdController.text.trim();
+            updateData['year'] = _selectedYear;
+            updateData['college'] = _selectedCollege;
+            updateData['collegeId'] = _selectedCollegeId;
+            updateData['program'] = _selectedProgram;
+            updateData['scholarship'] =
+                _selectedScholarship == 'Others'
+                    ? _customScholarship
+                    : (_selectedScholarship != 'N/A'
+                        ? _selectedScholarship
+                        : null);
+            updateData['graduateType'] = null;
+            updateData['graduatedCollege'] = null;
+            updateData['graduatedCollegeId'] = null;
+            updateData['graduatedProgram'] = null;
+            updateData['lrn'] = null;
+          } else if (_selectedStudentType == 'graduate') {
+            updateData['graduateType'] = _selectedGraduateType;
+            updateData['studentId'] = null;
+
+            if (_selectedGraduateType == 'masteral') {
+              updateData['program'] = _selectedProgram;
+              updateData['year'] = 'Graduate';
+              updateData['scholarship'] = null;
+              updateData['college'] = null;
+              updateData['collegeId'] = null;
+              updateData['graduatedCollege'] = null;
+              updateData['graduatedCollegeId'] = null;
+              updateData['graduatedProgram'] = null;
+            } else {
+              updateData['graduatedCollege'] = _graduatedCollege;
+              updateData['graduatedCollegeId'] = _graduatedCollegeId;
+              updateData['graduatedProgram'] = _graduatedProgram;
+              updateData['college'] = null;
+              updateData['collegeId'] = null;
+              updateData['program'] = null;
+              updateData['year'] = null;
+              updateData['scholarship'] = null;
+            }
+            updateData['lrn'] = null;
           }
-        } else if (_selectedGraduateType == 'not_masteral') {
-          if (_graduatedCollege == 'N/A') {
-            SnackbarUtil.showWarning(context, 'Please select graduated college');
-            return;
-          }
-          if (_graduatedProgram == 'N/A') {
-            SnackbarUtil.showWarning(context, 'Please select graduated program');
-            return;
-          }
-        }
-      }
-    }
-
-    if (_selectedAffiliation.toLowerCase() == 'incoming freshman applicant') {
-      if (_lrnController.text.trim().isEmpty) {
-        SnackbarUtil.showWarning(context, 'Please enter LRN');
-        return;
-      }
-
-      final isLrnUnique = await _isLRNUnique(
-        _lrnController.text.trim(),
-        excludeUserId: widget.userDoc.id,
-      );
-      if (!isLrnUnique) {
-        SnackbarUtil.showWarning(
-          context,
-          'This LRN is already registered',
-        );
-        return;
-      }
-
-      if (_selectedScholarship == 'N/A') {
-        SnackbarUtil.showWarning(context, 'Please select a scholarship');
-        return;
-      }
-
-      if (_selectedScholarship == 'Others' &&
-          _customScholarship.trim().isEmpty) {
-        SnackbarUtil.showWarning(
-          context,
-          'Please specify scholarship name',
-        );
-        return;
-      }
-    }
-
-    if (_selectedAffiliation.toLowerCase() == 'masteral (not cmu graduate)') {
-      if (_selectedProgram == 'N/A') {
-        SnackbarUtil.showWarning(context, 'Please select a masteral program');
-        return;
-      }
-    }
-  }
-
-  if (selectedRole.toLowerCase() == 'staff') {
-    if (_selectedServiceUnit == 'N/A') {
-      SnackbarUtil.showWarning(context, 'Please select a service unit');
-      return;
-    }
-  }
-
-  setState(() {
-    _isSubmitting = true;
-  });
-
-  try {
-    final newDisplayName =
-        '${firstNameController.text.trim()} ${lastNameController.text.trim()}';
-
-    // Update email and/or password in Firebase Authentication if changed
-    if (newEmail != originalEmail || passwordController.text.isNotEmpty) {
-      try {
-        final functionsService = FirebaseFunctionsService();
-        await functionsService.updateUserAuth(
-          uid: widget.userDoc.id,
-          email: newEmail != originalEmail ? newEmail : null,
-          displayName: newDisplayName,
-          password:
-              passwordController.text.isNotEmpty
-                  ? passwordController.text.trim()
-                  : null,
-        );
-      } catch (e) {
-        setState(() {
-          _isSubmitting = false;
-        });
-        SnackbarUtil.showError(
-          context,
-          'Failed to update authentication: ${e.toString()}',
-        );
-        return;
-      }
-    }
-
-    Map<String, dynamic> updateData = {
-      'name': newDisplayName,
-      'email': newEmail,
-      'role': selectedRole.toLowerCase(),
-      'isActive': isActive,
-      'updatedAt': Timestamp.now(),
-    };
-
-    // Add role-specific fields
-    if (_selectedRole.toLowerCase() == 'user') {
-      updateData['affiliation'] = _selectedAffiliation;
-      updateData['isEnrolled'] =
-          _selectedAffiliation.toLowerCase() == 'cmu student';
-
-      if (_selectedAffiliation.toLowerCase() == 'cmu student') {
-        updateData['studentType'] = _selectedStudentType;
-
-        if (_selectedStudentType == 'undergraduate') {
-          updateData['studentId'] = _studentIdController.text.trim();
-          updateData['year'] = selectedYear;
-          updateData['college'] = _selectedCollege;
-          updateData['collegeId'] = _selectedCollegeId;
-          updateData['program'] = _selectedProgram;
+        } else if (_selectedAffiliation.toLowerCase() ==
+            'incoming freshman applicant') {
+          updateData['lrn'] = _lrnController.text.trim();
           updateData['scholarship'] =
               _selectedScholarship == 'Others'
                   ? _customScholarship
                   : (_selectedScholarship != 'N/A'
                       ? _selectedScholarship
                       : null);
+          updateData['studentId'] = null;
+          updateData['year'] = null;
+          updateData['college'] = null;
+          updateData['collegeId'] = null;
+          updateData['program'] = null;
+          updateData['studentType'] = null;
           updateData['graduateType'] = null;
           updateData['graduatedCollege'] = null;
           updateData['graduatedCollegeId'] = null;
           updateData['graduatedProgram'] = null;
+        } else if (_selectedAffiliation.toLowerCase() ==
+            'masteral (not cmu graduate)') {
+          updateData['program'] = _selectedProgram;
           updateData['lrn'] = null;
-        } else if (_selectedStudentType == 'graduate') {
-          updateData['graduateType'] = _selectedGraduateType;
+          updateData['scholarship'] = null;
+          updateData['year'] = null;
+          updateData['college'] = null;
+          updateData['collegeId'] = null;
           updateData['studentId'] = null;
-
-          if (_selectedGraduateType == 'masteral') {
-            updateData['program'] = _selectedProgram;
-            updateData['year'] = 'Graduate';
-            updateData['scholarship'] = null;
-            updateData['college'] = null;
-            updateData['collegeId'] = null;
-            updateData['graduatedCollege'] = null;
-            updateData['graduatedCollegeId'] = null;
-            updateData['graduatedProgram'] = null;
-          } else {
-            updateData['graduatedCollege'] = _graduatedCollege;
-            updateData['graduatedCollegeId'] = _graduatedCollegeId;
-            updateData['graduatedProgram'] = _graduatedProgram;
-            updateData['college'] = null;
-            updateData['collegeId'] = null;
-            updateData['program'] = null;
-            updateData['year'] = null;
-            updateData['scholarship'] = null;
-          }
+          updateData['studentType'] = null;
+          updateData['graduateType'] = null;
+          updateData['graduatedCollege'] = null;
+          updateData['graduatedCollegeId'] = null;
+          updateData['graduatedProgram'] = null;
+        } else {
           updateData['lrn'] = null;
+          updateData['scholarship'] = null;
+          updateData['year'] = null;
+          updateData['college'] = null;
+          updateData['collegeId'] = null;
+          updateData['program'] = null;
+          updateData['studentId'] = null;
+          updateData['studentType'] = null;
+          updateData['graduateType'] = null;
+          updateData['graduatedCollege'] = null;
+          updateData['graduatedCollegeId'] = null;
+          updateData['graduatedProgram'] = null;
         }
-      } else if (_selectedAffiliation.toLowerCase() ==
-          'incoming freshman applicant') {
-        updateData['lrn'] = _lrnController.text.trim();
-        updateData['scholarship'] =
-            _selectedScholarship == 'Others'
-                ? _customScholarship
-                : (_selectedScholarship != 'N/A'
-                    ? _selectedScholarship
-                    : null);
-        updateData['studentId'] = null;
-        updateData['year'] = null;
-        updateData['college'] = null;
-        updateData['collegeId'] = null;
-        updateData['program'] = null;
-        updateData['studentType'] = null;
-        updateData['graduateType'] = null;
-        updateData['graduatedCollege'] = null;
-        updateData['graduatedCollegeId'] = null;
-        updateData['graduatedProgram'] = null;
-      } else if (_selectedAffiliation.toLowerCase() ==
-          'masteral (not cmu graduate)') {
-        updateData['program'] = _selectedProgram;
-        updateData['lrn'] = null;
-        updateData['scholarship'] = null;
-        updateData['year'] = null;
-        updateData['college'] = null;
-        updateData['collegeId'] = null;
-        updateData['studentId'] = null;
-        updateData['studentType'] = null;
-        updateData['graduateType'] = null;
-        updateData['graduatedCollege'] = null;
-        updateData['graduatedCollegeId'] = null;
-        updateData['graduatedProgram'] = null;
-      } else {
-        updateData['lrn'] = null;
-        updateData['scholarship'] = null;
-        updateData['year'] = null;
-        updateData['college'] = null;
-        updateData['collegeId'] = null;
-        updateData['program'] = null;
-        updateData['studentId'] = null;
-        updateData['studentType'] = null;
-        updateData['graduateType'] = null;
-        updateData['graduatedCollege'] = null;
-        updateData['graduatedCollegeId'] = null;
-        updateData['graduatedProgram'] = null;
+      } else if (_selectedRole.toLowerCase() == 'staff') {
+        updateData['serviceUnit'] = _selectedServiceUnit;
+        updateData['affiliation'] = FieldValue.delete();
+        updateData['studentId'] = FieldValue.delete();
+        updateData['year'] = FieldValue.delete();
+        updateData['program'] = FieldValue.delete();
+        updateData['scholarship'] = FieldValue.delete();
+        updateData['lrn'] = FieldValue.delete();
+      } else if (_selectedRole.toLowerCase() == 'admin') {
+        updateData['affiliation'] = FieldValue.delete();
+        updateData['studentId'] = FieldValue.delete();
+        updateData['year'] = FieldValue.delete();
+        updateData['program'] = FieldValue.delete();
+        updateData['scholarship'] = FieldValue.delete();
+        updateData['lrn'] = FieldValue.delete();
+        updateData['serviceUnit'] = FieldValue.delete();
       }
-    } else if (selectedRole.toLowerCase() == 'staff') {
-      updateData['serviceUnit'] = _selectedServiceUnit;
-      updateData['affiliation'] = FieldValue.delete();
-      updateData['studentId'] = FieldValue.delete();
-      updateData['year'] = FieldValue.delete();
-      updateData['program'] = FieldValue.delete();
-      updateData['scholarship'] = FieldValue.delete();
-      updateData['lrn'] = FieldValue.delete();
-    } else if (selectedRole.toLowerCase() == 'admin') {
-      updateData['affiliation'] = FieldValue.delete();
-      updateData['studentId'] = FieldValue.delete();
-      updateData['year'] = FieldValue.delete();
-      updateData['program'] = FieldValue.delete();
-      updateData['scholarship'] = FieldValue.delete();
-      updateData['lrn'] = FieldValue.delete();
-      updateData['serviceUnit'] = FieldValue.delete();
-    }
 
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.userDoc.id)
-        .update(updateData);
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userDoc.id)
+          .update(updateData);
 
-    final currentUser = FirebaseAuth.instance.currentUser;
-    String actorName = 'Unknown';
+      final currentUser = FirebaseAuth.instance.currentUser;
+      String actorName = 'Unknown';
 
-    if (currentUser != null) {
-      final doc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(currentUser.uid)
-              .get();
-      if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>;
-        actorName = data['name'] ?? currentUser.email ?? 'Unknown';
-      }
-    }
-
-    final originalName = userData['name'] ?? 'Unknown';
-    final logRef = FirebaseFirestore.instance.collection('logs').doc();
-    final logData = {
-      'logId': logRef.id,
-      'user': actorName,
-      'action': 'Updated User: $originalName to $newDisplayName',
-      'time': Timestamp.now(),
-    };
-    await logRef.set(logData);
-
-    if (mounted) {
-      setState(() {
-        _isSubmitting = false;
-      });
-
-      SnackbarUtil.showSuccess(context, 'User updated successfully');
-
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          Navigator.of(context).pop();
+      if (currentUser != null) {
+        final doc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
+        if (doc.exists) {
+          final data = doc.data() as Map<String, dynamic>;
+          actorName = data['name'] ?? currentUser.email ?? 'Unknown';
         }
-      });
-    }
-  } catch (e) {
-    if (mounted) {
-      setState(() {
-        _isSubmitting = false;
-      });
-      SnackbarUtil.showError(context, 'Failed to update: ${e.toString()}');
+      }
+
+      final originalName = userData['name'] ?? 'Unknown';
+      final logRef = FirebaseFirestore.instance.collection('logs').doc();
+      final logData = {
+        'logId': logRef.id,
+        'user': actorName,
+        'action': 'Updated User: $originalName to $newDisplayName',
+        'time': Timestamp.now(),
+      };
+      await logRef.set(logData);
+
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+
+        SnackbarUtil.showSuccess(context, 'User updated successfully');
+
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+        SnackbarUtil.showError(context, 'Failed to update: ${e.toString()}');
+      }
     }
   }
-}
 
   Widget _buildDropdownField({
     required String label,
@@ -1576,7 +1624,15 @@ Future<void> _saveChanges() async {
     required IconData icon,
     required ValueChanged<String?> onChanged,
     bool isEnabled = true,
+    bool showError = false,
+    String? errorText,
   }) {
+    // ✅ FIX: Remove duplicates and ensure unique items
+    final uniqueItems = items.toSet().toList();
+
+    // ✅ FIX: Ensure value exists in items, otherwise set to null
+    final safeValue = uniqueItems.contains(value) ? value : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1596,7 +1652,10 @@ Future<void> _saveChanges() async {
           decoration: BoxDecoration(
             color: isEnabled ? Colors.white : const Color(0xFFF9FAFB),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+            border: Border.all(
+              color: showError ? Colors.red : const Color(0xFFE5E7EB),
+              width: showError ? 2 : 1.5,
+            ),
             boxShadow:
                 isEnabled
                     ? [
@@ -1610,23 +1669,29 @@ Future<void> _saveChanges() async {
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButtonFormField<String>(
-              value: value,
+              value: safeValue, // ✅ CHANGED: Use safeValue instead of value
               onChanged: isEnabled ? onChanged : null,
               isExpanded: true,
               alignment: Alignment.centerLeft,
               menuMaxHeight: 250,
               items:
-                  items.map((String item) {
+                  uniqueItems.map((String item) {
+                    // ✅ CHANGED: Use uniqueItems instead of items
                     return DropdownMenuItem<String>(
                       value: item,
                       child: Text(
-                        item == 'n/a'
+                        item == 'N/A'
                             ? 'N/A'
                             : item
                                 .replaceAll('_', ' ')
                                 .split(' ')
-                                .map((w) => w[0].toUpperCase() + w.substring(1))
-                                .join(' '), // Capitalize each word
+                                .map(
+                                  (w) =>
+                                      w.isNotEmpty
+                                          ? w[0].toUpperCase() + w.substring(1)
+                                          : '',
+                                )
+                                .join(' '),
                       ),
                     );
                   }).toList(),
@@ -1650,6 +1715,14 @@ Future<void> _saveChanges() async {
             ),
           ),
         ),
+        if (showError && errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 12),
+            child: Text(
+              errorText,
+              style: const TextStyle(fontSize: 12, color: Colors.red),
+            ),
+          ),
       ],
     );
   }

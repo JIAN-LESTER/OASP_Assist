@@ -32,7 +32,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   bool isLoading = true;
   final StatDataManagement statData = StatDataManagement();
 
-    late final Stream<QuerySnapshot> _usersStream;
+  late final Stream<QuerySnapshot> _usersStream;
 
   UserData? user;
 
@@ -40,7 +40,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
- _usersStream = FirebaseFirestore.instance.collection('users').snapshots();
+    _usersStream = FirebaseFirestore.instance.collection('users').snapshots();
     loadStatData();
   }
 
@@ -118,7 +118,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         onItemsPerPageChanged: _changeItemsPerPage,
         onNavigateToPage: widget.onNavigateToPage,
         user: user,
-         usersStream: _usersStream, 
+        usersStream: _usersStream,
       ),
       tabletBody: TabletUserManagement(
         selectedRole: selectedRole,
@@ -130,7 +130,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         onItemsPerPageChanged: _changeItemsPerPage,
         onNavigateToPage: widget.onNavigateToPage,
         user: user,
-         usersStream: _usersStream, 
+        usersStream: _usersStream,
       ),
       desktopBody: DesktopUserManagement(
         selectedRole: selectedRole,
@@ -142,7 +142,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         onItemsPerPageChanged: _changeItemsPerPage,
         onNavigateToPage: widget.onNavigateToPage,
         user: user,
-         usersStream: _usersStream, 
+        usersStream: _usersStream,
       ),
     );
   }
@@ -158,7 +158,7 @@ class DesktopUserManagement extends StatelessWidget {
   final ValueChanged<int> onItemsPerPageChanged;
   final Function(int)? onNavigateToPage;
   final UserData? user;
-    final Stream<QuerySnapshot> usersStream;
+  final Stream<QuerySnapshot> usersStream;
 
   const DesktopUserManagement({
     super.key,
@@ -188,7 +188,7 @@ class DesktopUserManagement extends StatelessWidget {
       onNavigateToPage,
       24.0,
       user,
-      usersStream
+      usersStream,
     );
   }
 }
@@ -203,7 +203,7 @@ class TabletUserManagement extends StatelessWidget {
   final ValueChanged<int> onItemsPerPageChanged;
   final Function(int)? onNavigateToPage;
   final UserData? user;
-    final Stream<QuerySnapshot> usersStream;
+  final Stream<QuerySnapshot> usersStream;
 
   const TabletUserManagement({
     super.key,
@@ -233,7 +233,7 @@ class TabletUserManagement extends StatelessWidget {
       onNavigateToPage,
       20.0,
       user,
-      usersStream
+      usersStream,
     );
   }
 }
@@ -248,7 +248,7 @@ class MobileUserManagement extends StatelessWidget {
   final ValueChanged<int> onItemsPerPageChanged;
   final Function(int)? onNavigateToPage;
   final UserData? user;
-    final Stream<QuerySnapshot> usersStream;
+  final Stream<QuerySnapshot> usersStream;
 
   const MobileUserManagement({
     super.key,
@@ -306,9 +306,7 @@ class MobileUserManagement extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                    
-                        stream:
-                          usersStream,
+                        stream: usersStream,
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -364,7 +362,7 @@ Widget mainContent(
   final Function(int)? onNavigateToPage,
   final double padding,
   final UserData? user,
-    final Stream<QuerySnapshot> usersStream,
+  final Stream<QuerySnapshot> usersStream,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
@@ -402,9 +400,7 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      
-                      stream:
-                         usersStream,
+                      stream: usersStream,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -634,7 +630,7 @@ Widget _buildUserRow({
             ),
           ),
           const SizedBox(width: 12),
-          
+
           // User (Name & Email) - flex: 3
           Expanded(
             flex: 3,
@@ -660,7 +656,7 @@ Widget _buildUserRow({
               ],
             ),
           ),
-          
+
           // Role - flex: 3
           Expanded(
             flex: 3,
@@ -672,9 +668,10 @@ Widget _buildUserRow({
                   vertical: isMobile ? 4 : 6,
                 ),
                 decoration: BoxDecoration(
-                  color: role == 'OASP Admin'
-                      ? Colors.red[700]
-                      : role == 'OASP Staff'
+                  color:
+                      role == 'OASP Admin'
+                          ? Colors.red[700]
+                          : role == 'OASP Staff'
                           ? Colors.orange[700]
                           : Colors.blue[700],
                   borderRadius: BorderRadius.circular(4),
@@ -683,9 +680,10 @@ Widget _buildUserRow({
                   role,
                   style: TextStyle(
                     fontSize: 12,
-                    color: role == 'OASP Admin'
-                        ? Colors.red[50]
-                        : role == 'OASP Staff'
+                    color:
+                        role == 'OASP Admin'
+                            ? Colors.red[50]
+                            : role == 'OASP Staff'
                             ? Colors.orange[50]
                             : Colors.blue[50],
                     fontWeight: FontWeight.w500,
@@ -696,10 +694,9 @@ Widget _buildUserRow({
               ),
             ),
           ),
-          
-          // Year - flex: 3 (desktop only)
-          if (!isMobile)...[
 
+          // Year - flex: 3 (desktop only)
+          if (!isMobile) ...[
             Expanded(
               flex: 3,
               child: Text(
@@ -710,7 +707,7 @@ Widget _buildUserRow({
               ),
             ),
 
-              Expanded(
+            Expanded(
               flex: 4,
               child: Text(
                 program,
@@ -719,10 +716,8 @@ Widget _buildUserRow({
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-     
-          
           ],
-  
+
           // Status - flex: 2
           Expanded(
             flex: 2,
@@ -731,16 +726,18 @@ Widget _buildUserRow({
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: status == 'Active' ? Colors.green[50] : Colors.orange[50],
+                  color:
+                      status == 'Active' ? Colors.green[50] : Colors.orange[50],
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   status,
                   style: TextStyle(
                     fontSize: 12,
-                    color: status == 'Active'
-                        ? Colors.green[700]
-                        : Colors.orange[700],
+                    color:
+                        status == 'Active'
+                            ? Colors.green[700]
+                            : Colors.orange[700],
                     fontWeight: FontWeight.w500,
                   ),
                   maxLines: 1,
@@ -749,10 +746,10 @@ Widget _buildUserRow({
               ),
             ),
           ),
-          
+
           // Menu button spacing
           SizedBox(width: isTablet ? 60 : 60),
-          
+
           // Popup menu
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
@@ -773,35 +770,35 @@ Widget _buildUserRow({
                 );
               }
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, size: 18),
-                    SizedBox(width: 8),
-                    Text('Edit'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete, size: 18, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Delete', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
           ),
         ],
       ),
     ),
   );
 }
-
 
 Widget _buildHeader(
   String selectedRole,
@@ -911,7 +908,6 @@ Widget _buildHeader(
     },
   );
 }
-
 
 Widget _buildTableHeader() {
   return LayoutBuilder(
