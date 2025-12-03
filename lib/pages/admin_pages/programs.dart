@@ -613,7 +613,7 @@ Widget _buildHeader(
               ),
             ],
           ),
-         const SizedBox(height: 40,),
+          const SizedBox(height: 40),
           buildSearchField('Search programs by name', searchController),
         ],
       );
@@ -918,7 +918,7 @@ class ProgramInfoModal extends StatelessWidget {
                       data['name'] ?? 'N/A',
                     ),
                     const SizedBox(height: 8),
-                
+
                     if (collegeId.isNotEmpty)
                       FutureBuilder<DocumentSnapshot>(
                         future:
@@ -973,9 +973,16 @@ class ProgramInfoModal extends StatelessWidget {
                     child: SizedBox(
                       height: 48,
                       child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          showDeleteProgramModal(context, programDoc);
+                        onPressed: () async {
+                          final confirmed = await showDeleteProgramModal(
+                            context,
+                            programDoc,
+                          );
+                          if (confirmed == true && context.mounted) {
+                            Navigator.of(
+                              context,
+                            ).pop(); // Only close details modal if deleted
+                          }
                         },
                         icon: const Icon(Icons.delete_outline, size: 18),
                         label: const Text('Delete'),
@@ -1064,8 +1071,11 @@ class ProgramInfoModal extends StatelessWidget {
 }
 
 // ==================== DELETE PROGRAM MODAL ====================
-void showDeleteProgramModal(BuildContext context, DocumentSnapshot programDoc) {
-  showGeneralDialog(
+Future<bool?> showDeleteProgramModal(
+  BuildContext context,
+  DocumentSnapshot programDoc,
+) {
+  return showGeneralDialog<bool>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Delete Program',
@@ -1099,7 +1109,7 @@ class DeleteProgramModal extends StatefulWidget {
 class _DeleteProgramModalState extends State<DeleteProgramModal> {
   bool _isDeleting = false;
 
-  Future<void> _deleteProgram() async {
+  Future<void> _deleteProgram(BuildContext dialogContext) async {
     setState(() => _isDeleting = true);
     final data = widget.programDoc.data() as Map<String, dynamic>;
 
@@ -1132,7 +1142,9 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
       });
 
       if (mounted) {
-        Navigator.of(context).pop();
+        Navigator.of(
+          dialogContext,
+        ).pop(true); // Return true to indicate success
         SnackbarUtil.showSuccess(context, 'Program deleted successfully!');
       }
     } catch (e) {
@@ -1288,7 +1300,10 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
                         child: SizedBox(
                           height: isMobile ? 40 : 46,
                           child: ElevatedButton(
-                            onPressed: _isDeleting ? null : _deleteProgram,
+                            onPressed:
+                                _isDeleting
+                                    ? null
+                                    : () => _deleteProgram(context),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFEF4444),
                               foregroundColor: Colors.white,
@@ -1392,35 +1407,38 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize controller immediately
     _nameController = TextEditingController();
-    
+
     if (widget.programDoc != null) {
       final data = widget.programDoc!.data() as Map<String, dynamic>;
       final fullName = data['name'] ?? '';
       _selectedCategory = data['category']; // NEW: Load existing category
       _selectedCollegeId = data['collegeId'];
-      
+
       // Load colleges first, then strip prefix
       _loadColleges().then((_) {
         if (!mounted) return;
-        
+
         // NEW: Strip the prefix when editing to show only the user input part
         String nameWithoutPrefix = fullName;
-        
+
         // Check if we should strip the prefix based on college
         bool shouldStripPrefix = true;
-        if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null && _selectedCollegeId!.isNotEmpty) {
+        if (_selectedCategory == 'Bachelor' &&
+            _selectedCollegeId != null &&
+            _selectedCollegeId!.isNotEmpty) {
           try {
             final college = _colleges.firstWhere(
               (c) => c.id == _selectedCollegeId,
             );
             final collegeData = college.data() as Map<String, dynamic>;
             final collegeName = collegeData['name'] ?? '';
-            
+
             // Don't strip prefix for "Others" or "Veterinary Medicine"
-            if (collegeName == 'Others' || collegeName == 'College of Veterinary Medicine') {
+            if (collegeName == 'Others' ||
+                collegeName == 'College of Veterinary Medicine') {
               shouldStripPrefix = false;
             }
           } catch (e) {
@@ -1428,15 +1446,17 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
             shouldStripPrefix = true;
           }
         }
-        
+
         if (shouldStripPrefix) {
-          if (_selectedCategory == 'Bachelor' && fullName.startsWith('Bachelor ')) {
+          if (_selectedCategory == 'Bachelor' &&
+              fullName.startsWith('Bachelor ')) {
             nameWithoutPrefix = fullName.substring('Bachelor '.length);
-          } else if (_selectedCategory == 'Masteral' && fullName.startsWith('Master of ')) {
+          } else if (_selectedCategory == 'Masteral' &&
+              fullName.startsWith('Master of ')) {
             nameWithoutPrefix = fullName.substring('Master of '.length);
           }
         }
-        
+
         setState(() {
           _nameController.text = nameWithoutPrefix;
         });
@@ -1448,10 +1468,11 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
 
   Future<void> _loadColleges() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('colleges')
-          .orderBy('name')
-          .get();
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('colleges')
+              .orderBy('name')
+              .get();
       if (mounted) {
         setState(() {
           _colleges = snapshot.docs;
@@ -1478,17 +1499,15 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null) {
       // Check the college name
       try {
-        final college = _colleges.firstWhere(
-          (c) => c.id == _selectedCollegeId,
-        );
+        final college = _colleges.firstWhere((c) => c.id == _selectedCollegeId);
         final collegeData = college.data() as Map<String, dynamic>;
         final collegeName = collegeData['name'] ?? '';
-        
+
         // If college is "Others" or "Veterinary Medicine", return input as-is
         if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
           return input;
         }
-        
+
         // Otherwise, add "Bachelor " prefix
         return 'Bachelor $input';
       } catch (e) {
@@ -1548,16 +1567,19 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
             .update(programData);
       } else {
         programData['created_at'] = Timestamp.now();
-        await FirebaseFirestore.instance.collection('programs').add(programData);
+        await FirebaseFirestore.instance
+            .collection('programs')
+            .add(programData);
       }
 
       final currentUser = FirebaseAuth.instance.currentUser;
       String actorName = 'Unknown';
       if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
         if (userDoc.exists) {
           final userData = userDoc.data() as Map<String, dynamic>;
           actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
@@ -1602,7 +1624,10 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 650), // Increased height
+        constraints: const BoxConstraints(
+          maxWidth: 600,
+          maxHeight: 650,
+        ), // Increased height
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -1662,7 +1687,9 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
-                        isEditing ? Icons.edit_document : Icons.add_circle_outline,
+                        isEditing
+                            ? Icons.edit_document
+                            : Icons.add_circle_outline,
                         color: Colors.white,
                         size: isMobile ? 24 : 28,
                       ),
@@ -1755,7 +1782,9 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                         height: isMobile ? 44 : 48,
                         child: OutlinedButton(
                           onPressed:
-                              _isSubmitting ? null : () => Navigator.of(context).pop(),
+                              _isSubmitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF6B7280),
                             side: const BorderSide(
@@ -1791,45 +1820,48 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          child: _isSubmitting
-                              ? Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
-                                    SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
+                          child:
+                              _isSubmitting
+                                  ? Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
                                         ),
                                       ),
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Saving...',
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Saving...',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.save_outlined, size: 18),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      isEditing ? 'Save Changes' : 'Create Program',
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
+                                    ],
+                                  )
+                                  : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.save_outlined, size: 18),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        isEditing
+                                            ? 'Save Changes'
+                                            : 'Create Program',
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
+                                    ],
+                                  ),
                         ),
                       ),
                     ),
@@ -1870,16 +1902,21 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                 },
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 16,
+                  ),
                   decoration: BoxDecoration(
-                    color: _selectedCategory == 'Bachelor'
-                        ? const Color(0xFF2E7D32).withOpacity(0.1)
-                        : Colors.white,
+                    color:
+                        _selectedCategory == 'Bachelor'
+                            ? const Color(0xFF2E7D32).withOpacity(0.1)
+                            : Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: _selectedCategory == 'Bachelor'
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFFE5E7EB),
+                      color:
+                          _selectedCategory == 'Bachelor'
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFE5E7EB),
                       width: _selectedCategory == 'Bachelor' ? 2 : 1.5,
                     ),
                   ),
@@ -1902,12 +1939,14 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                           'Bachelor',
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight: _selectedCategory == 'Bachelor'
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                            color: _selectedCategory == 'Bachelor'
-                                ? const Color(0xFF2E7D32)
-                                : const Color(0xFF374151),
+                            fontWeight:
+                                _selectedCategory == 'Bachelor'
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                            color:
+                                _selectedCategory == 'Bachelor'
+                                    ? const Color(0xFF2E7D32)
+                                    : const Color(0xFF374151),
                           ),
                         ),
                       ),
@@ -1928,16 +1967,21 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                 },
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 16,
+                  ),
                   decoration: BoxDecoration(
-                    color: _selectedCategory == 'Masteral'
-                        ? const Color(0xFF2E7D32).withOpacity(0.1)
-                        : Colors.white,
+                    color:
+                        _selectedCategory == 'Masteral'
+                            ? const Color(0xFF2E7D32).withOpacity(0.1)
+                            : Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: _selectedCategory == 'Masteral'
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFFE5E7EB),
+                      color:
+                          _selectedCategory == 'Masteral'
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFE5E7EB),
                       width: _selectedCategory == 'Masteral' ? 2 : 1.5,
                     ),
                   ),
@@ -1961,12 +2005,14 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                           'Masteral',
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight: _selectedCategory == 'Masteral'
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                            color: _selectedCategory == 'Masteral'
-                                ? const Color(0xFF2E7D32)
-                                : const Color(0xFF374151),
+                            fontWeight:
+                                _selectedCategory == 'Masteral'
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                            color:
+                                _selectedCategory == 'Masteral'
+                                    ? const Color(0xFF2E7D32)
+                                    : const Color(0xFF374151),
                           ),
                         ),
                       ),
@@ -1986,16 +2032,16 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     String prefix = '';
     String example = '';
     bool showPrefix = true;
-    
+
     // Check if college is "Others" or "Veterinary Medicine"
-    if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null && _colleges.isNotEmpty) {
+    if (_selectedCategory == 'Bachelor' &&
+        _selectedCollegeId != null &&
+        _colleges.isNotEmpty) {
       try {
-        final college = _colleges.firstWhere(
-          (c) => c.id == _selectedCollegeId,
-        );
+        final college = _colleges.firstWhere((c) => c.id == _selectedCollegeId);
         final collegeData = college.data() as Map<String, dynamic>;
         final collegeName = collegeData['name'] ?? '';
-        
+
         if (collegeName == 'Others' || collegeName == 'Veterinary Medicine') {
           showPrefix = false;
           example = 'Bachelor of Science in Information Technology';
@@ -2051,19 +2097,18 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
             controller: _nameController,
             enabled: _selectedCategory != null,
             decoration: InputDecoration(
-              hintText: _selectedCategory != null 
-                  ? 'e.g., $example'
-                  : 'Select a category first',
-              hintStyle: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 14,
-              ),
+              hintText:
+                  _selectedCategory != null
+                      ? 'e.g., $example'
+                      : 'Select a category first',
+              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
               prefixIcon: const Icon(
                 Icons.school_outlined,
                 color: Color(0xFF9CA3AF),
                 size: 20,
               ),
-              prefixText: (_selectedCategory != null && showPrefix) ? prefix : null,
+              prefixText:
+                  (_selectedCategory != null && showPrefix) ? prefix : null,
               prefixStyle: const TextStyle(
                 color: Color(0xFF1F2937),
                 fontSize: 14,
@@ -2075,16 +2120,13 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                 vertical: 14,
               ),
             ),
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF1F2937),
-            ),
+            style: const TextStyle(fontSize: 14, color: Color(0xFF1F2937)),
           ),
         ),
         if (_selectedCategory != null) ...[
           const SizedBox(height: 8),
           Text(
-            showPrefix 
+            showPrefix
                 ? 'Will be saved as: $prefix${_nameController.text.isNotEmpty ? _nameController.text : example}'
                 : 'Will be saved as: ${_nameController.text.isNotEmpty ? _nameController.text : example}',
             style: TextStyle(
@@ -2125,56 +2167,64 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
               ),
             ],
           ),
-          child: _loadingColleges
-              ? const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                )
-              : DropdownButtonFormField<String>(
-                  value: _selectedCollegeId,
-                  decoration: InputDecoration(
-                    hintText: 'Select a college',
-                    hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                    prefixIcon: const Icon(
-                      Icons.account_balance_outlined,
-                      color: Color(0xFF9CA3AF),
-                      size: 20,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                  ),
-                  items: _colleges.map((college) {
-                    final data = college.data() as Map<String, dynamic>;
-                    return DropdownMenuItem<String>(
-                      value: college.id,
-                      child: Text(
-                        data['name'] ?? 'Unknown',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF1F2937),
-                        ),
+          child:
+              _loadingColleges
+                  ? const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedCollegeId = value;
-                    });
-                  },
-                  isExpanded: true,
-                  icon: const Icon(Icons.arrow_drop_down),
-                  dropdownColor: Colors.white,
-                  style: const TextStyle(fontSize: 14, color: Color(0xFF1F2937)),
-                ),
+                    ),
+                  )
+                  : DropdownButtonFormField<String>(
+                    value: _selectedCollegeId,
+                    decoration: InputDecoration(
+                      hintText: 'Select a college',
+                      hintStyle: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 14,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.account_balance_outlined,
+                        color: Color(0xFF9CA3AF),
+                        size: 20,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                    ),
+                    items:
+                        _colleges.map((college) {
+                          final data = college.data() as Map<String, dynamic>;
+                          return DropdownMenuItem<String>(
+                            value: college.id,
+                            child: Text(
+                              data['name'] ?? 'Unknown',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF1F2937),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedCollegeId = value;
+                      });
+                    },
+                    isExpanded: true,
+                    icon: const Icon(Icons.arrow_drop_down),
+                    dropdownColor: Colors.white,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
         ),
       ],
     );

@@ -220,10 +220,11 @@ class MobileCollegeManagement extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('colleges')
-                            .orderBy('name')
-                            .snapshots(),
+                        stream:
+                            FirebaseFirestore.instance
+                                .collection('colleges')
+                                .orderBy('name')
+                                .snapshots(),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -308,10 +309,11 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('colleges')
-                          .orderBy('name')
-                          .snapshots(),
+                      stream:
+                          FirebaseFirestore.instance
+                              .collection('colleges')
+                              .orderBy('name')
+                              .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -402,11 +404,12 @@ Widget _buildCollegeList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
 }) {
-  final filtered = allColleges.where((doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final name = (data['name'] ?? '').toString().toLowerCase();
-    return searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
-  }).toList();
+  final filtered =
+      allColleges.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final name = (data['name'] ?? '').toString().toLowerCase();
+        return searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
+      }).toList();
 
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
@@ -421,23 +424,24 @@ Widget _buildCollegeList({
   return Column(
     children: [
       Expanded(
-        child: currentPageColleges.isEmpty
-            ? const Center(
-                child: Text('No colleges match your search criteria.'),
-              )
-            : ListView.separated(
-                itemCount: currentPageColleges.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final doc = currentPageColleges[index];
-                  final data = doc.data() as Map<String, dynamic>;
-                  return _buildCollegeRow(
-                    context: context,
-                    doc: doc,
-                    name: data['name'] ?? 'N/A',
-                  );
-                },
-              ),
+        child:
+            currentPageColleges.isEmpty
+                ? const Center(
+                  child: Text('No colleges match your search criteria.'),
+                )
+                : ListView.separated(
+                  itemCount: currentPageColleges.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final doc = currentPageColleges[index];
+                    final data = doc.data() as Map<String, dynamic>;
+                    return _buildCollegeRow(
+                      context: context,
+                      doc: doc,
+                      name: data['name'] ?? 'N/A',
+                    );
+                  },
+                ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -489,10 +493,7 @@ Widget _buildCollegeRow({
           Expanded(
             child: Text(
               name,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -506,28 +507,29 @@ Widget _buildCollegeRow({
                 showDeleteCollegeModal(context, doc);
               }
             },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, size: 18),
-                    SizedBox(width: 8),
-                    Text('Edit'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete, size: 18, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Delete', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
+            itemBuilder:
+                (_) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
           ),
         ],
       ),
@@ -578,7 +580,7 @@ Widget _buildHeader(
               ),
             ],
           ),
-    const SizedBox(height: 40,),
+          const SizedBox(height: 40),
           buildSearchField('Search colleges by name', searchController),
         ],
       );
@@ -911,9 +913,16 @@ class CollegeInfoModal extends StatelessWidget {
                     child: SizedBox(
                       height: 48,
                       child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          showDeleteCollegeModal(context, collegeDoc);
+                        onPressed: () async {
+                          final confirmed = await showDeleteCollegeModal(
+                            context,
+                            collegeDoc,
+                          );
+                          if (confirmed == true && context.mounted) {
+                            Navigator.of(
+                              context,
+                            ).pop(); // Only close details modal if deleted
+                          }
                         },
                         icon: const Icon(Icons.delete_outline, size: 18),
                         label: const Text('Delete'),
@@ -1002,8 +1011,11 @@ class CollegeInfoModal extends StatelessWidget {
 }
 
 // ==================== DELETE COLLEGE MODAL ====================
-void showDeleteCollegeModal(BuildContext context, DocumentSnapshot collegeDoc) {
-  showGeneralDialog(
+Future<bool?> showDeleteCollegeModal(
+  BuildContext context,
+  DocumentSnapshot collegeDoc,
+) {
+  return showGeneralDialog<bool>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Delete College',
@@ -1037,7 +1049,7 @@ class DeleteCollegeModal extends StatefulWidget {
 class _DeleteCollegeModalState extends State<DeleteCollegeModal> {
   bool _isDeleting = false;
 
-  Future<void> _deleteCollege() async {
+  Future<void> _deleteCollege(BuildContext dialogContext) async {
     setState(() => _isDeleting = true);
     final data = widget.collegeDoc.data() as Map<String, dynamic>;
 
@@ -1050,10 +1062,11 @@ class _DeleteCollegeModalState extends State<DeleteCollegeModal> {
       final currentUser = FirebaseAuth.instance.currentUser;
       String actorName = 'Unknown';
       if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
         if (userDoc.exists) {
           final userData = userDoc.data() as Map<String, dynamic>;
           actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
@@ -1069,7 +1082,9 @@ class _DeleteCollegeModalState extends State<DeleteCollegeModal> {
       });
 
       if (mounted) {
-        Navigator.of(context).pop();
+        Navigator.of(
+          dialogContext,
+        ).pop(true); // Return true to indicate success
         SnackbarUtil.showSuccess(context, 'College deleted successfully!');
       }
     } catch (e) {
@@ -1197,11 +1212,15 @@ class _DeleteCollegeModalState extends State<DeleteCollegeModal> {
                           height: isMobile ? 40 : 46,
                           child: OutlinedButton(
                             onPressed:
-                                _isDeleting ? null : () => Navigator.of(context).pop(),
+                                _isDeleting
+                                    ? null
+                                    : () => Navigator.of(context).pop(),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF6B7280),
                               side: const BorderSide(
-                                  color: Color(0xFFD1D5DB), width: 1.5),
+                                color: Color(0xFFD1D5DB),
+                                width: 1.5,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -1221,7 +1240,10 @@ class _DeleteCollegeModalState extends State<DeleteCollegeModal> {
                         child: SizedBox(
                           height: isMobile ? 40 : 46,
                           child: ElevatedButton(
-                            onPressed: _isDeleting ? null : _deleteCollege,
+                            onPressed:
+                                _isDeleting
+                                    ? null
+                                    : () => _deleteCollege(context),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFEF4444),
                               foregroundColor: Colors.white,
@@ -1231,24 +1253,26 @@ class _DeleteCollegeModalState extends State<DeleteCollegeModal> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            child: _isDeleting
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
+                            child:
+                                _isDeleting
+                                    ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    )
+                                    : Text(
+                                      'Delete',
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 14 : 15,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                  )
-                                : Text(
-                                    'Delete',
-                                    style: TextStyle(
-                                      fontSize: isMobile ? 14 : 15,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
                           ),
                         ),
                       ),
@@ -1352,16 +1376,19 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
             .update(collegeData);
       } else {
         collegeData['createdAt'] = Timestamp.now();
-        await FirebaseFirestore.instance.collection('colleges').add(collegeData);
+        await FirebaseFirestore.instance
+            .collection('colleges')
+            .add(collegeData);
       }
 
       final currentUser = FirebaseAuth.instance.currentUser;
       String actorName = 'Unknown';
       if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
         if (userDoc.exists) {
           final userData = userDoc.data() as Map<String, dynamic>;
           actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
@@ -1466,7 +1493,9 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
-                        isEditing ? Icons.edit_document : Icons.add_circle_outline,
+                        isEditing
+                            ? Icons.edit_document
+                            : Icons.add_circle_outline,
                         color: Colors.white,
                         size: isMobile ? 24 : 28,
                       ),
@@ -1556,7 +1585,9 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
                         height: isMobile ? 44 : 48,
                         child: OutlinedButton(
                           onPressed:
-                              _isSubmitting ? null : () => Navigator.of(context).pop(),
+                              _isSubmitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF6B7280),
                             side: const BorderSide(
@@ -1592,45 +1623,48 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          child: _isSubmitting
-                              ? Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
-                                    SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
+                          child:
+                              _isSubmitting
+                                  ? Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
                                         ),
                                       ),
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Saving...',
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Saving...',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.save_outlined, size: 18),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      isEditing ? 'Save Changes' : 'Create College',
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
+                                    ],
+                                  )
+                                  : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.save_outlined, size: 18),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        isEditing
+                                            ? 'Save Changes'
+                                            : 'Create College',
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
+                                    ],
+                                  ),
                         ),
                       ),
                     ),
