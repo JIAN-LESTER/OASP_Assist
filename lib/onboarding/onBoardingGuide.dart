@@ -4,13 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum OnboardingStep {
-  sidebar,
-  sidebarContent,
-  notifications,
-  profile,
-  // Removed bottomNav step
-}
+enum OnboardingStep { sidebar, sidebarContent, notifications, profile }
 
 class OnboardingGuide extends StatefulWidget {
   final Widget child;
@@ -18,7 +12,7 @@ class OnboardingGuide extends StatefulWidget {
   final GlobalKey? notificationKey;
   final GlobalKey? profileKey;
   final GlobalKey? bottomNavKey;
-  final VoidCallback? onFinished; // ✅ NEW: Callback when guide finishes
+  final VoidCallback? onFinished;
 
   const OnboardingGuide({
     super.key,
@@ -27,7 +21,7 @@ class OnboardingGuide extends StatefulWidget {
     this.notificationKey,
     this.profileKey,
     this.bottomNavKey,
-    this.onFinished, // ✅ NEW
+    this.onFinished,
   });
 
   @override
@@ -67,7 +61,6 @@ class _OnboardingGuideState extends State<OnboardingGuide>
     if (user == null) return;
 
     try {
-      // ✅ Fetch the user's field from Firestore FIRST
       final userDoc =
           await FirebaseFirestore.instance
               .collection('users')
@@ -77,22 +70,17 @@ class _OnboardingGuideState extends State<OnboardingGuide>
       final dbHasSeenOnboarding =
           userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
 
-      // ✅ If user has seen onboarding in Firestore, don't show it (even on new device)
       if (dbHasSeenOnboarding) {
-        // Sync local SharedPreferences with Firestore value
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('hasSeenOnboarding_${user.uid}', true);
-        // Also prevent welcome dialog from showing on new devices
         await prefs.setBool('should_show_welcome_dialog', false);
-        return; // Don't show onboarding
+        return;
       }
 
-      // ✅ Check local SharedPreferences only if Firestore says false
       final prefs = await SharedPreferences.getInstance();
       final hasSeenLocal =
           prefs.getBool('hasSeenOnboarding_${user.uid}') ?? false;
 
-      // ✅ Show onboarding only if both Firestore and local say false
       if (!hasSeenLocal && !dbHasSeenOnboarding) {
         await Future.delayed(const Duration(milliseconds: 800));
         if (mounted) {
@@ -104,7 +92,6 @@ class _OnboardingGuideState extends State<OnboardingGuide>
       }
     } catch (e) {
       print('Error checking onboarding status: $e');
-      // On error, don't show onboarding to be safe
     }
   }
 
@@ -222,15 +209,180 @@ class _OnboardingGuideState extends State<OnboardingGuide>
     await _finishOnboarding();
   }
 
+  Widget _buildWelcomeFeature(IconData icon, String title, String subtitle) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2E7D32).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: const Color(0xFF2E7D32), size: 22),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ✅ ADD THIS METHOD (after _buildWelcomeFeature)
+  Future<void> _showWelcomeDialog() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            elevation: 8,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF2E7D32), Color(0xFF388E3C)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.waving_hand,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Welcome to OASP!',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Your AI assistant is ready',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Content
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        _buildWelcomeFeature(
+                          Icons.school,
+                          'Admission Information',
+                          'View admission requirements',
+                        ),
+                        const SizedBox(height: 12),
+                        _buildWelcomeFeature(
+                          Icons.card_giftcard,
+                          'Scholarship List',
+                          'Browse available scholarships',
+                        ),
+                        const SizedBox(height: 12),
+                        _buildWelcomeFeature(
+                          Icons.work,
+                          'Placement Information',
+                          'Career placement details',
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Button
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E7D32),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: const Text(
+                          'Get Started',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+  }
+
   Future<void> _finishOnboarding() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
-        // Save to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('hasSeenOnboarding_${user.uid}', true);
 
-        // ✅ Update Firestore so it syncs across devices
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
@@ -239,8 +391,8 @@ class _OnboardingGuideState extends State<OnboardingGuide>
               'updatedAt': FieldValue.serverTimestamp(),
             });
 
-        // ✅ Set flag to show welcome dialog
-        await prefs.setBool('should_show_welcome_dialog', true);
+        // ✅ Mark welcome as seen in prefs
+        await prefs.setBool('should_show_welcome_dialog', false);
       } catch (e) {
         print('Error finishing onboarding: $e');
       }
@@ -251,7 +403,7 @@ class _OnboardingGuideState extends State<OnboardingGuide>
       _showOnboarding = false;
     });
 
-    // ✅ Trigger callback after guide completes
+    // ✅ Then trigger the original callback
     widget.onFinished?.call();
   }
 
@@ -264,14 +416,6 @@ class _OnboardingGuideState extends State<OnboardingGuide>
       _showOverlay();
     }
   }
-
-  // void restartOnboarding() {
-  //   setState(() {
-  //     _currentStep = OnboardingStep.sidebar;
-  //     _showOnboarding = true;
-  //   });
-  //   _showOverlay();
-  // }
 
   @override
   void dispose() {
