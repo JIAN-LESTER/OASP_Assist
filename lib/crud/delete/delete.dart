@@ -317,150 +317,6 @@ void showDeleteConfirmation(
 // UPDATE THIS FUNCTION IN delete.dart
 // ============================================================================
 
-Widget _buildActionButtons(
-  BuildContext context,
-  DocumentSnapshot doc,
-  DeleteConfig config,
-  String collection,
-  bool isMobile, {
-  Future<void> Function(BuildContext, DocumentSnapshot)? customDeleteHandler,
-  Set<String>? deletedItemsTracker,
-}) {
-  double buttonHeight = 48;
-  double fontSize = isMobile ? 15 : 16;
-  double borderRadius = 8;
-
-  // ✅ Add ValueNotifier for loading state
-  final ValueNotifier<bool> isDeleting = ValueNotifier(false);
-
-  return ValueListenableBuilder<bool>(
-    valueListenable: isDeleting,
-    builder: (context, deleting, child) {
-      return Row(
-        children: [
-          Expanded(
-            child: SizedBox(
-              height: buttonHeight,
-              child: OutlinedButton(
-                onPressed: deleting ? null : () => Navigator.of(context).pop(),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF6B7280),
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFFD1D5DB), width: 1),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(borderRadius),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    fontSize: fontSize,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: SizedBox(
-              height: buttonHeight,
-              child: ElevatedButton(
-                onPressed:
-                    deleting
-                        ? null
-                        : () async {
-                          // ✅ Set loading state to true
-                          isDeleting.value = true;
-
-                          try {
-                            // Use custom handler if provided
-                            if (customDeleteHandler != null) {
-                              await customDeleteHandler(context, doc);
-                            } else {
-                              // Standard delete logic
-                              await _performStandardDelete(
-                                context,
-                                doc,
-                                config,
-                                collection,
-                                deletedItemsTracker: deletedItemsTracker,
-                              );
-                            }
-
-                            // Close confirmation dialog after success
-                            if (context.mounted) {
-                              Navigator.of(context).pop();
-                            }
-                          } catch (error) {
-                            print("❌ Delete operation failed: $error");
-
-                            // Reset loading state on error
-                            isDeleting.value = false;
-
-                            if (context.mounted) {
-                              SnackbarUtil.showError(
-                                context,
-                                'Delete failed: $error',
-                              );
-                            }
-                          }
-                        },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      config.headerColor ?? const Color(0xFFEF4444),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(borderRadius),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
-                child:
-                    deleting
-                        ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Deleting...',
-                              style: TextStyle(
-                                fontSize: fontSize,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0,
-                              ),
-                            ),
-                          ],
-                        )
-                        : Text(
-                          'Delete',
-                          style: TextStyle(
-                            fontSize: fontSize,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0,
-                          ),
-                        ),
-              ),
-            ),
-          ),
-        ],
-      );
-    },
-  );
-}
-
 // Helper function to get display title
 String _getDisplayTitle(Map<String, dynamic> data, String titleField) {
   String title = data[titleField]?.toString() ?? 'Untitled';
@@ -518,7 +374,9 @@ Future<void> _handleReusableDelete(
   }
 }
 
-// Standard delete for simple cases
+// ============================================================================
+// FIXED: Standard delete for simple cases - REMOVED dialog closing
+// ============================================================================
 Future<void> _performStandardDelete(
   BuildContext context,
   DocumentSnapshot doc,
@@ -563,11 +421,9 @@ Future<void> _performStandardDelete(
   // Delete the document
   await FirebaseFirestore.instance.collection(collection).doc(doc.id).delete();
 
-  // Pop dialogs
+  // ✅ REMOVED: Don't pop dialogs here - let the button handle it
+  // Show success message
   if (context.mounted) {
-    Navigator.of(context).pop(); // Close loading
-    Navigator.of(context).pop(); // Close confirmation dialog
-
     SnackbarUtil.showSuccess(context, config.successMessage);
   }
 
@@ -583,6 +439,153 @@ Future<void> _performStandardDelete(
   } catch (e) {
     print("⚠️ Failed to log action: $e");
   }
+}
+
+// ============================================================================
+// FIXED: Action Buttons with proper error handling
+// ============================================================================
+Widget _buildActionButtons(
+  BuildContext context,
+  DocumentSnapshot doc,
+  DeleteConfig config,
+  String collection,
+  bool isMobile, {
+  Future<void> Function(BuildContext, DocumentSnapshot)? customDeleteHandler,
+  Set<String>? deletedItemsTracker,
+}) {
+  double buttonHeight = 48;
+  double fontSize = isMobile ? 15 : 16;
+  double borderRadius = 8;
+
+  final ValueNotifier<bool> isDeleting = ValueNotifier(false);
+
+  return ValueListenableBuilder<bool>(
+    valueListenable: isDeleting,
+    builder: (context, deleting, child) {
+      return Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: buttonHeight,
+              child: OutlinedButton(
+                onPressed: deleting ? null : () => Navigator.of(context).pop(),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF6B7280),
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFFD1D5DB), width: 1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(borderRadius),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SizedBox(
+              height: buttonHeight,
+              child: ElevatedButton(
+                onPressed:
+                    deleting
+                        ? null
+                        : () async {
+                          // Set loading state to true
+                          isDeleting.value = true;
+
+                          try {
+                            // Use custom handler if provided
+                            if (customDeleteHandler != null) {
+                              await customDeleteHandler(context, doc);
+                            } else {
+                              // Standard delete logic
+                              await _performStandardDelete(
+                                context,
+                                doc,
+                                config,
+                                collection,
+                                deletedItemsTracker: deletedItemsTracker,
+                              );
+                            }
+
+                            // ✅ FIXED: Close dialog only if context is still valid and mounted
+                            if (context.mounted) {
+                              Navigator.of(context, rootNavigator: false).pop();
+                            }
+                          } catch (error) {
+                            print("❌ Delete operation failed: $error");
+
+                            // Reset loading state on error
+                            isDeleting.value = false;
+
+                            // Show error only if context is still valid
+                            if (context.mounted) {
+                              SnackbarUtil.showError(
+                                context,
+                                'Delete failed: ${error.toString()}',
+                              );
+                            }
+                          }
+                        },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      config.headerColor ?? const Color(0xFFEF4444),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(borderRadius),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                child:
+                    deleting
+                        ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Deleting...',
+                              style: TextStyle(
+                                fontSize: fontSize,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                          ],
+                        )
+                        : Text(
+                          'Delete',
+                          style: TextStyle(
+                            fontSize: fontSize,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0,
+                          ),
+                        ),
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 Future<void> handleUserDelete(
@@ -767,11 +770,8 @@ Future<void> handleInformationBankDelete(
     await firestore.collection('information_bank').doc(doc.id).delete();
     print("✅ Deleted information_bank document");
 
-    // Close dialogs and show feedback
+    // Show feedback (don't close dialogs - button handles it)
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
-      Navigator.of(context).pop(); // Close confirmation
-
       int totalFailures =
           failedScholarshipDeletes.length +
           failedAdmissionDeletes.length +
@@ -879,11 +879,9 @@ Future<void> handleAdmissionDelete(
     await firestore.collection('admissions').doc(docId).delete();
     print('✅ Deleted from admissions');
 
-    // Close dialogs and show feedback
+    // ✅ REMOVED: Dialog closing - let the button handle it
+    // Show success message
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading (from _handleReusableDelete)
-      Navigator.of(context).pop(); // Close confirmation
-
       SnackbarUtil.showSuccess(context, 'Admission deleted successfully');
     }
 
@@ -903,10 +901,10 @@ Future<void> handleAdmissionDelete(
     print("❌ Delete operation failed: $error");
 
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
-
       SnackbarUtil.showError(context, 'Delete failed: $error');
     }
+
+    throw error; // Re-throw so button can handle it
   }
 }
 
@@ -944,7 +942,6 @@ Future<void> handleScholarshipDelete(
     print('✅ Deleted scholarship');
 
     // Check if we should also delete the source document
-    // (Only if this is the last scholarship from that source)
     if (sourceId != null) {
       final remainingScholarships =
           await firestore
@@ -953,14 +950,12 @@ Future<void> handleScholarshipDelete(
               .get();
 
       if (remainingScholarships.docs.isEmpty) {
-        // This was the last scholarship, check if we should delete the source
         final ibDoc =
             await firestore.collection('information_bank').doc(sourceId).get();
 
         if (ibDoc.exists) {
           final ibData = ibDoc.data() as Map<String, dynamic>;
 
-          // Only delete if there are no other related documents
           final hasAdmissions =
               await firestore
                   .collection('admissions')
@@ -979,7 +974,6 @@ Future<void> handleScholarshipDelete(
             final chunkIds = List<String>.from(ibData['chunkIds'] ?? []);
             final pineconeNamespace = ibData['pinecone_namespace'];
 
-            // Delete from Pinecone FIRST
             if (chunkIds.isNotEmpty) {
               try {
                 print(
@@ -989,11 +983,9 @@ Future<void> handleScholarshipDelete(
                 print("✅ Orphaned Pinecone vectors deleted");
               } catch (e) {
                 print("⚠️ Failed to delete orphaned Pinecone vectors: $e");
-                // Continue anyway
               }
             }
 
-            // Delete the information_bank document
             await firestore
                 .collection('information_bank')
                 .doc(sourceId)
@@ -1004,11 +996,9 @@ Future<void> handleScholarshipDelete(
       }
     }
 
-    // Close dialogs and show feedback
+    // ✅ REMOVED: Dialog closing - let the button handle it
+    // Show success message
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading (from _handleReusableDelete)
-      Navigator.of(context).pop(); // Close confirmation
-
       SnackbarUtil.showSuccess(context, 'Scholarship deleted successfully');
     }
 
@@ -1028,10 +1018,10 @@ Future<void> handleScholarshipDelete(
     print("❌ Delete operation failed: $error");
 
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
-
       SnackbarUtil.showError(context, 'Delete failed: $error');
     }
+
+    throw error; // Re-throw so button can handle it
   }
 }
 
@@ -1083,7 +1073,6 @@ Future<void> handlePlacementDelete(
         if (ibDoc.exists) {
           final ibData = ibDoc.data() as Map<String, dynamic>;
 
-          // Only delete if there are no other related documents
           final hasAdmissions =
               await firestore
                   .collection('admissions')
@@ -1102,7 +1091,6 @@ Future<void> handlePlacementDelete(
             final chunkIds = List<String>.from(ibData['chunkIds'] ?? []);
             final pineconeNamespace = ibData['pinecone_namespace'];
 
-            // Delete from Pinecone FIRST
             if (chunkIds.isNotEmpty) {
               try {
                 print(
@@ -1112,11 +1100,9 @@ Future<void> handlePlacementDelete(
                 print("✅ Orphaned Pinecone vectors deleted");
               } catch (e) {
                 print("⚠️ Failed to delete orphaned Pinecone vectors: $e");
-                // Continue anyway
               }
             }
 
-            // Delete the information_bank document
             await firestore
                 .collection('information_bank')
                 .doc(sourceId)
@@ -1127,11 +1113,9 @@ Future<void> handlePlacementDelete(
       }
     }
 
-    // Close dialogs and show feedback
+    // ✅ REMOVED: Dialog closing - let the button handle it
+    // Show success message
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading (from _handleReusableDelete)
-      Navigator.of(context).pop(); // Close confirmation
-
       SnackbarUtil.showSuccess(context, 'Placement deleted successfully');
     }
 
@@ -1151,10 +1135,10 @@ Future<void> handlePlacementDelete(
     print("❌ Delete operation failed: $error");
 
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
-
       SnackbarUtil.showError(context, 'Delete failed: $error');
     }
+
+    throw error; // Re-throw so button can handle it
   }
 }
 
