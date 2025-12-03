@@ -174,7 +174,8 @@ void showUserInfoModal(
                               ),
 
                               // Show affiliation for users
-                              if (data['role']?.toString().toLowerCase() == 'user') ...[
+                              if (data['role']?.toString().toLowerCase() ==
+                                  'user') ...[
                                 // Show affiliation
                                 if (data['affiliation'] != null) ...[
                                   const SizedBox(height: 16),
@@ -186,7 +187,9 @@ void showUserInfoModal(
                                 ],
 
                                 // CMU STUDENT - Show student fields
-                                if (data['affiliation']?.toString().toLowerCase() ==
+                                if (data['affiliation']
+                                        ?.toString()
+                                        .toLowerCase() ==
                                     'cmu student') ...[
                                   if (data['studentType'] != null) ...[
                                     const SizedBox(height: 16),
@@ -195,14 +198,15 @@ void showUserInfoModal(
                                       data['studentType'] == 'undergraduate'
                                           ? 'Undergraduate'
                                           : data['studentType'] == 'graduate'
-                                              ? 'Graduate'
-                                              : data['studentType'],
+                                          ? 'Graduate'
+                                          : data['studentType'],
                                       Icons.school_outlined,
                                     ),
                                   ],
 
                                   // UNDERGRADUATE
-                                  if (data['studentType'] == 'undergraduate') ...[
+                                  if (data['studentType'] ==
+                                      'undergraduate') ...[
                                     if (data['studentId'] != null) ...[
                                       const SizedBox(height: 16),
                                       _buildMetadataRow(
@@ -253,9 +257,10 @@ void showUserInfoModal(
                                         'Graduate Status',
                                         data['graduateType'] == 'masteral'
                                             ? 'Taking Masteral'
-                                            : data['graduateType'] == 'not_masteral'
-                                                ? 'Already Graduated'
-                                                : data['graduateType'],
+                                            : data['graduateType'] ==
+                                                'not_masteral'
+                                            ? 'Already Graduated'
+                                            : data['graduateType'],
                                         Icons.school,
                                       ),
                                     ],
@@ -281,7 +286,8 @@ void showUserInfoModal(
                                     ],
 
                                     // NOT MASTERAL GRADUATE
-                                    if (data['graduateType'] == 'not_masteral') ...[
+                                    if (data['graduateType'] ==
+                                        'not_masteral') ...[
                                       if (data['graduatedCollege'] != null) ...[
                                         const SizedBox(height: 16),
                                         _buildMetadataRow(
@@ -303,7 +309,9 @@ void showUserInfoModal(
                                 ],
 
                                 // INCOMING FRESHMAN APPLICANT
-                                if (data['affiliation']?.toString().toLowerCase() ==
+                                if (data['affiliation']
+                                        ?.toString()
+                                        .toLowerCase() ==
                                     'incoming freshman applicant') ...[
                                   if (data['lrn'] != null) ...[
                                     const SizedBox(height: 16),
@@ -324,7 +332,9 @@ void showUserInfoModal(
                                 ],
 
                                 // MASTERAL (NOT CMU GRADUATE)
-                                if (data['affiliation']?.toString().toLowerCase() ==
+                                if (data['affiliation']
+                                        ?.toString()
+                                        .toLowerCase() ==
                                     'masteral (not cmu graduate)') ...[
                                   if (data['program'] != null) ...[
                                     const SizedBox(height: 16),
@@ -397,7 +407,7 @@ void showUserInfoModal(
         ),
       );
     },
-   transitionBuilder: (context, animation, secondaryAnimation, child) {
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
       return SlideTransition(
         position: Tween<Offset>(
           begin: const Offset(0, 0.1),
@@ -437,14 +447,24 @@ Widget _buildActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: OutlinedButton.icon(
-            onPressed: 
-                () => showDeleteConfirmation(
-                  context,
-                  doc,
-                  DeleteConfigs.users,
-                  'users',
-                ),
-                
+            onPressed: () {
+              // ✅ Show delete confirmation (removed async/await)
+              showDeleteConfirmation(
+                context,
+                doc,
+                DeleteConfigs.users,
+                'users',
+                customDeleteHandler: (ctx, document) async {
+                  // Perform the delete operation
+                  await handleUserDelete(ctx, document);
+
+                  // Close user info modal after successful deletion
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
+              );
+            },
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
               'Delete',

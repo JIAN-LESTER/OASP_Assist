@@ -313,6 +313,10 @@ void showDeleteConfirmation(
   );
 }
 
+// ============================================================================
+// UPDATE THIS FUNCTION IN delete.dart
+// ============================================================================
+
 Widget _buildActionButtons(
   BuildContext context,
   DocumentSnapshot doc,
@@ -326,68 +330,134 @@ Widget _buildActionButtons(
   double fontSize = isMobile ? 15 : 16;
   double borderRadius = 8;
 
-  return Row(
-    children: [
-      Expanded(
-        child: SizedBox(
-          height: buttonHeight,
-          child: OutlinedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF6B7280),
-              backgroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFFD1D5DB), width: 1),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-            ),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0,
-              ),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: SizedBox(
-          height: buttonHeight,
-          child: ElevatedButton(
-            onPressed:
-                () => _handleReusableDelete(
-                  context,
-                  doc,
-                  config,
-                  collection,
-                  customDeleteHandler: customDeleteHandler,
-                  deletedItemsTracker: deletedItemsTracker,
+  // ✅ Add ValueNotifier for loading state
+  final ValueNotifier<bool> isDeleting = ValueNotifier(false);
+
+  return ValueListenableBuilder<bool>(
+    valueListenable: isDeleting,
+    builder: (context, deleting, child) {
+      return Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: buttonHeight,
+              child: OutlinedButton(
+                onPressed: deleting ? null : () => Navigator.of(context).pop(),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF6B7280),
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFFD1D5DB), width: 1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(borderRadius),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: config.headerColor ?? const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-            ),
-            child: Text(
-              'Delete',
-              style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0,
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
-    ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: SizedBox(
+              height: buttonHeight,
+              child: ElevatedButton(
+                onPressed:
+                    deleting
+                        ? null
+                        : () async {
+                          // ✅ Set loading state to true
+                          isDeleting.value = true;
+
+                          try {
+                            // Use custom handler if provided
+                            if (customDeleteHandler != null) {
+                              await customDeleteHandler(context, doc);
+                            } else {
+                              // Standard delete logic
+                              await _performStandardDelete(
+                                context,
+                                doc,
+                                config,
+                                collection,
+                                deletedItemsTracker: deletedItemsTracker,
+                              );
+                            }
+
+                            // Close confirmation dialog after success
+                            if (context.mounted) {
+                              Navigator.of(context).pop();
+                            }
+                          } catch (error) {
+                            print("❌ Delete operation failed: $error");
+
+                            // Reset loading state on error
+                            isDeleting.value = false;
+
+                            if (context.mounted) {
+                              SnackbarUtil.showError(
+                                context,
+                                'Delete failed: $error',
+                              );
+                            }
+                          }
+                        },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      config.headerColor ?? const Color(0xFFEF4444),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(borderRadius),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                child:
+                    deleting
+                        ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Deleting...',
+                              style: TextStyle(
+                                fontSize: fontSize,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                          ],
+                        )
+                        : Text(
+                          'Delete',
+                          style: TextStyle(
+                            fontSize: fontSize,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0,
+                          ),
+                        ),
+              ),
+            ),
+          ),
+        ],
+      );
+    },
   );
 }
 
@@ -520,49 +590,75 @@ Future<void> handleUserDelete(
   DocumentSnapshot doc,
 ) async {
   try {
-
     final functionsService = FirebaseFunctionsService();
-    
+
     try {
       print('🔄 Calling deleteUser Cloud Function for: ${doc.id}');
       await functionsService.deleteUserAuth(doc.id);
       print('✅ Cloud Function completed successfully');
     } catch (e) {
       print('❌ Cloud Function failed: $e');
-      throw e; // Re-throw to be caught by outer try-catch
+      throw e;
     }
 
-    // Close dialogs and show success
-    if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
-      Navigator.of(context).pop(); // Close confirmation dialog
+    // ✅ REMOVED: Don't close dialogs here, let the caller handle it
+    // The confirmation dialog button will close itself after success
 
+    // Show success message
+    if (context.mounted) {
       SnackbarUtil.showSuccess(
-        context, 
-        'User and all related data deleted successfully'
+        context,
+        'User and all related data deleted successfully',
       );
     }
 
+    // Log the action
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      String actorName = 'Unknown';
+
+      if (currentUser != null) {
+        final currentUserDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
+
+        if (currentUserDoc.exists) {
+          final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
+          actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';
+        }
+      }
+
+      final docData = doc.data() as Map<String, dynamic>;
+      String deletedTitle = docData['name'] ?? 'Unknown';
+
+      final logRef = FirebaseFirestore.instance.collection('logs').doc();
+      await logRef.set({
+        'logId': logRef.id,
+        'user': actorName,
+        'action': 'Deleted user: $deletedTitle',
+        'time': Timestamp.now(),
+      });
+    } catch (e) {
+      print("⚠️ Failed to log action: $e");
+    }
   } catch (error) {
     print("❌ Delete operation failed: $error");
 
-    if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
-
-      // Show more specific error message
-      String errorMessage = 'Delete failed: ';
-      if (error.toString().contains('permission-denied')) {
-        errorMessage += 'You do not have permission to delete users';
-      } else if (error.toString().contains('unauthenticated')) {
-        errorMessage += 'Please log in as an admin';
-      } else if (error.toString().contains('not-found')) {
-        errorMessage += 'User not found';
-      } else {
-        errorMessage += error.toString();
-      }
-      
-      SnackbarUtil.showError(context, errorMessage);
+    // Show more specific error message
+    String errorMessage = 'Delete failed: ';
+    if (error.toString().contains('permission-denied')) {
+      errorMessage += 'You do not have permission to delete users';
+    } else if (error.toString().contains('unauthenticated')) {
+      errorMessage += 'Please log in as an admin';
+    } else if (error.toString().contains('not-found')) {
+      errorMessage += 'User not found';
+    } else {
+      errorMessage += error.toString();
     }
+
+    throw Exception(errorMessage); // Re-throw so button can handle it
   }
 }
 
@@ -1072,7 +1168,8 @@ Future<void> _deleteFromPinecone(
   try {
     // final apiKey = 'pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa';
     // // final indexHost = 'https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io';
-    final indexHost = 'https://oasp-assist-gemini-tpewr0x.svc.aped-4627-b74a.pinecone.io';
+    final indexHost =
+        'https://oasp-assist-gemini-tpewr0x.svc.aped-4627-b74a.pinecone.io';
     final apiKey =
         'pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa';
     // final indexHost =
