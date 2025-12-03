@@ -434,19 +434,12 @@ class _HomeDashboardState extends State<HomeDashboard>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ✅ UPDATED: Using MarkdownBody for bold text
-                      MarkdownBody(
-                        data: '**AI Chat Assistant**',
-                        styleSheet: MarkdownStyleSheet(
-                          p: TextStyle(
-                            fontSize: isMobile ? 16 : 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                          strong: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
+                      Text(
+                        'AI Chat Assistant',
+                        style: TextStyle(
+                          fontSize: isMobile ? 16 : 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -654,15 +647,19 @@ class _HomeDashboardState extends State<HomeDashboard>
             ),
           ],
         ),
-        child: Text(
-          displayMessage,
-          style: TextStyle(
-            color: isUser ? Colors.white : Colors.black87,
-            fontSize: isMobile ? 13 : 14,
-            height: 1.4,
+        child: MarkdownBody(
+          data: displayMessage,
+          styleSheet: MarkdownStyleSheet(
+            p: TextStyle(
+              color: isUser ? Colors.white : Colors.black87,
+              fontSize: isMobile ? 13 : 14,
+              height: 1.4,
+            ),
+            strong: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isUser ? Colors.white : Colors.black87,
+            ),
           ),
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
         ),
       ),
     );
@@ -700,6 +697,13 @@ class _HomeDashboardState extends State<HomeDashboard>
       ]),
     );
   }
+
+String cleanStep(String step) {
+  return step
+      .replaceAll(RegExp(r'^\s*[\(\[\d]+\s*[\.\)\]]\s*'), '') // removes "1.", "(1)", "[1]", etc.
+      .trim();
+}
+
 
   Widget _buildAdmissionCard() {
     final isMobile = _isMobile(context);
@@ -796,13 +800,13 @@ class _HomeDashboardState extends State<HomeDashboard>
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        step,
-                        style: TextStyle(
-                          fontSize: isMobile ? 12 : 13,
-                          color: Colors.black54,
-                        ),
-                      ),
+                     child: Text(
+  cleanStep(step),
+  style: TextStyle(
+    fontSize: isMobile ? 12 : 13,
+    color: Colors.black54,
+  ),
+),
                     ),
                   ],
                 ),

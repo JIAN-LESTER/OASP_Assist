@@ -55,70 +55,95 @@ class FileService {
     return null;
   }
 
-Future<void> saveToInformationBank(InformationBank ib) async {
+Future<void> saveToInformationBank(InformationBank ib, {bool isFromUpload = true}) async {
   try {
-    // Check if Pinecone is healthy
     final isHealthy = await _pineconeService.isHealthy();
     if (!isHealthy) {
       throw Exception('Pinecone service is not available');
+    }
+
+    // 🔥 FIX: Use category-prefixed ID for category documents
+    String finalDocId = ib.id;
+    
+    // If this is a category document, use the prefixed format
+    if (['admission', 'scholarship', 'placement'].contains(ib.category.toLowerCase())) {
+      // Check if it already has the prefix
+      if (!ib.id.startsWith('${ib.category.toLowerCase()}_')) {
+        finalDocId = '${ib.category.toLowerCase()}_${ib.id}';
+      }
+    }
+
+    final sanitizedId = sanitizeId(finalDocId);
+
+    // 🔥 FIX: Check if entry already exists
+    final existingDoc = await firestore
+        .collection('information_bank')
+        .doc(sanitizedId)
+        .get();
+
+    if (existingDoc.exists) {
+      print('ℹ️ Information Bank entry already exists: $sanitizedId');
+      
+      // Optional: Update existing entry instead of failing
+      final existingData = existingDoc.data()!;
+      final oldChunkIds = List<String>.from(existingData['chunkIds'] ?? []);
+      
+      // Delete old Pinecone vectors
+      if (oldChunkIds.isNotEmpty) {
+        await _pineconeService.deleteDocuments(oldChunkIds);
+        print('🗑️ Deleted ${oldChunkIds.length} old Pinecone vectors');
+      }
+      
+      // Continue with update...
     }
 
     // Split document into chunks
     final chunks = _splitIntoChunks(ib.content, ib.title, ib.source);
     print('📄 Document "${ib.title}" split into ${chunks.length} chunks');
 
-    // Process each chunk
+    // Process chunks...
     final chunkIds = <String>[];
     String? parentPineconeId;
 
     for (int i = 0; i < chunks.length; i++) {
       final chunk = chunks[i];
+      final embedding = await _geminiService.embedText(chunk.text);
 
-      // Generate embedding for the chunk
-      final embedding = await _geminiService.embedText(
-        chunk.text,
-       
-      );
+      final chunkTitle = chunks.length > 1
+          ? '${ib.title} (Part ${i + 1}/${chunks.length})'
+          : ib.title;
 
-      // Create chunk title that includes context
-      final chunkTitle =
-          chunks.length > 1
-              ? '${ib.title} (Part ${i + 1}/${chunks.length})'
-              : ib.title;
-
-      // 🔥 CRITICAL FIX: Flat metadata structure for Pinecone
-      // Pinecone stores all metadata at the top level - no nesting!
+      // 🔥 CRITICAL: Use finalDocId (with category prefix)
       final metadata = {
-        // === DOCUMENT IDENTIFICATION (required by Cloud Function) ===
-        'docId': ib.id,           // Cloud Function primary lookup
-        'originalDocId': ib.id,   // Fallback
-        'documentId': ib.id,      // Fallback
+        'docId': finalDocId,  // ← Use prefixed ID
+        'originalDocId': finalDocId,
+        'documentId': finalDocId,
+        'categoryDocId': ib.category.toLowerCase() == 'admission' || 
+                         ib.category.toLowerCase() == 'scholarship' || 
+                         ib.category.toLowerCase() == 'placement' 
+            ? ib.id  // Store original ID without prefix
+            : finalDocId,
         
-        // === CONTENT (required by Cloud Function) ===
-        'text': chunk.text,       // Cloud Function looks for this first
-        'content': chunk.text,    // Fallback
-        
-        // === TITLES (required by Cloud Function) ===
+        'text': chunk.text,
+        'content': chunk.text,
         'title': chunkTitle,
         'originalTitle': ib.title,
         'fileName': ib.title,
-        
-        // === CHUNKING INFO ===
         'chunkIndex': i,
-        'chunk_index': i,         // Alternative naming for Cloud Function
+        'chunk_index': i,
         'totalChunks': chunks.length,
-        'chunkCount': chunks.length,  // Alternative naming
+        'chunkCount': chunks.length,
         'isFirstChunk': i == 0,
         'isLastChunk': i == chunks.length - 1,
-        
-        // === SOURCE & CATEGORY ===
         'source': ib.source,
         'category': ib.category,
         'categoryID': ib.category,
-        
-        // === METADATA ===
         'chunkSize': chunk.text.length,
         'createdAt': DateTime.now().toIso8601String(),
+        
+        // 🔥 NEW: Mark where this came from
+        'uploadedViaFlutter': true,
+        'syncedFromCategory': false,
       };
 
       await _pineconeService.insertDocument(
@@ -132,41 +157,36 @@ Future<void> saveToInformationBank(InformationBank ib) async {
       );
 
       chunkIds.add(chunk.id);
-
-      // Use the first chunk ID as the parent document ID
       if (i == 0) {
         parentPineconeId = chunk.id;
       }
 
-      print(
-        '  ✓ Chunk ${i + 1}/${chunks.length} uploaded (${chunk.text.length} chars)',
-      );
+      print('  ✓ Chunk ${i + 1}/${chunks.length} uploaded (${chunk.text.length} chars)');
     }
 
-    // Save document metadata to Firestore with consistent naming
-    final sanitizedId = sanitizeId(ib.id);
+    // Save to Firestore with prefixed ID
     await firestore.collection('information_bank').doc(sanitizedId).set({
-      'ibID': sanitizedId,
-      'id': sanitizedId,
-      'ib_title': ib.title,
-      'title': ib.title,
-      'content': ib.content,
-      'source': ib.source,
-      'category': ib.category,
-      'categoryID': ib.category,
-      'pinecone_id': parentPineconeId,
-      'totalChunks': chunks.length,
-      'chunkIds': chunkIds,
-      'chunked': chunks.length > 1,
-      'chunkSize': maxChunkSize,
-      'chunkOverlap': chunkOverlap,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    'ibID': sanitizedId,
+    'id': sanitizedId,
+    'ib_title': ib.title,
+    'title': ib.title,
+    'content': ib.content,
+    'source': ib.source,
+    'category': ib.category,
+    'categoryID': ib.category,
+    'pinecone_id': parentPineconeId,
+    'totalChunks': chunks.length,
+    'chunkIds': chunkIds,
+    'chunked': chunks.length > 1,
+    'chunkSize': maxChunkSize,
+    'chunkOverlap': chunkOverlap,
+    'uploadedViaFlutter': true,
+    'isFromDocumentUpload': isFromUpload, // 🔥 NEW FLAG
+    'createdAt': FieldValue.serverTimestamp(),
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
 
-    print(
-      '✅ Document saved to Firebase and ${chunks.length} chunks uploaded to Pinecone',
-    );
+    print('✅ Document saved to Firebase and ${chunks.length} chunks uploaded to Pinecone');
   } catch (e) {
     print('❌ Error saving document: $e');
     rethrow;
@@ -282,14 +302,14 @@ Future<void> batchUploadToInformationBank(List<InformationBank> documents) async
   }
 }
 
-Future<void> saveToAdmission(Admissions ad) async {
+Future<void> saveToAdmission(Admissions ad, {String? sourceDocumentId}) async {
   try {
     final sanitizedId = sanitizeId(ad.id);
 
     final Map<String, dynamic> admissionData = {
-      'id': sanitizedId, // ✅ Add id field (required by Cloud Function)
+      'id': sanitizedId,
       'admissionID': sanitizedId,
-      'type': ad.type, // ✅ NEW: Save admission type
+      'type': ad.type,
       'title': ad.title,
       'content': ad.content,
       'source': ad.source,
@@ -298,23 +318,29 @@ Future<void> saveToAdmission(Admissions ad) async {
       'contact': ad.contact,
       'requirements': ad.requirements ?? [],
       'links': ad.links,
-      'schedules': ad.schedules, 
+      'schedules': ad.schedules,
+      'extractedFromDocument': sourceDocumentId != null, // 🔥 NEW FLAG
+      'sourceDocumentId': sourceDocumentId, // 🔥 Link to original document
       'createdAt': FieldValue.serverTimestamp(),
     };
 
     await firestore.collection('admissions').doc(sanitizedId).set(admissionData);
 
+    // 🔥 SKIP Info Bank creation if extracted from document
+    if (sourceDocumentId != null) {
+      print('ℹ️ Skipping Info Bank creation - admission extracted from document: $sourceDocumentId');
+      return;
+    }
+
     print('✅ Admission document saved successfully');
-    print('   Type: ${ad.type ?? "Not specified"}');
-    print('   Schedules: ${ad.schedules?.length ?? 0}');
   } catch (e) {
     print('❌ Error saving admission document: $e');
     rethrow;
   }
 }
- Future<void> saveMultipleScholarships(List<Scholarship> scholarships) async {
+
+Future<void> saveMultipleScholarships(List<Scholarship> scholarships, {String? sourceDocumentId}) async {
   try {
-    // Use batch write for better performance
     WriteBatch batch = firestore.batch();
 
     for (Scholarship scholarship in scholarships) {
@@ -329,12 +355,13 @@ Future<void> saveToAdmission(Admissions ad) async {
         'scholarshipProvider': scholarship.scholarshipProvider,
         'eligibilityRequirements': scholarship.eligibilityRequirements,
         'privileges': scholarship.privileges,
-        'deadline':
-            scholarship.deadline != null
-                ? Timestamp.fromDate(scholarship.deadline!)
-                : null,
+        'deadline': scholarship.deadline != null
+            ? Timestamp.fromDate(scholarship.deadline!)
+            : null,
         'applicationLink': scholarship.applicationLink,
         'deleted': false,
+        'extractedFromDocument': sourceDocumentId != null, // 🔥 NEW FLAG
+        'sourceDocumentId': sourceDocumentId, // 🔥 Link to original document
         'createdAt': Timestamp.fromDate(scholarship.createdAt),
       });
     }
@@ -342,7 +369,13 @@ Future<void> saveToAdmission(Admissions ad) async {
     await batch.commit();
     print('✅ Batch saved ${scholarships.length} scholarships successfully');
 
-    // 🔥 NEW: Create Information Bank entries for each scholarship
+    // 🔥 SKIP Info Bank creation if extracted from document
+    if (sourceDocumentId != null) {
+      print('ℹ️ Skipping Info Bank creation - scholarships extracted from document: $sourceDocumentId');
+      return;
+    }
+    
+    // Only create Info Bank for standalone scholarships (e.g., from Facebook posts)
     int created = 0;
     int skipped = 0;
     
@@ -351,7 +384,6 @@ Future<void> saveToAdmission(Admissions ad) async {
         final infoBankId = 'scholarship_${scholarship.scholarshipID}';
         final infoBankSanitized = sanitizeId(infoBankId);
         
-        // Check if already exists
         final existingInfoBank = await firestore
             .collection('information_bank')
             .doc(infoBankSanitized)
@@ -368,7 +400,6 @@ Future<void> saveToAdmission(Admissions ad) async {
         
       } catch (e) {
         print('⚠️ Error creating Information Bank for scholarship ${scholarship.scholarshipID}: $e');
-        // Continue with other scholarships
       }
     }
     
@@ -380,8 +411,7 @@ Future<void> saveToAdmission(Admissions ad) async {
   }
 }
 
-/// Save multiple placements in batch WITH automatic Information Bank creation
-Future<void> saveMultiplePlacements(List<Placement> placements) async {
+Future<void> saveMultiplePlacements(List<Placement> placements, {String? sourceDocumentId}) async {
   try {
     WriteBatch batch = firestore.batch();
 
@@ -399,6 +429,8 @@ Future<void> saveMultiplePlacements(List<Placement> placements) async {
             ? Timestamp.fromDate(placement.deadline!)
             : null,
         'deleted': false,
+        'extractedFromDocument': sourceDocumentId != null, // 🔥 NEW FLAG
+        'sourceDocumentId': sourceDocumentId, // 🔥 Link to original upload
         'createdAt': Timestamp.fromDate(placement.createdAt),
       }, SetOptions(merge: true));
     }
@@ -406,7 +438,13 @@ Future<void> saveMultiplePlacements(List<Placement> placements) async {
     await batch.commit();
     print('✅ Batch saved ${placements.length} placements successfully');
     
-    // 🔥 NEW: Create Information Bank entries for each placement
+    // 🔥 SKIP Info Bank creation if extracted from document
+    if (sourceDocumentId != null) {
+      print('ℹ️ Skipping Info Bank creation - placements extracted from document: $sourceDocumentId');
+      return;
+    }
+    
+    // Only create Info Bank for standalone placements (e.g., from Facebook posts)
     int created = 0;
     int skipped = 0;
     
@@ -415,7 +453,6 @@ Future<void> saveMultiplePlacements(List<Placement> placements) async {
         final infoBankId = 'placement_${placement.placementID}';
         final infoBankSanitized = sanitizeId(infoBankId);
         
-        // Check if already exists
         final existingInfoBank = await firestore
             .collection('information_bank')
             .doc(infoBankSanitized)
@@ -432,7 +469,6 @@ Future<void> saveMultiplePlacements(List<Placement> placements) async {
         
       } catch (e) {
         print('⚠️ Error creating Information Bank for placement ${placement.placementID}: $e');
-        // Continue with other placements
       }
     }
     

@@ -494,30 +494,29 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
     setState(() {
       _isUploading = true;
     });
+ try {
+    final uuid = Uuid();
+    final documentId = uuid.v4(); // 🔥 Generate document ID first
 
-    try {
-      final uuid = Uuid();
-      final documentId = uuid.v4();
+    // Save to Information Bank (the actual document)
+    final informationBank = InformationBank(
+      id: documentId,
+      title: _titleController.text.trim(),
+      content: _extractedText!,
+      embedding: [],
+      source: _selectedFileName ?? 'Unknown',
+      category: _categoryController.text.trim(),
+    );
 
-      final informationBank = InformationBank(
-        id: documentId,
-        title: _titleController.text.trim(),
-        content: _extractedText!,
-        embedding: [],
-        source: _selectedFileName ?? 'Unknown',
-        category: _categoryController.text.trim(),
-      );
+    // 🔥 Mark as document upload
+    await _fileService.saveToInformationBank(informationBank, isFromUpload: true);
 
-      await _fileService.saveToInformationBank(informationBank);
+    Navigator.of(context).pop(true);
 
-      Navigator.of(context).pop(true);
-
-      switch (_categoryController.text.trim()) {
-        case 'Admission':
-          print("🔍 Analyzing admission document...");
-          final admissionCohere = await _cohereService.analyzeAdmission(
-            _extractedText!,
-          );
+       switch (_categoryController.text.trim()) {
+      case 'Admission':
+        print("🔍 Analyzing admission document...");
+        final admissionCohere = await _cohereService.analyzeAdmission(_extractedText!);
 
           print("📋 Admission analysis result: $admissionCohere");
 
@@ -554,69 +553,58 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
             print("❌ Error processing steps: $e");
             stepsList = <String>[];
           }
+ final admissions = Admissions(
+          id: documentId,
+          steps: stepsList,
+          requirements: admissionCohere['requirements'],
+          title: _titleController.text.trim(),
+          content: _extractedText!,
+          contact: contactsList,
+          academicYear: admissionCohere['academicYear'],
+          links: admissionCohere['links'],
+          source: _selectedFileName ?? 'Unknown',
+          createdAt: DateTime.now(),
+        );
 
-          final admissions = Admissions(
-            id: documentId,
-            steps: stepsList,
-            requirements: admissionCohere['requirements'],
-            title: _titleController.text.trim(),
-            content: _extractedText!,
-            contact: contactsList,
-            academicYear: admissionCohere['academicYear'],
-            links: admissionCohere['links'],
-            source: _selectedFileName ?? 'Unknown',
-            createdAt: DateTime.now(),
+        // 🔥 Pass sourceDocumentId to skip Info Bank creation
+        await _fileService.saveToAdmission(admissions, sourceDocumentId: documentId);
+        break;
+
+           case 'Scholarship':
+        print("🔍 Analyzing scholarship document...");
+        final scholarshipCohere = await _cohereService.analyzeScholarship(_extractedText!);
+
+        if (scholarshipCohere['scholarships'] is List &&
+            scholarshipCohere['scholarships'].isNotEmpty) {
+          List<dynamic> scholarshipDataList = scholarshipCohere['scholarships'];
+          List<Scholarship> scholarships = [];
+
+          for (int i = 0; i < scholarshipDataList.length; i++) {
+            final scholarshipData = scholarshipDataList[i];
+            final scholarshipId = i == 0 ? documentId : '${documentId}_$i';
+
+            final scholarship = Scholarship(
+              scholarshipID: scholarshipId,
+              sourceId: scholarshipId,
+              name: scholarshipData['name'] ?? 'Unnamed Scholarship',
+              description: scholarshipData['description'] ?? 'No description available',
+              scholarshipProvider: scholarshipData['scholarshipProvider'] ?? 'Unknown Provider',
+              eligibilityRequirements: scholarshipData['eligibilityRequirements'] ?? <String>[],
+              privileges: scholarshipData['privileges'] ?? <String>[],
+              deadline: scholarshipCohere['deadline'],
+              applicationLink: scholarshipData['application_link'] ?? '',
+              createdAt: DateTime.now(),
+            );
+
+            scholarships.add(scholarship);
+          }
+
+          // 🔥 Pass sourceDocumentId to skip Info Bank creation
+          await _fileService.saveMultipleScholarships(
+            scholarships,
+            sourceDocumentId: documentId,
           );
 
-          await _fileService.saveToAdmission(admissions);
-          break;
-
-        case 'Scholarship':
-          print("🔍 Analyzing scholarship document...");
-          final scholarshipCohere = await _cohereService.analyzeScholarship(
-            _extractedText!,
-          );
-
-          print("📋 Scholarship analysis result: $scholarshipCohere");
-
-          if (scholarshipCohere['scholarships'] is List &&
-              scholarshipCohere['scholarships'].isNotEmpty) {
-            List<dynamic> scholarshipDataList =
-                scholarshipCohere['scholarships'];
-            print("📚 Found ${scholarshipDataList.length} scholarship(s)");
-
-            List<Scholarship> scholarships = [];
-
-            for (int i = 0; i < scholarshipDataList.length; i++) {
-              final scholarshipData = scholarshipDataList[i];
-              final scholarshipId = i == 0 ? documentId : '${documentId}_$i';
-
-              print(
-                "📝 Preparing scholarship ${i + 1}/${scholarshipDataList.length} with ID: $scholarshipId",
-              );
-
-              final scholarship = Scholarship(
-                scholarshipID: scholarshipId,
-                sourceId: scholarshipId,
-                name: scholarshipData['name'] ?? 'Unnamed Scholarship',
-                description:
-                    scholarshipData['description'] ??
-                    'No description available',
-                scholarshipProvider:
-                    scholarshipData['scholarshipProvider'] ??
-                    'Unknown Provider',
-                eligibilityRequirements:
-                    scholarshipData['eligibilityRequirements'] ?? <String>[],
-                privileges: scholarshipData['privileges'] ?? <String>[],
-                deadline: scholarshipCohere['deadline'],
-                applicationLink: scholarshipData['application_link'] ?? '',
-                createdAt: DateTime.now(),
-              );
-
-              scholarships.add(scholarship);
-            }
-
-            await _fileService.saveMultipleScholarships(scholarships);
 
             SnackbarUtil.showSuccess(
               context,
@@ -631,55 +619,42 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
           }
           break;
 
-        case 'Placement':
-          print("🔍 Analyzing placement document...");
-          final placementCohere = await _cohereService.analyzePlacement(
-            _extractedText!,
+      
+      case 'Placement':
+        print("🔍 Analyzing placement document...");
+        final placementCohere = await _cohereService.analyzePlacement(_extractedText!);
+
+        if (placementCohere['placements'] is List &&
+            placementCohere['placements'].isNotEmpty) {
+          List<dynamic> placementDataList = placementCohere['placements'];
+          List<Placement> placements = [];
+
+          for (int i = 0; i < placementDataList.length; i++) {
+            final placementData = placementDataList[i];
+            final placementId = i == 0 ? documentId : '${documentId}_$i';
+
+            final placement = Placement(
+              placementID: placementId,
+              isRecruiting: true,
+              partnerCompany: placementData['partnerCompany'] ?? 'Unnamed Placement',
+              contacts: placementData['contacts'] is List
+                  ? List<String>.from(placementData['contacts'].map((e) => e.toString()))
+                  : <String>[],
+              positions: placementData['positions'] is List
+                  ? List<String>.from(placementData['positions'].map((e) => e.toString()))
+                  : <String>[],
+              createdAt: DateTime.tryParse(placementData['createdAt'] ?? '') ?? DateTime.now(),
+            );
+
+            placements.add(placement);
+          }
+
+          // 🔥 Pass sourceDocumentId to skip Info Bank creation
+          await _fileService.saveMultiplePlacements(
+            placements,
+            sourceDocumentId: documentId,
           );
 
-          print("📋 Placement analysis result: $placementCohere");
-
-          if (placementCohere['placements'] is List &&
-              placementCohere['placements'].isNotEmpty) {
-            List<dynamic> placementDataList = placementCohere['placements'];
-            print("📚 Found ${placementDataList.length} placement(s)");
-
-            List<Placement> placements = [];
-
-            for (int i = 0; i < placementDataList.length; i++) {
-              final placementData = placementDataList[i];
-              final placementId = i == 0 ? documentId : '${documentId}_$i';
-
-              print(
-                "📝 Preparing placement ${i + 1}/${placementDataList.length} with ID: $placementId",
-              );
-
-              final placement = Placement(
-                placementID: placementId,
-                isRecruiting: true,
-                partnerCompany:
-                    placementData['partnerCompany'] ?? 'Unnamed Placement',
-                contacts:
-                    placementData['contacts'] is List
-                        ? List<String>.from(
-                          placementData['contacts'].map((e) => e.toString()),
-                        )
-                        : <String>[],
-                positions:
-                    placementData['positions'] is List
-                        ? List<String>.from(
-                          placementData['positions'].map((e) => e.toString()),
-                        )
-                        : <String>[],
-                createdAt:
-                    DateTime.tryParse(placementData['createdAt'] ?? '') ??
-                    DateTime.now(),
-              );
-
-              placements.add(placement);
-            }
-
-            await _fileService.saveMultiplePlacements(placements);
 
             SnackbarUtil.showSuccess(
               context,

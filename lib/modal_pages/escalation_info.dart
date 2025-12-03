@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 class EscalationDetailModal extends StatefulWidget {
   final String escalationId;
@@ -467,20 +468,51 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    data['botAnswer'] ??
-                                        'No bot response available',
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      height: 1.6,
-                                      color: Color(0xFF1F2937),
-                                    ),
-                                    maxLines: _showFullBotResponse ? null : 3,
-                                    overflow:
-                                        _showFullBotResponse
-                                            ? null
-                                            : TextOverflow.ellipsis,
-                                  ),
+                                  _showFullBotResponse
+                                      ? MarkdownBody(
+                                        data:
+                                            data['botAnswer'] ??
+                                            'No bot response available',
+                                        styleSheet: MarkdownStyleSheet(
+                                          p: const TextStyle(
+                                            fontSize: 15,
+                                            height: 1.6,
+                                            color: Color(0xFF1F2937),
+                                          ),
+                                          strong: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1B5E20),
+                                          ),
+                                          h1: const TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1B5E20),
+                                          ),
+                                          h2: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1B5E20),
+                                          ),
+                                          code: TextStyle(
+                                            backgroundColor: Colors.grey[100],
+                                            fontFamily: 'monospace',
+                                          ),
+                                          listBullet: const TextStyle(
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      )
+                                      : Text(
+                                        data['botAnswer'] ??
+                                            'No bot response available',
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          height: 1.6,
+                                          color: Color(0xFF1F2937),
+                                        ),
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                   if ((data['botAnswer'] ?? '').length > 200)
                                     Align(
                                       alignment: Alignment.centerRight,
@@ -565,18 +597,43 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                             if (data['staffResponse'] != null) ...[
                               const SizedBox(height: 24),
                               _buildSection(
-                                title: 'Staff Response',
+                                title:
+                                    'Response', // ✅ Changed from 'Staff Response' to 'Response'
                                 icon: Icons.admin_panel_settings,
                                 iconColor: const Color(0xFF2E7D32),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      data['staffResponse'],
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        height: 1.6,
-                                        color: Color(0xFF1F2937),
+                                    MarkdownBody(
+                                      // ✅ Add markdown rendering for staff response
+                                      data: data['staffResponse'],
+                                      styleSheet: MarkdownStyleSheet(
+                                        p: const TextStyle(
+                                          fontSize: 15,
+                                          height: 1.6,
+                                          color: Color(0xFF1F2937),
+                                        ),
+                                        strong: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1B5E20),
+                                        ),
+                                        h1: const TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1B5E20),
+                                        ),
+                                        h2: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1B5E20),
+                                        ),
+                                        code: TextStyle(
+                                          backgroundColor: Colors.grey[100],
+                                          fontFamily: 'monospace',
+                                        ),
+                                        listBullet: const TextStyle(
+                                          fontSize: 15,
+                                        ),
                                       ),
                                     ),
                                     if (data['respondedBy'] != null) ...[

@@ -86,7 +86,7 @@ async function findMatchingFAQ(
   query: string,
   queryEmbedding: number[],
   geminiApiKey: string,
-  similarityThreshold = 0.78
+  similarityThreshold = 0.75
 ): Promise<{ question: string; answer: string; similarity: number; category: string } | null> {
   try {
     console.log(`🔍 FAQ MATCHING START for: "${query}"`);

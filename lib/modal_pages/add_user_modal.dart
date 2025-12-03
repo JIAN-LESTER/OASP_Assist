@@ -544,13 +544,7 @@ Future<bool> _isEmailUnique(String email, {String? excludeUserId}) async {
         return;
       }
 
-      if (_selectedScholarship == 'N/A') {
-        SnackbarUtil.showWarning(
-          context,
-          'Please select a scholarship',
-        );
-        return;
-      }
+
 
       if (_selectedScholarship == 'Others' &&
           _customScholarship.trim().isEmpty) {
@@ -582,6 +576,8 @@ Future<bool> _isEmailUnique(String email, {String? excludeUserId}) async {
   });
 
   try {
+
+    
     final fullName =
         '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
     final email = _emailController.text.trim();
@@ -590,11 +586,25 @@ Future<bool> _isEmailUnique(String email, {String? excludeUserId}) async {
     final functionsService = FirebaseFunctionsService();
     String uid;
 
+        Map<String, dynamic> userData = {
+      'name': fullName,
+      'email': email,
+      'role': _selectedRole.toLowerCase().trim(),
+      'isActive': true,
+
+      'profileCompleted': true,
+      'onboardingCompleted': true,
+      'isVerified': true,
+      'emailVerified': true,
+  
+    };
+
     try {
       uid = await functionsService.createUserAuth(
         email: email,
         password: password,
         displayName: fullName,
+     userData: userData
       );
     } catch (e) {
       SnackbarUtil.showError(
@@ -607,18 +617,7 @@ Future<bool> _isEmailUnique(String email, {String? excludeUserId}) async {
       return;
     }
 
-    Map<String, dynamic> userData = {
-      'name': fullName,
-      'email': email,
-      'role': _selectedRole.toLowerCase().trim(),
-      'isActive': true,
-      'createdAt': Timestamp.now(),
-      'profileCompleted': true,
-      'onboardingCompleted': true,
-      'isVerified': true,
-      'emailVerified': true,
-      'verifiedAt': Timestamp.now(),
-    };
+
 
     if (_selectedRole.toLowerCase() == 'user') {
       userData['affiliation'] = _selectedAffiliation;
@@ -634,12 +633,12 @@ Future<bool> _isEmailUnique(String email, {String? excludeUserId}) async {
           userData['college'] = _selectedCollege;
           userData['collegeId'] = _selectedCollegeId;
           userData['program'] = _selectedProgram;
-          userData['scholarship'] =
-              _selectedScholarship == 'Others'
-                  ? _customScholarship
-                  : (_selectedScholarship != 'N/A'
-                      ? _selectedScholarship
-                      : null);
+        userData['scholarship'] =
+    _selectedScholarship == 'Others'
+        ? _customScholarship
+        : (_selectedScholarship != 'N/A'
+            ? _selectedScholarship
+            : null);
           userData['graduateType'] = null;
           userData['graduatedCollege'] = null;
           userData['graduatedCollegeId'] = null;

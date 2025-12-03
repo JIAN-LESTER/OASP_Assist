@@ -1225,6 +1225,7 @@ List<ChartData> generateConversationTrend(
 
 String _getTimeKey(DateTime dateTime, String timeFrame) {
   return switch (timeFrame) {
+    'All' => "${dateTime.year}", // Group by year for "All"
     'Today' => "${dateTime.hour.toString().padLeft(2, '0')}:00",
     'This Week' =>
       "${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}",
@@ -1241,12 +1242,54 @@ List<ChartData> generateTrendData(
   Map<String, Map<String, int>> timeCategoryCounts,
 ) {
   return switch (timeFrame) {
+    'All' => _generateAllTimeTrend(startDate, timeCategoryCounts), // Add this case
     'Today' => _generateHourlyTrend(timeCategoryCounts),
     'This Week' => _generateWeeklyTrend(startDate, timeCategoryCounts),
     'This Month' => _generateMonthlyTrend(timeCategoryCounts),
     'This Year' => _generateYearlyTrend(startDate, timeCategoryCounts),
     _ => _generateYearlyTrend(startDate, timeCategoryCounts),
   };
+}
+
+List<ChartData> _generateAllTimeTrend(
+  DateTime startDate,
+  Map<String, Map<String, int>> data,
+) {
+  // Find the earliest and latest years in the data
+  final years = data.keys
+      .map((key) => int.tryParse(key))
+      .where((year) => year != null)
+      .cast<int>()
+      .toList();
+  
+  if (years.isEmpty) {
+    return [];
+  }
+  
+  years.sort();
+  final earliestYear = years.first;
+  final latestYear = DateTime.now().year;
+  
+  // Generate data for all years from earliest to current
+  final trend = <ChartData>[];
+  for (int year = earliestYear; year <= latestYear; year++) {
+    final yearKey = year.toString();
+    final categoryBreakdown = data[yearKey] ?? <String, int>{};
+    final totalCount = categoryBreakdown.values.fold(
+      0,
+      (sum, count) => sum + count,
+    );
+
+    trend.add(
+      ChartData(
+        date: yearKey,
+        count: totalCount,
+        categoryBreakdown: categoryBreakdown,
+      ),
+    );
+  }
+
+  return trend;
 }
 
 List<ChartData> generateConversationTrendData(

@@ -101,16 +101,17 @@ export const createUser = onCall(
         name: displayName || email.split("@")[0],
         role: role || "user",
         profileComplete: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(), // ✅ Add server timestamp
+  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  verifiedAt: admin.firestore.FieldValue.serverTimestamp(), // ✅ Add server timestamp
         createdBy: callerUid,
         isActive: true,
         isVerified: true,
         emailVerified: true,
         hasSeenOnboardingGuide: false,
         profileCompleted: true,
-        onBoardingCompleted: true,
-        verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        onboardingCompleted: true,
+
         verificationEmailSent: false,
         dailyMessageCount: 0,
         lastMessageResetDate: admin.firestore.FieldValue.serverTimestamp(),

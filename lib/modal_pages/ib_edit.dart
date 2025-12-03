@@ -12,9 +12,12 @@ void showEditIBModal(
 }) {
   final userData = userDoc.data() as Map<String, dynamic>;
   final titleController = TextEditingController(
-    text: userData['ib_title'] ?? '',
+    text: userData['ib_title'] ?? userData['title'] ?? '',
   );
-  String selectedCategory = userData['category'] ?? 'General';
+  
+  // FIX: Normalize the category value to match dropdown items
+  String rawCategory = userData['category'] ?? 'General';
+  String selectedCategory = _normalizeCategory(rawCategory);
 
   final categories = ['Admission', 'Scholarship', 'Placement', 'General'];
 
@@ -83,15 +86,6 @@ void showEditIBModal(
                                           context,
                                           userDoc,
                                           fromEdit: true,
-                                        );
-                                      } else if (previousModal ==
-                                          'fullContent') {
-                                        _showFullContentModal(
-                                          context,
-                                          userData,
-                                          isMobile,
-                                          isTablet,
-                                          userDoc,
                                         );
                                       }
                                     },
@@ -286,29 +280,25 @@ void showEditIBModal(
                                   vertical: 16,
                                 ),
                               ),
-                              items:
-                                  categories.map((category) {
-                                    return DropdownMenuItem<String>(
-                                      value: category,
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 8,
-                                            height: 8,
-                                            decoration: BoxDecoration(
-                                              color: _getCategoryColor(
-                                                category,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Text(category),
-                                        ],
+                              items: categories.map((category) {
+                                return DropdownMenuItem<String>(
+                                  value: category,
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          color: _getCategoryColor(category),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
                                       ),
-                                    );
-                                  }).toList(),
+                                      const SizedBox(width: 12),
+                                      Text(category),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
                               onChanged: (String? newValue) {
                                 if (newValue != null) {
                                   setState(() {
@@ -320,11 +310,11 @@ void showEditIBModal(
 
                             const SizedBox(height: 32),
 
-                            // Action Buttons
+                            // Action Buttons - ✅ Pass titleController directly
                             _buildActionButtons(
                               context,
                               userDoc,
-                              titleController.text.trim(),
+                              titleController,
                               selectedCategory,
                               previousModal,
                               isMobile,
@@ -363,19 +353,14 @@ void showEditIBModal(
 Widget _buildActionButtons(
   BuildContext context,
   DocumentSnapshot userDoc,
-  String title,
+  TextEditingController titleController, // ✅ Changed to accept controller
   String selectedCategory,
   String? previousModal,
   bool isMobile,
   bool isTablet,
   bool isDesktop,
 ) {
-  double buttonHeight =
-      isMobile
-          ? 40
-          : isTablet
-          ? 44
-          : 46;
+  double buttonHeight = isMobile ? 40 : isTablet ? 44 : 46;
   double fontSize = isMobile ? 14 : 15;
   double borderRadius = 10;
 
@@ -406,14 +391,18 @@ Widget _buildActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: ElevatedButton.icon(
-            onPressed:
-                () => _handleSaveChanges(
-                  context,
-                  userDoc,
-                  title,
-                  selectedCategory,
-                  previousModal,
-                ),
+            onPressed: () {
+              // ✅ Get the value at the time of button press
+              final title = titleController.text.trim();
+              print('Saving with title: $title'); // Debug
+              _handleSaveChanges(
+                context,
+                userDoc,
+                title,
+                selectedCategory,
+                previousModal,
+              );
+            },
             icon: const Icon(Icons.save_outlined, size: 18),
             label: Text(
               'Save Changes',
@@ -743,6 +732,8 @@ Future<void> _handleSaveChanges(
   String category,
   String? previousModal,
 ) async {
+  print('_handleSaveChanges called with title: $title'); // Debug
+  
   if (title.isEmpty) {
     SnackbarUtil.showError(context, 'Please enter a document title');
     return;
@@ -753,32 +744,48 @@ Future<void> _handleSaveChanges(
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder:
-          (context) => const Center(
-            child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-          ),
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+      ),
     );
+
+    // Prepare update data - ALWAYS update both title fields
+    Map<String, dynamic> updateData = {
+      'ib_title': title,
+      'title': title,
+      'category': category,
+      'categoryID': category.toLowerCase(),
+      'categoryType': category.toLowerCase(),
+      'updatedAt': Timestamp.now(),
+    };
+
+    print('Updating document ${userDoc.id} with data: $updateData'); // Debug
 
     // Update the document
     await FirebaseFirestore.instance
         .collection('information_bank')
         .doc(userDoc.id)
-        .update({
-          'ib_title': title,
-          'category': category,
-          'updatedAt': Timestamp.now(),
-        });
+        .update(updateData);
+
+    print('Document updated successfully'); // Debug
+
+    // ✅ Fetch the updated document
+    final updatedDocSnapshot = await FirebaseFirestore.instance
+        .collection('information_bank')
+        .doc(userDoc.id)
+        .get();
+
+    print('Fetched updated document: ${updatedDocSnapshot.data()}'); // Debug
 
     // Get current user for logging
     final currentUser = FirebaseAuth.instance.currentUser;
     String actorName = 'Unknown';
 
     if (currentUser != null) {
-      final doc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(currentUser.uid)
-              .get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         actorName = data['name'] ?? currentUser.email ?? 'Unknown';
@@ -790,36 +797,46 @@ Future<void> _handleSaveChanges(
     final logData = {
       'logId': logRef.id,
       'user': actorName,
-      'action': 'Updated document: $title',
+      'action': 'Updated document: $title (Category: $category)',
       'time': Timestamp.now(),
     };
     await logRef.set(logData);
 
-    // Close loading and modal, then navigate back if needed
+    // Close loading and modal
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
       Navigator.of(context).pop(); // Close edit modal
 
-      // Use Future.delayed to prevent black screen flash
+      // Navigate back with the UPDATED document
       Future.delayed(const Duration(milliseconds: 200), () {
-        // If we came from another modal, show it again
         if (previousModal == 'info') {
-          showIBInfoModal(context, userDoc, fromEdit: true);
-        } else if (previousModal == 'fullContent') {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          final screenWidth = MediaQuery.of(context).size.width;
-          final isMobile = screenWidth < 600;
-          final isTablet = screenWidth >= 600 && screenWidth < 1024;
-          _showFullContentModal(context, userData, isMobile, isTablet, userDoc);
+          showIBInfoModal(context, updatedDocSnapshot, fromEdit: true);
         }
       });
 
       SnackbarUtil.showSuccess(context, 'Document updated successfully');
     }
   } catch (e) {
+    print('Error updating document: $e'); // Debug
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
-      SnackbarUtil.showError(context, 'Failed to update document');
+      SnackbarUtil.showError(context, 'Failed to update document: $e');
     }
+  }
+}
+
+
+String _normalizeCategory(String category) {
+  // Convert to lowercase for comparison, then return proper case
+  switch (category.toLowerCase()) {
+    case 'admission':
+      return 'Admission';
+    case 'scholarship':
+      return 'Scholarship';
+    case 'placement':
+      return 'Placement';
+    case 'general':
+    default:
+      return 'General';
   }
 }

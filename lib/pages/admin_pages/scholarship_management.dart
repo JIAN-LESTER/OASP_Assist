@@ -69,7 +69,7 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage> {
   }
 
   void _loadScholarships() {
-    FirebaseFirestore.instance.collection('scholarships').snapshots().listen((
+    FirebaseFirestore.instance.collection('scholarships').orderBy('createdAt', descending: true).snapshots().listen((
       snapshot,
     ) {
       setState(() {

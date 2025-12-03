@@ -28,13 +28,12 @@ class InformationBankPage extends StatefulWidget {
 
 // Replace the _InformationBankPageState class with this optimized version:
 
+
 class _InformationBankPageState extends State<InformationBankPage> {
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
-  bool isLoading = false;
-
-
+  bool isLoading = true; // ✅ Start with loading true
   final StatDataManagement statData = StatDataManagement();
 
   InformationBankData? ibData;
@@ -45,7 +44,7 @@ class _InformationBankPageState extends State<InformationBankPage> {
   void _onCategoryChanged(String newCategory) {
     setState(() {
       selectedCategory = newCategory;
-      currentPage = 1; // Reset to first page when category changes
+      currentPage = 1;
     });
   }
 
@@ -53,38 +52,37 @@ class _InformationBankPageState extends State<InformationBankPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-
-    // ✅ Initialize the stream once
-
-    // ✅ Load stats asynchronously without blocking UI
     _loadStatsAsync();
   }
 
-  // ✅ Load stats in background without blocking
+  // ✅ Set isLoading to false after data loads
   Future<void> _loadStatsAsync() async {
     try {
       final data = await statData.getInformationBankData();
       if (mounted) {
         setState(() {
           ibData = data;
+          isLoading = false; // ✅ Done loading
         });
       }
     } catch (e) {
       print("Error loading information bank data: $e");
+      if (mounted) {
+        setState(() {
+          isLoading = false; // ✅ Still stop loading even on error
+        });
+      }
     }
   }
 
   void _onSearchChanged() {
-
-        setState(() {
-          currentPage = 1;
-    
+    setState(() {
+      currentPage = 1;
     });
   }
 
   @override
   void dispose() {
-   
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
@@ -105,10 +103,17 @@ class _InformationBankPageState extends State<InformationBankPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Show loading spinner while stats are loading
     if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF2E7D32),
+          ),
+        ),
+      );
     }
-
 
     return ResponsiveLayout(
       mobileBody: MobileInformationBank(

@@ -40,7 +40,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    _usersStream = FirebaseFirestore.instance.collection('users').snapshots();
+    _usersStream = FirebaseFirestore.instance.collection('users').orderBy('createdAt', descending: true).snapshots();
     loadStatData();
   }
 

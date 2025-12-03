@@ -70,7 +70,7 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
   }
 
   void loadPlacements() {
-    FirebaseFirestore.instance.collection('placements').snapshots().listen((
+    FirebaseFirestore.instance.collection('placements').orderBy('createdAt', descending: true).snapshots().listen((
       snapshot,
     ) {
       setState(() {

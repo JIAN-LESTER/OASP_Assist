@@ -104,6 +104,7 @@ class FirebaseFunctionsService {
     String? displayName,
     String? affiliation,
     String? scholarship,
+     required Map<String, dynamic> userData, // 👈 Pass all data
   }) async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -120,6 +121,8 @@ class FirebaseFunctionsService {
           'affiliation': affiliation,
         if (scholarship != null && scholarship.isNotEmpty) 
           'scholarship': scholarship,
+        if(userData != null && userData.isNotEmpty)
+         ...userData, 
       };
       
       final responseData = await _callFunction('createUser', data);

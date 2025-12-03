@@ -2488,87 +2488,86 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
   }
 
-  void _sendMessage(ChatProvider chatProvider) async {
-    final text = _controller.text.trim();
-    if (text.isEmpty || chatProvider.isLoading) return;
 
-    // ✅ Check if user should see warning (5 or 1 messages left)
-    final remainingMessages =
-        ChatProvider.MAX_DAILY_MESSAGES - chatProvider.userDailyMessageCount;
+void _sendMessage(ChatProvider chatProvider) async {
+  final text = _controller.text.trim();
+  if (text.isEmpty || chatProvider.isLoading) return;
 
-    if (remainingMessages == 2) {
-      // ✅ Show warning dialog and WAIT for confirmation
-      final bool? shouldContinue = await showDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder:
-            (context) => MessageLimitWarningDialog(
-              remainingMessages: remainingMessages,
-              timeUntilReset: chatProvider.getTimeUntilReset(),
-            ),
-      );
+  final remainingMessages =
+      ChatProvider.MAX_DAILY_MESSAGES - chatProvider.userDailyMessageCount;
 
-      // ✅ If user cancels or closes dialog, stop here
-      if (shouldContinue != true) {
-        return; // Don't send the message
-      }
-    }
+  if (remainingMessages == 2) {
+    // ✅ CRITICAL: Dismiss keyboard before showing dialog
+    FocusScope.of(context).unfocus();
+    
+    // ✅ Wait for keyboard animation to complete
+    await Future.delayed(Duration(milliseconds: 300));
+    
+    final bool? shouldContinue = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => MessageLimitWarningDialog(
+        remainingMessages: remainingMessages,
+        timeUntilReset: chatProvider.getTimeUntilReset(),
+      ),
+    );
 
-    // ✅ Check if completely out of messages
-    if (chatProvider.isMessageLimitReached) {
-      final timeUntilReset = chatProvider.getTimeUntilReset();
-
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder:
-            (context) => MessageLimitDialog(timeUntilReset: timeUntilReset),
-      );
+    if (shouldContinue != true) {
       return;
     }
+  }
 
-    _controller.clear();
+  // ✅ Check if completely out of messages
+  if (chatProvider.isMessageLimitReached) {
+    // ✅ Also dismiss keyboard for limit reached dialog
+    FocusScope.of(context).unfocus();
+    await Future.delayed(Duration(milliseconds: 300));
+    
+    final timeUntilReset = chatProvider.getTimeUntilReset();
 
-    if (_showFAQs && mounted) {
-      setState(() {
-        _showFAQs = false;
-      });
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => MessageLimitDialog(timeUntilReset: timeUntilReset),
+    );
+    return;
+  }
+
+  _controller.clear();
+
+  if (_showFAQs && mounted) {
+    setState(() {
+      _showFAQs = false;
+    });
+  }
+
+  try {
+    await chatProvider.askQuestionWithStreaming(context, text);
+    await Future.delayed(Duration(milliseconds: 100));
+    if (mounted && _scrollController.hasClients) {
+      _scrollToBottomSmooth();
     }
-
-    try {
-      await chatProvider.askQuestionWithStreaming(context, text);
-
-      await Future.delayed(Duration(milliseconds: 100));
-      if (mounted && _scrollController.hasClients) {
-        _scrollToBottomSmooth();
-      }
-    } catch (e) {
-      debugPrint('Error sending message: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  Icons.error_outline_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                SizedBox(width: 12),
-                Expanded(child: Text('Error sending message: ${e.toString()}')),
-              ],
-            ),
-            backgroundColor: Colors.red.shade400,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: EdgeInsets.all(16),
+  } catch (e) {
+    debugPrint('Error sending message: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Expanded(child: Text('Error sending message: ${e.toString()}')),
+            ],
           ),
-        );
-      }
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: EdgeInsets.all(16),
+        ),
+      );
     }
   }
+}
 
   @override
   void dispose() {

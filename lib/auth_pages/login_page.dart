@@ -120,13 +120,21 @@ class _LoginPageState extends State<LoginPage> {
 
   // Validate email
   bool _validateEmail(String email) {
+    // Check if empty
     if (email.trim().isEmpty) {
-      _setEmailError('Please enter your email');
+      _setEmailError('Email address is required');
       return false;
     }
 
+    // Check if valid email format
     if (!_isValidEmail(email.trim())) {
       _setEmailError('Please enter a valid email address');
+      return false;
+    }
+
+    // Check email length
+    if (email.trim().length > 320) {
+      _setEmailError('Email address is too long');
       return false;
     }
 
@@ -137,8 +145,15 @@ class _LoginPageState extends State<LoginPage> {
 
   // Validate password
   bool _validatePassword(String password) {
+    // Check if empty
     if (password.isEmpty) {
-      _setPasswordError('Please enter your password');
+      _setPasswordError('Password is required');
+      return false;
+    }
+
+    // Check minimum length
+    if (password.length < 6) {
+      _setPasswordError('Password must be at least 6 characters');
       return false;
     }
 
@@ -147,12 +162,17 @@ class _LoginPageState extends State<LoginPage> {
     return true;
   }
 
-  // Sign in Method
+  // Enhanced sign in method with better error handling
   void signUserIn() async {
+    // Clear all previous errors
     _clearErrors();
 
-    bool isEmailValid = _validateEmail(emailController.text);
-    bool isPasswordValid = _validatePassword(passwordController.text);
+    // Validate inputs
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+
+    bool isEmailValid = _validateEmail(email);
+    bool isPasswordValid = _validatePassword(password);
 
     if (!isEmailValid || !isPasswordValid) {
       return;
@@ -161,15 +181,25 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
+      // Attempt to sign in
       UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(
-            email: emailController.text.trim(),
-            password: passwordController.text,
+            email: email,
+            password: password,
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw TimeoutException('Connection timeout. Please try again.');
+            },
           );
 
       final user = userCredential.user;
+      
       if (user == null) {
-        throw Exception("Sign in failed - no user returned");
+        _setGeneralError('Sign in failed. Please try again.');
+        setState(() => _isLoading = false);
+        return;
       }
 
       // Check email verification
@@ -178,54 +208,109 @@ class _LoginPageState extends State<LoginPage> {
         if (mounted) {
           setState(() => _isLoading = false);
           _setVerificationError(
-            'Please verify your email before signing in. Check your inbox or spam folder.',
+            'Email not verified. Please check your inbox and verify your email address before signing in.',
           );
         }
         return;
       }
 
       // Update Firestore verification status
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({
-            'isVerified': true,
-            'emailVerified': true,
-            'verifiedAt': FieldValue.serverTimestamp(),
-          });
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+              'isVerified': true,
+              'emailVerified': true,
+              'verifiedAt': FieldValue.serverTimestamp(),
+            })
+            .timeout(const Duration(seconds: 10));
+      } catch (firestoreError) {
+        print('⚠️ Failed to update verification status: $firestoreError');
+        // Don't block login if this fails
+      }
 
-      print("Sign in successful");
+      print("✅ Sign in successful: ${user.email}");
+      
+    } on TimeoutException catch (e) {
+      print("⏱️ Timeout Error: $e");
+      _setGeneralError('Connection timeout. Please check your internet connection and try again.');
+      
     } on FirebaseAuthException catch (e) {
-   
-
+      print("🔥 Firebase Auth Error: ${e.code} - ${e.message}");
+      
       switch (e.code) {
         case 'user-not-found':
-          _setEmailError('No user found with this email');
+          _setEmailError('No account found with this email address');
           break;
+          
         case 'wrong-password':
-          _setPasswordError('Incorrect password');
+          _setPasswordError('Incorrect password. Please try again.');
           break;
+          
         case 'invalid-email':
-          _setEmailError('Invalid email address');
+          _setEmailError('Invalid email address format');
           break;
+          
         case 'user-disabled':
-          _setGeneralError('This account has been disabled');
+          _setGeneralError('This account has been disabled. Please contact support.');
           break;
+          
         case 'too-many-requests':
-          _setGeneralError('Too many failed attempts. Try again later');
+          _setGeneralError('Too many failed login attempts. Please try again later or reset your password.');
           break;
+          
         case 'invalid-credential':
-          _setGeneralError('Invalid email or password');
+          _setGeneralError('Invalid email or password. Please check your credentials.');
           break;
+          
         case 'network-request-failed':
-          _setGeneralError('Network error. Please check your connection');
+          _setGeneralError('Network error. Please check your internet connection.');
           break;
+          
+        case 'operation-not-allowed':
+          _setGeneralError('Email/password sign in is not enabled. Please contact support.');
+          break;
+          
+        case 'email-already-in-use':
+          _setEmailError('This email is already registered');
+          break;
+          
+        case 'weak-password':
+          _setPasswordError('Password is too weak');
+          break;
+          
+        case 'account-exists-with-different-credential':
+          _setGeneralError('An account already exists with a different sign-in method.');
+          break;
+          
+        case 'invalid-verification-code':
+          _setGeneralError('Invalid verification code');
+          break;
+          
+        case 'invalid-verification-id':
+          _setGeneralError('Invalid verification ID');
+          break;
+          
+        case 'session-expired':
+          _setGeneralError('Session expired. Please try again.');
+          break;
+          
         default:
-          _setGeneralError(e.message ?? 'Login failed. Please try again');
+          // For unknown Firebase errors, show a user-friendly message
+          _setGeneralError(
+            'Login failed: ${_getFriendlyErrorMessage(e.message ?? 'Unknown error')}'
+          );
       }
+      
+    } on SocketException catch (e) {
+      print("🌐 Network Error: $e");
+      _setGeneralError('No internet connection. Please check your network and try again.');
+      
     } catch (e) {
-      print("General Error: $e");
-      _setGeneralError('An unexpected error occurred. Please try again');
+      print("❌ Unexpected Error: $e");
+      _setGeneralError('An unexpected error occurred. Please try again or contact support.');
+      
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -233,9 +318,50 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // Email validation helper
+  // Helper to convert technical error messages to user-friendly ones
+  String _getFriendlyErrorMessage(String technicalMessage) {
+    final lowerMessage = technicalMessage.toLowerCase();
+    
+    if (lowerMessage.contains('network')) {
+      return 'Network connection issue';
+    } else if (lowerMessage.contains('timeout')) {
+      return 'Connection timed out';
+    } else if (lowerMessage.contains('permission')) {
+      return 'Permission denied';
+    } else if (lowerMessage.contains('not found')) {
+      return 'Resource not found';
+    } else if (lowerMessage.contains('already exists')) {
+      return 'Already exists';
+    } else {
+      return 'Please try again';
+    }
+  }
+
+  // Email validation helper with comprehensive checks
   bool _isValidEmail(String email) {
-    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+    if (email.isEmpty) return false;
+    
+    // Basic format check
+    final emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    );
+    
+    if (!emailRegex.hasMatch(email)) return false;
+    
+    // Additional checks
+    final parts = email.split('@');
+    if (parts.length != 2) return false;
+    
+    final localPart = parts[0];
+    final domainPart = parts[1];
+    
+    // Check local part
+    if (localPart.isEmpty || localPart.length > 64) return false;
+    
+    // Check domain part
+    if (domainPart.isEmpty || !domainPart.contains('.')) return false;
+    
+    return true;
   }
 
   // Build error text widget with animation
@@ -386,12 +512,12 @@ class _LoginPageState extends State<LoginPage> {
               height: 120,
               child: Image.asset(
                 'lib/images/oasp.png',
-                fit: BoxFit.contain, // or BoxFit.cover / BoxFit.fitWidth
+                fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Icon(
                     Icons.smart_toy_outlined,
                     color: Color(0xFF2E7D32),
-                    size: 100, // optional smaller icon size
+                    size: 100,
                   );
                 },
               ),

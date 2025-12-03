@@ -72,6 +72,7 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
   void _loadAdmissions() {
     FirebaseFirestore.instance
         .collection('admissions')
+        .orderBy('createdAt', descending: true)
         .snapshots()
         .listen(
           (snapshot) {

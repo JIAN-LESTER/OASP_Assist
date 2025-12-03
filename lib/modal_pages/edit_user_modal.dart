@@ -1323,13 +1323,7 @@ class _EditUserModalState extends State<EditUserModal> {
             return;
           }
 
-          if (_selectedScholarship == null || _selectedScholarship == 'N/A') {
-            SnackbarUtil.showWarning(
-              context,
-              'Please select a scholarship or choose "Others"',
-            );
-            return;
-          }
+   
         }
 
         if (_selectedStudentType == 'graduate') {
@@ -1380,10 +1374,7 @@ class _EditUserModalState extends State<EditUserModal> {
           return;
         }
 
-        if (_selectedScholarship == null || _selectedScholarship == 'N/A') {
-          SnackbarUtil.showWarning(context, 'Please select a scholarship');
-          return;
-        }
+   
 
         if (_selectedScholarship == 'Others' &&
             _customScholarship.trim().isEmpty) {

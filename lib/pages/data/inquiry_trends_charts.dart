@@ -136,6 +136,8 @@ double _getGridInterval(List<ChartData> trendData) {
 
 double _getBottomTitleInterval(int dataLength, String timeFrame) {
   switch (timeFrame) {
+    case 'All':
+      return 1.0; // ADD THIS CASE
     case 'Today':
       return dataLength <= 12 ? 2.0 : 4.0;
     case 'This Week':
@@ -153,6 +155,8 @@ double _getBottomTitleInterval(int dataLength, String timeFrame) {
 
 String _formatBottomTitle(String date, String timeFrame) {
   switch (timeFrame) {
+    case 'All':
+      return date; // ADD THIS CASE - displays full year
     case 'Today':
       if (date.contains(":")) {
         int hour = int.tryParse(date.split(":")[0]) ?? 0;
@@ -172,7 +176,6 @@ String _formatBottomTitle(String date, String timeFrame) {
       return date.length <= 3 ? date : date.substring(0, 3);
   }
 }
-
 Widget buildSeasonalTrendsCard(Map<String, int> seasonalTrends) {
   final sortedData = seasonalTrends.entries.toList();
   sortedData.sort((a, b) => a.key.compareTo(b.key));
