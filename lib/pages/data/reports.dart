@@ -2,6 +2,7 @@ import 'package:capstone_project/pages/data/chatbot_usage_data.dart';
 import 'package:capstone_project/pages/data/inquiry_trends_data.dart';
 import 'package:capstone_project/pages/data/user_demographics_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 class ChartData {
   final String date;
@@ -782,36 +783,6 @@ List<ChartData> _buildResponseTimeTrend(
   return trendData;
 }
 
-  List<ChartData>? _generateResponseTimeTrend(
-    Map<String, List<double>> responseTimeData,
-    String timeFrame,
-  ) {
-    try {
-      return _generateTrendDataFromAverages(responseTimeData, timeFrame);
-    } catch (e) {
-      print('Error generating response time trend: $e');
-      return [];
-    }
-  }
-
-  List<ChartData> _generateTrendDataFromAverages(
-    Map<String, List<double>> data,
-    String timeFrame,
-  ) {
-    final trendData = <ChartData>[];
-    final sortedKeys = data.keys.toList()..sort();
-
-    for (final key in sortedKeys) {
-      final values = data[key]!;
-      final average =
-          values.isNotEmpty
-              ? values.reduce((a, b) => a + b) / values.length
-              : 0.0;
-      trendData.add(ChartData(date: key, count: average.round()));
-    }
-
-    return trendData;
-  }
 
 String _getSeason(int month) {
   switch (month) {
@@ -843,6 +814,40 @@ String _getSeason(int month) {
       return 'Invalid Month';
   }
 }
+
+Color getMonthColor(int month) {
+  switch (month) {
+    case 1:
+      return const Color(0xFF4A90E2);
+    case 2:
+      return const Color(0xFFE26A6A);
+    case 3:
+      return const Color(0xFF81C784);
+    case 4:
+      return const Color(0xFFFFC107);
+    case 5:
+      return const Color(0xFFFFA726);
+    case 6:
+      return const Color(0xFF29B6F6);
+    case 7:
+      return const Color(0xFFAB47BC);
+    case 8:
+      return const Color(0xFFD4E157);
+    case 9:
+      return const Color(0xFF66BB6A);
+    case 10:
+      return const Color(0xFFFF7043);
+    case 11:
+      return const Color(0xFF8D6E63);
+    case 12:
+      return const Color(0xFF1976D2);
+    default:
+      return Colors.grey;
+  }
+}
+
+
+
 
 
   List<ChartData>? _generateHourlyUsageTrend(

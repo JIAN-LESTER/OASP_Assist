@@ -1121,7 +1121,7 @@ $question
         print('   Similarity: ${similarity.toStringAsFixed(4)}');
 
         // ✅ LOWERED THRESHOLD: Changed from 0.85 to 0.75 for better matching
-        if (similarity > 0.75 && similarity > highestSimilarity) {
+        if (similarity > 0.85 && similarity > highestSimilarity) {
           highestSimilarity = similarity;
           bestMatch = {
             'question': data['question'],

@@ -437,13 +437,14 @@ Widget _buildActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: OutlinedButton.icon(
-            onPressed:
+            onPressed: 
                 () => showDeleteConfirmation(
                   context,
                   doc,
                   DeleteConfigs.users,
                   'users',
                 ),
+                
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
               'Delete',
@@ -460,6 +461,7 @@ Widget _buildActionButtons(
           ),
         ),
       ),
+
       const SizedBox(width: 12),
       // Edit Button
       Expanded(

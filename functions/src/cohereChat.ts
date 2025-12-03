@@ -456,7 +456,7 @@ async function findMatchingFAQ(
   query: string,
   queryEmbedding: number[],
   cohereApiKey: string,
-  similarityThreshold = 0.75 // ✅ LOWERED from 0.85
+  similarityThreshold = 0.85 // ✅ LOWERED from 0.85
 ): Promise<{ question: string; answer: string; similarity: number } | null> {
   try {
     console.log(`🔍 ===========================================`);

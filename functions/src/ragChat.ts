@@ -344,7 +344,7 @@ async function retrieveRelevantDocuments(
   query: string,
   queryEmbedding: number[],
   pineconeIndex: any,
-  topK = 8, // Increased from 6 to 8 for more context
+  topK = 8, 
   minSimilarityScore = 0.30
 ): Promise<Array<{
   ibID: string;

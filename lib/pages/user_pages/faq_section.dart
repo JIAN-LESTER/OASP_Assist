@@ -29,7 +29,7 @@ class FAQSection extends StatefulWidget {
 }
 
 class FAQSectionState extends State<FAQSection>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   Map<String, List<Map<String, String>>> faqCategories = {};
   bool _isLoadingFAQs = true;
   String? _expandedCategory;
@@ -40,17 +40,19 @@ class FAQSectionState extends State<FAQSection>
   bool _isListening = false;
   bool _speechAvailable = false;
   String _lastWords = '';
+  Timer? _listeningTimer;
+
 
   final List<String> categoryOrder = [
-    'General',
     'Admission',
     'Scholarship',
     'Placement',
   ];
 
-  @override
+ @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _expandController = AnimationController(
       duration: Duration(milliseconds: 300),
       vsync: this,
@@ -61,20 +63,57 @@ class FAQSectionState extends State<FAQSection>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _listeningTimer?.cancel();
     _expandController.dispose();
+    if (_isListening) {
+      _speechToText.stop();
+    }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Stop listening when app goes to background
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      if (_isListening) {
+        _stopListening();
+      }
+    }
   }
 
   Future<void> _initSpeechToText() async {
     _speechToText = stt.SpeechToText();
+    
+    // First check if microphone permission is granted
+    final permissionStatus = await Permission.microphone.status;
+    print('Initial microphone permission: $permissionStatus');
+    
+    if (!permissionStatus.isGranted) {
+      print('Microphone permission not granted, requesting...');
+      final result = await Permission.microphone.request();
+      if (!result.isGranted) {
+        print('Microphone permission denied by user');
+        _speechAvailable = false;
+        return;
+      }
+    }
+    
     try {
+      print('Initializing speech recognition...');
       _speechAvailable = await _speechToText.initialize(
         onError: (error) {
-          print('Speech recognition error: $error');
+          print('Speech recognition error: ${error.errorMsg}');
           if (mounted) {
             setState(() {
               _isListening = false;
             });
+            // Show user-friendly error message
+            _showSnackBar(
+              'Voice input error: ${_getErrorMessage(error.errorMsg)}',
+              Icons.error_outline,
+              Colors.red,
+            );
           }
         },
         onStatus: (status) {
@@ -87,70 +126,201 @@ class FAQSectionState extends State<FAQSection>
             }
           }
         },
+        debugLogging: true,
       );
-      print('Speech recognition available: $_speechAvailable');
+      
+      print('Speech recognition initialization result: $_speechAvailable');
+      
+      if (!_speechAvailable) {
+        print('Speech recognition not available after initialization');
+        if (mounted) {
+          _showSnackBar(
+            'Voice input not available on this device',
+            Icons.mic_off,
+            Colors.orange,
+          );
+        }
+      } else {
+        print('Speech recognition successfully initialized');
+      }
     } catch (e) {
       print('Failed to initialize speech recognition: $e');
       _speechAvailable = false;
+      if (mounted) {
+        _showSnackBar(
+          'Failed to initialize voice input',
+          Icons.error_outline,
+          Colors.red,
+        );
+      }
     }
   }
 
+  String _getErrorMessage(String error) {
+    if (error.contains('network')) {
+      return 'Network error';
+    } else if (error.contains('permission')) {
+      return 'Microphone permission denied';
+    } else if (error.contains('busy')) {
+      return 'Microphone is busy';
+    } else if (error.contains('not available')) {
+      return 'Not available on this device';
+    }
+    return 'Please try again';
+  }
+
   Future<void> _toggleListening() async {
-    if (!_speechAvailable) {
-      _showSnackBar(
-        'Speech recognition not available on this device',
-        Icons.mic_off,
-        Colors.orange,
-      );
+    if (_isListening) {
+      await _stopListening();
       return;
     }
 
-    // Check microphone permission
+    // Check if speech is available
+    if (!_speechAvailable) {
+      print('Speech not available, attempting to reinitialize...');
+      await _initSpeechToText();
+      
+      if (!_speechAvailable) {
+        _showSnackBar(
+          'Voice input not available. Please check your device settings.',
+          Icons.mic_off,
+          Colors.orange,
+        );
+        return;
+      }
+    }
+
+    // Double-check microphone permission before starting
     final status = await Permission.microphone.status;
+    print('Microphone permission check before listening: $status');
+
     if (!status.isGranted) {
+      print('Requesting microphone permission...');
       final result = await Permission.microphone.request();
+      print('Permission request result: $result');
+      
       if (!result.isGranted) {
         _showSnackBar(
-          'Microphone permission denied',
+          'Microphone permission is required for voice input',
           Icons.mic_off,
+          Colors.red,
+        );
+        
+        if (result.isPermanentlyDenied) {
+          await Future.delayed(Duration(seconds: 2));
+          await openAppSettings();
+        }
+        return;
+      }
+    }
+
+    // Verify speech recognition is still initialized
+    if (!_speechToText.isAvailable) {
+      print('Speech recognition lost availability, reinitializing...');
+      await _initSpeechToText();
+      
+      if (!_speechAvailable) {
+        _showSnackBar(
+          'Voice input initialization failed',
+          Icons.error_outline,
           Colors.red,
         );
         return;
       }
     }
 
-    if (_isListening) {
-      // Stop listening
-      await _speechToText.stop();
-      setState(() {
-        _isListening = false;
-      });
-    } else {
-      // Start listening
+    // Start listening
+    print('Attempting to start listening...');
+    await _startListening();
+  }
+
+  Future<void> _startListening() async {
+    print('_startListening called');
+    
+    try {
+      // Verify we have permission
+      final hasPermission = await Permission.microphone.isGranted;
+      if (!hasPermission) {
+        print('No microphone permission in _startListening');
+        throw Exception('Microphone permission not granted');
+      }
+
+      // Check if already listening
+      if (_speechToText.isListening) {
+        print('Already listening, stopping first...');
+        await _speechToText.stop();
+        await Future.delayed(Duration(milliseconds: 300));
+      }
+
       setState(() {
         _isListening = true;
         _lastWords = '';
       });
 
-      await _speechToText.listen(
+      // Cancel any existing timer
+      _listeningTimer?.cancel();
+
+      print('Calling _speechToText.listen()...');
+      
+      // Call listen without await
+      _speechToText.listen(
         onResult: (result) {
-          setState(() {
-            _lastWords = result.recognizedWords;
-            // Update the message controller if provided
-            if (widget.messageController != null) {
-              widget.messageController!.text = _lastWords;
-            }
-          });
+          print('Speech result received: ${result.recognizedWords}');
+          if (mounted) {
+            setState(() {
+              _lastWords = result.recognizedWords;
+              if (widget.messageController != null) {
+                widget.messageController!.text = _lastWords;
+              }
+            });
+          }
         },
         listenFor: Duration(seconds: 30),
-        pauseFor: Duration(seconds: 3),
+        pauseFor: Duration(seconds: 5),
         partialResults: true,
         cancelOnError: true,
         listenMode: stt.ListenMode.confirmation,
       );
-    }
 
-    HapticFeedback.mediumImpact();
+      print('Listen method called successfully');
+      HapticFeedback.mediumImpact();
+
+      // Set a safety timer to stop listening after 30 seconds
+      _listeningTimer = Timer(Duration(seconds: 31), () {
+        print('Safety timer triggered, stopping listening');
+        if (_isListening && mounted) {
+          _stopListening();
+        }
+      });
+
+    } catch (e) {
+      print('Error in _startListening: $e');
+      if (mounted) {
+        setState(() {
+          _isListening = false;
+        });
+        _showSnackBar(
+          'Failed to start voice input: ${e.toString()}',
+          Icons.error_outline,
+          Colors.red,
+        );
+      }
+    }
+  }
+
+  Future<void> _stopListening() async {
+    try {
+      _listeningTimer?.cancel();
+      await _speechToText.stop();
+      if (mounted) {
+        setState(() {
+          _isListening = false;
+        });
+      }
+      HapticFeedback.lightImpact();
+    } catch (e) {
+      print('Error stopping speech recognition: $e');
+    }
   }
 
   void _showSnackBar(String message, IconData icon, Color color) {
@@ -161,7 +331,12 @@ class FAQSectionState extends State<FAQSection>
             children: [
               Icon(icon, color: Colors.white, size: 20),
               SizedBox(width: 12),
-              Expanded(child: Text(message)),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(fontSize: 14),
+                ),
+              ),
             ],
           ),
           backgroundColor: color,
@@ -169,12 +344,18 @@ class FAQSectionState extends State<FAQSection>
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          duration: Duration(seconds: 3),
+          duration: Duration(seconds: 4),
+          action: message.contains('settings')
+              ? SnackBarAction(
+                  label: 'OPEN',
+                  textColor: Colors.white,
+                  onPressed: () => openAppSettings(),
+                )
+              : null,
         ),
       );
     }
   }
-
   Future<void> _fetchFAQs() async {
     try {
       // Use cached FAQs from UserConstant
@@ -905,16 +1086,17 @@ class FAQSectionState extends State<FAQSection>
     }
   }
 
-  void toggleSpeechRecognition() {
+
+ void toggleSpeechRecognition() {
     _toggleListening();
   }
 
   bool get isListening => _isListening;
-
   bool get speechAvailable => _speechAvailable;
-
   String get lastWords => _lastWords;
 }
+
+
 
 /// FAQToggleButton Widget
 class FAQToggleButton extends StatelessWidget {
