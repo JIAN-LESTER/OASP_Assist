@@ -302,6 +302,139 @@ Future<void> batchUploadToInformationBank(List<InformationBank> documents) async
   }
 }
 
+Future<void> updateInformationBankContent({
+  required String documentId,
+  required String newTitle,
+  required String newContent,
+  required String newCategory,
+}) async {
+  try {
+    print('🔄 Starting content update for document: $documentId');
+    
+    // Check Pinecone health
+    final isHealthy = await _pineconeService.isHealthy();
+    if (!isHealthy) {
+      throw Exception('Pinecone service is not available');
+    }
+
+    // Get existing document to find old chunk IDs
+    final existingDoc = await firestore
+        .collection('information_bank')
+        .doc(documentId)
+        .get();
+
+    if (!existingDoc.exists) {
+      throw Exception('Document not found: $documentId');
+    }
+
+    final existingData = existingDoc.data()!;
+    final oldChunkIds = List<String>.from(existingData['chunkIds'] ?? []);
+
+    // Delete old Pinecone vectors FIRST
+    if (oldChunkIds.isNotEmpty) {
+      print('🗑️ Deleting ${oldChunkIds.length} old Pinecone vectors...');
+      await _pineconeService.deleteDocuments(oldChunkIds);
+      print('✅ Old vectors deleted successfully');
+    }
+
+    // Split new content into chunks
+    final chunks = _splitIntoChunks(
+      newContent,
+      newTitle,
+      existingData['source'] ?? 'information_bank',
+    );
+    print('📄 Document split into ${chunks.length} new chunks');
+
+    // Generate new embeddings and upload to Pinecone
+    final chunkIds = <String>[];
+    String? parentPineconeId;
+
+    for (int i = 0; i < chunks.length; i++) {
+      final chunk = chunks[i];
+      
+      // Generate embedding for new content
+      final embedding = await _geminiService.embedText(chunk.text);
+
+      final chunkTitle = chunks.length > 1
+          ? '$newTitle (Part ${i + 1}/${chunks.length})'
+          : newTitle;
+
+      // Prepare metadata (preserve important fields from original)
+      final metadata = {
+        'docId': documentId,
+        'originalDocId': documentId,
+        'documentId': documentId,
+        'categoryDocId': existingData['categoryDocId'] ?? documentId,
+        'text': chunk.text,
+        'content': chunk.text,
+        'title': chunkTitle,
+        'originalTitle': newTitle,
+        'fileName': newTitle,
+        'chunkIndex': i,
+        'chunk_index': i,
+        'totalChunks': chunks.length,
+        'chunkCount': chunks.length,
+        'isFirstChunk': i == 0,
+        'isLastChunk': i == chunks.length - 1,
+        'source': existingData['source'] ?? 'information_bank',
+        'category': newCategory,
+        'categoryID': newCategory.toLowerCase(),
+        'categoryType': newCategory.toLowerCase(),
+        'chunkSize': chunk.text.length,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+        'uploadedViaFlutter': existingData['uploadedViaFlutter'] ?? true,
+        'syncedFromCategory': existingData['syncedFromCategory'] ?? false,
+      };
+
+      // Upload new chunk to Pinecone
+      await _pineconeService.insertDocument(
+        id: chunk.id,
+        embedding: embedding,
+        title: chunkTitle,
+        content: chunk.text,
+        source: existingData['source'] ?? 'information_bank',
+        category: newCategory,
+        metadata: metadata,
+      );
+
+      chunkIds.add(chunk.id);
+      if (i == 0) {
+        parentPineconeId = chunk.id;
+      }
+
+      print('  ✓ Chunk ${i + 1}/${chunks.length} uploaded (${chunk.text.length} chars)');
+    }
+
+    // Update Firestore document with new data
+    await firestore.collection('information_bank').doc(documentId).update({
+      'ib_title': newTitle,
+      'title': newTitle,
+      'content': newContent,
+      'category': newCategory,
+      'categoryID': newCategory.toLowerCase(),
+      'categoryType': newCategory.toLowerCase(),
+      'pinecone_id': parentPineconeId,
+      'totalChunks': chunks.length,
+      'chunkIds': chunkIds,
+      'chunked': chunks.length > 1,
+      'chunkSize': maxChunkSize,
+      'chunkOverlap': chunkOverlap,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    print('✅ Document updated successfully in Firestore');
+    print('📊 Summary:');
+    print('   - Old chunks deleted: ${oldChunkIds.length}');
+    print('   - New chunks created: ${chunks.length}');
+    print('   - Content length: ${newContent.length} characters');
+
+  } catch (e) {
+    print('❌ Error updating document content: $e');
+    rethrow;
+  }
+}
+
 Future<void> saveToAdmission(Admissions ad, {String? sourceDocumentId}) async {
   try {
     final sanitizedId = sanitizeId(ad.id);
