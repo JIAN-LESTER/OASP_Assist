@@ -3672,11 +3672,11 @@ Widget _buildProfilePage(
       FeatureHighlight(
         icon: Icons.smart_toy,
         title: "AI Chat Assistant",
-        description: "Get instant answers to your academic questions",
+        description: "Get answers to your academic questions",
       ),
       FeatureHighlight(
         icon: Icons.school,
-        title: "Student Services",
+        title: "OASP Services",
         description: "Access admission, scholarship, and placement info",
       ),
       FeatureHighlight(

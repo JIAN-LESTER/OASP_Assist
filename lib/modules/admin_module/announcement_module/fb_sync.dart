@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:capstone_project/modules/admin_module/announcement_module/fb_storage.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -366,74 +367,108 @@ static Future<Map<String, dynamic>> _exchangeTokenViaCloudFunctions(
   // TEST CONNECTION (unchanged)
   // ============================================================================
   
-  static Future<Map<String, dynamic>> testConnection() async {
-    print('🧪 Testing Facebook connection...');
-    print('📱 Platform: ${_getPlatformName()}');
-    print('🔧 Using: ${_shouldUseHttp ? "HTTP" : "Cloud Functions SDK"}');
-    
+  static Future<Map<String, dynamic>> syncPostsWithStorage() async {
     try {
-      if (_shouldUseHttp) {
-        return await _testViaHttp();
-      } else {
-        return await _testViaCloudFunctions();
-      }
-    } catch (e) {
-      print('❌ Test failed: $e');
-      rethrow;
-    }
-  }
+      print('🔄 Starting Facebook sync with Firebase Storage upload...');
 
-  static Future<Map<String, dynamic>> _testViaHttp() async {
-    print('📡 Using HTTP endpoint...');
-    
-    final authToken = await _getAuthToken();
-    if (authToken == null) {
-      throw Exception('Not authenticated. Please log in first.');
-    }
-    
-    try {
-      final response = await http.post(
-        Uri.parse(FbSyncConfig.testConnectionUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $authToken',
-        },
-        body: json.encode({'data': {}}),
-      ).timeout(Duration(seconds: 30));
-      
-      print('📦 Response: ${response.statusCode}');
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['result'] ?? data;
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? 'Server error (${response.statusCode})');
-      }
-    } catch (e) {
-      if (e is TimeoutException) {
-        throw Exception('Request timed out. Please try again.');
-      }
-      rethrow;
-    }
-  }
+      // First, do the regular sync
+      final syncResult = await syncPosts();
 
-  static Future<Map<String, dynamic>> _testViaCloudFunctions() async {
-    print('📞 Using Cloud Functions SDK...');
-    
-    try {
-      final callable = FirebaseFunctions.instance
-          .httpsCallable('testFacebookConnection');
+      if (syncResult['success'] != true) {
+        return syncResult;
+      }
+
+      // Get the synced posts
+      final posts = syncResult['posts'] as List<dynamic>? ?? [];
       
-      final result = await callable.call(<String, dynamic>{})
-          .timeout(Duration(seconds: 30));
-      
-      print('📦 Test result: ${json.encode(result.data)}');
-      return result.data as Map<String, dynamic>;
+      int imagesProcessed = 0;
+      int imagesFailed = 0;
+
+      for (var post in posts) {
+        final postId = post['id'];
+        List<String> imageUrls = [];
+
+        // Extract image URLs from the post
+        if (post['attachments'] != null) {
+          final attachments = post['attachments']['data'] as List<dynamic>?;
+          if (attachments != null) {
+            for (var attachment in attachments) {
+              if (attachment['type'] == 'photo' || 
+                  attachment['type'] == 'album') {
+                if (attachment['media'] != null) {
+                  final media = attachment['media'];
+                  if (media['image'] != null && media['image']['src'] != null) {
+                    imageUrls.add(media['image']['src']);
+                  }
+                }
+                
+                // Handle subattachments (multiple images)
+                if (attachment['subattachments'] != null) {
+                  final subAttachments = 
+                      attachment['subattachments']['data'] as List<dynamic>?;
+                  if (subAttachments != null) {
+                    for (var subAttachment in subAttachments) {
+                      if (subAttachment['media'] != null && 
+                          subAttachment['media']['image'] != null) {
+                        imageUrls.add(subAttachment['media']['image']['src']);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Also check full_picture
+        if (post['full_picture'] != null && 
+            !imageUrls.contains(post['full_picture'])) {
+          imageUrls.add(post['full_picture']);
+        }
+
+        // Upload images to Firebase Storage
+        if (imageUrls.isNotEmpty) {
+          print('📸 Processing ${imageUrls.length} images for post $postId');
+          
+          final uploadResult = await FacebookImageStorageService.processPostImages(
+            postId: postId,
+            facebookImageUrls: imageUrls,
+          );
+
+          if (uploadResult['success'] == true) {
+            imagesProcessed += uploadResult['successCount'] as int;
+            imagesFailed += uploadResult['failedCount'] as int;
+
+            // Update the post document with Firebase Storage URLs
+            final firebaseUrls = uploadResult['firebaseUrls'] as List<String>;
+            await FirebaseFirestore.instance
+                .collection('announcements')
+                .doc(postId)
+                .update({
+              'images': firebaseUrls,
+              'original_fb_urls': imageUrls,
+              'images_migrated': true,
+              'migration_date': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
+
+      print('✅ Sync complete! Images processed: $imagesProcessed, failed: $imagesFailed');
+
+      return {
+        'success': true,
+        'count': syncResult['count'],
+        'failed': syncResult['failed'],
+        'imagesProcessed': imagesProcessed,
+        'imagesFailed': imagesFailed,
+      };
     } catch (e) {
-      print('❌ Cloud Functions call failed: $e');
-      print('🔄 Falling back to HTTP...');
-      return await _testViaHttp();
+      print('❌ Error in sync with storage: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
     }
   }
 

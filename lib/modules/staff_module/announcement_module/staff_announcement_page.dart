@@ -1,7 +1,7 @@
 
 import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/modules/admin_module/widgets/category_dropdown_button.dart';
-import 'package:capstone_project/services/fb_sync.dart';
+import 'package:capstone_project/modules/admin_module/announcement_module/fb_sync.dart';
 import 'package:flutter/material.dart';
 
 import 'package:capstone_project/responsive/responsive_layout.dart';

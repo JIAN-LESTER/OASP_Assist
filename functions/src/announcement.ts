@@ -562,6 +562,9 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     startOfMonth.setHours(0, 0, 0, 0);
 
+    //     const startOfMonth = new Date(2024, 10, 1);
+    // startOfMonth.setHours(0, 0, 0, 0);
+
     // Convert to Unix timestamp (seconds since epoch)
     const sinceTimestamp = Math.floor(startOfMonth.getTime() / 1000);
 
