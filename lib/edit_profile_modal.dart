@@ -1,9 +1,8 @@
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:capstone_project/pages/admin_pages/buttons/affiliation.dart';
-import 'package:capstone_project/pages/admin_pages/buttons/program.dart';
 import 'package:capstone_project/profile.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
 
@@ -779,38 +778,6 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildManagementButtons() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.settings, size: 20, color: const Color(0xFF2E7D32)),
-              const SizedBox(width: 8),
-              const Text(
-                'Management Tools',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(spacing: 8, runSpacing: 8, children: [ManageProgramsButton()]),
         ],
       ),
     );

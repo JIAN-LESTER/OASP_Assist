@@ -1,21 +1,24 @@
 import 'dart:async';
 import 'package:capstone_project/icon_and_color.dart';
-import 'package:capstone_project/pages/admin_pages/admin_main_page.dart';
-import 'package:capstone_project/pages/staff_pages/human_escalation.dart';
-import 'package:capstone_project/pages/staff_pages/staff_main_page.dart';
+import 'package:capstone_project/modules/admin_module/admin_main_page.dart';
+import 'package:capstone_project/modules/admin_module/information_bank_module/information_bank_page.dart';
+import 'package:capstone_project/modules/authentication_module/onboarding/userOnboarding.dart';
+import 'package:capstone_project/modules/staff_module/human_escalation_module/human_escalation.dart';
+import 'package:capstone_project/modules/staff_module/staff_main_page.dart';
+import 'package:capstone_project/modules/user_module/announcement_module/user_announcement.dart';
+import 'package:capstone_project/modules/user_module/chat_module/chat_page.dart';
+import 'package:capstone_project/modules/user_module/services_module/admission_info.dart';
+import 'package:capstone_project/modules/user_module/services_module/placement_info.dart';
+import 'package:capstone_project/modules/user_module/services_module/scholarship_list.dart';
+import 'package:capstone_project/modules/user_module/user_main_page.dart';
+
 import 'package:flutter/services.dart';
-import 'package:capstone_project/auth_pages/auth_page.dart';
+import 'package:capstone_project/modules/authentication_module/auth_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:capstone_project/onboarding/onboarding.dart';
-import 'package:capstone_project/onboarding/useronboarding.dart';
-import 'package:capstone_project/pages/admin_pages/information_bank_page.dart';
-import 'package:capstone_project/pages/user_pages/admission_info.dart';
-import 'package:capstone_project/pages/user_pages/chat_page.dart';
-import 'package:capstone_project/pages/user_pages/placement_info.dart';
-import 'package:capstone_project/pages/user_pages/scholarship_list.dart';
-import 'package:capstone_project/pages/user_pages/user_announcement.dart';
-import 'package:capstone_project/pages/user_pages/user_main_page.dart';
+import 'package:capstone_project/modules/authentication_module/onboarding/onboarding.dart';
+
+
 import 'package:capstone_project/provider/chat_provider.dart';
 import 'package:capstone_project/services/admin_functions.dart';
 import 'package:capstone_project/services/answer_retrieval.dart';

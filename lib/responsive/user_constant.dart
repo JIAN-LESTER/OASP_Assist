@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:capstone_project/modules/user_module/chat_module/chat_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,7 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 
-import 'package:capstone_project/pages/user_pages/chat_page.dart';
+
 
 import 'package:capstone_project/provider/chat_provider.dart';
 import 'package:capstone_project/responsive/widgets/logout.dart';
