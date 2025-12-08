@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:capstone_project/modules/user_module/chat_module/chat_utilities.dart';
 
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -15,8 +14,6 @@ import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'package:intl/intl.dart';
-
-
 
 import 'package:capstone_project/models/message.dart';
 import 'package:capstone_project/provider/chat_provider.dart';
@@ -179,13 +176,10 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       vsync: this,
     );
 
-
     _showFAQs = widget.showFAQs;
 
     _initChatSpeechToText();
     chatProvider = Provider.of<ChatProvider>(context, listen: false);
-
-
 
     // ✅ FIX: Only initialize once in postFrameCallback
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -203,7 +197,6 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       }
     });
   }
-
 
   Future<void> _initChatSpeechToText() async {
     _speechToText = stt.SpeechToText();
@@ -822,33 +815,28 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     );
   }
 
-  void _scrollToBottomSmooth() {
-    if (!_scrollController.hasClients) return;
+  // void _scrollToBottomSmooth() {
+  //   if (!_scrollController.hasClients) return;
 
-    // Get current and target positions
-    final double currentPosition = _scrollController.position.pixels;
-    final double targetPosition = _scrollController.position.maxScrollExtent;
+  //   final double currentPosition = _scrollController.position.pixels;
+  //   final double targetPosition = _scrollController.position.maxScrollExtent;
 
-    // If already at bottom (within 50px), no need to scroll
-    if ((targetPosition - currentPosition).abs() < 50) {
-      return;
-    }
+  //   if ((targetPosition - currentPosition).abs() < 50) {
+  //     return;
+  //   }
 
-    // Calculate distance and duration
-    final double distance = (targetPosition - currentPosition).abs();
-    final int duration =
-        (distance / 2)
-            .clamp(200, 800)
-            .toInt(); // Dynamic duration based on distance
+  //   final double distance = (targetPosition - currentPosition).abs();
+  //   final int duration =
+  //       (distance / 2)
+  //           .clamp(200, 800)
+  //           .toInt();
 
-    // Smooth animated scroll
-    _scrollController.animateTo(
-      targetPosition,
-      duration: Duration(milliseconds: duration),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
+  //   _scrollController.animateTo(
+  //     targetPosition,
+  //     duration: Duration(milliseconds: duration),
+  //     curve: Curves.easeOutCubic,
+  //   );
+  // }
 
   void _scrollToBottomInstant() {
     if (!_scrollController.hasClients) return;
@@ -2205,47 +2193,47 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     );
   }
 
-//  Future<void> _showWelcomeDialog() async {
-//   final user = FirebaseAuth.instance.currentUser;
-//   if (user == null) return;
+  //  Future<void> _showWelcomeDialog() async {
+  //   final user = FirebaseAuth.instance.currentUser;
+  //   if (user == null) return;
 
-//   try {
-//     // ✅ Check Firestore first
-//     final userDoc = await FirebaseFirestore.instance
-//         .collection('users')
-//         .doc(user.uid)
-//         .get();
+  //   try {
+  //     // ✅ Check Firestore first
+  //     final userDoc = await FirebaseFirestore.instance
+  //         .collection('users')
+  //         .doc(user.uid)
+  //         .get();
 
-//     final hasSeenOnboardingGuide =
-//         userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
+  //     final hasSeenOnboardingGuide =
+  //         userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
 
-//     // ✅ Only show welcome dialog if user has NOT seen onboarding
-//     if (!hasSeenOnboardingGuide) {
-//       // Check SharedPreferences flag
-//       final prefs = await SharedPreferences.getInstance();
-//       final shouldShowWelcome =
-//           prefs.getBool('should_show_welcome_dialog') ?? false;
+  //     // ✅ Only show welcome dialog if user has NOT seen onboarding
+  //     if (!hasSeenOnboardingGuide) {
+  //       // Check SharedPreferences flag
+  //       final prefs = await SharedPreferences.getInstance();
+  //       final shouldShowWelcome =
+  //           prefs.getBool('should_show_welcome_dialog') ?? false;
 
-//       if (shouldShowWelcome && mounted) {
-//         // Clear the flag so it doesn't show again
-//         await prefs.setBool('should_show_welcome_dialog', false);
+  //       if (shouldShowWelcome && mounted) {
+  //         // Clear the flag so it doesn't show again
+  //         await prefs.setBool('should_show_welcome_dialog', false);
 
-//         // Show the dialog
-//         await showDialog(
-//           context: context,
-//           barrierDismissible: false,
-//           builder: (context) => const FirstTimeWelcomeDialog(),
-//         );
-//       }
-//     } else {
-//       // ✅ User has seen onboarding, clear the flag to prevent showing
-//       final prefs = await SharedPreferences.getInstance();
-//       await prefs.setBool('should_show_welcome_dialog', false);
-//     }
-//   } catch (e) {
-//     print('Error checking welcome dialog status: $e');
-//   }
-// }
+  //         // Show the dialog
+  //         await showDialog(
+  //           context: context,
+  //           barrierDismissible: false,
+  //           builder: (context) => const FirstTimeWelcomeDialog(),
+  //         );
+  //       }
+  //     } else {
+  //       // ✅ User has seen onboarding, clear the flag to prevent showing
+  //       final prefs = await SharedPreferences.getInstance();
+  //       await prefs.setBool('should_show_welcome_dialog', false);
+  //     }
+  //   } catch (e) {
+  //     print('Error checking welcome dialog status: $e');
+  //   }
+  // }
 
   //  Helper method for next steps (if not already in your code)
   Widget _buildNextStepItem({required IconData icon, required String text}) {
@@ -2457,86 +2445,87 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
   }
 
+  void _sendMessage(ChatProvider chatProvider) async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || chatProvider.isLoading) return;
 
-void _sendMessage(ChatProvider chatProvider) async {
-  final text = _controller.text.trim();
-  if (text.isEmpty || chatProvider.isLoading) return;
+    final remainingMessages =
+        ChatProvider.MAX_DAILY_MESSAGES - chatProvider.userDailyMessageCount;
 
-  final remainingMessages =
-      ChatProvider.MAX_DAILY_MESSAGES - chatProvider.userDailyMessageCount;
+    if (remainingMessages == 2) {
+      FocusScope.of(context).unfocus();
+      // ✅ REDUCED: from 300ms to 150ms
+      await Future.delayed(Duration(milliseconds: 150));
 
-  if (remainingMessages == 2) {
-    // ✅ CRITICAL: Dismiss keyboard before showing dialog
-    FocusScope.of(context).unfocus();
-    
-    // ✅ Wait for keyboard animation to complete
-    await Future.delayed(Duration(milliseconds: 300));
-    
-    final bool? shouldContinue = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => MessageLimitWarningDialog(
-        remainingMessages: remainingMessages,
-        timeUntilReset: chatProvider.getTimeUntilReset(),
-      ),
-    );
+      final bool? shouldContinue = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder:
+            (context) => MessageLimitWarningDialog(
+              remainingMessages: remainingMessages,
+              timeUntilReset: chatProvider.getTimeUntilReset(),
+            ),
+      );
 
-    if (shouldContinue != true) {
+      if (shouldContinue != true) {
+        return;
+      }
+    }
+
+    if (chatProvider.isMessageLimitReached) {
+      FocusScope.of(context).unfocus();
+      await Future.delayed(Duration(milliseconds: 150));
+
+      final timeUntilReset = chatProvider.getTimeUntilReset();
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => MessageLimitDialog(timeUntilReset: timeUntilReset),
+      );
       return;
     }
-  }
 
-  // ✅ Check if completely out of messages
-  if (chatProvider.isMessageLimitReached) {
-    // ✅ Also dismiss keyboard for limit reached dialog
-    FocusScope.of(context).unfocus();
-    await Future.delayed(Duration(milliseconds: 300));
-    
-    final timeUntilReset = chatProvider.getTimeUntilReset();
+    // ✅ INSTANT: Clear input immediately (better UX)
+    _controller.clear();
 
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => MessageLimitDialog(timeUntilReset: timeUntilReset),
-    );
-    return;
-  }
-
-  _controller.clear();
-
-  if (_showFAQs && mounted) {
-    setState(() {
-      _showFAQs = false;
-    });
-  }
-
-  try {
-    await chatProvider.askQuestionWithStreaming(context, text);
-    await Future.delayed(Duration(milliseconds: 100));
-    if (mounted && _scrollController.hasClients) {
-      _scrollToBottomSmooth();
+    if (_showFAQs && mounted) {
+      setState(() {
+        _showFAQs = false;
+      });
     }
-  } catch (e) {
-    debugPrint('Error sending message: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
-              SizedBox(width: 12),
-              Expanded(child: Text('Error sending message: ${e.toString()}')),
-            ],
+
+    try {
+      // ✅ INSTANT: Scroll happens automatically via callback, no manual delay needed
+      await chatProvider.askQuestionWithStreaming(context, text);
+    } catch (e) {
+      debugPrint('Error sending message: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  Icons.error_outline_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                SizedBox(width: 12),
+                Expanded(child: Text('Error sending message: ${e.toString()}')),
+              ],
+            ),
+            backgroundColor: Colors.red.shade400,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: EdgeInsets.all(16),
           ),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-        ),
-      );
+        );
+      }
     }
   }
-}
 
   @override
   void dispose() {
@@ -2640,43 +2629,169 @@ void _sendMessage(ChatProvider chatProvider) async {
     );
   }
 
-  //  IMPROVED: Messages list with better scroll behavior
-  Widget _buildMessagesList(List<Message> messages, ChatProvider chatProvider) {
-    return NotificationListener<ScrollNotification>(
-      onNotification: (scrollNotification) {
-        // Track if user is manually scrolling
-        if (scrollNotification is UserScrollNotification) {
-          if (scrollNotification.direction == ScrollDirection.forward) {
-            // User scrolling up - don't auto-scroll
-          } else if (scrollNotification.direction == ScrollDirection.reverse) {
-            // User scrolling down
-          }
-        }
-        return false;
-      },
-      child: ListView.builder(
-        controller: _scrollController,
-        physics: BouncingScrollPhysics(), // iOS-like bouncy scroll
-        itemCount: messages.length,
-        padding: EdgeInsets.only(top: 16, bottom: 24, left: 8, right: 8),
-        itemBuilder: (context, index) {
-          final Message message = messages[index];
-          final bool isUser = message.sender == 'user';
-          final bool isLastMessage = index == messages.length - 1;
-
-          return AnimatedOpacity(
-            opacity: 1.0,
-            duration: Duration(milliseconds: 300),
-            child: Padding(
-              padding: EdgeInsets.only(bottom: isLastMessage ? 16 : 4),
-              child: _buildMessageBubble(message, isUser),
+  Widget _buildTypingIndicatorBubble() {
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Bot avatar
+          Container(
+            width: 32,
+            height: 32,
+            margin: EdgeInsets.only(right: 8, bottom: 4),
+            decoration: BoxDecoration(
+              color: Colors.green.shade100,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Color(0xFF2E7D32).withOpacity(0.3),
+                width: 1,
+              ),
             ),
-          );
-        },
+            child: ClipOval(
+              child: Image.asset(
+                'lib/images/oasp.png',
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(
+                    Icons.smart_toy_outlined,
+                    color: Color(0xFF2E7D32),
+                    size: 18,
+                  );
+                },
+              ),
+            ),
+          ),
+          // Typing bubble
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.grey.shade50],
+              ),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+                bottomLeft: Radius.circular(4),
+                bottomRight: Radius.circular(20),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 15,
+                  offset: Offset(0, 5),
+                ),
+              ],
+            ),
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildTypingDot(0),
+                SizedBox(width: 6),
+                _buildTypingDot(1),
+                SizedBox(width: 6),
+                _buildTypingDot(2),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  Widget _buildTypingDot(int index) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 600),
+      curve: Curves.easeInOut,
+      builder: (context, value, child) {
+        final adjustedValue = ((value + (index * 0.33)) % 1.0);
+        final scale = 0.5 + (adjustedValue * 0.5);
+        final opacity = 0.3 + (adjustedValue * 0.7);
+
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: Color(0xFF2E7D32).withOpacity(opacity),
+              shape: BoxShape.circle,
+            ),
+          ),
+        );
+      },
+      onEnd: () {
+        // Restart animation
+        if (mounted) {
+          setState(() {});
+        }
+      },
+    );
+  }
+
+  // OPTIMIZED: Faster scroll with reduced delay
+  void _scrollToBottomSmooth() {
+    if (!_scrollController.hasClients) return;
+
+    final double currentPosition = _scrollController.position.pixels;
+    final double targetPosition = _scrollController.position.maxScrollExtent;
+
+    if ((targetPosition - currentPosition).abs() < 50) {
+      return;
+    }
+
+    // ✅ OPTIMIZED: Faster scroll duration
+    final double distance = (targetPosition - currentPosition).abs();
+    final int duration =
+        (distance / 3)
+            .clamp(150, 600)
+            .toInt(); // Reduced from /2 and max from 800
+
+    _scrollController.animateTo(
+      targetPosition,
+      duration: Duration(milliseconds: duration),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  //  IMPROVED: Messages list with better scroll behavior
+  Widget _buildMessagesList(List<Message> messages, ChatProvider chatProvider) {
+    return ListView.builder(
+      controller: _scrollController,
+      physics: BouncingScrollPhysics(),
+      itemCount:
+          messages.length +
+          (chatProvider.showTypingIndicator
+              ? 1
+              : 0), // ✅ Add 1 for typing indicator
+      padding: EdgeInsets.only(top: 16, bottom: 24, left: 8, right: 8),
+      itemBuilder: (context, index) {
+        // ✅ Show typing indicator at the end
+        if (chatProvider.showTypingIndicator && index == messages.length) {
+          return _buildTypingIndicatorBubble();
+        }
+
+        final Message message = messages[index];
+        final bool isUser = message.sender == 'user';
+        final bool isLastMessage = index == messages.length - 1;
+
+        return AnimatedOpacity(
+          opacity: 1.0,
+          duration: Duration(milliseconds: 200), // ✅ Reduced from 300ms
+          child: Padding(
+            padding: EdgeInsets.only(bottom: isLastMessage ? 16 : 4),
+            child: _buildMessageBubble(message, isUser),
+          ),
+        );
+      },
+    );
+  }
 }
+
 
 class FirstTimeWelcomeDialog extends StatelessWidget {
   const FirstTimeWelcomeDialog({Key? key}) : super(key: key);

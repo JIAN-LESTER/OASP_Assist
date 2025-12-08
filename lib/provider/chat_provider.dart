@@ -211,44 +211,7 @@ class ChatProvider extends ChangeNotifier {
   // Keep the old getter for backward compatibility but use the new logic
   bool get isMessageLimitReached => !canSendMessage;
 
-  // // Replace the isMessageLimitReached getter in chat_provider.dart with this:
-
-  // bool get isMessageLimitReached {
-  //   final userId = FirebaseAuth.instance.currentUser?.uid;
-  //   if (userId == null) return false;
-
-  //   final now = DateTime.now();
-
-  //   // ✅ CRITICAL FIX: If values haven't been loaded yet (both are initial values),
-  //   // assume user can send messages (don't block new users)
-  //   if (_userDailyMessageCount == 0 && _userLastResetDate == null) {
-  //     return false; // Brand new user or data not loaded yet
-  //   }
-
-  //   // If we have a reset date, check if we need to reset
-  //   if (_userLastResetDate != null) {
-  //     final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
-
-  //     // Check if it's past 6 AM and the last reset was before today's 6 AM
-  //     final shouldReset =
-  //         now.isAfter(resetTime) &&
-  //         (_userLastResetDate!.isBefore(resetTime) ||
-  //             _userLastResetDate!.day != now.day);
-
-  //     if (shouldReset) {
-  //       return false; // Time to reset, allow messages
-  //     }
-  //   }
-
-  //   // If we have a non-zero count but no reset date (edge case from old data),
-  //   // allow reset
-  //   if (_userDailyMessageCount > 0 && _userLastResetDate == null) {
-  //     return false; // Reset needed
-  //   }
-
-  //   // Check if limit reached
-  //   return _userDailyMessageCount >= MAX_DAILY_MESSAGES;
-  // }
+  
 
   Duration getTimeUntilReset() {
     final now = DateTime.now();
@@ -745,272 +708,277 @@ class ChatProvider extends ChangeNotifier {
   final Map<String, String> _streamingContent = {};
   final Set<String> _processedMessages = {}; // NEW: Track processed messages
 
+  bool _showTypingIndicator = false;
+bool get showTypingIndicator => _showTypingIndicator;
+
   String? getStreamingContent(String messageId) => _streamingContent[messageId];
 
   Future<void> askQuestionWithStreaming(
-    BuildContext context,
-    String question,
-  ) async {
-    if (_isLoading) return;
+  BuildContext context,
+  String question,
+) async {
+  if (_isLoading) return;
 
-    // Check message limit
-    if (isMessageLimitReached) {
-      print('❌ User daily message limit reached');
-      return;
-    }
+  // Check message limit
+  if (isMessageLimitReached) {
+    print('❌ User daily message limit reached');
+    return;
+  }
 
-    // Create conversation if needed
-    if (conversationId == null || conversationId!.isEmpty) {
-      print('⚠️ No conversation ID - creating new conversation');
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-      if (userId == null) return;
-
-      try {
-        final newConversationId = await UserConstant.createNewConversation(
-          userId,
-        );
-        await setConversationId(newConversationId);
-        await Future.delayed(Duration(milliseconds: 300));
-      } catch (e) {
-        print('❌ Error creating conversation: $e');
-        return;
-      }
-    }
-
-    if (conversationId == null || conversationId!.isEmpty) {
-      print('❌ Still no conversation ID after creation attempt');
-      return;
-    }
-
-    _isLoading = true;
-    notifyListeners();
-
-    final startTime = DateTime.now();
+  // Create conversation if needed
+  if (conversationId == null || conversationId!.isEmpty) {
+    print('⚠️ No conversation ID - creating new conversation');
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
 
     try {
-      _cohere ??= CohereService();
-      final userId = FirebaseAuth.instance.currentUser?.uid;
+      final newConversationId = await UserConstant.createNewConversation(userId);
+      await setConversationId(newConversationId);
+      // ✅ REDUCED: from 300ms to 100ms
+      await Future.delayed(Duration(milliseconds: 100));
+    } catch (e) {
+      print('❌ Error creating conversation: $e');
+      return;
+    }
+  }
 
-      // Run embedding + FAQ load in parallel
-      final results = await Future.wait([
-        _generateEmbeddingCached(question),
-        _ensureFAQCacheLoaded(),
-      ]);
+  if (conversationId == null || conversationId!.isEmpty) {
+    print('❌ Still no conversation ID after creation attempt');
+    return;
+  }
 
-      final currentEmbedding = results[0] as List<double>;
-      final existingFAQ = _findBestFAQMatch(question, currentEmbedding);
+  _isLoading = true;
+  notifyListeners();
 
-      // Determine category
-      String questionCategory;
-      if (existingFAQ != null && existingFAQ['category'] != null) {
-        questionCategory = existingFAQ['category'] as String;
-        print('✅ Using FAQ category: $questionCategory');
-      } else {
-        questionCategory = await _classifyQuestionCategoryFast(question);
-        print('✅ Classified category: $questionCategory');
-      }
+  final startTime = DateTime.now();
 
-      // Create user message
-      final userMessageRef =
-          _firestore
-              .collection('conversations')
-              .doc(conversationId!)
-              .collection('messages')
-              .doc();
+  try {
+    _cohere ??= CohereService();
+    final userId = FirebaseAuth.instance.currentUser?.uid;
 
-      final userMsg = Message(
-        id: userMessageRef.id,
-        conversationId: conversationId!,
-        content: question,
-        userID: userId,
-        category: questionCategory,
-        sender: 'user',
-        status: 'sent',
-        isAnswered: false,
-        type: 'text',
-        sentAt: DateTime.now(),
-        count: count,
-      );
+    // ✅ OPTIMIZED: Start embedding and FAQ load immediately, DON'T wait
+    final embeddingFuture = _generateEmbeddingCached(question);
+    final faqFuture = _ensureFAQCacheLoaded();
 
-      // Add to local state FIRST
-      _messages.add(userMsg);
-      _processedMessages.add(userMsg.id);
-      notifyListeners();
-      _onMessageAdded?.call();
-
-      // Save to Firestore
-      userMessageRef.set(_messageToMap(userMsg)).catchError((e) {
-        print('Error saving user message: $e');
-      });
-
-      // Increment user message count
-      await _updateUserMessageCount();
-
-      // Update conversation title if needed
-      bool shouldUpdateTitle = false;
-      if (currentConversation != null) {
-        final title = currentConversation!.title.toLowerCase();
-        shouldUpdateTitle =
-            (title.contains('new conversation') ||
-                title == 'untitled' ||
-                title.trim().isEmpty) &&
-            _messages.where((m) => m.sender == 'user').length <= 1;
-      }
-
-      if (shouldUpdateTitle) {
-        await _updateConversationTitleNow(question);
-      }
-
-      // ✅ FIX: Build complete conversation history with BOTH user and bot messages
-      final allMessages =
-          _messages.where((m) => m.conversationId == conversationId).toList();
-      allMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
-
-      // Take last 10 messages (5 exchanges) for context
-      final recentHistory =
-          allMessages.length > 10
-              ? allMessages.sublist(allMessages.length - 10)
-              : allMessages;
-
-      print('📝 Sending conversation history:');
-      print('   Total messages in conversation: ${allMessages.length}');
-      print('   Recent messages being sent: ${recentHistory.length}');
-      for (var msg in recentHistory) {
-        print(
-          '   - ${msg.sender}: ${msg.content.substring(0, min(50, msg.content.length))}...',
-        );
-      }
-
-      // Create bot message placeholder
-      final botMessageId = "bot_${userMsg.id}";
-      final botMessage = Message(
-        id: botMessageId,
-        conversationId: conversationId!,
-        content: "",
-        sender: "bot",
-        status: "sent",
-        type: "text",
-        sentAt: DateTime.now(),
-        count: count,
-      );
-
-      // Add bot message to UI immediately
-      _messages.add(botMessage);
-      _streamingContent[botMessageId] = "";
-      notifyListeners();
-      _onMessageAdded?.call();
-
-      String finalAnswer = "";
-
-      // Fast path: FAQ answer
-      if (existingFAQ != null) {
-        final String answer = existingFAQ["answer"];
-        final int chunkSize = 20;
-
-        for (int i = 0; i < answer.length; i += chunkSize) {
-          final chunk = answer.substring(
-            i,
-            (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
-          );
-
-          _streamingContent[botMessageId] =
-              _streamingContent[botMessageId]! + chunk;
-
-          if (i % (chunkSize * 3) == 0) {
-            notifyListeners();
-            _onMessageAdded?.call();
-          }
-        }
-
-        finalAnswer = answer;
-        unawaited(_incrementFAQSimilarityCountAsync(existingFAQ["question"]));
-      } else {
-        // RAG streaming with complete history
-        int chunkCounter = 0;
-
-        await for (final streamedText in _retriever.generateAnswerStream(
-          question,
-          conversationHistory:
-              recentHistory, // ✅ Now includes both user and bot messages
-          conversationId: conversationId!,
-        )) {
-          chunkCounter++;
-          _streamingContent[botMessageId] = streamedText;
-
-          if (chunkCounter % 4 == 0) {
-            notifyListeners();
-            _onMessageAdded?.call();
-          }
-
-          finalAnswer = streamedText;
-        }
-      }
-
-      // Remove streaming content
-      _streamingContent.remove(botMessageId);
-
-      // Remove duplication
-      String verified = finalAnswer;
-      if (verified.length > 300) {
-        final half = verified.length ~/ 2;
-        if (verified.substring(0, half) == verified.substring(half)) {
-          verified = verified.substring(0, half);
-        }
-      }
-
-      // Update bot message locally
-      final idx = _messages.indexWhere((m) => m.id == botMessageId);
-      if (idx >= 0) {
-        _messages[idx] = botMessage.copyWith(content: verified);
-      }
-
-      notifyListeners();
-      _onMessageAdded?.call();
-
-      final totalMs = DateTime.now().difference(startTime).inMilliseconds;
-      print("⚡ Total response time: ${totalMs}ms");
-
-      // Save bot message to Firestore (background)
-      unawaited(() async {
-        final batch = _firestore.batch();
-
-        final botRef = _firestore
+    // Create user message IMMEDIATELY (don't wait for embedding)
+    final userMessageRef =
+        _firestore
             .collection('conversations')
             .doc(conversationId!)
             .collection('messages')
-            .doc(botMessageId);
+            .doc();
 
-        batch.set(botRef, _messageToMap(_messages[idx]));
+    final userMsg = Message(
+      id: userMessageRef.id,
+      conversationId: conversationId!,
+      content: question,
+      userID: userId,
+      category: 'General', // Will update later
+      sender: 'user',
+      status: 'sent',
+      isAnswered: false,
+      type: 'text',
+      sentAt: DateTime.now(),
+      count: count,
+    );
 
-        batch.update(userMessageRef, {
-          "isAnswered": true,
-          "answeredAt": Timestamp.now(),
-          "responseTimeMs": totalMs,
-        });
+    // ✅ INSTANT: Add to UI immediately (fastest visual feedback)
+    _messages.add(userMsg);
+    _processedMessages.add(userMsg.id);
+    notifyListeners();
+    _onMessageAdded?.call();
 
-        await batch.commit();
-      }());
+    // ✅ INSTANT: Save to Firestore in background (don't await)
+    unawaited(userMessageRef.set(_messageToMap(userMsg)));
 
-      // Update title and reload conversation info
-      await _updateConversationTitleIfNeeded(question);
+    // ✅ INSTANT: Update message count in background
+    unawaited(_updateUserMessageCount());
 
-      // Background tasks
-      unawaited(
-        _handlePostResponseTasks(
-          context,
-          question,
-          verified,
-          currentEmbedding,
-          questionCategory,
-          userId,
-        ),
-      );
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-      _onMessageAdded?.call();
+    // NOW wait for embedding and FAQ results
+    await Future.wait([embeddingFuture, faqFuture]);
+    final currentEmbedding = await embeddingFuture;
+    final existingFAQ = _findBestFAQMatch(question, currentEmbedding);
+
+    // Determine category (in background if possible)
+    String questionCategory;
+    if (existingFAQ != null && existingFAQ['category'] != null) {
+      questionCategory = existingFAQ['category'] as String;
+    } else {
+      questionCategory = await _classifyQuestionCategoryFast(question);
     }
+
+    // Update category in background
+    unawaited(userMessageRef.update({'category': questionCategory}));
+
+    // Update title if needed (background)
+    if (currentConversation != null) {
+      final title = currentConversation!.title.toLowerCase();
+      final shouldUpdateTitle =
+          (title.contains('new conversation') ||
+              title == 'untitled' ||
+              title.trim().isEmpty) &&
+          _messages.where((m) => m.sender == 'user').length <= 1;
+      
+      if (shouldUpdateTitle) {
+        unawaited(_updateConversationTitleNow(question));
+      }
+    }
+
+    // Build conversation history
+    final allMessages =
+        _messages.where((m) => m.conversationId == conversationId).toList();
+    allMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    final recentHistory =
+        allMessages.length > 10
+            ? allMessages.sublist(allMessages.length - 10)
+            : allMessages;
+
+    // ✅ SHOW TYPING INDICATOR immediately
+    _showTypingIndicator = true;
+    notifyListeners();
+
+    // Create bot message placeholder
+    final botMessageId = "bot_${userMsg.id}";
+    final botMessage = Message(
+      id: botMessageId,
+      conversationId: conversationId!,
+      content: "",
+      sender: "bot",
+      status: "sent",
+      type: "text",
+      sentAt: DateTime.now(),
+      count: count,
+    );
+
+    // ✅ INSTANT: Add bot placeholder to UI
+    _messages.add(botMessage);
+    _streamingContent[botMessageId] = "";
+    notifyListeners();
+    _onMessageAdded?.call();
+
+    String finalAnswer = "";
+
+    // ✅ OPTIMIZED: Faster FAQ streaming
+    if (existingFAQ != null) {
+      // Hide typing indicator when content starts
+      _showTypingIndicator = false;
+      
+      final String answer = existingFAQ["answer"];
+      final int chunkSize = 30; // Increased from 20 for faster display
+
+      for (int i = 0; i < answer.length; i += chunkSize) {
+        final chunk = answer.substring(
+          i,
+          (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
+        );
+
+        _streamingContent[botMessageId] =
+            _streamingContent[botMessageId]! + chunk;
+
+        // ✅ OPTIMIZED: Update every 2 chunks instead of every 3
+        if (i % (chunkSize * 2) == 0) {
+          notifyListeners();
+          _onMessageAdded?.call();
+        }
+      }
+
+      finalAnswer = answer;
+      unawaited(_incrementFAQSimilarityCountAsync(existingFAQ["question"]));
+    } else {
+      // ✅ OPTIMIZED: Faster RAG streaming
+      int chunkCounter = 0;
+
+      await for (final streamedText in _retriever.generateAnswerStream(
+        question,
+        conversationHistory: recentHistory,
+        conversationId: conversationId!,
+      )) {
+        // Hide typing indicator on first chunk
+        if (chunkCounter == 0 && _showTypingIndicator) {
+          _showTypingIndicator = false;
+        }
+        
+        chunkCounter++;
+        _streamingContent[botMessageId] = streamedText;
+
+        // ✅ OPTIMIZED: Update every 2 chunks instead of every 4
+        if (chunkCounter % 2 == 0) {
+          notifyListeners();
+          _onMessageAdded?.call();
+        }
+
+        finalAnswer = streamedText;
+      }
+    }
+
+    // Hide typing indicator if still showing
+    if (_showTypingIndicator) {
+      _showTypingIndicator = false;
+    }
+
+    // Remove streaming content
+    _streamingContent.remove(botMessageId);
+
+    // Remove duplication
+    String verified = finalAnswer;
+    if (verified.length > 300) {
+      final half = verified.length ~/ 2;
+      if (verified.substring(0, half) == verified.substring(half)) {
+        verified = verified.substring(0, half);
+      }
+    }
+
+    // Update bot message locally
+    final idx = _messages.indexWhere((m) => m.id == botMessageId);
+    if (idx >= 0) {
+      _messages[idx] = botMessage.copyWith(content: verified);
+    }
+
+    notifyListeners();
+    _onMessageAdded?.call();
+
+    final totalMs = DateTime.now().difference(startTime).inMilliseconds;
+    print("⚡ Total response time: ${totalMs}ms");
+
+    // ✅ OPTIMIZED: Save to Firestore in background (don't await)
+    unawaited(() async {
+      final batch = _firestore.batch();
+
+      final botRef = _firestore
+          .collection('conversations')
+          .doc(conversationId!)
+          .collection('messages')
+          .doc(botMessageId);
+
+      batch.set(botRef, _messageToMap(_messages[idx]));
+
+      batch.update(userMessageRef, {
+        "isAnswered": true,
+        "answeredAt": Timestamp.now(),
+        "responseTimeMs": totalMs,
+      });
+
+      await batch.commit();
+    }());
+
+    // Background tasks (don't wait)
+    unawaited(
+      _handlePostResponseTasks(
+        context,
+        question,
+        verified,
+        currentEmbedding,
+        questionCategory,
+        userId,
+      ),
+    );
+  } finally {
+    _isLoading = false;
+    _showTypingIndicator = false; // Ensure it's hidden
+    notifyListeners();
+    _onMessageAdded?.call();
   }
+}
 
   Future<void> _updateConversationTitleNow(String question) async {
     if (conversationId == null) return;

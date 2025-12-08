@@ -472,12 +472,22 @@ export const generateAnswer = onRequest(
       const pineconeKey = PINECONE_API_KEY.value();
 
       console.log("🔧 Generating query embedding...");
-      const queryEmbedding = await generateGeminiEmbedding(query, geminiKey, "search_query");
+      
+      // ✅ OPTIMIZED: Generate embedding in parallel with Pinecone client init
+      const [queryEmbedding, pineconeClient] = await Promise.all([
+        generateGeminiEmbedding(query, geminiKey, "search_query"),
+        Promise.resolve(new Pinecone({ apiKey: pineconeKey }))
+      ]);
+      
       console.log(`✅ Embedding generated: ${queryEmbedding.length} dimensions`);
 
-      // Check FAQ first
-      const faqMatch = await findMatchingFAQ(query, queryEmbedding, geminiKey);
+      // ✅ OPTIMIZED: Check FAQ and init Pinecone index in parallel
+      const [faqMatch, pineconeIndex] = await Promise.all([
+        findMatchingFAQ(query, queryEmbedding, geminiKey),
+        Promise.resolve(pineconeClient.Index("oasp-assist-gemini"))
+      ]);
 
+      // FAQ MATCH - OPTIMIZED STREAMING
       if (faqMatch) {
         console.log("✅ Returning FAQ answer");
         
@@ -487,13 +497,16 @@ export const generateAnswer = onRequest(
           res.setHeader("Connection", "keep-alive");
 
           const answer = faqMatch.answer;
-          for (let i = 0; i < answer.length; i += 10) {
-            const chunk = answer.substring(i, Math.min(i + 10, answer.length));
+          // ✅ OPTIMIZED: Larger chunks for faster display
+          const chunkSize = 40;
+          
+          for (let i = 0; i < answer.length; i += chunkSize) {
+            const chunk = answer.substring(i, Math.min(i + chunkSize, answer.length));
             res.write(`data: ${JSON.stringify({ 
               type: "content-delta", 
               delta: { message: { content: { text: chunk } } } 
             })}\n\n`);
-            await new Promise(resolve => setTimeout(resolve, 30));
+            // ✅ NO artificial delays - stream as fast as possible
           }
 
           res.write(`data: ${JSON.stringify({ 
@@ -512,10 +525,8 @@ export const generateAnswer = onRequest(
         return;
       }
 
+      // RETRIEVE DOCUMENTS FROM PINECONE
       console.log("🔧 Querying Pinecone...");
-      const pineconeClient = new Pinecone({ apiKey: pineconeKey });
-      const pineconeIndex = pineconeClient.Index("oasp-assist-gemini");
-
       const results = await retrieveRelevantDocuments(
         query,
         queryEmbedding,
@@ -524,7 +535,7 @@ export const generateAnswer = onRequest(
         minSimilarityScore
       );
 
-      // ✅ FIX 3: Use AI fallback instead of hard "no information" message
+      // NO DOCUMENTS FOUND - AI FALLBACK
       if (results.length === 0) {
         console.log("⚠️ No documents found - using AI fallback");
         
@@ -602,6 +613,7 @@ Answer:`;
         return;
       }
 
+      // DOCUMENTS FOUND - GENERATE RAG RESPONSE
       console.log(`✅ Found ${results.length} relevant documents`);
 
       const { contexts, confidence } = filterAndRankContext(results, query);
@@ -611,6 +623,7 @@ Answer:`;
         ? buildPartialInfoPrompt(query, contexts, conversationContext)
         : buildContextAwarePrompt(query, contexts, conversationContext, confidence);
 
+      // STREAMING RESPONSE
       if (stream) {
         res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
@@ -619,6 +632,7 @@ Answer:`;
         let streamSucceeded = false;
 
         try {
+          // ✅ OPTIMIZED: Stream directly without buffering
           for await (const chunk of generateGeminiResponseStream(prompt, geminiKey)) {
             if (chunk && chunk.length > 0) {
               streamSucceeded = true;
@@ -626,6 +640,7 @@ Answer:`;
                 type: "content-delta", 
                 delta: { message: { content: { text: chunk } } } 
               })}\n\n`);
+              // ✅ NO artificial delays - stream as fast as possible
             }
           }
 
@@ -642,19 +657,21 @@ Answer:`;
           console.error("❌ Streaming failed, using fallback:", streamError);
         }
 
-        // Fallback
+        // FALLBACK IF STREAMING FAILS
         try {
           console.log("⚠️ Using fallback non-streaming mode");
           const fullAnswer = await generateGeminiResponse(prompt, geminiKey);
           
-          const chunkSize = 15;
+          // ✅ OPTIMIZED: Larger chunks, minimal delay
+          const chunkSize = 30;
           for (let i = 0; i < fullAnswer.length; i += chunkSize) {
             const chunk = fullAnswer.substring(i, Math.min(i + chunkSize, fullAnswer.length));
             res.write(`data: ${JSON.stringify({ 
               type: "content-delta", 
               delta: { message: { content: { text: chunk } } } 
             })}\n\n`);
-            await new Promise(resolve => setTimeout(resolve, 30));
+            // ✅ OPTIMIZED: Minimal delay (5ms instead of 30ms)
+            await new Promise(resolve => setTimeout(resolve, 5));
           }
 
           res.write(`data: ${JSON.stringify({ 
@@ -672,6 +689,7 @@ Answer:`;
           res.end();
         }
       } else {
+        // NON-STREAMING RESPONSE
         const answer = await generateGeminiResponse(prompt, geminiKey);
         res.json({ 
           answer: answer.trim(), 
@@ -692,7 +710,7 @@ Answer:`;
   }
 );
 
-export async function generateGeminiResponse(
+async function generateGeminiResponse(
   prompt: string,
   apiKey: string
 ): Promise<string> {
@@ -702,8 +720,8 @@ export async function generateGeminiResponse(
       {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.3, // Lower for more factual, accurate responses
-          maxOutputTokens: 4096, // Increased from 2048 for longer, more detailed answers
+          temperature: 0.3,
+          maxOutputTokens: 4096,
           topP: 0.95,
           topK: 40,
         }
@@ -736,7 +754,6 @@ export async function generateGeminiResponse(
     throw error;
   }
 }
-
 // ✅ IMPROVED: Streaming with better config
 async function* generateGeminiResponseStream(
   prompt: string,
@@ -752,7 +769,7 @@ async function* generateGeminiResponseStream(
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.3,
-            maxOutputTokens: 4096, // Increased for longer responses
+            maxOutputTokens: 4096,
             topP: 0.95,
             topK: 40,
           }
@@ -773,6 +790,7 @@ async function* generateGeminiResponseStream(
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    let chunkCount = 0;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -800,15 +818,18 @@ async function* generateGeminiResponseStream(
           const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
           
           if (text) {
+            chunkCount++;
+            // ✅ OPTIMIZED: Yield immediately, no batching
             yield text;
           }
           
           const finishReason = data?.candidates?.[0]?.finishReason;
           if (finishReason === "STOP") {
+            console.log(`✅ Stream complete: ${chunkCount} chunks`);
             return;
           }
         } catch (parseError) {
-          console.warn("⚠️ Failed to parse streaming chunk:", jsonStr.substring(0, 100));
+          console.warn("⚠️ Failed to parse streaming chunk");
           continue;
         }
       }

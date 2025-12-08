@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:capstone_project/models/message.dart';
 
@@ -9,137 +10,104 @@ class AnswerRetrievalService {
 
   /// Generate an answer using streaming for real-time response
 Stream<String> generateAnswerStream(
-  String query, {
+  String question, {
   List<Message>? conversationHistory,
   String? conversationId,
-  int topK = 5,
-  double minSimilarityScore = 0.3,
 }) async* {
   try {
-    print('🤖 Generating streaming answer for: "$query"');
-
-    final historyData = conversationHistory?.map((msg) => {
-      'sender': msg.sender,
-      'content': msg.content,
-    }).toList() ?? [];
+    print('🚀 Starting streaming for: "${question.substring(0, min(50, question.length))}..."');
 
     final requestBody = {
-      'query': query,
-      'conversationHistory': historyData,
-      'conversationId': conversationId,
-      'topK': topK,
-      'minSimilarityScore': minSimilarityScore,
+      'query': question,
       'stream': true,
+      'topK': 8,
+      'minSimilarityScore': 0.30,
+      'conversationHistory': conversationHistory
+          ?.map((m) => {'sender': m.sender, 'content': m.content})
+          .toList() ?? [],
     };
 
-    print('📤 Sending streaming request to Cloud Function...');
-
-    final request = http.Request('POST', Uri.parse(cloudFunctionUrl));
-    request.headers['Content-Type'] = 'application/json';
-    request.body = jsonEncode(requestBody);
-
-    final response = await request.send().timeout(
-      Duration(seconds: 60),
-      onTimeout: () {
-        throw Exception('Request timed out after 60 seconds');
-      },
+    final request = http.Request(
+      'POST',
+      Uri.parse('$cloudFunctionUrl/generateAnswer'),
     );
+    request.headers['Content-Type'] = 'application/json';
+    request.body = json.encode(requestBody);
 
-    print('📥 Received streaming response: ${response.statusCode}');
+    final streamedResponse = await request.send();
 
-    if (response.statusCode != 200) {
-      final errorBody = await response.stream.bytesToString();
-      print('❌ Cloud Function error: $errorBody');
-      throw Exception('Cloud Function returned error: ${response.statusCode}');
+    if (streamedResponse.statusCode != 200) {
+      final errorBody = await streamedResponse.stream.bytesToString();
+      print('❌ HTTP Error ${streamedResponse.statusCode}: $errorBody');
+      yield 'I apologize, but I encountered an error processing your request. Please try again.';
+      return;
     }
 
-    String accumulatedText = '';
+    String fullAnswer = '';
     String buffer = '';
-    bool hasReceivedContent = false;
-    bool streamEnded = false;
-    
-    await for (final chunk in response.stream.transform(utf8.decoder)) {
-      if (streamEnded) break;
+    int chunkCount = 0;
+    final startTime = DateTime.now();
+
+    await for (final chunk in streamedResponse.stream
+        .transform(utf8.decoder)
+        .transform(LineSplitter())) {
       
-      buffer += chunk;
-      
-      final lines = buffer.split('\n');
-      buffer = lines.last;
-      
-      for (int i = 0; i < lines.length - 1; i++) {
-        final line = lines[i].trim();
-        
-        if (line.isEmpty || line.startsWith(':')) continue;
-        
-        if (line.startsWith('data: ')) {
-          final jsonStr = line.substring(6).trim();
+      if (chunk.trim().isEmpty || 
+          chunk.startsWith('event:') || 
+          chunk == 'data: [DONE]') {
+        continue;
+      }
+
+      String jsonStr = chunk.trim();
+      if (jsonStr.startsWith('data: ')) {
+        jsonStr = jsonStr.substring(6);
+      }
+
+      if (jsonStr.isEmpty || jsonStr == '[DONE]') continue;
+
+      try {
+        final data = json.decode(jsonStr);
+
+        if (data['type'] == 'content-delta') {
+          final text = data['delta']?['message']?['content']?['text'] as String?;
           
-          if (jsonStr.isEmpty) continue;
-          
-          if (jsonStr == '[DONE]') {
-            print('✅ Received [DONE] signal');
-            streamEnded = true;
-            break;
-          }
-          
-          try {
-            final data = jsonDecode(jsonStr);
+          if (text != null && text.isNotEmpty) {
+            chunkCount++;
+            fullAnswer += text;
             
-            if (data['type'] == 'content-delta') {
-              final text = data['delta']?['message']?['content']?['text'];
-              if (text != null && text.isNotEmpty) {
-                hasReceivedContent = true;
-                accumulatedText += text;
-                
-                // ✅ Yield the full accumulated text
-                yield accumulatedText;
-                
-                print('📝 Accumulated: ${accumulatedText.length} chars');
-              }
-            }
-            else if (data['type'] == 'message-end') {
-              print('✅ Stream ended successfully');
-              final metadata = data['metadata'];
-              if (metadata != null) {
-                print('📊 Documents used: ${metadata['documentsUsed']}');
-              }
-              streamEnded = true;
-              break;
-            }
-            else if (data['type'] == 'error' || data['error'] != null) {
-              final errorMsg = data['error'] ?? 'Unknown error';
-              print('❌ Server error: $errorMsg');
-              throw Exception(errorMsg);
-            }
-          } catch (e) {
-            print('⚠️ Error parsing chunk: $e');
-            continue;
+            // ✅ OPTIMIZED: Yield more frequently for faster visual updates
+            // Every 1-2 chunks instead of accumulating buffer
+            yield fullAnswer;
           }
+        } else if (data['type'] == 'message-end') {
+          final totalTime = DateTime.now().difference(startTime).inMilliseconds;
+          print('✅ Streaming complete: $chunkCount chunks in ${totalTime}ms');
+          
+          if (fullAnswer.isNotEmpty) {
+            yield fullAnswer; // Final yield
+          }
+          break;
+        } else if (data['type'] == 'error') {
+          print('❌ Streaming error: ${data['error']}');
+          if (fullAnswer.isEmpty) {
+            yield 'I encountered an error processing your request. Please try again.';
+          }
+          break;
         }
+      } catch (e) {
+        print('⚠️ Failed to parse chunk: ${jsonStr.substring(0, min(100, jsonStr.length))}');
+        continue;
       }
     }
 
-    // ✅ CRITICAL FIX: Don't yield again if we already received content
-    if (!hasReceivedContent || accumulatedText.isEmpty) {
+    if (fullAnswer.isEmpty) {
       print('⚠️ No content received from stream');
-      yield "I'm having trouble processing your question right now. Please try again or contact OASP staff for assistance.";
-    } else {
-      print('✅ Streaming complete: ${accumulatedText.length} chars');
-      // ❌ REMOVE THIS LINE - it causes duplication!
-      // yield accumulatedText;  // DON'T yield again, we already yielded in the loop!
+      yield 'I apologize, but I was unable to generate a response. Please try again.';
     }
 
-  } catch (e, stackTrace) {
-    print('❌ Error in generateAnswerStream: $e');
-    print('Stack trace: $stackTrace');
-    
-    if (e.toString().contains('timeout')) {
-      yield "The request is taking longer than expected. Please try again or contact OASP staff for assistance.";
-    } else if (e.toString().contains('network') || e.toString().contains('SocketException')) {
-      yield "Network error. Please check your internet connection and try again.";
-    } else {
-      yield "I encountered an error while processing your question. Please try again or contact OASP staff for assistance.";
-    }
+  } catch (e) {
+    print('❌ Streaming error: $e');
+    yield 'I apologize, but I encountered an error. Please try again or contact OASP staff.';
   }
 }
 
