@@ -805,7 +805,7 @@ class _MessageLimitDialogState extends State<MessageLimitDialog>
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'This limit ensures quality service for all users',
+                            'This limit helps prevent spam and keeps the chat fair for everyone.',
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.blue.shade900,
