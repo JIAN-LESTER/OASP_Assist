@@ -15,9 +15,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 
-
 import 'package:provider/provider.dart';
-
 
 import 'package:capstone_project/provider/chat_provider.dart';
 
@@ -26,7 +24,6 @@ import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/responsive/widgets/menu.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 
 class UserMainPage extends StatefulWidget {
   final int? initialTabIndex;
@@ -64,6 +61,8 @@ class _UserMainPageState extends State<UserMainPage>
   final GlobalKey _notificationKey = GlobalKey();
   final GlobalKey _profileKey = GlobalKey();
   final GlobalKey _bottomNavKey = GlobalKey();
+  final GlobalKey _faqButtonKey = GlobalKey();
+  final GlobalKey _audioButtonKey = GlobalKey();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -156,13 +155,9 @@ class _UserMainPageState extends State<UserMainPage>
       final shouldShow = prefs.getBool('should_show_guide') ?? false;
 
       if (shouldShow && mounted) {
-        // Clear the flag so it doesn't show again
         await prefs.setBool('should_show_guide', false);
 
-        // Wait a bit for the UI to settle
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        // Trigger the OnboardingGuide
+        //  REMOVED DELAY - Show immediately
         if (mounted) {
           final onboardingGuide = OnboardingGuide.of(context);
           if (onboardingGuide != null) {
@@ -479,7 +474,6 @@ class _UserMainPageState extends State<UserMainPage>
     }
   }
 
-
   final List<String> _pageTitles = const [
     'Home',
     'Chat with OASP Assist',
@@ -508,7 +502,6 @@ class _UserMainPageState extends State<UserMainPage>
         index == 1 && (_conversationId != null && _conversationId!.isNotEmpty);
 
     if (shouldShowLoading) {
-
       setState(() {
         _isNavigating = true;
       });
@@ -804,6 +797,8 @@ class _UserMainPageState extends State<UserMainPage>
         conversationId: _conversationId ?? '',
         showFAQs: _showFAQs,
         onFAQToggle: _toggleFAQs,
+        faqButtonKey: _faqButtonKey,
+        audioButtonKey: _audioButtonKey,
       ),
       const UserAnnouncementPage(),
       const AdmissionInfo(),
@@ -837,11 +832,13 @@ class _UserMainPageState extends State<UserMainPage>
           notificationKey: _notificationKey,
           profileKey: _profileKey,
           bottomNavKey: _bottomNavKey,
-          onFinished: () async {
+          faqButtonKey: _faqButtonKey,
+          audioButtonKey: _audioButtonKey,
+          onFinished: () {
             //  Callback when guide finishes
-            print('✅ Onboarding guide completed');
-            // ✅ Show welcome dialog after onboarding
-            await _showWelcomeDialog();
+            print(' Onboarding guide completed');
+            //  Show welcome dialog immediately after onboarding
+            _showWelcomeDialog();
           },
           child: ResponsiveLayout(
             mobileBody: _buildMobileLayout(_pages),
@@ -1823,7 +1820,6 @@ class _UserMainPageState extends State<UserMainPage>
       ),
     );
   }
-
 
   void _showServicesMenu() {
     showModalBottomSheet(

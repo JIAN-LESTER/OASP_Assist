@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:capstone_project/modules/user_module/chat_module/chat_utilities.dart';
 
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -15,8 +14,6 @@ import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'package:intl/intl.dart';
-
-
 
 import 'package:capstone_project/models/message.dart';
 import 'package:capstone_project/provider/chat_provider.dart';
@@ -35,6 +32,8 @@ class ChatPage extends StatefulWidget {
   final String? initialMessage;
   final bool showFAQs;
   final VoidCallback? onFAQToggle;
+  final GlobalKey? faqButtonKey;
+  final GlobalKey? audioButtonKey;
 
   const ChatPage({
     Key? key,
@@ -42,6 +41,8 @@ class ChatPage extends StatefulWidget {
     this.initialMessage,
     this.showFAQs = false,
     this.onFAQToggle,
+    this.faqButtonKey,
+    this.audioButtonKey,
   }) : super(key: key);
 
   @override
@@ -179,13 +180,10 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       vsync: this,
     );
 
-
     _showFAQs = widget.showFAQs;
 
     _initChatSpeechToText();
     chatProvider = Provider.of<ChatProvider>(context, listen: false);
-
-
 
     // ✅ FIX: Only initialize once in postFrameCallback
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -203,7 +201,6 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       }
     });
   }
-
 
   Future<void> _initChatSpeechToText() async {
     _speechToText = stt.SpeechToText();
@@ -848,7 +845,6 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       curve: Curves.easeOutCubic,
     );
   }
-
 
   void _scrollToBottomInstant() {
     if (!_scrollController.hasClients) return;
@@ -2205,47 +2201,47 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     );
   }
 
-//  Future<void> _showWelcomeDialog() async {
-//   final user = FirebaseAuth.instance.currentUser;
-//   if (user == null) return;
+  //  Future<void> _showWelcomeDialog() async {
+  //   final user = FirebaseAuth.instance.currentUser;
+  //   if (user == null) return;
 
-//   try {
-//     // ✅ Check Firestore first
-//     final userDoc = await FirebaseFirestore.instance
-//         .collection('users')
-//         .doc(user.uid)
-//         .get();
+  //   try {
+  //     // ✅ Check Firestore first
+  //     final userDoc = await FirebaseFirestore.instance
+  //         .collection('users')
+  //         .doc(user.uid)
+  //         .get();
 
-//     final hasSeenOnboardingGuide =
-//         userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
+  //     final hasSeenOnboardingGuide =
+  //         userDoc.data()?['hasSeenOnboardingGuide'] ?? false;
 
-//     // ✅ Only show welcome dialog if user has NOT seen onboarding
-//     if (!hasSeenOnboardingGuide) {
-//       // Check SharedPreferences flag
-//       final prefs = await SharedPreferences.getInstance();
-//       final shouldShowWelcome =
-//           prefs.getBool('should_show_welcome_dialog') ?? false;
+  //     // ✅ Only show welcome dialog if user has NOT seen onboarding
+  //     if (!hasSeenOnboardingGuide) {
+  //       // Check SharedPreferences flag
+  //       final prefs = await SharedPreferences.getInstance();
+  //       final shouldShowWelcome =
+  //           prefs.getBool('should_show_welcome_dialog') ?? false;
 
-//       if (shouldShowWelcome && mounted) {
-//         // Clear the flag so it doesn't show again
-//         await prefs.setBool('should_show_welcome_dialog', false);
+  //       if (shouldShowWelcome && mounted) {
+  //         // Clear the flag so it doesn't show again
+  //         await prefs.setBool('should_show_welcome_dialog', false);
 
-//         // Show the dialog
-//         await showDialog(
-//           context: context,
-//           barrierDismissible: false,
-//           builder: (context) => const FirstTimeWelcomeDialog(),
-//         );
-//       }
-//     } else {
-//       // ✅ User has seen onboarding, clear the flag to prevent showing
-//       final prefs = await SharedPreferences.getInstance();
-//       await prefs.setBool('should_show_welcome_dialog', false);
-//     }
-//   } catch (e) {
-//     print('Error checking welcome dialog status: $e');
-//   }
-// }
+  //         // Show the dialog
+  //         await showDialog(
+  //           context: context,
+  //           barrierDismissible: false,
+  //           builder: (context) => const FirstTimeWelcomeDialog(),
+  //         );
+  //       }
+  //     } else {
+  //       // ✅ User has seen onboarding, clear the flag to prevent showing
+  //       final prefs = await SharedPreferences.getInstance();
+  //       await prefs.setBool('should_show_welcome_dialog', false);
+  //     }
+  //   } catch (e) {
+  //     print('Error checking welcome dialog status: $e');
+  //   }
+  // }
 
   //  Helper method for next steps (if not already in your code)
   Widget _buildNextStepItem({required IconData icon, required String text}) {
@@ -2457,86 +2453,93 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
   }
 
+  void _sendMessage(ChatProvider chatProvider) async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || chatProvider.isLoading) return;
 
-void _sendMessage(ChatProvider chatProvider) async {
-  final text = _controller.text.trim();
-  if (text.isEmpty || chatProvider.isLoading) return;
+    final remainingMessages =
+        ChatProvider.MAX_DAILY_MESSAGES - chatProvider.userDailyMessageCount;
 
-  final remainingMessages =
-      ChatProvider.MAX_DAILY_MESSAGES - chatProvider.userDailyMessageCount;
+    if (remainingMessages == 2) {
+      // ✅ CRITICAL: Dismiss keyboard before showing dialog
+      FocusScope.of(context).unfocus();
 
-  if (remainingMessages == 2) {
-    // ✅ CRITICAL: Dismiss keyboard before showing dialog
-    FocusScope.of(context).unfocus();
-    
-    // ✅ Wait for keyboard animation to complete
-    await Future.delayed(Duration(milliseconds: 300));
-    
-    final bool? shouldContinue = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => MessageLimitWarningDialog(
-        remainingMessages: remainingMessages,
-        timeUntilReset: chatProvider.getTimeUntilReset(),
-      ),
-    );
+      // ✅ Wait for keyboard animation to complete
+      await Future.delayed(Duration(milliseconds: 300));
 
-    if (shouldContinue != true) {
+      final bool? shouldContinue = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder:
+            (context) => MessageLimitWarningDialog(
+              remainingMessages: remainingMessages,
+              timeUntilReset: chatProvider.getTimeUntilReset(),
+            ),
+      );
+
+      if (shouldContinue != true) {
+        return;
+      }
+    }
+
+    // ✅ Check if completely out of messages
+    if (chatProvider.isMessageLimitReached) {
+      // ✅ Also dismiss keyboard for limit reached dialog
+      FocusScope.of(context).unfocus();
+      await Future.delayed(Duration(milliseconds: 300));
+
+      final timeUntilReset = chatProvider.getTimeUntilReset();
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => MessageLimitDialog(timeUntilReset: timeUntilReset),
+      );
       return;
     }
-  }
 
-  // ✅ Check if completely out of messages
-  if (chatProvider.isMessageLimitReached) {
-    // ✅ Also dismiss keyboard for limit reached dialog
-    FocusScope.of(context).unfocus();
-    await Future.delayed(Duration(milliseconds: 300));
-    
-    final timeUntilReset = chatProvider.getTimeUntilReset();
+    _controller.clear();
 
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => MessageLimitDialog(timeUntilReset: timeUntilReset),
-    );
-    return;
-  }
-
-  _controller.clear();
-
-  if (_showFAQs && mounted) {
-    setState(() {
-      _showFAQs = false;
-    });
-  }
-
-  try {
-    await chatProvider.askQuestionWithStreaming(context, text);
-    await Future.delayed(Duration(milliseconds: 100));
-    if (mounted && _scrollController.hasClients) {
-      _scrollToBottomSmooth();
+    if (_showFAQs && mounted) {
+      setState(() {
+        _showFAQs = false;
+      });
     }
-  } catch (e) {
-    debugPrint('Error sending message: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
-              SizedBox(width: 12),
-              Expanded(child: Text('Error sending message: ${e.toString()}')),
-            ],
+
+    try {
+      await chatProvider.askQuestionWithStreaming(context, text);
+      await Future.delayed(Duration(milliseconds: 100));
+      if (mounted && _scrollController.hasClients) {
+        _scrollToBottomSmooth();
+      }
+    } catch (e) {
+      debugPrint('Error sending message: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  Icons.error_outline_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                SizedBox(width: 12),
+                Expanded(child: Text('Error sending message: ${e.toString()}')),
+              ],
+            ),
+            backgroundColor: Colors.red.shade400,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: EdgeInsets.all(16),
           ),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-        ),
-      );
+        );
+      }
     }
   }
-}
 
   @override
   void dispose() {
@@ -2587,6 +2590,8 @@ void _sendMessage(ChatProvider chatProvider) async {
                     _showFAQs
                         ? (_faqSectionKey.currentState?.isListening ?? false)
                         : _isListening,
+                faqButtonKey: widget.faqButtonKey,
+                audioButtonKey: widget.audioButtonKey,
               ),
             ],
           );

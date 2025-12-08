@@ -1,12 +1,10 @@
 import 'dart:async';
 
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:capstone_project/responsive/user_constant.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
-
 
 typedef OnFAQSelected = void Function(String question);
 
@@ -42,14 +40,9 @@ class FAQSectionState extends State<FAQSection>
   String _lastWords = '';
   Timer? _listeningTimer;
 
+  final List<String> categoryOrder = ['Admission', 'Scholarship', 'Placement'];
 
-  final List<String> categoryOrder = [
-    'Admission',
-    'Scholarship',
-    'Placement',
-  ];
-
- @override
+  @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
@@ -75,7 +68,8 @@ class FAQSectionState extends State<FAQSection>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Stop listening when app goes to background
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       if (_isListening) {
         _stopListening();
       }
@@ -84,11 +78,11 @@ class FAQSectionState extends State<FAQSection>
 
   Future<void> _initSpeechToText() async {
     _speechToText = stt.SpeechToText();
-    
+
     // First check if microphone permission is granted
     final permissionStatus = await Permission.microphone.status;
     print('Initial microphone permission: $permissionStatus');
-    
+
     if (!permissionStatus.isGranted) {
       print('Microphone permission not granted, requesting...');
       final result = await Permission.microphone.request();
@@ -98,7 +92,7 @@ class FAQSectionState extends State<FAQSection>
         return;
       }
     }
-    
+
     try {
       print('Initializing speech recognition...');
       _speechAvailable = await _speechToText.initialize(
@@ -128,9 +122,9 @@ class FAQSectionState extends State<FAQSection>
         },
         debugLogging: true,
       );
-      
+
       print('Speech recognition initialization result: $_speechAvailable');
-      
+
       if (!_speechAvailable) {
         print('Speech recognition not available after initialization');
         if (mounted) {
@@ -179,7 +173,7 @@ class FAQSectionState extends State<FAQSection>
     if (!_speechAvailable) {
       print('Speech not available, attempting to reinitialize...');
       await _initSpeechToText();
-      
+
       if (!_speechAvailable) {
         _showSnackBar(
           'Voice input not available. Please check your device settings.',
@@ -198,14 +192,14 @@ class FAQSectionState extends State<FAQSection>
       print('Requesting microphone permission...');
       final result = await Permission.microphone.request();
       print('Permission request result: $result');
-      
+
       if (!result.isGranted) {
         _showSnackBar(
           'Microphone permission is required for voice input',
           Icons.mic_off,
           Colors.red,
         );
-        
+
         if (result.isPermanentlyDenied) {
           await Future.delayed(Duration(seconds: 2));
           await openAppSettings();
@@ -218,7 +212,7 @@ class FAQSectionState extends State<FAQSection>
     if (!_speechToText.isAvailable) {
       print('Speech recognition lost availability, reinitializing...');
       await _initSpeechToText();
-      
+
       if (!_speechAvailable) {
         _showSnackBar(
           'Voice input initialization failed',
@@ -236,7 +230,7 @@ class FAQSectionState extends State<FAQSection>
 
   Future<void> _startListening() async {
     print('_startListening called');
-    
+
     try {
       // Verify we have permission
       final hasPermission = await Permission.microphone.isGranted;
@@ -261,7 +255,7 @@ class FAQSectionState extends State<FAQSection>
       _listeningTimer?.cancel();
 
       print('Calling _speechToText.listen()...');
-      
+
       // Call listen without await
       _speechToText.listen(
         onResult: (result) {
@@ -292,7 +286,6 @@ class FAQSectionState extends State<FAQSection>
           _stopListening();
         }
       });
-
     } catch (e) {
       print('Error in _startListening: $e');
       if (mounted) {
@@ -331,12 +324,7 @@ class FAQSectionState extends State<FAQSection>
             children: [
               Icon(icon, color: Colors.white, size: 20),
               SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(fontSize: 14),
-                ),
-              ),
+              Expanded(child: Text(message, style: TextStyle(fontSize: 14))),
             ],
           ),
           backgroundColor: color,
@@ -345,17 +333,19 @@ class FAQSectionState extends State<FAQSection>
             borderRadius: BorderRadius.circular(12),
           ),
           duration: Duration(seconds: 4),
-          action: message.contains('settings')
-              ? SnackBarAction(
-                  label: 'OPEN',
-                  textColor: Colors.white,
-                  onPressed: () => openAppSettings(),
-                )
-              : null,
+          action:
+              message.contains('settings')
+                  ? SnackBarAction(
+                    label: 'OPEN',
+                    textColor: Colors.white,
+                    onPressed: () => openAppSettings(),
+                  )
+                  : null,
         ),
       );
     }
   }
+
   Future<void> _fetchFAQs() async {
     try {
       // Use cached FAQs from UserConstant
@@ -1080,8 +1070,7 @@ class FAQSectionState extends State<FAQSection>
     }
   }
 
-
- void toggleSpeechRecognition() {
+  void toggleSpeechRecognition() {
     _toggleListening();
   }
 
@@ -1089,8 +1078,6 @@ class FAQSectionState extends State<FAQSection>
   bool get speechAvailable => _speechAvailable;
   String get lastWords => _lastWords;
 }
-
-
 
 /// FAQToggleButton Widget
 class FAQToggleButton extends StatelessWidget {
@@ -1134,6 +1121,8 @@ class FAQInputSection extends StatelessWidget {
   final VoidCallback onSendMessage;
   final VoidCallback? onMicrophoneTap;
   final bool isListening;
+  final GlobalKey? faqButtonKey;
+  final GlobalKey? audioButtonKey;
 
   const FAQInputSection({
     Key? key,
@@ -1144,6 +1133,8 @@ class FAQInputSection extends StatelessWidget {
     required this.onSendMessage,
     this.onMicrophoneTap,
     this.isListening = false,
+    this.faqButtonKey,
+    this.audioButtonKey,
   }) : super(key: key);
 
   Map<String, double> _getResponsiveSizes(BuildContext context) {
@@ -1224,6 +1215,7 @@ class FAQInputSection extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Container(
+                        key: faqButtonKey,
                         width: buttonSize,
                         height: buttonSize,
                         decoration: BoxDecoration(
@@ -1360,6 +1352,7 @@ class FAQInputSection extends StatelessWidget {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Container(
+                          key: audioButtonKey,
                           width: buttonSize,
                           height: buttonSize,
                           decoration: BoxDecoration(

@@ -4,7 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum OnboardingStep { sidebar, sidebarContent, notifications, profile }
+enum OnboardingStep {
+  sidebar,
+  sidebarContent,
+  faqButton,
+  audioButton,
+  notifications,
+  profile,
+}
 
 class OnboardingGuide extends StatefulWidget {
   final Widget child;
@@ -12,6 +19,8 @@ class OnboardingGuide extends StatefulWidget {
   final GlobalKey? notificationKey;
   final GlobalKey? profileKey;
   final GlobalKey? bottomNavKey;
+  final GlobalKey? faqButtonKey;
+  final GlobalKey? audioButtonKey;
   final VoidCallback? onFinished;
 
   const OnboardingGuide({
@@ -21,6 +30,8 @@ class OnboardingGuide extends StatefulWidget {
     this.notificationKey,
     this.profileKey,
     this.bottomNavKey,
+    this.faqButtonKey,
+    this.audioButtonKey,
     this.onFinished,
   });
 
@@ -114,6 +125,8 @@ class _OnboardingGuideState extends State<OnboardingGuide>
             notificationKey: widget.notificationKey,
             profileKey: widget.profileKey,
             bottomNavKey: widget.bottomNavKey,
+            faqButtonKey: widget.faqButtonKey,
+            audioButtonKey: widget.audioButtonKey,
             pulseAnimation: _pulseAnimation,
             onNext: _nextStep,
             onPrevious: _previousStep,
@@ -135,6 +148,12 @@ class _OnboardingGuideState extends State<OnboardingGuide>
             _currentStep = OnboardingStep.sidebarContent;
             break;
           case OnboardingStep.sidebarContent:
+            _currentStep = OnboardingStep.faqButton;
+            break;
+          case OnboardingStep.faqButton:
+            _currentStep = OnboardingStep.audioButton;
+            break;
+          case OnboardingStep.audioButton:
             _currentStep = OnboardingStep.notifications;
             break;
           case OnboardingStep.notifications:
@@ -150,6 +169,12 @@ class _OnboardingGuideState extends State<OnboardingGuide>
             _currentStep = OnboardingStep.sidebarContent;
             break;
           case OnboardingStep.sidebarContent:
+            _currentStep = OnboardingStep.faqButton;
+            break;
+          case OnboardingStep.faqButton:
+            _currentStep = OnboardingStep.audioButton;
+            break;
+          case OnboardingStep.audioButton:
             _currentStep = OnboardingStep.notifications;
             break;
           case OnboardingStep.notifications:
@@ -176,8 +201,14 @@ class _OnboardingGuideState extends State<OnboardingGuide>
           case OnboardingStep.sidebarContent:
             _currentStep = OnboardingStep.sidebar;
             break;
-          case OnboardingStep.notifications:
+          case OnboardingStep.faqButton:
             _currentStep = OnboardingStep.sidebarContent;
+            break;
+          case OnboardingStep.audioButton:
+            _currentStep = OnboardingStep.faqButton;
+            break;
+          case OnboardingStep.notifications:
+            _currentStep = OnboardingStep.audioButton;
             break;
           case OnboardingStep.profile:
             _currentStep = OnboardingStep.notifications;
@@ -190,8 +221,14 @@ class _OnboardingGuideState extends State<OnboardingGuide>
           case OnboardingStep.sidebarContent:
             _currentStep = OnboardingStep.sidebar;
             break;
-          case OnboardingStep.notifications:
+          case OnboardingStep.faqButton:
             _currentStep = OnboardingStep.sidebarContent;
+            break;
+          case OnboardingStep.audioButton:
+            _currentStep = OnboardingStep.faqButton;
+            break;
+          case OnboardingStep.notifications:
+            _currentStep = OnboardingStep.audioButton;
             break;
           case OnboardingStep.profile:
             _currentStep = OnboardingStep.notifications;
@@ -436,6 +473,8 @@ class _OnboardingOverlay extends StatelessWidget {
   final GlobalKey? notificationKey;
   final GlobalKey? profileKey;
   final GlobalKey? bottomNavKey;
+  final GlobalKey? faqButtonKey;
+  final GlobalKey? audioButtonKey;
   final Animation<double> pulseAnimation;
   final VoidCallback onNext;
   final VoidCallback onPrevious;
@@ -447,6 +486,8 @@ class _OnboardingOverlay extends StatelessWidget {
     this.notificationKey,
     this.profileKey,
     this.bottomNavKey,
+    this.faqButtonKey,
+    this.audioButtonKey,
     required this.pulseAnimation,
     required this.onNext,
     required this.onPrevious,
@@ -647,6 +688,10 @@ class _OnboardingOverlay extends StatelessWidget {
         return sidebarKey;
       case OnboardingStep.sidebarContent:
         return null;
+      case OnboardingStep.faqButton:
+        return faqButtonKey;
+      case OnboardingStep.audioButton:
+        return audioButtonKey;
       case OnboardingStep.notifications:
         return notificationKey;
       case OnboardingStep.profile:
@@ -660,6 +705,10 @@ class _OnboardingOverlay extends StatelessWidget {
         return 0;
       case OnboardingStep.sidebarContent:
         return 0;
+      case OnboardingStep.faqButton:
+        return 8;
+      case OnboardingStep.audioButton:
+        return 8;
       case OnboardingStep.notifications:
         return 24;
       case OnboardingStep.profile:
@@ -683,6 +732,36 @@ class _OnboardingOverlay extends StatelessWidget {
         }
       case OnboardingStep.sidebarContent:
         return 0;
+      case OnboardingStep.faqButton:
+        // Center tooltip above the button
+        final tooltipWidth =
+            isMobile ? (screenWidth - 40).clamp(280.0, 340.0) : 340.0;
+        final centeredLeft = offset.dx + (size.width / 2) - (tooltipWidth / 2);
+
+        // Keep within screen bounds
+        if (centeredLeft < 20) {
+          return 20;
+        }
+        if (centeredLeft + tooltipWidth > screenWidth - 20) {
+          return screenWidth - tooltipWidth - 20;
+        }
+        return centeredLeft;
+
+      case OnboardingStep.audioButton:
+        // Center tooltip above the button (positioned to the right)
+        final tooltipWidth =
+            isMobile ? (screenWidth - 40).clamp(280.0, 340.0) : 340.0;
+        final centeredLeft = offset.dx + (size.width / 2) - (tooltipWidth / 2);
+
+        // Keep within screen bounds
+        if (centeredLeft < 20) {
+          return 20;
+        }
+        if (centeredLeft + tooltipWidth > screenWidth - 20) {
+          return screenWidth - tooltipWidth - 20;
+        }
+        return centeredLeft;
+
       case OnboardingStep.notifications:
         if (offset.dx - 300 < 20) {
           return 20;
@@ -709,6 +788,28 @@ class _OnboardingOverlay extends StatelessWidget {
         }
       case OnboardingStep.sidebarContent:
         return 0;
+      case OnboardingStep.faqButton:
+        // Position tooltip above the button with better spacing
+        final tooltipHeight = 180.0;
+        final proposedTop = offset.dy - tooltipHeight - 48; //
+
+        // If too close to top, position below instead
+        if (proposedTop < 80) {
+          return offset.dy + size.height + 48; //
+        }
+        return proposedTop;
+
+      case OnboardingStep.audioButton:
+        // Position tooltip above the button with better spacing
+        final tooltipHeight = 160.0;
+        final proposedTop = offset.dy - tooltipHeight - 48; //
+
+        // If too close to top, position below instead
+        if (proposedTop < 80) {
+          return offset.dy + size.height + 48; //
+        }
+        return proposedTop;
+
       case OnboardingStep.notifications:
         final proposedTop = offset.dy + size.height + 20;
         if (proposedTop + 200 > screenHeight) {
@@ -909,7 +1010,7 @@ class _OnboardingOverlay extends StatelessWidget {
 
   Widget _buildStepIndicator(BuildContext context) {
     final isMobile = _isMobile(context);
-    final totalSteps = 4; // Changed from 5 to 4
+    final totalSteps = 6; // 6 steps total
     final currentStepIndex = _getCurrentStepIndex();
 
     return Row(
@@ -934,10 +1035,14 @@ class _OnboardingOverlay extends StatelessWidget {
         return 0;
       case OnboardingStep.sidebarContent:
         return 1;
-      case OnboardingStep.notifications:
+      case OnboardingStep.faqButton:
         return 2;
-      case OnboardingStep.profile:
+      case OnboardingStep.audioButton:
         return 3;
+      case OnboardingStep.notifications:
+        return 4;
+      case OnboardingStep.profile:
+        return 5;
     }
   }
 
@@ -978,6 +1083,20 @@ class _OnboardingOverlay extends StatelessWidget {
                 'Use the sidebar to navigate between different sections:',
           );
         }
+
+      case OnboardingStep.faqButton:
+        return _StepInfo(
+          title: 'Browse FAQs',
+          description:
+              'Toggle this button to view frequently asked questions. It\'s a quick way to find answers without typing.',
+        );
+
+      case OnboardingStep.audioButton:
+        return _StepInfo(
+          title: 'Voice Input',
+          description:
+              'Use voice input to ask questions. Simply tap the microphone and speak your query.',
+        );
 
       case OnboardingStep.notifications:
         return _StepInfo(
