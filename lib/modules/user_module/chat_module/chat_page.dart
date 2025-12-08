@@ -32,6 +32,8 @@ class ChatPage extends StatefulWidget {
   final String? initialMessage;
   final bool showFAQs;
   final VoidCallback? onFAQToggle;
+  final GlobalKey? faqButtonKey;
+  final GlobalKey? audioButtonKey;
 
   const ChatPage({
     Key? key,
@@ -39,6 +41,8 @@ class ChatPage extends StatefulWidget {
     this.initialMessage,
     this.showFAQs = false,
     this.onFAQToggle,
+    this.faqButtonKey,
+    this.audioButtonKey,
   }) : super(key: key);
 
   @override
@@ -830,13 +834,6 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   //       (distance / 2)
   //           .clamp(200, 800)
   //           .toInt();
-
-  //   _scrollController.animateTo(
-  //     targetPosition,
-  //     duration: Duration(milliseconds: duration),
-  //     curve: Curves.easeOutCubic,
-  //   );
-  // }
 
   void _scrollToBottomInstant() {
     if (!_scrollController.hasClients) return;
@@ -2453,9 +2450,12 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
         ChatProvider.MAX_DAILY_MESSAGES - chatProvider.userDailyMessageCount;
 
     if (remainingMessages == 2) {
+
+      // ✅ CRITICAL: Dismiss keyboard before showing dialog
       FocusScope.of(context).unfocus();
-      // ✅ REDUCED: from 300ms to 150ms
-      await Future.delayed(Duration(milliseconds: 150));
+
+      // ✅ Wait for keyboard animation to complete
+      await Future.delayed(Duration(milliseconds: 300));
 
       final bool? shouldContinue = await showDialog<bool>(
         context: context,
@@ -2467,14 +2467,19 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
             ),
       );
 
+
       if (shouldContinue != true) {
         return;
       }
     }
 
+
+    // ✅ Check if completely out of messages
     if (chatProvider.isMessageLimitReached) {
+      // ✅ Also dismiss keyboard for limit reached dialog
       FocusScope.of(context).unfocus();
-      await Future.delayed(Duration(milliseconds: 150));
+      await Future.delayed(Duration(milliseconds: 300));
+
 
       final timeUntilReset = chatProvider.getTimeUntilReset();
 
@@ -2487,7 +2492,6 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       return;
     }
 
-    // ✅ INSTANT: Clear input immediately (better UX)
     _controller.clear();
 
     if (_showFAQs && mounted) {
@@ -2497,8 +2501,11 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
 
     try {
+
       // ✅ INSTANT: Scroll happens automatically via callback, no manual delay needed
       await chatProvider.askQuestionWithStreaming(context, text);
+
+
     } catch (e) {
       debugPrint('Error sending message: $e');
       if (mounted) {
@@ -2576,6 +2583,8 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                     _showFAQs
                         ? (_faqSectionKey.currentState?.isListening ?? false)
                         : _isListening,
+                faqButtonKey: widget.faqButtonKey,
+                audioButtonKey: widget.audioButtonKey,
               ),
             ],
           );
