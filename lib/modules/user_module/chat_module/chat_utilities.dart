@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
@@ -596,26 +597,47 @@ class MessageLimitDialog extends StatefulWidget {
   State<MessageLimitDialog> createState() => _MessageLimitDialogState();
 }
 
-class _MessageLimitDialogState extends State<MessageLimitDialog> {
+class _MessageLimitDialogState extends State<MessageLimitDialog>
+    with SingleTickerProviderStateMixin {
   late Duration _remainingTime;
   Timer? _timer;
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _remainingTime = widget.timeUntilReset;
     _startCountdown();
+
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
+    _scaleAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutBack,
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    );
+
+    _animationController.forward();
   }
 
   void _startCountdown() {
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
 
       setState(() {
-        _remainingTime = _remainingTime - Duration(seconds: 1);
+        _remainingTime = _remainingTime - const Duration(seconds: 1);
 
         if (_remainingTime.isNegative) {
           timer.cancel();
@@ -642,143 +664,148 @@ class _MessageLimitDialogState extends State<MessageLimitDialog> {
   @override
   void dispose() {
     _timer?.cancel();
+    _animationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      elevation: 8,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 400),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(24),
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 380),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.orange.shade600, Colors.orange.shade400],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.chat_bubble_outline,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Daily Message Limit Reached',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'You\'ve used all 5 messages today',
-                          style: TextStyle(fontSize: 13, color: Colors.white70),
-                        ),
-                      ],
-                    ),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 40,
+                    offset: const Offset(0, 20),
                   ),
                 ],
               ),
-            ),
-
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(24),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Countdown Timer
+                  const SizedBox(height: 40),
+
+                  // Icon
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    width: 80,
+                    height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.orange.shade200),
+                      color: const Color(0xFFFFF3E0),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.hourglass_empty_rounded,
+                      size: 40,
+                      color: Color(0xFFFF9800),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Title
+                  const Text(
+                    'Daily Limit Reached',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1A1A),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Subtitle
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      'You\'ve used all 5 messages today',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade600,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Timer Display
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 32),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFAFAFA),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                     child: Column(
                       children: [
-                        Icon(
-                          Icons.timer_outlined,
-                          size: 48,
-                          color: Colors.orange.shade700,
+                        Text(
+                          'Resets in',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade600,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'Next reset in:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade700,
+                          _formatDuration(_remainingTime),
+                          style: const TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFFF9800),
+                            letterSpacing: -1,
+                            fontFeatures: [FontFeature.tabularFigures()],
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          _formatDuration(_remainingTime),
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange.shade700,
-                            fontFeatures: [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Resets daily at 6:00 AM',
+                          'Daily at 6:00 AM',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade600,
+                            color: Colors.grey.shade500,
                           ),
                         ),
                       ],
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 32),
 
-                  // Info
+                  // Info Box
                   Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 32),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.shade200),
+                      color: const Color(0xFFE3F2FD),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: Colors.blue.shade700,
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          color: Color(0xFF1976D2),
                           size: 20,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'This limit helps us provide quality service to all users. You can send 5 more messages after the reset.',
+                            'This limit ensures quality service for all users',
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.blue.shade900,
@@ -789,41 +816,50 @@ class _MessageLimitDialogState extends State<MessageLimitDialog> {
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 32),
+
+                  // Close Button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E7D32),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                        ),
+                        child: const Text(
+                          'Got it',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
-
-            // Close button
-            Container(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text(
-                    'Got it',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class MessageLimitWarningDialog extends StatelessWidget {
+class MessageLimitWarningDialog extends StatefulWidget {
   final int remainingMessages;
   final Duration timeUntilReset;
 
@@ -832,6 +868,45 @@ class MessageLimitWarningDialog extends StatelessWidget {
     required this.remainingMessages,
     required this.timeUntilReset,
   }) : super(key: key);
+
+  @override
+  State<MessageLimitWarningDialog> createState() =>
+      _MessageLimitWarningDialogState();
+}
+
+class _MessageLimitWarningDialogState extends State<MessageLimitWarningDialog>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
+    _scaleAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutBack,
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    );
+
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   String _formatDuration(Duration duration) {
     final hours = duration.inHours;
@@ -846,101 +921,120 @@ class MessageLimitWarningDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      elevation: 8,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 400),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(24),
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 380),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.amber.shade600, Colors.orange.shade400],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.warning_amber_rounded,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Running Low on Messages',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'You\'re approaching your daily limit',
-                          style: TextStyle(fontSize: 13, color: Colors.white70),
-                        ),
-                      ],
-                    ),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 40,
+                    offset: const Offset(0, 20),
                   ),
                 ],
               ),
-            ),
-
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(24),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Remaining messages indicator
+                  const SizedBox(height: 40),
+
+                  // Icon with animated circle
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    width: 80,
+                    height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.amber.shade200),
+                      color: const Color(0xFFFFF8E1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.notification_important_rounded,
+                      size: 40,
+                      color: Color(0xFFFFA726),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Title
+                  const Text(
+                    'Running Low',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1A1A),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Subtitle
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      'You\'re approaching your daily limit',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade600,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Messages Counter
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 32),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFAFAFA),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                     child: Column(
                       children: [
-                        Icon(
-                          Icons.chat_bubble_outline,
-                          size: 48,
-                          color: Colors.amber.shade700,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              '${widget.remainingMessages}',
+                              style: const TextStyle(
+                                fontSize: 48,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFFFA726),
+                                letterSpacing: -2,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '/ 5',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade400,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         Text(
-                          '$remainingMessages message${remainingMessages == 1 ? '' : 's'} left',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.amber.shade700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'out of 5 daily messages',
+                          'messages left today',
                           style: TextStyle(
                             fontSize: 13,
+                            fontWeight: FontWeight.w500,
                             color: Colors.grey.shade600,
                           ),
                         ),
@@ -948,21 +1042,21 @@ class MessageLimitWarningDialog extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
-                  // Reset info
+                  // Reset Info
                   Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 32),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.shade200),
+                      color: const Color(0xFFF1F8F4),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.refresh,
-                          color: Colors.blue.shade700,
+                        const Icon(
+                          Icons.refresh_rounded,
+                          color: Color(0xFF2E7D32),
                           size: 20,
                         ),
                         const SizedBox(width: 12),
@@ -971,19 +1065,19 @@ class MessageLimitWarningDialog extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Resets in ${_formatDuration(timeUntilReset)}',
-                                style: TextStyle(
+                                'Resets in ${_formatDuration(widget.timeUntilReset)}',
+                                style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.blue.shade900,
+                                  color: Color(0xFF1A1A1A),
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'Limit resets daily at 6:00 AM',
+                                'Daily at 6:00 AM',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.blue.shade700,
+                                  color: Colors.grey.shade600,
                                 ),
                               ),
                             ],
@@ -992,69 +1086,75 @@ class MessageLimitWarningDialog extends StatelessWidget {
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
 
-            // Close button
-            Container(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: Row(
-                children: [
-                  //  Cancel button
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed:
-                          () =>
-                              Navigator.of(context).pop(false), // Returns false
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        side: BorderSide(
-                          color: Colors.grey.shade300,
-                          width: 1.5,
+                  const SizedBox(height: 32),
+
+                  // Action Buttons
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Row(
+                      children: [
+                        // Cancel Button
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              side: BorderSide(
+                                color: Colors.grey.shade300,
+                                width: 1.5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                color: Colors.grey.shade700,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ),
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+
+                        const SizedBox(width: 12),
+
+                        // Send Button
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2E7D32),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                            ),
+                            child: const Text(
+                              'Continue',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  //  MODIFIED: Send anyway button
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed:
-                          () => Navigator.of(context).pop(true), // Returns true
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text(
-                        'Send Anyway',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ),
+
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
