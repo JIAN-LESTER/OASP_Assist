@@ -10,7 +10,8 @@ export {
   generateAnswer,
   generateGeminiEmbedding,
 
-  generateGeminiResponse,
+
+
 } from "./ragChat";
 
 // User Management Functions

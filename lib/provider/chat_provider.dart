@@ -183,7 +183,7 @@ class ChatProvider extends ChangeNotifier {
 
     // ✅ RESET CHECK: If we need to reset, allow sending
     if (_userLastResetDate != null) {
-      final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
+      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
 
       final shouldReset =
           now.isAfter(resetTime) &&
@@ -212,21 +212,108 @@ class ChatProvider extends ChangeNotifier {
   bool get isMessageLimitReached => !canSendMessage;
 
   
+// Duration getTimeUntilReset() {
+//   final now = DateTime.now();
+//   DateTime nextReset;
 
-  Duration getTimeUntilReset() {
+//   final todayReset = DateTime(now.year, now.month, now.day, 6, 0, 0);
+  
+//   if (now.isBefore(todayReset)) {
+//     // It's before 6 AM today - next reset is today at 6 AM
+//     nextReset = todayReset;
+//   } else {
+//     // It's after 6 AM today - next reset is tomorrow at 6 AM
+//     nextReset = DateTime(now.year, now.month, now.day + 1, 6, 0, 0);
+//   }
+
+//   final duration = nextReset.difference(now);
+  
+//   print('⏰ Time until reset calculation:');
+//   print('   Current time: ${now.toString()}');
+//   print('   Next reset: ${nextReset.toString()}');
+//   print('   Duration: ${duration.inHours}h ${duration.inMinutes % 60}m');
+  
+//   return duration;
+// }
+
+Duration getTimeUntilReset() {
+  final now = DateTime.now();
+  DateTime nextReset;
+
+  // 🕐 PRODUCTION: 8:00 AM (uncomment when ready)
+  final todayReset = DateTime(now.year, now.month, now.day, 8, 0, 0);
+  
+
+  
+  if (now.isBefore(todayReset)) {
+    // It's before 8:40 AM today - next reset is today at 8:40 AM
+    nextReset = todayReset;
+  } else {
+    // It's after 8:40 AM today - next reset is tomorrow at 8:40 AM
+    nextReset = DateTime(now.year, now.month, now.day + 1, 8, 0, 0);
+  }
+
+  final duration = nextReset.difference(now);
+  
+  print('⏰ Time until reset calculation:');
+  print('   Current time: ${now.toString()}');
+  print('   Next reset: ${nextReset.toString()}');
+  print('   Duration: ${duration.inHours}h ${duration.inMinutes % 60}m');
+  
+  return duration;
+}
+
+
+Future<void> resetAllUserMessageCounts() async {
+  try {
     final now = DateTime.now();
-    DateTime nextReset;
+    
+    // 🕐 PRODUCTION: 8:00 AM (uncomment when ready)
+    final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
+    
+    // ⏰ TESTING: 8:40 AM (comment out for production)
+   
+    
+    // ✅ REMOVED: The 5-minute window check - allow manual reset anytime
+    print('🔄 Starting manual message count reset at ${now.toString()}');
 
-    if (now.hour < 6) {
-      // Reset is today at 6 AM
-      nextReset = DateTime(now.year, now.month, now.day, 6, 0, 0);
-    } else {
-      // Reset is tomorrow at 6 AM
-      nextReset = DateTime(now.year, now.month, now.day + 1, 6, 0, 0);
+    final usersSnapshot = await _firestore.collection('users').get();
+    final batch = _firestore.batch();
+    int resetCount = 0;
+
+    for (var doc in usersSnapshot.docs) {
+      final data = doc.data();
+      final lastReset = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+      
+      // Reset everyone who hasn't been reset today after reset time
+      if (lastReset == null || lastReset.isBefore(resetTime) || lastReset.day != now.day) {
+        batch.update(doc.reference, {
+          'dailyMessageCount': 0,
+          'lastMessageResetDate': Timestamp.now(),
+        });
+        resetCount++;
+      }
     }
 
-    return nextReset.difference(now);
+    if (resetCount > 0) {
+      await batch.commit();
+      print('✅ Reset complete: $resetCount users reset');
+    } else {
+      print('ℹ️ No users needed reset');
+    }
+
+    // Update local state if this is the current user
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId != null) {
+      _userDailyMessageCount = 0;
+      _userLastResetDate = now;
+      notifyListeners();
+    }
+  } catch (e) {
+    print('❌ Error in manual reset: $e');
   }
+}
+
 
   Future<void> loadUserMessageCount() async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
@@ -266,74 +353,103 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _updateUserMessageCount() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
+Future<void> _updateUserMessageCount() async {
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  if (userId == null) return;
 
-    try {
-      final now = DateTime.now();
-      final userRef = _firestore.collection('users').doc(userId);
+  try {
+    final now = DateTime.now();
+    final userRef = _firestore.collection('users').doc(userId);
 
-      // Get current data
-      final userDoc = await userRef.get();
+    // Get current data
+    final userDoc = await userRef.get();
 
-      if (!userDoc.exists) {
-        // ✅ Brand new user - create document and set count to 1
-        await userRef.set({
-          'dailyMessageCount': 1,
-          'lastMessageResetDate': Timestamp.now(),
-        }, SetOptions(merge: true));
+    if (!userDoc.exists) {
+      // ✅ Brand new user - create document and set count to 1
+      await userRef.set({
+        'dailyMessageCount': 0,
+        'lastMessageResetDate': Timestamp.now(),
+      }, SetOptions(merge: true));
 
-        _userDailyMessageCount = 1;
-        _userLastResetDate = now;
+      _userDailyMessageCount = 1;
+      _userLastResetDate = now;
 
-        print('✅ New user first message - count set to 1');
-        notifyListeners();
-        return;
-      }
-
-      // Existing user - check if reset needed
-      final data = userDoc.data()!;
-      final currentCount = data['dailyMessageCount'] ?? 0;
-      final lastReset = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
-
-      final resetTime = DateTime(now.year, now.month, now.day, 6, 0, 0);
-      final shouldReset =
-          lastReset == null ||
-          (now.isAfter(resetTime) &&
-              (lastReset.isBefore(resetTime) || lastReset.day != now.day));
-
-      if (shouldReset) {
-        // ✅ Reset and set to 1 (current message)
-        await userRef.update({
-          'dailyMessageCount': 1,
-          'lastMessageResetDate': Timestamp.now(),
-        });
-
-        _userDailyMessageCount = 1;
-        _userLastResetDate = now;
-
-        print('✅ Message count reset to 1');
-      } else {
-        // ✅ Increment using transaction to avoid race conditions
-        await _firestore.runTransaction((transaction) async {
-          final snapshot = await transaction.get(userRef);
-          final currentCount = snapshot.data()?['dailyMessageCount'] ?? 0;
-          final newCount = currentCount + 1;
-
-          transaction.update(userRef, {'dailyMessageCount': newCount});
-        });
-
-        _userDailyMessageCount = currentCount + 1;
-
-        print('✅ User message count incremented to $_userDailyMessageCount');
-      }
-
+      print('✅ New user first message - count set to 1');
       notifyListeners();
-    } catch (e) {
-      print('❌ Error updating user message count: $e');
+      return;
     }
+
+    // Existing user - check if reset needed
+    final data = userDoc.data()!;
+    final currentCount = data['dailyMessageCount'] ?? 0;
+    final lastReset = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+
+  
+    final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
+    
+   
+    
+    // ✅ FIXED: More precise reset check
+    bool shouldReset = false;
+    
+    if (lastReset == null) {
+      // No last reset recorded - reset needed
+      shouldReset = true;
+      print('🔄 Reset needed: No previous reset recorded');
+    } else {
+      // Check if we've passed today's reset time AND last reset was before it
+      if (now.isAfter(resetTime) && lastReset.isBefore(resetTime)) {
+        shouldReset = true;
+        print('🔄 Reset needed: Passed today\'s reset time');
+      } 
+      // OR if last reset was on a different day
+      else if (lastReset.day != now.day || lastReset.month != now.month || lastReset.year != now.year) {
+        // Check if current time is after reset time
+        if (now.isAfter(resetTime)) {
+          shouldReset = true;
+          print('🔄 Reset needed: Different day and past reset time');
+        }
+      }
+    }
+
+    if (shouldReset) {
+      // ✅ FIX: Reset to 1 (for current message), not 0
+      await userRef.update({
+        'dailyMessageCount': 1,
+        'lastMessageResetDate': Timestamp.now(),
+      });
+
+      _userDailyMessageCount = 1;
+      _userLastResetDate = now;
+
+      print('✅ Message count RESET - new count: 1');
+      print('   Previous count was: $currentCount');
+      print('   Last reset was: ${lastReset?.toString() ?? "never"}');
+      print('   Current time: ${now.toString()}');
+      print('   Reset time threshold: ${resetTime.toString()}');
+    } else {
+      // ✅ No reset needed - increment using transaction
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(userRef);
+        final currentCount = snapshot.data()?['dailyMessageCount'] ?? 0;
+        final newCount = currentCount + 1;
+
+        transaction.update(userRef, {'dailyMessageCount': newCount});
+      });
+
+      _userDailyMessageCount = currentCount + 1;
+
+      print('✅ User message count incremented to $_userDailyMessageCount');
+      print('   No reset needed');
+    }
+
+    notifyListeners();
+  } catch (e) {
+    print('❌ Error updating user message count: $e');
   }
+}
+
+
 
   StreamSubscription<QuerySnapshot>? _messagesSubscription;
   bool _isSettingConversation = false;
@@ -685,6 +801,7 @@ class ChatProvider extends ChangeNotifier {
 
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 notifyListeners();
+                 _onMessageAdded?.call();
               });
             }
           },
@@ -834,37 +951,24 @@ bool get showTypingIndicator => _showTypingIndicator;
             : allMessages;
 
     // ✅ SHOW TYPING INDICATOR immediately
-    _showTypingIndicator = true;
-    notifyListeners();
-
-    // Create bot message placeholder
-    final botMessageId = "bot_${userMsg.id}";
-    final botMessage = Message(
-      id: botMessageId,
-      conversationId: conversationId!,
-      content: "",
-      sender: "bot",
-      status: "sent",
-      type: "text",
-      sentAt: DateTime.now(),
-      count: count,
-    );
-
-    // ✅ INSTANT: Add bot placeholder to UI
-    _messages.add(botMessage);
-    _streamingContent[botMessageId] = "";
+  _showTypingIndicator = true;
     notifyListeners();
     _onMessageAdded?.call();
+
+    // Create bot message ID for streaming
+    final botMessageId = "bot_${userMsg.id}";
+    
+    // ✅ DON'T add message to UI yet - just register for streaming
+    _streamingContent[botMessageId] = "";
 
     String finalAnswer = "";
 
     // ✅ OPTIMIZED: Faster FAQ streaming
     if (existingFAQ != null) {
       // Hide typing indicator when content starts
-      _showTypingIndicator = false;
-      
-      final String answer = existingFAQ["answer"];
-      final int chunkSize = 30; // Increased from 20 for faster display
+         final String answer = existingFAQ["answer"];
+      final int chunkSize = 30;
+      bool messageAdded = false;
 
       for (int i = 0; i < answer.length; i += chunkSize) {
         final chunk = answer.substring(
@@ -875,7 +979,27 @@ bool get showTypingIndicator => _showTypingIndicator;
         _streamingContent[botMessageId] =
             _streamingContent[botMessageId]! + chunk;
 
-        // ✅ OPTIMIZED: Update every 2 chunks instead of every 3
+        // ✅ On FIRST chunk, hide typing and add message
+        if (!messageAdded) {
+          _showTypingIndicator = false;
+          
+          final botMessage = Message(
+            id: botMessageId,
+            conversationId: conversationId!,
+            content: "",
+            sender: "bot",
+            status: "sent",
+            type: "text",
+            sentAt: DateTime.now(),
+            count: count,
+          );
+          
+          _messages.add(botMessage);
+          _processedMessages.add(botMessageId);
+          messageAdded = true;
+        }
+
+        // Update UI every 2 chunks
         if (i % (chunkSize * 2) == 0) {
           notifyListeners();
           _onMessageAdded?.call();
@@ -887,21 +1011,37 @@ bool get showTypingIndicator => _showTypingIndicator;
     } else {
       // ✅ OPTIMIZED: Faster RAG streaming
       int chunkCounter = 0;
+      bool messageAdded = false;
 
       await for (final streamedText in _retriever.generateAnswerStream(
         question,
         conversationHistory: recentHistory,
         conversationId: conversationId!,
       )) {
-        // Hide typing indicator on first chunk
-        if (chunkCounter == 0 && _showTypingIndicator) {
-          _showTypingIndicator = false;
-        }
-        
         chunkCounter++;
         _streamingContent[botMessageId] = streamedText;
 
-        // ✅ OPTIMIZED: Update every 2 chunks instead of every 4
+        // ✅ On FIRST chunk, hide typing and add message
+        if (!messageAdded) {
+          _showTypingIndicator = false;
+          
+          final botMessage = Message(
+            id: botMessageId,
+            conversationId: conversationId!,
+            content: "",
+            sender: "bot",
+            status: "sent",
+            type: "text",
+            sentAt: DateTime.now(),
+            count: count,
+          );
+          
+          _messages.add(botMessage);
+          _processedMessages.add(botMessageId);
+          messageAdded = true;
+        }
+
+        // Update UI every 2 chunks
         if (chunkCounter % 2 == 0) {
           notifyListeners();
           _onMessageAdded?.call();
@@ -931,7 +1071,7 @@ bool get showTypingIndicator => _showTypingIndicator;
     // Update bot message locally
     final idx = _messages.indexWhere((m) => m.id == botMessageId);
     if (idx >= 0) {
-      _messages[idx] = botMessage.copyWith(content: verified);
+      _messages[idx] = _messages[idx].copyWith(content: verified);
     }
 
     notifyListeners();

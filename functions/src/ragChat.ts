@@ -5,6 +5,7 @@ import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import { Pinecone } from "@pinecone-database/pinecone";
 import axios from "axios";
+import { onSchedule } from "firebase-functions/scheduler";
 
 // Secrets
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
@@ -838,4 +839,220 @@ async function* generateGeminiResponseStream(
     console.error("❌ Gemini streaming error:", error);
     throw error;
   }
+}
+
+export const resetDailyMessageCounts = onSchedule(
+  {
+    // 🕐 PRODUCTION: "0 8 * * *" for 8:00 AM (uncomment when ready)
+    // schedule: "0 8 * * *",
+    
+    // ⏰ TESTING: "40 8 * * *" for 8:40 AM (comment out for production)
+    schedule: "40 8 * * *", // Every day at 8:40 AM
+    
+    timeZone: "Asia/Manila", // Philippine Time (UTC+8)
+    memory: "256MiB",
+  },
+  async (event) => {
+    try {
+      const now = new Date();
+      console.log(`🔄 Starting daily message count reset at ${now.toISOString()}`);
+      console.log(`   Philippine Time: ${now.toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}`);
+
+      // ✅ FIXED: Calculate reset time in Philippine timezone
+      const phTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      
+      // 🕐 PRODUCTION: 8:00 AM (uncomment when ready)
+      // const resetTime = new Date(phTime.getFullYear(), phTime.getMonth(), phTime.getDate(), 8, 0, 0);
+      
+      // ⏰ TESTING: 8:40 AM (comment out for production)
+      const resetTime = new Date(phTime.getFullYear(), phTime.getMonth(), phTime.getDate(), 8, 40, 0);
+      
+      const resetTimestamp = admin.firestore.Timestamp.fromDate(resetTime);
+
+      // Get all users with message counts > 0
+      const usersSnapshot = await db.collection('users')
+        .where('dailyMessageCount', '>', 0)
+        .get();
+
+      console.log(`📊 Found ${usersSnapshot.docs.length} users with message counts > 0`);
+
+      // Process in batches of 500 (Firestore batch limit)
+      const batchSize = 500;
+      let processedCount = 0;
+      let resetCount = 0;
+
+      for (let i = 0; i < usersSnapshot.docs.length; i += batchSize) {
+        const batch = db.batch();
+        const batchDocs = usersSnapshot.docs.slice(i, i + batchSize);
+
+        for (const doc of batchDocs) {
+          const data = doc.data();
+          const lastReset = data.lastMessageResetDate?.toDate();
+
+          // ✅ FIXED: Reset logic
+          let shouldReset = false;
+
+          if (!lastReset) {
+            // Never been reset
+            shouldReset = true;
+          } else {
+            const lastResetPH = new Date(lastReset.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+            
+            // Reset if last reset was before today's reset time
+            if (lastResetPH < resetTime) {
+              shouldReset = true;
+            }
+          }
+
+          if (shouldReset) {
+            batch.update(doc.ref, {
+              'dailyMessageCount': 0,
+              'lastMessageResetDate': resetTimestamp,
+            });
+            resetCount++;
+          }
+          processedCount++;
+        }
+
+        await batch.commit();
+        console.log(`✅ Processed batch ${Math.floor(i / batchSize) + 1}: ${batchDocs.length} users`);
+      }
+
+      console.log(`✅ Daily reset complete:`);
+      console.log(`   Total processed: ${processedCount}`);
+      console.log(`   Actually reset: ${resetCount}`);
+      console.log(`   Skipped (already reset): ${processedCount - resetCount}`);
+    } catch (error: any) {
+      console.error('❌ Error in daily reset:', error);
+      throw error;
+    }
+  }
+);
+
+// ✅ FIXED: Manual reset endpoint for testing
+export const manualResetMessageCounts = onRequest(
+  {
+    cors: true,
+    memory: "256MiB",
+  },
+  async (req, res) => {
+    // ✅ Optional: Add authentication (uncomment for production)
+    // const authHeader = req.headers.authorization;
+    // if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    //   res.status(401).json({ error: 'Unauthorized' });
+    //   return;
+    // }
+
+    try {
+      const now = new Date();
+      console.log(`🔧 Manual reset triggered at ${now.toISOString()}`);
+
+      const phTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      
+      // 🕐 PRODUCTION: 8:00 AM (uncomment when ready)
+      // const resetTime = new Date(phTime.getFullYear(), phTime.getMonth(), phTime.getDate(), 8, 0, 0);
+      
+      // ⏰ TESTING: 8:40 AM (comment out for production)
+      const resetTime = new Date(phTime.getFullYear(), phTime.getMonth(), phTime.getDate(), 8, 40, 0);
+      
+      const resetTimestamp = admin.firestore.Timestamp.fromDate(resetTime);
+
+      const usersSnapshot = await db.collection('users').get();
+
+      const batchSize = 500;
+      let resetCount = 0;
+
+      for (let i = 0; i < usersSnapshot.docs.length; i += batchSize) {
+        const batch = db.batch();
+        const batchDocs = usersSnapshot.docs.slice(i, i + batchSize);
+
+        for (const doc of batchDocs) {
+          batch.update(doc.ref, {
+            'dailyMessageCount': 0,
+            'lastMessageResetDate': resetTimestamp,
+          });
+          resetCount++;
+        }
+
+        await batch.commit();
+      }
+
+      console.log(`✅ Manual reset complete: ${resetCount} users reset`);
+
+      res.json({ 
+        success: true, 
+        reset: resetCount, 
+        timestamp: now.toISOString(),
+        philippineTime: phTime.toISOString(),
+      });
+    } catch (error: any) {
+      console.error('❌ Error in manual reset:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// ✅ NEW: Test endpoint to check if scheduled function will trigger
+export const checkResetStatus = onRequest(
+  {
+    cors: true,
+    memory: "256MiB",
+  },
+  async (req, res) => {
+    try {
+      const now = new Date();
+      const phTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      
+      // 🕐 PRODUCTION: 8:00 AM (uncomment when ready)
+      // const resetTime = new Date(phTime.getFullYear(), phTime.getMonth(), phTime.getDate(), 8, 0, 0);
+      
+      // ⏰ TESTING: 8:40 AM (comment out for production)
+      const resetTime = new Date(phTime.getFullYear(), phTime.getMonth(), phTime.getDate(), 8, 40, 0);
+      
+      // Sample 10 users to check status
+      const usersSnapshot = await db.collection('users')
+        .limit(10)
+        .get();
+
+      const userStatus = usersSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const lastReset = data.lastMessageResetDate?.toDate();
+        
+        return {
+          userId: doc.id.substring(0, 8) + '...',
+          messageCount: data.dailyMessageCount || 0,
+          lastReset: lastReset ? lastReset.toISOString() : 'never',
+          needsReset: !lastReset || lastReset < resetTime,
+        };
+      });
+
+      res.json({
+        currentTime: now.toISOString(),
+        philippineTime: phTime.toISOString(),
+        todayResetTime: resetTime.toISOString(),
+        nextResetIn: getTimeUntilReset(phTime, resetTime),
+        scheduledFunctionCron: "40 8 * * *", // Update this comment when changing schedule
+        sampleUsers: userStatus,
+      });
+    } catch (error: any) {
+      console.error('❌ Error checking status:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+function getTimeUntilReset(now: Date, resetTime: Date): string {
+  let nextReset: Date;
+
+  if (now < resetTime) {
+    nextReset = resetTime;
+  } else {
+    nextReset = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 8, 40, 0);
+  }
+
+  const diff = nextReset.getTime() - now.getTime();
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+  return `${hours}h ${minutes}m`;
 }

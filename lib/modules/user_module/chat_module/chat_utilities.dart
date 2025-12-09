@@ -775,7 +775,7 @@ class _MessageLimitDialogState extends State<MessageLimitDialog>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Daily at 6:00 AM',
+                          'Daily at 8:00 AM',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade500,
@@ -1074,7 +1074,7 @@ class _MessageLimitWarningDialogState extends State<MessageLimitWarningDialog>
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'Daily at 6:00 AM',
+                                'Daily at 8:00 AM',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey.shade600,
