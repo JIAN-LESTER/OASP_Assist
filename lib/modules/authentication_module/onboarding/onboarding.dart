@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'onboarding_desktop.dart';
+import 'onboarding_tablet.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({Key? key}) : super(key: key);
@@ -120,11 +122,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
- void _finishOnboarding() async {
+  void _finishOnboarding() async {
     // Set app onboarding as completed
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('app_onboarding_completed', true);
-    
+
     if (mounted) {
       Navigator.of(context).pushReplacementNamed('/auth');
     }
@@ -402,10 +404,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             page.title,
             style: TextStyle(
               fontSize: titleFontSize,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: textPrimaryColor,
               height: 1.2,
-              letterSpacing: -0.5,
+              letterSpacing: -0.3,
             ),
             textAlign: TextAlign.center,
           ),
@@ -468,9 +470,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             page.title,
             style: TextStyle(
               fontSize: titleFontSize * 0.85,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: textPrimaryColor,
-              letterSpacing: -0.5,
+              letterSpacing: -0.3,
             ),
             textAlign: TextAlign.center,
           ),
@@ -510,13 +512,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       DataCollectionItem(
         icon: Icons.account_circle_outlined,
         title: "Profile Information",
-        description: "Name, email, year level, program, affiliation, student ID, LRN, and scholarship for authentication and user profile.",
-        color:  Colors.green,
+        description:
+            "Name, email, year level, program, affiliation, student ID, LRN, and scholarship for authentication and user profile.",
+        color: Colors.green,
       ),
       DataCollectionItem(
         icon: Icons.message_outlined,
         title: "Chat History",
-        description: "Conversations to improve AI responses and your experience.",
+        description:
+            "Conversations to improve AI responses and your experience.",
         color: Colors.green,
       ),
       DataCollectionItem(
@@ -546,9 +550,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             page.title,
             style: TextStyle(
               fontSize: titleFontSize * 0.85,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: textPrimaryColor,
-              letterSpacing: -0.5,
+              letterSpacing: -0.3,
             ),
             textAlign: TextAlign.center,
           ),
@@ -569,8 +573,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               physics: const NeverScrollableScrollPhysics(),
               itemCount: dataItems.length,
               itemBuilder:
-                  (context, index) =>
-                      _buildDataCollectionCard(dataItems[index], descriptionFontSize),
+                  (context, index) => _buildDataCollectionCard(
+                    dataItems[index],
+                    descriptionFontSize,
+                  ),
             ),
           ),
           const SizedBox(height: 12),
@@ -586,11 +592,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.shield_outlined,
-                  color: primaryColor,
-                  size: 20,
-                ),
+                Icon(Icons.shield_outlined, color: primaryColor, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -640,7 +642,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   feature.title,
                   style: TextStyle(
                     fontSize: fontSize * 0.9,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: primaryColor,
                   ),
                 ),
@@ -699,7 +701,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   item.title,
                   style: TextStyle(
                     fontSize: fontSize * 0.9,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: item.color,
                   ),
                 ),
@@ -711,7 +713,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     color: textSecondaryColor,
                     height: 1.3,
                   ),
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -738,7 +740,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       StepItem(
         number: "2",
         title: "Start Chatting",
-        description: "Ask questions about admissions, scholarships, or placements.",
+        description:
+            "Ask questions about admissions, scholarships, or placements.",
         icon: Icons.chat_rounded,
       ),
       StepItem(
@@ -768,9 +771,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             page.title,
             style: TextStyle(
               fontSize: titleFontSize * 0.85,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: textPrimaryColor,
-              letterSpacing: -0.5,
+              letterSpacing: -0.3,
             ),
             textAlign: TextAlign.center,
           ),
@@ -858,7 +861,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     'Step ${step.number}',
                     style: TextStyle(
                       fontSize: fontSize * 0.65,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       color: primaryColor,
                       letterSpacing: 0.3,
                     ),
@@ -869,7 +872,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   step.title,
                   style: TextStyle(
                     fontSize: fontSize * 1.0,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: primaryColor,
                   ),
                 ),
@@ -906,54 +909,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  // Tablet Layout
-  Widget _buildTabletLayout() {
-    return SafeArea(
-      child: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 550),
-          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: _buildContent(
-            maxWidth: 550,
-            horizontalPadding: 28,
-            iconSize: 110,
-            titleFontSize: 28,
-            descriptionFontSize: 16,
-            buttonHeight: 18,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Desktop Layout
-  Widget _buildDesktopLayout() {
-    return SafeArea(
-      child: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 480),
-          margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-          child: _buildContent(
-            maxWidth: 480,
-            horizontalPadding: 36,
-            iconSize: 120,
-            titleFontSize: 32,
-            descriptionFontSize: 17,
-            buttonHeight: 20,
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: backgroundColor,
       body: ResponsiveLayout(
         mobileBody: _buildMobileLayout(),
-        tabletBody: _buildTabletLayout(),
-        desktopBody: _buildDesktopLayout(),
+        tabletBody: const OnboardingTablet(),
+        desktopBody: const OnboardingDesktop(),
       ),
     );
   }
