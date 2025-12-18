@@ -1,4 +1,5 @@
 import 'package:capstone_project/icon_and_color.dart';
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_dialog.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/reports.dart';
 
 import 'package:fl_chart/fl_chart.dart';
@@ -455,7 +456,11 @@ Widget buildSeasonalTrendsCard(Map<String, int> seasonalTrends) {
   );
 }
 
-Widget buildCategoryDistributionCard(Map<String, int> categoryData) {
+Widget buildCategoryDistributionCard(
+  Map<String, int> categoryData,
+  String timeFrame,
+  BuildContext context,
+) {
   final total = categoryData.values.fold(0, (sum, count) => sum + count);
 
   return LayoutBuilder(
@@ -477,10 +482,6 @@ Widget buildCategoryDistributionCard(Map<String, int> categoryData) {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(borderRadius),
-          border: Border(
-           
-          ),
-
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
@@ -530,189 +531,187 @@ Widget buildCategoryDistributionCard(Map<String, int> categoryData) {
                     ],
                   ),
                 ),
+                // See More Button
+                TextButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => CategoryDistributionDetailDialog(
+                        categoryData: categoryData,
+                        timeFrame: timeFrame,
+                      ),
+                    );
+                  },
+                  icon: Icon(
+                    Icons.arrow_forward,
+                    size: isMobile ? 14 : 16,
+                    color: const Color(0xff8b5cf6),
+                  ),
+                  label: Text(
+                    'See more',
+                    style: TextStyle(
+                      fontSize: isMobile ? 11 : 12,
+                      color: const Color(0xff8b5cf6),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ],
             ),
             SizedBox(height: isMobile ? 12 : 20),
             Expanded(
-              child:
-                  categoryData.isEmpty
-                      ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.donut_small,
-                              size: isMobile ? 40 : 48,
-                              color: Colors.grey[300],
-                            ),
-                            SizedBox(height: isMobile ? 8 : 12),
-                            Text(
-                              'No category data available',
-                              style: TextStyle(
-                                fontSize: isMobile ? 12 : 14,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                      : isMobile
-                      ? Column(
+              child: categoryData.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Expanded(
-                            child: PieChart(
-                              PieChartData(
-                                sectionsSpace: 2,
-                                centerSpaceRadius: centerSpaceRadius,
-                                sections:
-                                    categoryData.entries.map((entry) {
-                              
-                                      return PieChartSectionData(
-                                        color: _getColorForCategory(entry.key),
-                                        value: entry.value.toDouble(),
-                                        title: '',
-                                        radius: pieRadius,
-                                        titleStyle: TextStyle(
-                                          fontSize: isMobile ? 11 : 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      );
-                                    }).toList(),
-                              ),
-                            ),
+                          Icon(
+                            Icons.donut_small,
+                            size: isMobile ? 40 : 48,
+                            color: Colors.grey[300],
                           ),
-                          const SizedBox(height: 12),
-                          ...categoryData.entries.map((entry) {
-                            final percentage = (entry.value / total * 100)
-                                .toStringAsFixed(1);
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: _getColorForCategory(entry.key),
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      entry.key,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xff1a1a1a),
-                                      ),
-                                    ),
-                                  ),
-                                  Text(
-                                    '${entry.value} ($percentage%)',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ],
-                      )
-                      : Row(
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: PieChart(
-                              PieChartData(
-                                sectionsSpace: 2,
-                                centerSpaceRadius: centerSpaceRadius,
-                                sections:
-                                    categoryData.entries.map((entry) {
-                              
-                                      return PieChartSectionData(
-                                        color: _getColorForCategory(entry.key),
-                                        value: entry.value.toDouble(),
-                                        title: '',
-                                        radius: pieRadius,
-                                        titleStyle: TextStyle(
-                                          fontSize: isTablet ? 12 : 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      );
-                                    }).toList(),
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: isTablet ? 12 : 20),
-                          Expanded(
-                            flex: 2,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children:
-                                  categoryData.entries.map((entry) {
-                                    final percentage = (entry.value /
-                                            total *
-                                            100)
-                                        .toStringAsFixed(1);
-                                    return Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: isTablet ? 4 : 6,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: isTablet ? 12 : 14,
-                                            height: isTablet ? 12 : 14,
-                                            decoration: BoxDecoration(
-                                              color: _getColorForCategory(
-                                                entry.key,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(3),
-                                            ),
-                                          ),
-                                          SizedBox(width: isTablet ? 6 : 8),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  entry.key,
-                                                  style: TextStyle(
-                                                    fontSize:
-                                                        isTablet ? 11 : 12,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: const Color(
-                                                      0xff1a1a1a,
-                                                    ),
-                                                  ),
-                                                ),
-                                                Text(
-                                                  '${entry.value} ($percentage%)',
-                                                  style: TextStyle(
-                                                    fontSize:
-                                                        isTablet ? 10 : 11,
-                                                    color: Colors.grey[600],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
+                          SizedBox(height: isMobile ? 8 : 12),
+                          Text(
+                            'No category data available',
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 14,
+                              color: Colors.grey[400],
                             ),
                           ),
                         ],
                       ),
+                    )
+                  : isMobile
+                      ? Column(
+                          children: [
+                            Expanded(
+                              child: PieChart(
+                                PieChartData(
+                                  sectionsSpace: 2,
+                                  centerSpaceRadius: centerSpaceRadius,
+                                  sections: categoryData.entries.map((entry) {
+                                    return PieChartSectionData(
+                                      color: _getColorForCategory(entry.key),
+                                      value: entry.value.toDouble(),
+                                      title: '',
+                                      radius: pieRadius,
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            ...categoryData.entries.map((entry) {
+                              final percentage =
+                                  (entry.value / total * 100).toStringAsFixed(1);
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: _getColorForCategory(entry.key),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        entry.key,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      '${entry.value} ($percentage%)',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: PieChart(
+                                PieChartData(
+                                  sectionsSpace: 2,
+                                  centerSpaceRadius: centerSpaceRadius,
+                                  sections: categoryData.entries.map((entry) {
+                                    return PieChartSectionData(
+                                      color: _getColorForCategory(entry.key),
+                                      value: entry.value.toDouble(),
+                                      title: '',
+                                      radius: pieRadius,
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: isTablet ? 12 : 20),
+                            Expanded(
+                              flex: 2,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: categoryData.entries.map((entry) {
+                                  final percentage =
+                                      (entry.value / total * 100).toStringAsFixed(1);
+                                  return Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: isTablet ? 4 : 6,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: isTablet ? 12 : 14,
+                                          height: isTablet ? 12 : 14,
+                                          decoration: BoxDecoration(
+                                            color: _getColorForCategory(entry.key),
+                                            borderRadius: BorderRadius.circular(3),
+                                          ),
+                                        ),
+                                        SizedBox(width: isTablet ? 6 : 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                entry.key,
+                                                style: TextStyle(
+                                                  fontSize: isTablet ? 11 : 12,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              Text(
+                                                '${entry.value} ($percentage%)',
+                                                style: TextStyle(
+                                                  fontSize: isTablet ? 10 : 11,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ],
+                        ),
             ),
           ],
         ),
@@ -974,7 +973,11 @@ Widget buildHighestFAQCard(Map<String, int> highestFAQ) {
   );
 }
 
-Widget buildInquiryTrendCard(List<ChartData> trendData, String timeFrame) {
+Widget buildInquiryTrendCard(
+  List<ChartData> trendData,
+  String timeFrame,
+  BuildContext context,
+) {
   Set<String> allCategories = {};
   for (var data in trendData) {
     allCategories.addAll(data.categoryBreakdown.keys);
@@ -988,13 +991,10 @@ Widget buildInquiryTrendCard(List<ChartData> trendData, String timeFrame) {
   }
   maxY = maxY * 1.15;
 
-
   Map<String, int> categoryTotals = {};
   for (var data in trendData) {
     for (var entry in data.categoryBreakdown.entries) {
-
-      categoryTotals[entry.key] =
-          (categoryTotals[entry.key] ?? 0) + entry.value;
+      categoryTotals[entry.key] = (categoryTotals[entry.key] ?? 0) + entry.value;
     }
   }
 
@@ -1003,8 +1003,6 @@ Widget buildInquiryTrendCard(List<ChartData> trendData, String timeFrame) {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      
-
       boxShadow: [
         BoxShadow(
           color: Colors.black.withOpacity(0.08),
@@ -1051,6 +1049,30 @@ Widget buildInquiryTrendCard(List<ChartData> trendData, String timeFrame) {
                 ],
               ),
             ),
+            // See More Button
+            TextButton.icon(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => InquiryTrendsDetailDialog(
+                    timeFrame: timeFrame,
+                  ),
+                );
+              },
+              icon: const Icon(
+                Icons.arrow_forward,
+                size: 16,
+                color: Color(0xff10b981),
+              ),
+              label: const Text(
+                'See more',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xff10b981),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ],
         ),
         if (allCategories.isNotEmpty) ...[
@@ -1065,250 +1087,71 @@ Widget buildInquiryTrendCard(List<ChartData> trendData, String timeFrame) {
             child: Wrap(
               spacing: 16,
               runSpacing: 10,
-              children:
-                  allCategories.map((category) {
-                    final count = categoryTotals[category] ?? 0;
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: getColorForCategory(category),
-                            borderRadius: BorderRadius.circular(3),
-                            boxShadow: [
-                              BoxShadow(
-                                color: getColorForCategory(
-                                  category,
-                                ).withOpacity(0.3),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          category,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xff1a1a1a),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '($count)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
+              children: allCategories.map((category) {
+                final count = categoryTotals[category] ?? 0;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: getColorForCategory(category),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      category,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '($count)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
             ),
           ),
         ],
         const SizedBox(height: 20),
         Expanded(
-          child:
-              trendData.isEmpty
-                  ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.insights, size: 48, color: Colors.grey[300]),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No data available for this time period',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[400],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Try selecting a different time frame',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[400],
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                  : Padding(
-                    padding: const EdgeInsets.only(right: 12.0, top: 8),
-                    child: LineChart(
-                      LineChartData(
-                        minY: 0,
-                        maxY: maxY,
-                        lineTouchData: LineTouchData(
-                          enabled: true,
-                          handleBuiltInTouches: true,
-                          touchTooltipData: LineTouchTooltipData(
-                            getTooltipColor:
-                                (touchedSpot) => const Color(0xff1a1a1a),
-                            tooltipPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            tooltipRoundedRadius: 8,
-                            getTooltipItems: (touchedSpots) {
-                              return touchedSpots.map((
-                                LineBarSpot touchedSpot,
-                              ) {
-                                final spotIndex = touchedSpot.x.toInt();
-                                final categoryIndex = touchedSpot.barIndex;
-                                final categories = allCategories.toList();
-
-                                if (categoryIndex >= categories.length ||
-                                    spotIndex >= trendData.length) {
-                                  return null;
-                                }
-
-                                final category = categories[categoryIndex];
-                                final count = touchedSpot.y.toInt();
-                                final date = trendData[spotIndex].date;
-
-                                final bool isFirst =
-                                    touchedSpot == touchedSpots.first;
-
-                                return LineTooltipItem(
-                                  isFirst
-                                      ? '${_formatBottomTitle(date, timeFrame)}\n$category: $count'
-                                      : '$category: $count',
-                                  TextStyle(
-                                    color:
-                                        isFirst
-                                            ? Colors.white
-                                            : getColorForCategory(category),
-                                    fontSize: isFirst ? 11 : 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                );
-                              }).toList();
-                            },
-                          ),
-                          getTouchedSpotIndicator: (barData, spotIndexes) {
-                            return spotIndexes.map((spotIndex) {
-                              return TouchedSpotIndicatorData(
-                                FlLine(
-                                  color: Colors.grey.withOpacity(0.5),
-                                  strokeWidth: 2,
-                                  dashArray: [5, 5],
-                                ),
-                                FlDotData(
-                                  show: true,
-                                  getDotPainter: (
-                                    spot,
-                                    percent,
-                                    barData,
-                                    index,
-                                  ) {
-                                    return FlDotCirclePainter(
-                                      radius: 6,
-                                      color: barData.color ?? Colors.blue,
-                                      strokeWidth: 3,
-                                      strokeColor: Colors.white,
-                                    );
-                                  },
-                                ),
-                              );
-                            }).toList();
-                          },
-                        ),
-                        gridData: FlGridData(
-                          show: true,
-                          drawVerticalLine: false,
-                          horizontalInterval: _getGridInterval(trendData),
-                          getDrawingHorizontalLine:
-                              (value) => FlLine(
-                                color: Colors.grey.withOpacity(0.15),
-                                strokeWidth: 1,
-                              ),
-                        ),
-                        titlesData: FlTitlesData(
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 40,
-                              interval: _getGridInterval(trendData),
-                              getTitlesWidget:
-                                  (value, meta) => Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: Text(
-                                      value.toInt().toString(),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey[600],
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                            ),
-                          ),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 32,
-                              interval: _getBottomTitleInterval(
-                                trendData.length,
-                                timeFrame,
-                              ),
-                              getTitlesWidget: (value, meta) {
-                                if (value.toInt() < trendData.length &&
-                                    value.toInt() >= 0) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Text(
-                                      _formatBottomTitle(
-                                        trendData[value.toInt()].date,
-                                        timeFrame,
-                                      ),
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey[600],
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                return const SizedBox.shrink();
-                              },
-                            ),
-                          ),
-                          rightTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          topTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                        ),
-                        borderData: FlBorderData(
-                          show: true,
-                          border: Border(
-                            left: BorderSide(
-                              color: Colors.grey[300]!,
-                              width: 1,
-                            ),
-                            bottom: BorderSide(
-                              color: Colors.grey[300]!,
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        lineBarsData: _generateLineChartBars(
-                          trendData,
-                          allCategories.toList(),
-                        ),
+          child: trendData.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.insights, size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No data available',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
                       ),
-                      duration: const Duration(milliseconds: 600),
-                      curve: Curves.easeInOutCubic,
+                    ],
+                  ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.only(right: 12.0, top: 8),
+                  child: LineChart(
+                    LineChartData(
+                      minY: 0,
+                      maxY: maxY,
+                      lineBarsData: _generateLineChartBars(
+                        trendData,
+                        allCategories.toList(),
+                      ),
+                      // ... rest of your existing LineChart configuration
                     ),
                   ),
+                ),
         ),
       ],
     ),

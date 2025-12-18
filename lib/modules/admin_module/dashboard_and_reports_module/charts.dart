@@ -1,17 +1,24 @@
 
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_dialog.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/reports.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
 
-Widget buildStatCard(String title, String value, Color color, IconData icon) {
+
+Widget buildStatCard(
+  String title,
+  String value,
+  Color color,
+  IconData icon, {
+  VoidCallback? onTap,
+}) {
   return LayoutBuilder(
     builder: (context, constraints) {
       final screenWidth = MediaQuery.of(context).size.width;
       final isMobile = screenWidth < 600;
       final isTablet = screenWidth >= 600 && screenWidth < 1100;
       
-      // Responsive sizing
       final padding = isMobile ? 12.0 : (isTablet ? 14.0 : 16.0);
       final iconPadding = isMobile ? 6.0 : (isTablet ? 7.0 : 8.0);
       final iconSize = isMobile ? 16.0 : (isTablet ? 18.0 : 20.0);
@@ -21,26 +28,31 @@ Widget buildStatCard(String title, String value, Color color, IconData icon) {
       final borderRadius = isMobile ? 10.0 : 12.0;
       final borderWidth = isMobile ? 3.0 : 4.0;
       
-      return Container(
-        padding: EdgeInsets.all(padding),
-        decoration: BoxDecoration(
-          color: Colors.white,
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(borderRadius),
-          border: Border(
-            left: BorderSide(
-              color: color,
-              width: borderWidth,
+          child: Container(
+            padding: EdgeInsets.all(padding),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(borderRadius),
+              border: Border(
+                left: BorderSide(
+                  color: color,
+                  width: borderWidth,
+                ),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
+               child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -66,23 +78,39 @@ Widget buildStatCard(String title, String value, Color color, IconData icon) {
                 ),
               ],
             ),
-            SizedBox(height: spacing),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: titleFontSize,
-                color: Colors.grey,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+                SizedBox(height: spacing),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: titleFontSize,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (onTap != null)
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: isMobile ? 10 : 12,
+                        color: Colors.grey.withOpacity(0.5),
+                      ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       );
     },
   );
 }
+
 
 Widget _buildAdaptiveValueText(String value, double baseFontSize, Color color) {
   return LayoutBuilder(
@@ -202,21 +230,21 @@ class DashboardWidgets {
 
 
 // Enhanced System Logs Card with modern design
-Widget buildSystemLogsCard(List<SystemLog> logs) {
+Widget buildSystemLogsCard(
+  List<SystemLog> logs,
+  String timeFrame,
+  BuildContext context,
+) {
   return LayoutBuilder(
     builder: (context, constraints) {
       final screenWidth = MediaQuery.of(context).size.width;
       final isMobile = screenWidth < 600;
-      final isTablet = screenWidth >= 600 && screenWidth < 1100;
 
       return Container(
         padding: EdgeInsets.all(isMobile ? 14 : 20),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-           border: Border(
-        
-      ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
@@ -228,7 +256,6 @@ Widget buildSystemLogsCard(List<SystemLog> logs) {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with icon
             Row(
               children: [
                 Container(
@@ -266,24 +293,62 @@ Widget buildSystemLogsCard(List<SystemLog> logs) {
                     ],
                   ),
                 ),
+                // See More Button
+                TextButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => SystemLogsDetailDialog(
+                        timeFrame: timeFrame,
+                      ),
+                    );
+                  },
+                  icon: Icon(
+                    Icons.arrow_forward,
+                    size: isMobile ? 14 : 16,
+                    color: Colors.blue[700],
+                  ),
+                  label: Text(
+                    'See more',
+                    style: TextStyle(
+                      fontSize: isMobile ? 11 : 12,
+                      color: Colors.blue[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ],
             ),
             SizedBox(height: isMobile ? 14 : 20),
-            
-            // Logs List
             Expanded(
               child: logs.isEmpty
-                  ? _buildEmptyState(
-                      icon: Icons.inventory_2_outlined,
-                      message: 'No system logs available',
-                      isMobile: isMobile,
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.inventory_2_outlined,
+                            size: isMobile ? 40 : 48,
+                            color: Colors.grey[300],
+                          ),
+                          SizedBox(height: isMobile ? 8 : 12),
+                          Text(
+                            'No system logs available',
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 14,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                        ],
+                      ),
                     )
                   : ListView.separated(
-                      itemCount: logs.length,
-                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      itemCount: logs.length > 5 ? 5 : logs.length,
+                      separatorBuilder: (context, index) =>
+                          const Divider(height: 1),
                       itemBuilder: (context, index) {
                         final log = logs[index];
-                        return _buildSystemLogItem(log, isMobile, isTablet);
+                        return _buildSystemLogItem(log, isMobile, false);
                       },
                     ),
             ),
@@ -295,22 +360,21 @@ Widget buildSystemLogsCard(List<SystemLog> logs) {
 }
 
 // Enhanced Message Logs Card with modern design
-Widget buildMessageLogsCard(List<MessageLogs> msgLogs) {
+Widget buildMessageLogsCard(
+  List<MessageLogs> msgLogs,
+  String timeFrame,
+  BuildContext context,
+) {
   return LayoutBuilder(
     builder: (context, constraints) {
       final screenWidth = MediaQuery.of(context).size.width;
       final isMobile = screenWidth < 600;
-      final isTablet = screenWidth >= 600 && screenWidth < 1100;
 
       return Container(
         padding: EdgeInsets.all(isMobile ? 14 : 20),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-           border: Border(
-        
-      ),
-          
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
@@ -322,7 +386,6 @@ Widget buildMessageLogsCard(List<MessageLogs> msgLogs) {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with icon
             Row(
               children: [
                 Container(
@@ -360,24 +423,62 @@ Widget buildMessageLogsCard(List<MessageLogs> msgLogs) {
                     ],
                   ),
                 ),
+                // See More Button
+                TextButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => MessageLogsDetailDialog(
+                        timeFrame: timeFrame,
+                      ),
+                    );
+                  },
+                  icon: Icon(
+                    Icons.arrow_forward,
+                    size: isMobile ? 14 : 16,
+                    color: Colors.green[700],
+                  ),
+                  label: Text(
+                    'See more',
+                    style: TextStyle(
+                      fontSize: isMobile ? 11 : 12,
+                      color: Colors.green[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ],
             ),
             SizedBox(height: isMobile ? 14 : 20),
-            
-            // Message Logs List
             Expanded(
               child: msgLogs.isEmpty
-                  ? _buildEmptyState(
-                      icon: Icons.mark_chat_unread_outlined,
-                      message: 'No recent conversations',
-                      isMobile: isMobile,
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.mark_chat_unread_outlined,
+                            size: isMobile ? 40 : 48,
+                            color: Colors.grey[300],
+                          ),
+                          SizedBox(height: isMobile ? 8 : 12),
+                          Text(
+                            'No recent conversations',
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 14,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                        ],
+                      ),
                     )
                   : ListView.separated(
-                      itemCount: msgLogs.length,
-                      separatorBuilder: (context, index) => SizedBox(height: isMobile ? 10 : 12),
+                      itemCount: msgLogs.length > 5 ? 5 : msgLogs.length,
+                      separatorBuilder: (context, index) =>
+                          SizedBox(height: isMobile ? 10 : 12),
                       itemBuilder: (context, index) {
                         final log = msgLogs[index];
-                        return _buildMessageLogItem(log, isMobile, isTablet);
+                        return _buildMessageLogItem(log, isMobile, false);
                       },
                     ),
             ),
@@ -387,7 +488,6 @@ Widget buildMessageLogsCard(List<MessageLogs> msgLogs) {
     },
   );
 }
-
 // System Log Item with enhanced design
 Widget _buildSystemLogItem(SystemLog log, bool isMobile, bool isTablet) {
   return Container(

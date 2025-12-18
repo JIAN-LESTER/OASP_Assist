@@ -414,6 +414,7 @@ class DesktopDashboard extends StatelessWidget {
                 inq,
                 selectedTimeFrame: selectedTimeFrame,
                 isMobile: false,
+                context: context,
               ),
           ],
         ),
@@ -473,6 +474,7 @@ class TabletDashboard extends StatelessWidget {
                 inq,
                 selectedTimeFrame: selectedTimeFrame,
                 isMobile: false,
+                context: context,
               ),
           ],
         ),
@@ -532,6 +534,7 @@ class MobileDashboard extends StatelessWidget {
                 inq,
                 selectedTimeFrame: selectedTimeFrame,
                 isMobile: true,
+                context: context,
               ),
           ],
         ),
@@ -593,6 +596,7 @@ List<Widget> buildInquiryTrendsReport(
   InquiryReportsData? data, {
   String? selectedTimeFrame,
   bool isMobile = false,
+  required BuildContext context,
 }) {
   if (isMobile) {
     return [
@@ -645,12 +649,13 @@ List<Widget> buildInquiryTrendsReport(
         child: buildInquiryTrendCard(
           data?.inquiryTrend ?? [],
           selectedTimeFrame.toString(),
+          context
         ),
       ),
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
-        child: buildCategoryDistributionCard(data?.categoryDistribution ?? {}),
+        child: buildCategoryDistributionCard(data?.categoryDistribution ?? {}, selectedTimeFrame.toString(), context),
       ),
       const SizedBox(height: 16),
       SizedBox(
@@ -717,6 +722,7 @@ List<Widget> buildInquiryTrendsReport(
             child: buildInquiryTrendCard(
               data?.inquiryTrend ?? [],
               selectedTimeFrame.toString(),
+              context
             ),
           ),
         ],
@@ -729,7 +735,9 @@ List<Widget> buildInquiryTrendsReport(
         children: [
           Expanded(
             child: buildCategoryDistributionCard(
-              data?.categoryDistribution ?? {},
+              data?.categoryDistribution ?? {}, 
+              selectedTimeFrame.toString(),
+              context,
             ),
           ),
           const SizedBox(width: 20),

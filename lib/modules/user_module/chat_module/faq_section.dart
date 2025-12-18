@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -40,6 +41,85 @@ class FAQSectionState extends State<FAQSection>
   String _lastWords = '';
   Timer? _listeningTimer;
 
+   bool _speechInitialized = false;
+  bool _isDisposing = false;
+
+   @override
+  Future<void> _initSpeechToText() async {
+    _speechToText = stt.SpeechToText();
+
+    final permissionStatus = await Permission.microphone.status;
+    print('Initial microphone permission: $permissionStatus');
+
+    if (!permissionStatus.isGranted) {
+      print('Microphone permission not granted, requesting...');
+      final result = await Permission.microphone.request();
+      if (!result.isGranted) {
+        print('Microphone permission denied by user');
+        _speechAvailable = false;
+        _speechInitialized = false;
+        return;
+      }
+    }
+
+    try {
+      print('Initializing speech recognition...');
+      _speechAvailable = await _speechToText.initialize(
+        onError: (error) {
+          print('Speech recognition error: ${error.errorMsg}');
+          if (mounted && !_isDisposing) {
+            setState(() {
+              _isListening = false;
+            });
+            _showSnackBar(
+              'Voice input error: ${_getErrorMessage(error.errorMsg)}',
+              Icons.error_outline,
+              Colors.red,
+            );
+          }
+        },
+        onStatus: (status) {
+          print('Speech recognition status: $status');
+          if (status == 'done' || status == 'notListening') {
+            if (mounted && !_isDisposing) {
+              setState(() {
+                _isListening = false;
+              });
+            }
+          }
+        },
+        debugLogging: false, // ✅ Disable debug logging to prevent crashes
+      );
+
+      print('Speech recognition initialization result: $_speechAvailable');
+      _speechInitialized = _speechAvailable;
+
+      if (!_speechAvailable) {
+        print('Speech recognition not available after initialization');
+        if (mounted && !_isDisposing) {
+          _showSnackBar(
+            'Voice input not available on this device',
+            Icons.mic_off,
+            Colors.orange,
+          );
+        }
+      } else {
+        print('Speech recognition successfully initialized');
+      }
+    } catch (e) {
+      print('Failed to initialize speech recognition: $e');
+      _speechAvailable = false;
+      _speechInitialized = false;
+      if (mounted && !_isDisposing) {
+        _showSnackBar(
+          'Failed to initialize voice input',
+          Icons.error_outline,
+          Colors.red,
+        );
+      }
+    }
+  }
+
   final List<String> categoryOrder = ['Admission', 'Scholarship', 'Placement'];
 
   @override
@@ -54,102 +134,85 @@ class FAQSectionState extends State<FAQSection>
     _fetchFAQs();
   }
 
+
+
+ 
   @override
   void dispose() {
+    print('FAQSection disposing...');
+    _isDisposing = true;
+    
+    // 1. Remove observer first
     WidgetsBinding.instance.removeObserver(this);
+    
+    // 2. Cancel timer
     _listeningTimer?.cancel();
+    
+    // 3. Stop speech recognition safely
+    _cleanupSpeechRecognition();
+    
+    // 4. Dispose controllers
     _expandController.dispose();
-    if (_isListening) {
-      _speechToText.stop();
-    }
+    
     super.dispose();
+    print('FAQSection disposed');
+  }
+
+  // ✅ NEW: Safe cleanup method
+  void _cleanupSpeechRecognition() {
+    try {
+      if (_speechInitialized && _speechToText.isAvailable) {
+        if (_speechToText.isListening) {
+          print('Stopping speech recognition in dispose...');
+          _speechToText.cancel(); // Use cancel for immediate stop
+        }
+      }
+    } catch (e) {
+      print('Error cleaning up speech recognition: $e');
+      // Ignore errors during dispose
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Stop listening when app goes to background
+    if (_isDisposing) return;
+    
     if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      if (_isListening) {
-        _stopListening();
-      }
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      print('App lifecycle changed to: $state');
+      _safeStopListening();
     }
   }
 
-  Future<void> _initSpeechToText() async {
-    _speechToText = stt.SpeechToText();
-
-    // First check if microphone permission is granted
-    final permissionStatus = await Permission.microphone.status;
-    print('Initial microphone permission: $permissionStatus');
-
-    if (!permissionStatus.isGranted) {
-      print('Microphone permission not granted, requesting...');
-      final result = await Permission.microphone.request();
-      if (!result.isGranted) {
-        print('Microphone permission denied by user');
-        _speechAvailable = false;
-        return;
-      }
-    }
-
+ Future<void> _safeStopListening() async {
+    if (_isDisposing) return;
+    
     try {
-      print('Initializing speech recognition...');
-      _speechAvailable = await _speechToText.initialize(
-        onError: (error) {
-          print('Speech recognition error: ${error.errorMsg}');
-          if (mounted) {
-            setState(() {
-              _isListening = false;
-            });
-            // Show user-friendly error message
-            _showSnackBar(
-              'Voice input error: ${_getErrorMessage(error.errorMsg)}',
-              Icons.error_outline,
-              Colors.red,
-            );
-          }
-        },
-        onStatus: (status) {
-          print('Speech recognition status: $status');
-          if (status == 'done' || status == 'notListening') {
-            if (mounted) {
-              setState(() {
-                _isListening = false;
-              });
-            }
-          }
-        },
-        debugLogging: true,
-      );
-
-      print('Speech recognition initialization result: $_speechAvailable');
-
-      if (!_speechAvailable) {
-        print('Speech recognition not available after initialization');
-        if (mounted) {
-          _showSnackBar(
-            'Voice input not available on this device',
-            Icons.mic_off,
-            Colors.orange,
-          );
+      _listeningTimer?.cancel();
+      
+      if (_speechInitialized && _speechToText.isAvailable) {
+        if (_speechToText.isListening) {
+          await _speechToText.cancel();
         }
-      } else {
-        print('Speech recognition successfully initialized');
+      }
+      
+      if (mounted && !_isDisposing) {
+        setState(() {
+          _isListening = false;
+        });
       }
     } catch (e) {
-      print('Failed to initialize speech recognition: $e');
-      _speechAvailable = false;
-      if (mounted) {
-        _showSnackBar(
-          'Failed to initialize voice input',
-          Icons.error_outline,
-          Colors.red,
-        );
+      print('Error in _safeStopListening: $e');
+      // Force reset state
+      if (mounted && !_isDisposing) {
+        setState(() {
+          _isListening = false;
+        });
       }
     }
   }
-
+ 
   String _getErrorMessage(String error) {
     if (error.contains('network')) {
       return 'Network error';
@@ -163,14 +226,15 @@ class FAQSectionState extends State<FAQSection>
     return 'Please try again';
   }
 
-  Future<void> _toggleListening() async {
+ Future<void> _toggleListening() async {
+    if (_isDisposing) return;
+    
     if (_isListening) {
-      await _stopListening();
+      await _safeStopListening();
       return;
     }
 
-    // Check if speech is available
-    if (!_speechAvailable) {
+    if (!_speechAvailable || !_speechInitialized) {
       print('Speech not available, attempting to reinitialize...');
       await _initSpeechToText();
 
@@ -184,7 +248,6 @@ class FAQSectionState extends State<FAQSection>
       }
     }
 
-    // Double-check microphone permission before starting
     final status = await Permission.microphone.status;
     print('Microphone permission check before listening: $status');
 
@@ -208,92 +271,83 @@ class FAQSectionState extends State<FAQSection>
       }
     }
 
-    // Verify speech recognition is still initialized
-    if (!_speechToText.isAvailable) {
-      print('Speech recognition lost availability, reinitializing...');
-      await _initSpeechToText();
-
-      if (!_speechAvailable) {
-        _showSnackBar(
-          'Voice input initialization failed',
-          Icons.error_outline,
-          Colors.red,
-        );
-        return;
-      }
-    }
-
-    // Start listening
     print('Attempting to start listening...');
     await _startListening();
   }
 
+   
   Future<void> _startListening() async {
+    if (_isDisposing) return;
+    
     print('_startListening called');
 
     try {
-      // Verify we have permission
+      // Check initialization
+      if (!_speechInitialized || !_speechToText.isAvailable) {
+        throw Exception('Speech recognition not initialized');
+      }
+
       final hasPermission = await Permission.microphone.isGranted;
       if (!hasPermission) {
         print('No microphone permission in _startListening');
         throw Exception('Microphone permission not granted');
       }
 
-      // Check if already listening
+      // Stop any existing session with longer delay
       if (_speechToText.isListening) {
-        print('Already listening, stopping first...');
-        await _speechToText.stop();
-        await Future.delayed(Duration(milliseconds: 300));
+        print('Already listening, canceling first...');
+        await _speechToText.cancel();
+        await Future.delayed(Duration(milliseconds: 800)); // ✅ Longer delay
       }
+
+      if (_isDisposing || !mounted) return;
 
       setState(() {
         _isListening = true;
         _lastWords = '';
       });
 
-      // Cancel any existing timer
       _listeningTimer?.cancel();
 
       print('Calling _speechToText.listen()...');
 
-      // Call listen without await
+      // ✅ Simplified listen configuration
       _speechToText.listen(
         onResult: (result) {
+          if (_isDisposing || !mounted) return;
+          
           print('Speech result received: ${result.recognizedWords}');
-          if (mounted) {
-            setState(() {
-              _lastWords = result.recognizedWords;
-              if (widget.messageController != null) {
-                widget.messageController!.text = _lastWords;
-              }
-            });
-          }
+          setState(() {
+            _lastWords = result.recognizedWords;
+            if (widget.messageController != null) {
+              widget.messageController!.text = _lastWords;
+            }
+          });
         },
         listenFor: Duration(seconds: 30),
         pauseFor: Duration(seconds: 5),
         partialResults: true,
         cancelOnError: true,
-        listenMode: stt.ListenMode.confirmation,
       );
 
       print('Listen method called successfully');
       HapticFeedback.mediumImpact();
 
-      // Set a safety timer to stop listening after 30 seconds
+      // Safety timer
       _listeningTimer = Timer(Duration(seconds: 31), () {
-        print('Safety timer triggered, stopping listening');
-        if (_isListening && mounted) {
-          _stopListening();
+        if (!_isDisposing && _isListening && mounted) {
+          print('Safety timer triggered, stopping listening');
+          _safeStopListening();
         }
       });
     } catch (e) {
       print('Error in _startListening: $e');
-      if (mounted) {
+      if (mounted && !_isDisposing) {
         setState(() {
           _isListening = false;
         });
         _showSnackBar(
-          'Failed to start voice input: ${e.toString()}',
+          'Failed to start voice input',
           Icons.error_outline,
           Colors.red,
         );
@@ -301,19 +355,11 @@ class FAQSectionState extends State<FAQSection>
     }
   }
 
-  Future<void> _stopListening() async {
-    try {
-      _listeningTimer?.cancel();
-      await _speechToText.stop();
-      if (mounted) {
-        setState(() {
-          _isListening = false;
-        });
-      }
-      HapticFeedback.lightImpact();
-    } catch (e) {
-      print('Error stopping speech recognition: $e');
-    }
+  
+
+Future<void> _stopListening() async {
+    await _safeStopListening();
+    HapticFeedback.lightImpact();
   }
 
   void _showSnackBar(String message, IconData icon, Color color) {
@@ -1113,8 +1159,6 @@ class FAQToggleButton extends StatelessWidget {
 
 // FAQInputSection
 
-
-
 class FAQInputSection extends StatefulWidget {
   final TextEditingController controller;
   final bool showFAQs;
@@ -1145,17 +1189,90 @@ class FAQInputSection extends StatefulWidget {
 
 class _FAQInputSectionState extends State<FAQInputSection> {
   late FocusNode _textFieldFocusNode;
+  bool _isSending = false;
 
   @override
   void initState() {
     super.initState();
     _textFieldFocusNode = FocusNode();
+    _textFieldFocusNode.addListener(_onFocusChange);
+    
+    // Prevent focus issues on Windows
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      _textFieldFocusNode.skipTraversal = false;
+      _textFieldFocusNode.canRequestFocus = true;
+    }
   }
 
   @override
   void dispose() {
+    _textFieldFocusNode.removeListener(_onFocusChange);
     _textFieldFocusNode.dispose();
     super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (!_textFieldFocusNode.hasFocus && mounted) {
+      setState(() {});
+    }
+  }
+
+  // ✅ CRITICAL FIX: Desktop-compatible message sending
+  void _handleSendMessage() {
+    if (_isSending || widget.isLoading) return;
+    
+    final text = widget.controller.text.trim();
+    if (text.isEmpty) return;
+
+    print('🚀 _handleSendMessage called');
+    print('   Platform: ${Platform.operatingSystem}');
+    print('   Has focus: ${_textFieldFocusNode.hasFocus}');
+
+    // Prevent multiple sends
+    setState(() {
+      _isSending = true;
+    });
+
+    // Stop speech if active
+    if (widget.isListening && widget.onMicrophoneTap != null) {
+      widget.onMicrophoneTap!();
+    }
+
+    // ✅ DESKTOP FIX: Handle focus removal safely
+    if (_textFieldFocusNode.hasFocus) {
+      print('   Removing focus...');
+      
+      // Schedule focus removal for next frame
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        
+        try {
+          // Use primary focus unfocus for desktop compatibility
+          FocusManager.instance.primaryFocus?.unfocus();
+          print('   ✅ Focus removed successfully');
+        } catch (e) {
+          print('   ⚠️ Focus removal error: $e');
+        }
+      });
+    }
+
+    // Send message immediately (don't wait for focus removal)
+    Future.microtask(() {
+      if (!mounted) return;
+      
+      print('   Calling onSendMessage...');
+      widget.onSendMessage();
+      
+      // Reset sending flag
+      Future.microtask(() {
+        if (mounted) {
+          setState(() {
+            _isSending = false;
+          });
+          print('   ✅ Message sent');
+        }
+      });
+    });
   }
 
   Map<String, double> _getResponsiveSizes(BuildContext context) {
@@ -1188,20 +1305,6 @@ class _FAQInputSectionState extends State<FAQInputSection> {
         'fontSize': 16.0,
       };
     }
-  }
-
-  // ✅ SIMPLIFIED: Just call the callback directly
-  void _handleSendMessage() {
-    if (widget.isLoading) return;
-    
-    final text = widget.controller.text.trim();
-    if (text.isEmpty) return;
-
-    // Unfocus keyboard
-    _textFieldFocusNode.unfocus();
-
-    // Call the send callback
-    widget.onSendMessage();
   }
 
   @override
@@ -1237,17 +1340,6 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                     // FAQ Toggle Button
                     Tooltip(
                       message: widget.showFAQs ? 'Hide FAQs' : 'Show FAQs',
-                      preferBelow: true,
-                      verticalOffset: 12,
-                      textStyle: TextStyle(
-                        color: Colors.white,
-                        fontSize: fontSize - 2,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade800,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
                       child: Container(
                         key: widget.faqButtonKey,
                         width: buttonSize,
@@ -1259,37 +1351,26 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                             color: Color(0xFFE0E0E0),
                             width: 1.5,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
                         ),
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: widget.isLoading ? null : () {
-                              HapticFeedback.lightImpact();
-                              widget.onFAQToggle();
-                            },
+                            onTap: (_isSending || widget.isLoading)
+                                ? null
+                                : () {
+                                    HapticFeedback.lightImpact();
+                                    widget.onFAQToggle();
+                                  },
                             borderRadius: BorderRadius.circular(8),
-                            splashColor: Colors.grey.withOpacity(0.1),
-                            highlightColor: Colors.grey.withOpacity(0.05),
                             child: Center(
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
-                                child: Icon(
-                                  widget.showFAQs
-                                      ? Icons.chat_bubble_outline_rounded
-                                      : Icons.help_outline_rounded,
-                                  key: ValueKey(widget.showFAQs),
-                                  color: widget.isLoading
-                                      ? Color(0xFFCCCCCC)
-                                      : Color(0xFF666666),
-                                  size: iconSize,
-                                ),
+                              child: Icon(
+                                widget.showFAQs
+                                    ? Icons.chat_bubble_outline_rounded
+                                    : Icons.help_outline_rounded,
+                                color: (_isSending || widget.isLoading)
+                                    ? Color(0xFFCCCCCC)
+                                    : Color(0xFF666666),
+                                size: iconSize,
                               ),
                             ),
                           ),
@@ -1298,73 +1379,85 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                     ),
                     SizedBox(width: 10),
 
-                    // Text Input Field
+                    // ✅ Text Input with KeyboardListener for Desktop
                     Expanded(
-                      child: Container(
-                        constraints: BoxConstraints(
-                          minHeight: buttonSize,
-                          maxHeight: 100,
-                        ),
-                        decoration: BoxDecoration(
-                          color: widget.isLoading
-                              ? Colors.grey.shade100
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(borderRadius),
-                          border: Border.all(
-                            color: widget.isLoading
-                                ? Colors.grey.shade200
-                                : borderColor,
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 12,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: TextField(
-                          controller: widget.controller,
-                          focusNode: _textFieldFocusNode,
-                          enabled: !widget.isLoading,
-                          maxLines: null,
-                          minLines: 1,
-                          textAlignVertical: TextAlignVertical.center,
-                          textInputAction: TextInputAction.send,
-                          
-                          style: TextStyle(
-                            fontSize: fontSize,
-                            fontWeight: FontWeight.w500,
-                            color: widget.isLoading
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade900,
-                            height: 1.4,
-                          ),
-
-                          decoration: InputDecoration(
-                            hintText: widget.isLoading
-                                ? 'Sending message...'
-                                : 'Ask something...',
-                            hintStyle: TextStyle(
-                              color: Colors.grey.shade400,
-                              fontSize: fontSize,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            isDense: true,
-                          ),
-
-                          // ✅ ONLY onSubmitted - no onEditingComplete
-                          onSubmitted: (_) {
-                            if (!widget.isLoading) {
+                      child: KeyboardListener(
+                        focusNode: FocusNode(),
+                        onKeyEvent: (event) {
+                          // Handle Enter key on desktop
+                          if ((Platform.isWindows ||
+                                  Platform.isLinux ||
+                                  Platform.isMacOS) &&
+                              event is KeyDownEvent &&
+                              event.logicalKey == LogicalKeyboardKey.enter &&
+                              !HardwareKeyboard.instance.isShiftPressed) {
+                            if (!_isSending && !widget.isLoading) {
+                              print('📥 Enter key pressed (desktop)');
                               _handleSendMessage();
                             }
-                          },
+                          }
+                        },
+                        child: Container(
+                          constraints: BoxConstraints(
+                            minHeight: buttonSize,
+                            maxHeight: 100,
+                          ),
+                          decoration: BoxDecoration(
+                            color: (_isSending || widget.isLoading)
+                                ? Colors.grey.shade100
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(borderRadius),
+                            border: Border.all(
+                              color: (_isSending || widget.isLoading)
+                                  ? Colors.grey.shade200
+                                  : borderColor,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: TextField(
+                            controller: widget.controller,
+                            focusNode: _textFieldFocusNode,
+                            enabled: !_isSending && !widget.isLoading,
+                            maxLines: null,
+                            minLines: 1,
+                            textAlignVertical: TextAlignVertical.center,
+                            textInputAction: TextInputAction.send,
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w500,
+                              color: (_isSending || widget.isLoading)
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade900,
+                              height: 1.4,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: (_isSending || widget.isLoading)
+                                  ? 'Sending message...'
+                                  : 'Ask something...',
+                              hintStyle: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontSize: fontSize,
+                                fontWeight: FontWeight.w400,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              isDense: true,
+                            ),
+                            // ✅ Disable onSubmitted on desktop (KeyboardListener handles it)
+                            onSubmitted: (Platform.isWindows ||
+                                    Platform.isLinux ||
+                                    Platform.isMacOS)
+                                ? null
+                                : (_) {
+                                    if (!_isSending && !widget.isLoading) {
+                                      print('📥 Enter key pressed (mobile)');
+                                      _handleSendMessage();
+                                    }
+                                  },
+                          ),
                         ),
                       ),
                     ),
@@ -1372,82 +1465,39 @@ class _FAQInputSectionState extends State<FAQInputSection> {
 
                     // Microphone Button
                     if (widget.onMicrophoneTap != null)
-                      Tooltip(
-                        message: widget.isListening
-                            ? 'Stop listening'
-                            : 'Voice input',
-                        preferBelow: true,
-                        verticalOffset: 12,
-                        textStyle: TextStyle(
-                          color: Colors.white,
-                          fontSize: fontSize - 2,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      Container(
+                        key: widget.audioButtonKey,
+                        width: buttonSize,
+                        height: buttonSize,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade800,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Container(
-                          key: widget.audioButtonKey,
-                          width: buttonSize,
-                          height: buttonSize,
-                          decoration: BoxDecoration(
+                          color: widget.isListening
+                              ? primaryColor
+                              : Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
                             color: widget.isListening
                                 ? primaryColor
-                                : widget.isLoading
-                                    ? Color(0xFFEEEEEE)
-                                    : Color(0xFFF5F5F5),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: widget.isListening
-                                  ? primaryColor
-                                  : widget.isLoading
-                                      ? Color(0xFFDDDDDD)
-                                      : Color(0xFFE0E0E0),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: widget.isListening
-                                    ? primaryColor.withOpacity(0.3)
-                                    : Colors.black.withOpacity(0.06),
-                                blurRadius: widget.isListening ? 12 : 8,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
+                                : Color(0xFFE0E0E0),
+                            width: 1.5,
                           ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: widget.isLoading
-                                  ? null
-                                  : () {
-                                      HapticFeedback.mediumImpact();
-                                      widget.onMicrophoneTap!();
-                                    },
-                              borderRadius: BorderRadius.circular(8),
-                              splashColor: widget.isListening
-                                  ? Colors.white.withOpacity(0.2)
-                                  : Colors.grey.withOpacity(0.1),
-                              highlightColor: widget.isListening
-                                  ? Colors.white.withOpacity(0.1)
-                                  : Colors.grey.withOpacity(0.05),
-                              child: Center(
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 200),
-                                  child: Icon(
-                                    widget.isListening
-                                        ? Icons.mic
-                                        : Icons.mic_none,
-                                    key: ValueKey(widget.isListening),
-                                    color: widget.isListening
-                                        ? Colors.white
-                                        : widget.isLoading
-                                            ? Color(0xFFCCCCCC)
-                                            : Color(0xFF666666),
-                                    size: iconSize,
-                                  ),
-                                ),
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: (_isSending || widget.isLoading)
+                                ? null
+                                : () {
+                                    HapticFeedback.mediumImpact();
+                                    widget.onMicrophoneTap!();
+                                  },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Center(
+                              child: Icon(
+                                widget.isListening ? Icons.mic : Icons.mic_none,
+                                color: widget.isListening
+                                    ? Colors.white
+                                    : Color(0xFF666666),
+                                size: iconSize,
                               ),
                             ),
                           ),
@@ -1460,49 +1510,39 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                       width: buttonSize,
                       height: buttonSize,
                       decoration: BoxDecoration(
-                        color: widget.isLoading
+                        color: (_isSending || widget.isLoading)
                             ? Colors.grey.shade400
                             : primaryColor,
                         borderRadius: BorderRadius.circular(10),
-                        boxShadow: widget.isLoading
-                            ? []
-                            : [
-                                BoxShadow(
-                                  color: primaryColor.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
                       ),
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
-                          onTap: widget.isLoading ? null : _handleSendMessage,
+                          onTap: (_isSending || widget.isLoading)
+                              ? null
+                              : () {
+                                  HapticFeedback.lightImpact();
+                                  print('🖱️ Send button clicked');
+                                  _handleSendMessage();
+                                },
                           borderRadius: BorderRadius.circular(10),
-                          splashColor: Colors.white.withOpacity(0.2),
-                          highlightColor: Colors.white.withOpacity(0.1),
                           child: Center(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              child: widget.isLoading
-                                  ? SizedBox(
-                                      width: iconSize - 4,
-                                      height: iconSize - 4,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
-                                        ),
+                            child: (_isSending || widget.isLoading)
+                                ? SizedBox(
+                                    width: iconSize - 4,
+                                    height: iconSize - 4,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
                                       ),
-                                    )
-                                  : Icon(
-                                      Icons.arrow_forward_rounded,
-                                      color: Colors.white,
-                                      size: iconSize,
-                                      key: ValueKey('send'),
                                     ),
-                            ),
+                                  )
+                                : Icon(
+                                    Icons.arrow_forward_rounded,
+                                    color: Colors.white,
+                                    size: iconSize,
+                                  ),
                           ),
                         ),
                       ),

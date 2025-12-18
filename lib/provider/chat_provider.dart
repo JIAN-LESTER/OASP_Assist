@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:capstone_project/provider/embedding_cache.dart';
+import 'package:capstone_project/provider/faq_cache.dart';
+import 'package:capstone_project/provider/question_group.dart';
 import 'package:capstone_project/responsive/user_constant.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -19,41 +22,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Cache classes for better performance
-class FAQCache {
-  static Map<String, Map<String, dynamic>> cache = {};
-  static DateTime lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(0);
-  static const Duration cacheExpiry = Duration(
-    hours: 2,
-  ); // ⚡ Increased from 1 hour
 
-  static bool get isExpired =>
-      DateTime.now().difference(lastCacheUpdate) > cacheExpiry;
 
-  static void updateCache(List<QueryDocumentSnapshot> docs) {
-    cache.clear();
-    for (var doc in docs) {
-      cache[doc.id] = doc.data() as Map<String, dynamic>;
-    }
-    lastCacheUpdate = DateTime.now();
-  }
-}
-
-class EmbeddingCache {
-  static final Map<String, List<double>> _cache = {};
-  static const int maxSize = 1000; // ⚡ Increased from 500
-
-  static List<double>? get(String key) => _cache[key];
-
-  static void put(String key, List<double> value) {
-    if (_cache.length >= maxSize) {
-      final oldestKeys = _cache.keys.take(_cache.length - maxSize + 1);
-      for (final oldKey in oldestKeys) {
-        _cache.remove(oldKey);
-      }
-    }
-    _cache[key] = value;
-  }
-}
 
 class ChatProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -211,30 +181,6 @@ class ChatProvider extends ChangeNotifier {
   // Keep the old getter for backward compatibility but use the new logic
   bool get isMessageLimitReached => !canSendMessage;
 
-  
-// Duration getTimeUntilReset() {
-//   final now = DateTime.now();
-//   DateTime nextReset;
-
-//   final todayReset = DateTime(now.year, now.month, now.day, 6, 0, 0);
-  
-//   if (now.isBefore(todayReset)) {
-//     // It's before 6 AM today - next reset is today at 6 AM
-//     nextReset = todayReset;
-//   } else {
-//     // It's after 6 AM today - next reset is tomorrow at 6 AM
-//     nextReset = DateTime(now.year, now.month, now.day + 1, 6, 0, 0);
-//   }
-
-//   final duration = nextReset.difference(now);
-  
-//   print('⏰ Time until reset calculation:');
-//   print('   Current time: ${now.toString()}');
-//   print('   Next reset: ${nextReset.toString()}');
-//   print('   Duration: ${duration.inHours}h ${duration.inMinutes % 60}m');
-  
-//   return duration;
-// }
 
 Duration getTimeUntilReset() {
   final now = DateTime.now();
@@ -1980,6 +1926,13 @@ Return ONLY the category name (Admission, Scholarship, Placement, or General):''
         }
       }
 
+            final uid = FirebaseAuth.instance.currentUser!.uid;
+
+final userDoc =
+    await _firestore.collection('users').doc(uid).get();
+
+final userName = userDoc.data()?['name'] ?? 'Unknown User';
+
       final userId = FirebaseAuth.instance.currentUser?.uid;
       final escalationRef = _firestore.collection('escalations').doc();
       final escalationId = escalationRef.id;
@@ -1987,6 +1940,7 @@ Return ONLY the category name (Admission, Scholarship, Placement, or General):''
       final escalatedData = {
         'escalationId': escalationId,
         'userId': userId,
+        'user': userName,
         'conversationId': conversationId!,
         'question': question,
         'botAnswer': answerText,
@@ -2229,134 +2183,126 @@ Return ONLY the category name (Admission, Scholarship, Placement, or General):''
     }
   }
 
-  Future<void> _checkAndPromoteToFAQOptimized(
-    String question,
-    List<double> currentEmbedding,
-    String botAnswer,
-    String category,
-  ) async {
-    try {
-      // Only process if answer and question are worthy
-      if (!_isAnswerWorthyOfFAQ(botAnswer) ||
-          !_isQuestionWorthyOfFAQ(question)) {
-        return;
-      }
+ Future<void> _checkAndPromoteToFAQOptimized(
+  String question,
+  List<double> currentEmbedding,
+  String botAnswer,
+  String category,
+) async {
+  try {
+    // Only process if answer and question are worthy
+    if (!_isAnswerWorthyOfFAQ(botAnswer) ||
+        !_isQuestionWorthyOfFAQ(question)) {
+      return;
+    }
 
-      // Calculate date 30 days ago
-      final oneMonthAgo = DateTime.now().subtract(Duration(days: 30));
-      final oneMonthAgoTimestamp = Timestamp.fromDate(oneMonthAgo);
+    // ✅ CHANGED: Query ALL historical messages (no time limit)
+    final querySnapshot =
+        await _firestore
+            .collectionGroup('messages')
+            .where('sender', isEqualTo: 'user')
+            .where('isAnswered', isEqualTo: true)
+            .where('category', isEqualTo: category)
+            .orderBy('sent_at', descending: true)
+            .limit(200) // Increased limit to capture more historical data
+            .get();
 
-      // Query messages from the last 30 days only
-      final querySnapshot =
-          await _firestore
-              .collectionGroup('messages')
-              .where('sender', isEqualTo: 'user')
-              .where('isAnswered', isEqualTo: true)
-              .where('category', isEqualTo: category)
-              .where('sent_at', isGreaterThanOrEqualTo: oneMonthAgoTimestamp)
-              .orderBy('sent_at', descending: true)
-              .limit(100)
-              .get();
+    Map<String, QuestionGroup> questionGroups = {};
 
-      Map<String, QuestionGroup> questionGroups = {};
+    for (var doc in querySnapshot.docs) {
+      final data = doc.data();
+      final pastQuestion = data['content'] as String?;
+      final pastEmbeddingData = data['embedding'];
 
-      for (var doc in querySnapshot.docs) {
-        final data = doc.data();
-        final pastQuestion = data['content'] as String?;
-        final pastEmbeddingData = data['embedding'];
+      if (pastQuestion == null || pastEmbeddingData == null) continue;
+      if (!_isQuestionWorthyOfFAQ(pastQuestion)) continue;
 
-        if (pastQuestion == null || pastEmbeddingData == null) continue;
-        if (!_isQuestionWorthyOfFAQ(pastQuestion)) continue;
+      try {
+        final pastEmbedding =
+            (pastEmbeddingData as List)
+                .map((e) => (e as num).toDouble())
+                .toList();
 
-        try {
-          final pastEmbedding =
-              (pastEmbeddingData as List)
-                  .map((e) => (e as num).toDouble())
-                  .toList();
+        if (pastEmbedding.length != currentEmbedding.length) continue;
 
-          if (pastEmbedding.length != currentEmbedding.length) continue;
+        final similarity = cosineSimilarity(currentEmbedding, pastEmbedding);
 
-          final similarity = cosineSimilarity(currentEmbedding, pastEmbedding);
+        if (similarity > 0.88) {
+          final contextKey = _extractContextualKey(pastQuestion);
+          final groupKey = '${category}_$contextKey';
 
-          if (similarity > 0.88) {
-            final contextKey = _extractContextualKey(pastQuestion);
-            final groupKey = '${category}_$contextKey';
-
-            questionGroups.putIfAbsent(groupKey, () => QuestionGroup());
-            questionGroups[groupKey]!.addQuestion(
-              pastQuestion,
-              data,
-              similarity,
-            );
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      // ✅ FIX 2: Changed threshold from 10 to 3
-      final batch = _firestore.batch();
-      bool hasBatchOperations = false;
-
-      for (var group in questionGroups.values) {
-        // ✅ NEW THRESHOLD: More than 3 questions with avg similarity > 0.90
-        if (group.questionCount > 3 && group.averageSimilarity > 0.90) {
-          final representativeQuestion = group.getMostRepresentativeQuestion();
-
-          final existing =
-              await _firestore
-                  .collection('faqs')
-                  .where('question', isEqualTo: representativeQuestion)
-                  .limit(1)
-                  .get();
-
-          if (existing.docs.isEmpty) {
-            final faqRef = _firestore.collection('faqs').doc();
-            final faqData = {
-              'question': representativeQuestion,
-              'answer': botAnswer,
-              'category': category,
-              'isPredefined': false,
-              'createdAt': Timestamp.now(),
-              'embedding': currentEmbedding,
-              'promotionReason':
-                  'Auto-promoted: ${group.questionCount} similar questions in last 30 days',
-              'similarityCount': group.questionCount,
-              'averageSimilarity': group.averageSimilarity,
-              'promotionPeriod': '30_days',
-              'promotionDate': Timestamp.now(),
-            };
-
-            batch.set(faqRef, faqData);
-            hasBatchOperations = true;
-
-            print('🎯 Auto-adding FAQ: $representativeQuestion');
-            print('   Questions in group: ${group.questionCount}');
-            print(
-              '   Average similarity: ${group.averageSimilarity.toStringAsFixed(3)}',
-            );
-            print('   Category: $category');
-          }
-        } else if (group.questionCount > 2) {
-          // Log groups approaching threshold
-          print('📊 Question group approaching threshold:');
-          print('   Context: ${_extractContextualKey(group.questions.first)}');
-          print('   Count: ${group.questionCount}/4 (need >3)');
-          print(
-            '   Avg similarity: ${group.averageSimilarity.toStringAsFixed(3)}',
+          questionGroups.putIfAbsent(groupKey, () => QuestionGroup());
+          questionGroups[groupKey]!.addQuestion(
+            pastQuestion,
+            data,
+            similarity,
           );
         }
+      } catch (e) {
+        continue;
       }
-
-      if (hasBatchOperations) {
-        await batch.commit();
-        FAQCache.lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(0);
-        print('✅ FAQ promotion batch committed successfully');
-      }
-    } catch (e) {
-      print('❌ Error in FAQ promotion: $e');
     }
+
+    // ✅ CHANGED: Promote when reaching 10 questions (increased from 3)
+    final batch = _firestore.batch();
+    bool hasBatchOperations = false;
+
+    for (var group in questionGroups.values) {
+      // ✅ NEW THRESHOLD: Exactly 10 or more questions with avg similarity > 0.90
+      if (group.questionCount >= 10 && group.averageSimilarity > 0.90) {
+        final representativeQuestion = group.getMostRepresentativeQuestion();
+
+        final existing =
+            await _firestore
+                .collection('faqs')
+                .where('question', isEqualTo: representativeQuestion)
+                .limit(1)
+                .get();
+
+        if (existing.docs.isEmpty) {
+          final faqRef = _firestore.collection('faqs').doc();
+          final faqData = {
+            'question': representativeQuestion,
+            'answer': botAnswer,
+            'category': category,
+            'isPredefined': false,
+            'createdAt': Timestamp.now(),
+            'embedding': currentEmbedding,
+            'similarityCount': group.questionCount,
+            'averageSimilarity': group.averageSimilarity,
+          };
+
+          batch.set(faqRef, faqData);
+          hasBatchOperations = true;
+
+          print('🎯 Auto-adding FAQ: $representativeQuestion');
+          print('   Questions in group: ${group.questionCount}');
+          print(
+            '   Average similarity: ${group.averageSimilarity.toStringAsFixed(3)}',
+          );
+          print('   Category: $category');
+          print('   ✅ PROMOTED: Reached 10 question threshold');
+        }
+      } else if (group.questionCount >= 5) {
+        // Log groups approaching threshold (every 5 questions)
+        print('📊 Question group approaching threshold:');
+        print('   Context: ${_extractContextualKey(group.questions.first)}');
+        print('   Count: ${group.questionCount}/10 (need 10 for promotion)');
+        print(
+          '   Avg similarity: ${group.averageSimilarity.toStringAsFixed(3)}',
+        );
+      }
+    }
+
+    if (hasBatchOperations) {
+      await batch.commit();
+      FAQCache.lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(0);
+      print('✅ FAQ promotion batch committed successfully');
+    }
+  } catch (e) {
+    print('❌ Error in FAQ promotion: $e');
   }
+}
 
   String _extractContextualKey(String question) {
     final lowercaseQuestion = question.toLowerCase();
@@ -2376,7 +2322,7 @@ Return ONLY the category name (Admission, Scholarship, Placement, or General):''
       ],
       'internship': ['internship', 'intern', 'training', 'practicum'],
       'scholarship': ['scholarship', 'grant', 'financial aid', 'funding'],
-      'admission': ['admission', 'enrollment', 'application', 'entry'],
+      'admission': ['admission', 'enrollment', 'exam', 'entry'],
       'requirement': ['requirement', 'needed', 'prerequisite', 'criteria'],
       'deadline': ['deadline', 'due date', 'when', 'schedule'],
       'fee': ['fee', 'cost', 'payment', 'tuition', 'amount'],
@@ -2810,84 +2756,3 @@ $question
 }
 
 // Helper class for grouping similar questions
-class QuestionGroup {
-  final List<String> questions = [];
-  final List<Map<String, dynamic>> questionData = [];
-  final List<double> similarities = [];
-
-  int get questionCount => questions.length;
-  double get averageSimilarity =>
-      similarities.isEmpty
-          ? 0.0
-          : similarities.reduce((a, b) => a + b) / similarities.length;
-
-  void addQuestion(
-    String question,
-    Map<String, dynamic> data,
-    double similarity,
-  ) {
-    questions.add(question);
-    questionData.add(data);
-    similarities.add(similarity);
-  }
-
-  String getMostRepresentativeQuestion() {
-    if (questions.isEmpty) return '';
-
-    double bestScore = 0.0;
-    String bestQuestion = questions.first;
-
-    for (int i = 0; i < questions.length; i++) {
-      final question = questions[i];
-      final similarity = similarities[i];
-      final qualityScore = _calculateQuestionQuality(question);
-      final combinedScore = similarity * 0.7 + qualityScore * 0.3;
-
-      if (combinedScore > bestScore) {
-        bestScore = combinedScore;
-        bestQuestion = question;
-      }
-    }
-
-    return bestQuestion;
-  }
-}
-
-// Helper function to calculate question quality
-double _calculateQuestionQuality(String question) {
-  double score = 0.0;
-  final cleanQuestion = question.trim().toLowerCase();
-
-  // Length bonus (up to 1.0)
-  score += (cleanQuestion.length / 100).clamp(0.0, 1.0);
-
-  // Question word bonus
-  final questionWords = ['what', 'how', 'when', 'where', 'why', 'who'];
-  if (questionWords.any((qw) => cleanQuestion.startsWith(qw))) {
-    score += 0.5;
-  }
-
-  // Academic/domain words bonus
-  final domainWords = [
-    'admission',
-    'scholarship',
-    'placement',
-    'course',
-    'program',
-    'requirement',
-    'deadline',
-    'fee',
-    'exam',
-  ];
-  final domainMatches =
-      domainWords.where((dw) => cleanQuestion.contains(dw)).length;
-  score += (domainMatches * 0.3);
-
-  return score.clamp(0.0, 5.0);
-}
-
-extension DoubleExtension on double {
-  String toFixed(int decimals) {
-    return toStringAsFixed(decimals);
-  }
-}

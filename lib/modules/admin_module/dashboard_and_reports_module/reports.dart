@@ -136,7 +136,7 @@ class FirebaseService {
     }
 
     try {
-      final startDate = _getStartDate(timeFrame);
+      final startDate = getStartDate(timeFrame);
 
       // Parallel fetch with indexed queries
       final results = await Future.wait([
@@ -181,7 +181,7 @@ class FirebaseService {
     }
 
     try {
-      final startDate = _getStartDate(timeFrame);
+      final startDate = getStartDate(timeFrame);
 
       // NEW: Get user lookup first (cached)
       final userLookup = await _getUserLookup();
@@ -220,7 +220,7 @@ class FirebaseService {
     }
 
     try {
-      final startDate = _getStartDate(timeFrame);
+      final startDate = getStartDate(timeFrame);
 
       final results = await Future.wait([
         _getUsers(),
@@ -330,7 +330,7 @@ class FirebaseService {
   }
 
   Future<List<QueryDocumentSnapshot>> _getNewUsers(String timeFrame) async {
-    final startDate = _getStartDate(timeFrame);
+    final startDate = getStartDate(timeFrame);
     final snapshot =
         await _firestore
             .collection('users')
@@ -370,18 +370,39 @@ class FirebaseService {
     return hourCounts;
   }
 
-  DateTime _getStartDate(String timeFrame) {
-    final now = DateTime.now();
-    return switch (timeFrame) {
-      'All' => DateTime(2000, 1, 1), // Far past date to get all data
-      'Today' => DateTime(now.year, now.month, now.day),
-      'This Week' => _getStartOfWeek(now),
-      'This Month' => DateTime(now.year, now.month, 1),
-      'This Year' => DateTime(now.year, 1, 1),
-      _ => DateTime(now.year, now.month, 1),
-    };
+DateTime getStartDate(String timeFrame, [DateTimeRange? customRange]) {
+  if (timeFrame == 'Custom' && customRange != null) {
+    return DateTime(
+      customRange.start.year,
+      customRange.start.month,
+      customRange.start.day,
+    );
   }
+  
+  final now = DateTime.now();
+  return switch (timeFrame) {
+    'All' => DateTime(2000, 1, 1),
+    'Today' => DateTime(now.year, now.month, now.day),
+    'This Week' => _getStartOfWeek(now),
+    'This Month' => DateTime(now.year, now.month, 1),
+    'This Year' => DateTime(now.year, 1, 1),
+    _ => DateTime(now.year, now.month, 1),
+  };
+}
 
+DateTime? getEndDate(String timeFrame, [DateTimeRange? customRange]) {
+  if (timeFrame == 'Custom' && customRange != null) {
+    return DateTime(
+      customRange.end.year,
+      customRange.end.month,
+      customRange.end.day,
+      23,
+      59,
+      59,
+    );
+  }
+  return null; // For other timeframes, no end date filter
+}
   
   InquiryReportsData _processInquiryReportsData({
     required List<QueryDocumentSnapshot> messages,
@@ -685,7 +706,7 @@ DateTime _getStartOfWeek(DateTime date) {
   ).subtract(Duration(days: daysFromMonday));
 }
 Future<Map<String, int>> getQuickStats(String timeFrame) async {
-    final startDate = _getStartDate(timeFrame);
+    final startDate = getStartDate(timeFrame);
 
     try {
       // Single optimized query for counts
@@ -1442,6 +1463,8 @@ List<ChartData> _generateYearlyTrend(
     );
   });
 }
+
+
 
 // Utility functions
 int _getWeekOfMonth(DateTime date) {

@@ -1003,33 +1003,41 @@ Widget _mobileCardsSection(InquiryReportsData? inq, String timeFrame) {
   return Column(
     children: [
       SizedBox(
-        height: 400,
-        child: LazyLoadWidget(
-          delay: const Duration(milliseconds: 100),
-          builder:
-              (_) => buildCategoryDistributionCard(
-                inq?.categoryDistribution ?? {},
-              ),
+          height: 400,
+          child: LazyLoadWidget(
+            delay: const Duration(milliseconds: 100),
+            builder: (context) => buildCategoryDistributionCard(
+              inq?.categoryDistribution ?? {},
+              timeFrame,
+              context, // Add context parameter
+            ),
+          ),
         ),
-      ),
       const SizedBox(height: 20),
-      SizedBox(
-        height: 400,
-        child: LazyLoadWidget(
-          delay: const Duration(milliseconds: 200),
-          builder:
-              (_) => buildInquiryTrendCard(inq?.inquiryTrend ?? [], timeFrame),
+       SizedBox(
+          height: 400,
+          child: LazyLoadWidget(
+            delay: const Duration(milliseconds: 200),
+            builder: (context) => buildInquiryTrendCard(
+              inq?.inquiryTrend ?? [],
+              timeFrame,
+              context, // Add context parameter
+            ),
+          ),
         ),
-      ),
 
       const SizedBox(height: 20),
-      SizedBox(
-        height: 350,
-        child: LazyLoadWidget(
-          delay: const Duration(milliseconds: 400),
-          builder: (_) => buildMessageLogsCard(inq?.msgLogs ?? []),
+    SizedBox(
+          height: 350,
+          child: LazyLoadWidget(
+            delay: const Duration(milliseconds: 400),
+            builder: (context) => buildMessageLogsCard(
+              inq?.msgLogs ?? [],
+              timeFrame,
+              context, // Add context parameter
+            ),
+          ),
         ),
-      ),
     ],
   );
 }
@@ -1039,32 +1047,33 @@ Widget _desktopCardsSection(InquiryReportsData? inq, String timeFrame) {
   return Column(
     children: [
       SizedBox(
-        height: 400,
-        child: Row(
-          children: [
-            Expanded(
-              child: LazyLoadWidget(
-                delay: const Duration(milliseconds: 100),
-                builder:
-                    (_) => buildCategoryDistributionCard(
-                      inq?.categoryDistribution ?? {},
-                    ),
+          height: 400,
+          child: Row(
+            children: [
+              Expanded(
+                child: LazyLoadWidget(
+                  delay: const Duration(milliseconds: 100),
+                  builder: (context) => buildCategoryDistributionCard(
+                    inq?.categoryDistribution ?? {},
+                    timeFrame,
+                    context,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: LazyLoadWidget(
-                delay: const Duration(milliseconds: 200),
-                builder:
-                    (_) => buildInquiryTrendCard(
-                      inq?.inquiryTrend ?? [],
-                      timeFrame,
-                    ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: LazyLoadWidget(
+                  delay: const Duration(milliseconds: 200),
+                  builder: (context) => buildInquiryTrendCard(
+                    inq?.inquiryTrend ?? [],
+                    timeFrame,
+                    context,
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       const SizedBox(height: 20),
       SizedBox(
         height: 350,
@@ -1072,10 +1081,14 @@ Widget _desktopCardsSection(InquiryReportsData? inq, String timeFrame) {
           children: [
             Expanded(
               flex: 2,
-              child: LazyLoadWidget(
-                delay: const Duration(milliseconds: 400),
-                builder: (_) => buildMessageLogsCard(inq?.msgLogs ?? []),
-              ),
+             child: LazyLoadWidget(
+                  delay: const Duration(milliseconds: 400),
+                  builder: (context) => buildMessageLogsCard(
+                    inq?.msgLogs ?? [],
+                    timeFrame,
+                    context,
+                  ),
+                ),
             ),
           ],
         ),

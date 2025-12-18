@@ -54,11 +54,13 @@ class _HumanEscalationState extends State<HumanEscalation>
     print('   - autoOpen: ${widget.autoOpen}');
     print('   - serviceUnit: ${widget.serviceUnit}');
 
-    if (widget.autoOpen == true && 
-        widget.initialEscalationId != null && 
+    if (widget.autoOpen == true &&
+        widget.initialEscalationId != null &&
         widget.initialEscalationId!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        print('⏰ Post-frame callback: Opening escalation ${widget.initialEscalationId}');
+        print(
+          '⏰ Post-frame callback: Opening escalation ${widget.initialEscalationId}',
+        );
         _openEscalationById(widget.initialEscalationId!);
       });
     }
@@ -69,46 +71,53 @@ class _HumanEscalationState extends State<HumanEscalation>
     // Check if serviceUnit is empty or null
     if (widget.serviceUnit.isEmpty) {
       print('⚠️ Service unit is empty, loading all escalations');
-      _escalationsStream = FirebaseFirestore.instance
-          .collection('escalations')
-          .orderBy('createdAt', descending: true)
-          .snapshots();
+      _escalationsStream =
+          FirebaseFirestore.instance
+              .collection('escalations')
+              .orderBy('createdAt', descending: true)
+              .snapshots();
     } else {
       // Use compound query with OR logic
       print('🔍 Setting up query for service unit: "${widget.serviceUnit}"');
-      
+
       _escalationsStream = FirebaseFirestore.instance
           .collection('escalations')
           .orderBy('createdAt', descending: true)
           .snapshots()
           .map((snapshot) {
             print('📊 Raw escalations count: ${snapshot.docs.length}');
-            
+
             // Filter in-memory to include both service unit and General
-            final filtered = snapshot.docs.where((doc) {
-              final data = doc.data();
-              final category = data['category'] as String?;
-              
-              // Include if category matches service unit OR is "General" OR is null/empty
-              final matches = category == widget.serviceUnit || 
-                             category == 'General' ||
-                             category == null ||
-                             category.isEmpty;
-              
-              if (matches) {
-                print('✅ Including escalation ${doc.id}: category = "$category"');
-              }
-              
-              return matches;
-            }).toList();
-            
+            final filtered =
+                snapshot.docs.where((doc) {
+                  final data = doc.data();
+                  final category = data['category'] as String?;
+
+                  // Include if category matches service unit OR is "General" OR is null/empty
+                  final matches =
+                      category == widget.serviceUnit ||
+                      category == 'General' ||
+                      category == null ||
+                      category.isEmpty;
+
+                  if (matches) {
+                    print(
+                      '✅ Including escalation ${doc.id}: category = "$category"',
+                    );
+                  }
+
+                  return matches;
+                }).toList();
+
             print('📊 Filtered escalations count: ${filtered.length}');
-            
+
             // Return a new QuerySnapshot with filtered docs
             return _FilteredQuerySnapshot(filtered, snapshot);
           });
-      
-      print('✅ Stream initialized with filter for: "${widget.serviceUnit}" and "General"');
+
+      print(
+        '✅ Stream initialized with filter for: "${widget.serviceUnit}" and "General"',
+      );
     }
   }
 
@@ -146,10 +155,11 @@ class _HumanEscalationState extends State<HumanEscalation>
     try {
       print('📂 Opening escalation: $escalationId');
 
-      final doc = await FirebaseFirestore.instance
-          .collection('escalations')
-          .doc(escalationId)
-          .get();
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('escalations')
+              .doc(escalationId)
+              .get();
 
       if (!doc.exists) {
         print('❌ Escalation not found: $escalationId');
@@ -162,13 +172,16 @@ class _HumanEscalationState extends State<HumanEscalation>
       // ✅ Verify escalation belongs to staff's service unit or is General
       final data = doc.data() as Map<String, dynamic>;
       final escalationCategory = data['category'] as String?;
-      
-      if (escalationCategory != widget.serviceUnit && escalationCategory != 'General') {
-        print('⚠️ Escalation category mismatch: $escalationCategory not in [${widget.serviceUnit}, General]');
+
+      if (escalationCategory != widget.serviceUnit &&
+          escalationCategory != 'General') {
+        print(
+          '⚠️ Escalation category mismatch: $escalationCategory not in [${widget.serviceUnit}, General]',
+        );
         if (mounted) {
           SnackbarUtil.showError(
-            context, 
-            'This escalation is not assigned to your service unit'
+            context,
+            'This escalation is not assigned to your service unit',
           );
         }
         return;
@@ -179,10 +192,11 @@ class _HumanEscalationState extends State<HumanEscalation>
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => EscalationDetailModal(
-            escalationId: doc.id,
-            escalationData: data,
-          ),
+          builder:
+              (context) => EscalationDetailModal(
+                escalationId: doc.id,
+                escalationData: data,
+              ),
         );
 
         print('✅ Escalation modal closed');
@@ -309,7 +323,8 @@ class _HumanEscalationState extends State<HumanEscalation>
                               Text(
                                 "Escalations",
                                 style: TextStyle(
-                                  fontSize: isDesktop ? 26 : (isTablet ? 24 : 20),
+                                  fontSize:
+                                      isDesktop ? 26 : (isTablet ? 24 : 20),
                                   fontWeight: FontWeight.bold,
                                   color: const Color(0xFF0F172A),
                                 ),
@@ -351,7 +366,9 @@ class _HumanEscalationState extends State<HumanEscalation>
                                 return PopupMenuItem<String>(
                                   value: option,
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
                                     child: Row(
                                       children: [
                                         Container(
@@ -361,15 +378,18 @@ class _HumanEscalationState extends State<HumanEscalation>
                                                     ? const Color(0xFF6B7280)
                                                     : _getStatusColor(option))
                                                 .withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(6),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                           ),
                                           child: Icon(
                                             option == 'all'
                                                 ? Icons.list_alt
                                                 : _getStatusIcon(option),
-                                            color: option == 'all'
-                                                ? const Color(0xFF6B7280)
-                                                : _getStatusColor(option),
+                                            color:
+                                                option == 'all'
+                                                    ? const Color(0xFF6B7280)
+                                                    : _getStatusColor(option),
                                             size: 16,
                                           ),
                                         ),
@@ -379,12 +399,14 @@ class _HumanEscalationState extends State<HumanEscalation>
                                               ? 'All Status'
                                               : option.toUpperCase(),
                                           style: TextStyle(
-                                            fontWeight: _selectedFilter == option
-                                                ? FontWeight.w600
-                                                : FontWeight.w500,
-                                            color: _selectedFilter == option
-                                                ? const Color(0xFF0F172A)
-                                                : const Color(0xFF475569),
+                                            fontWeight:
+                                                _selectedFilter == option
+                                                    ? FontWeight.w600
+                                                    : FontWeight.w500,
+                                            color:
+                                                _selectedFilter == option
+                                                    ? const Color(0xFF0F172A)
+                                                    : const Color(0xFF475569),
                                           ),
                                         ),
                                       ],
@@ -433,25 +455,28 @@ class _HumanEscalationState extends State<HumanEscalation>
                             color: const Color(0xFF64748B),
                             size: isTablet ? 22 : 20,
                           ),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(
-                                    Icons.clear,
-                                    color: const Color(0xFF64748B),
-                                    size: isTablet ? 22 : 20,
-                                  ),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() {
-                                      _searchQuery = '';
-                                    });
-                                  },
-                                )
-                              : null,
+                          suffixIcon:
+                              _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                    icon: Icon(
+                                      Icons.clear,
+                                      color: const Color(0xFF64748B),
+                                      size: isTablet ? 22 : 20,
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {
+                                        _searchQuery = '';
+                                      });
+                                    },
+                                  )
+                                  : null,
                           filled: true,
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(isTablet ? 16 : 14),
+                            borderRadius: BorderRadius.circular(
+                              isTablet ? 16 : 14,
+                            ),
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: EdgeInsets.symmetric(
@@ -473,21 +498,31 @@ class _HumanEscalationState extends State<HumanEscalation>
                             margin: EdgeInsets.only(bottom: isTablet ? 24 : 16),
                             decoration: BoxDecoration(
                               color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+                              borderRadius: BorderRadius.circular(
+                                isTablet ? 16 : 12,
+                              ),
                             ),
                           );
                         }
 
                         final docs = snapshot.data!.docs;
                         final total = docs.length;
-                        final pending = docs
-                            .where((doc) =>
-                                (doc.data() as Map)['status'] == 'pending')
-                            .length;
-                        final resolved = docs
-                            .where((doc) =>
-                                (doc.data() as Map)['status'] == 'resolved')
-                            .length;
+                        final pending =
+                            docs
+                                .where(
+                                  (doc) =>
+                                      (doc.data() as Map)['status'] ==
+                                      'pending',
+                                )
+                                .length;
+                        final resolved =
+                            docs
+                                .where(
+                                  (doc) =>
+                                      (doc.data() as Map)['status'] ==
+                                      'resolved',
+                                )
+                                .length;
 
                         return Container(
                           margin: EdgeInsets.only(bottom: isTablet ? 24 : 16),
@@ -500,8 +535,10 @@ class _HumanEscalationState extends State<HumanEscalation>
                                   color: const Color(0xFF6366F1),
                                   icon: Icons.inbox,
                                   isSelected: _selectedFilter == 'all',
-                                  onTap: () =>
-                                      setState(() => _selectedFilter = 'all'),
+                                  onTap:
+                                      () => setState(
+                                        () => _selectedFilter = 'all',
+                                      ),
                                   isCompact: !isTablet,
                                 ),
                               ),
@@ -513,8 +550,10 @@ class _HumanEscalationState extends State<HumanEscalation>
                                   color: const Color(0xFFF59E0B),
                                   icon: Icons.schedule,
                                   isSelected: _selectedFilter == 'pending',
-                                  onTap: () =>
-                                      setState(() => _selectedFilter = 'pending'),
+                                  onTap:
+                                      () => setState(
+                                        () => _selectedFilter = 'pending',
+                                      ),
                                   isCompact: !isTablet,
                                 ),
                               ),
@@ -526,8 +565,10 @@ class _HumanEscalationState extends State<HumanEscalation>
                                   color: const Color(0xFF10B981),
                                   icon: Icons.check_circle,
                                   isSelected: _selectedFilter == 'resolved',
-                                  onTap: () =>
-                                      setState(() => _selectedFilter = 'resolved'),
+                                  onTap:
+                                      () => setState(
+                                        () => _selectedFilter = 'resolved',
+                                      ),
                                   isCompact: !isTablet,
                                 ),
                               ),
@@ -565,26 +606,28 @@ class _HumanEscalationState extends State<HumanEscalation>
                     );
                   }
 
-                  final escalations = snapshot.data!.docs.where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
+                  final escalations =
+                      snapshot.data!.docs.where((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
 
-                    if (_selectedFilter != 'all') {
-                      if (data['status']?.toString().toLowerCase() !=
-                          _selectedFilter) {
-                        return false;
-                      }
-                    }
+                        if (_selectedFilter != 'all') {
+                          if (data['status']?.toString().toLowerCase() !=
+                              _selectedFilter) {
+                            return false;
+                          }
+                        }
 
-                    return _matchesSearch(data);
-                  }).toList();
+                        return _matchesSearch(data);
+                      }).toList();
 
                   if (escalations.isEmpty) {
                     return _EmptyState(
                       icon: Icons.search_off,
                       title: "No matching escalations",
-                      subtitle: _searchQuery.isNotEmpty
-                          ? "Try adjusting your search terms"
-                          : "No $_selectedFilter escalations found",
+                      subtitle:
+                          _searchQuery.isNotEmpty
+                              ? "Try adjusting your search terms"
+                              : "No $_selectedFilter escalations found",
                       isCompact: !isTablet,
                     );
                   }
@@ -595,13 +638,17 @@ class _HumanEscalationState extends State<HumanEscalation>
                     itemBuilder: (context, index) {
                       final doc = escalations[index];
                       final escalation = doc.data() as Map<String, dynamic>;
-                      final status = escalation['status']?.toString() ?? 'unknown';
+                      final status =
+                          escalation['status']?.toString() ?? 'unknown';
 
+                      final isResolved = status.toLowerCase() == 'resolved';
                       return Container(
                         margin: EdgeInsets.only(bottom: isTablet ? 16 : 12),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+                          borderRadius: BorderRadius.circular(
+                            isTablet ? 16 : 12,
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.05),
@@ -613,15 +660,18 @@ class _HumanEscalationState extends State<HumanEscalation>
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+                            borderRadius: BorderRadius.circular(
+                              isTablet ? 16 : 12,
+                            ),
                             onTap: () {
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (context) => EscalationDetailModal(
-                                  escalationId: doc.id,
-                                  escalationData: escalation,
-                                ),
+                                builder:
+                                    (context) => EscalationDetailModal(
+                                      escalationId: doc.id,
+                                      escalationData: escalation,
+                                    ),
                               );
                             },
                             child: Padding(
@@ -632,10 +682,12 @@ class _HumanEscalationState extends State<HumanEscalation>
                                   Container(
                                     padding: EdgeInsets.all(isTablet ? 10 : 8),
                                     decoration: BoxDecoration(
-                                      color: _getStatusColor(status)
-                                          .withOpacity(0.1),
-                                      borderRadius:
-                                          BorderRadius.circular(isTablet ? 12 : 10),
+                                      color: _getStatusColor(
+                                        status,
+                                      ).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(
+                                        isTablet ? 12 : 10,
+                                      ),
                                     ),
                                     child: Icon(
                                       _getStatusIcon(status),
@@ -646,7 +698,8 @@ class _HumanEscalationState extends State<HumanEscalation>
                                   SizedBox(width: isTablet ? 16 : 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           escalation['question'] ??
@@ -671,8 +724,9 @@ class _HumanEscalationState extends State<HumanEscalation>
                                                 vertical: isTablet ? 5 : 4,
                                               ),
                                               decoration: BoxDecoration(
-                                                color: _getStatusColor(status)
-                                                    .withOpacity(0.15),
+                                                color: _getStatusColor(
+                                                  status,
+                                                ).withOpacity(0.15),
                                                 borderRadius:
                                                     BorderRadius.circular(8),
                                               ),
@@ -681,7 +735,9 @@ class _HumanEscalationState extends State<HumanEscalation>
                                                 style: TextStyle(
                                                   fontSize: isTablet ? 11 : 10,
                                                   fontWeight: FontWeight.w700,
-                                                  color: _getStatusColor(status),
+                                                  color: _getStatusColor(
+                                                    status,
+                                                  ),
                                                   letterSpacing: 0.5,
                                                 ),
                                               ),
@@ -701,7 +757,8 @@ class _HumanEscalationState extends State<HumanEscalation>
                                                         as Timestamp?,
                                                   ),
                                                   style: TextStyle(
-                                                    fontSize: isTablet ? 13 : 12,
+                                                    fontSize:
+                                                        isTablet ? 13 : 12,
                                                     color: Colors.grey[600],
                                                     fontWeight: FontWeight.w500,
                                                   ),
@@ -727,12 +784,92 @@ class _HumanEscalationState extends State<HumanEscalation>
                                       ],
                                     ),
                                   ),
-                                  SizedBox(width: isTablet ? 12 : 8),
-                                  Icon(
-                                    Icons.arrow_forward_ios,
-                                    color: Colors.grey[400],
-                                    size: isTablet ? 16 : 14,
-                                  ),
+                                  // ✅ Right side - Show responder details for resolved escalations
+                                  if (isResolved &&
+                                      escalation['respondedBy'] != null) ...[
+                                    SizedBox(width: isTablet ? 12 : 8),
+                                    Container(
+                                      constraints: BoxConstraints(
+                                        maxWidth: isTablet ? 200 : 140,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Staff name
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.person_outline,
+                                                size: isTablet ? 14 : 12,
+                                                color: const Color(0xFF2E7D32),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Flexible(
+                                                child: Text(
+                                                  escalation['respondedBy'],
+                                                  style: TextStyle(
+                                                    fontSize:
+                                                        isTablet ? 12 : 11,
+                                                    color: const Color(
+                                                      0xFF2E7D32,
+                                                    ),
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  textAlign: TextAlign.right,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          // Responded date
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.check_circle,
+                                                size: isTablet ? 14 : 12,
+                                                color: const Color(0xFF2E7D32),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Flexible(
+                                                child: Text(
+                                                  _formatDateTime(
+                                                    escalation['respondedAt']
+                                                        as Timestamp?,
+                                                  ),
+                                                  style: TextStyle(
+                                                    fontSize:
+                                                        isTablet ? 11 : 10,
+                                                    color: const Color(
+                                                      0xFF2E7D32,
+                                                    ),
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  textAlign: TextAlign.right,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    SizedBox(width: isTablet ? 12 : 8),
+                                    Icon(
+                                      Icons.arrow_forward_ios,
+                                      color: Colors.grey[400],
+                                      size: isTablet ? 16 : 14,
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -749,6 +886,35 @@ class _HumanEscalationState extends State<HumanEscalation>
       ),
     );
   }
+}
+
+String _formatDateTime(Timestamp? timestamp) {
+  if (timestamp == null) return 'N/A';
+  final date = timestamp.toDate();
+
+  // Month names
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
+  // Convert to 12-hour format
+  final hour =
+      date.hour == 0 ? 12 : (date.hour > 12 ? date.hour - 12 : date.hour);
+  final period = date.hour >= 12 ? 'PM' : 'AM';
+  final minute = date.minute.toString().padLeft(2, '0');
+
+  return '${months[date.month - 1]} ${date.day}, ${date.year} ${hour}:${minute} $period';
 }
 
 class _StatCard extends StatelessWidget {
@@ -918,7 +1084,8 @@ class _FilteredQuerySnapshot implements QuerySnapshot<Map<String, dynamic>> {
   List<QueryDocumentSnapshot<Map<String, dynamic>>> get docs => _docs;
 
   @override
-  List<DocumentChange<Map<String, dynamic>>> get docChanges => _original.docChanges;
+  List<DocumentChange<Map<String, dynamic>>> get docChanges =>
+      _original.docChanges;
 
   @override
   SnapshotMetadata get metadata => _original.metadata;

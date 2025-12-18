@@ -1,7 +1,9 @@
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/chatbot_usage_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_data.dart';
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/paginated_list.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/user_demographics_data.dart';
+import 'package:capstone_project/modules/admin_module/widgets/date_range_filter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:capstone_project/modules/admin_module/widgets/custom_dropdown_button.dart';
@@ -9,7 +11,6 @@ import 'package:capstone_project/modules/admin_module/dashboard_and_reports_modu
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/reports.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
-
 
 class SkeletonBox extends StatefulWidget {
   final double? width;
@@ -267,6 +268,9 @@ class _Dashboardmodulestate extends State<DashboardPage> {
 
   final Map<String, DashboardCache> _cache = {};
 
+  DateTimeRange? customDateRange;
+  bool showDateRangePicker = false;
+
   InquiryReportsData? inq;
   ChatbotUsageReportsData? cb;
   UserDemographicsReportsData? ud;
@@ -459,37 +463,90 @@ class _Dashboardmodulestate extends State<DashboardPage> {
     }
   }
 
+ Future<void> _onTimeFrameChanged(String newValue) async {
+  if (newValue == selectedTimeFrame) return;
 
-  Future<void> _onTimeFrameChanged(String newValue) async {
-    if (newValue == selectedTimeFrame) return;
+  // If Custom is selected, the DateRangeFilter will handle showing the picker
+  // We just need to wait for the result
+  if (newValue == 'Custom') {
+    // Don't do anything here - the DateRangeFilter will handle it
+    // The date range will be set via onDateRangeChanged callback
+    return;
+  }
 
-    setState(() {
-      selectedTimeFrame = newValue;
-      isLazyLoading = true;
-    });
+  // Normal timeframe selection
+  setState(() {
+    selectedTimeFrame = newValue;
+    customDateRange = null; // Clear custom range when selecting preset
+    isLazyLoading = true;
+  });
 
-    try {
-      await Future.wait([
-        _fetchQuickStats().then((stats) {
-          if (mounted) {
-            setState(() {
-              quickStats = stats;
-            });
-          }
-        }),
-        _loadFullData(),
-      ]);
-    } catch (e) {
-      print('Error changing timeframe: $e');
-      _showSnackBar('Failed to load data for $newValue', isError: true);
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLazyLoading = false;
-        });
-      }
+  try {
+    await Future.wait([
+      _fetchQuickStats().then((stats) {
+        if (mounted) {
+          setState(() {
+            quickStats = stats;
+          });
+        }
+      }),
+      _loadFullData(),
+    ]);
+  } catch (e) {
+    print('Error changing timeframe: $e');
+    _showSnackBar('Failed to load data for $newValue', isError: true);
+  } finally {
+    if (mounted) {
+      setState(() {
+        isLazyLoading = false;
+      });
     }
   }
+}
+
+Future<void> _onDateRangeChanged(DateTimeRange? range) async {
+  if (range == null) {
+    // User cleared the date range, revert to "This Month"
+    setState(() {
+      customDateRange = null;
+      selectedTimeFrame = 'This Month';
+      isLazyLoading = true;
+    });
+  } else {
+    // User selected a custom date range
+    setState(() {
+      customDateRange = range;
+      selectedTimeFrame = 'Custom';
+      isLazyLoading = true;
+    });
+  }
+
+  try {
+    // Clear cache for custom range
+    _cache.remove('Custom');
+    
+    await Future.wait([
+      _fetchQuickStats().then((stats) {
+        if (mounted) {
+          setState(() {
+            quickStats = stats;
+          });
+        }
+      }),
+      _loadFullData(),
+    ]);
+  } catch (e) {
+    print('Error loading custom date range: $e');
+    _showSnackBar('Failed to load data for selected date range', isError: true);
+  } finally {
+    if (mounted) {
+      setState(() {
+        isLazyLoading = false;
+      });
+    }
+  }
+}
+
 
   void _showSnackBar(String message, {required bool isError}) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -558,6 +615,8 @@ class _Dashboardmodulestate extends State<DashboardPage> {
             ud: ud,
             userName: userName!,
             quickStats: quickStats,
+            customDateRange: customDateRange,
+            onDateRangeChanged: _onDateRangeChanged,
           ),
           tabletBody: TabletDashboard(
             selectedTimeFrame: selectedTimeFrame,
@@ -568,6 +627,8 @@ class _Dashboardmodulestate extends State<DashboardPage> {
             ud: ud,
             userName: userName!,
             quickStats: quickStats,
+            customDateRange: customDateRange,
+            onDateRangeChanged: _onDateRangeChanged,
           ),
           desktopBody: DesktopDashboard(
             selectedTimeFrame: selectedTimeFrame,
@@ -578,6 +639,8 @@ class _Dashboardmodulestate extends State<DashboardPage> {
             ud: ud,
             userName: userName!,
             quickStats: quickStats,
+            customDateRange: customDateRange,
+            onDateRangeChanged: _onDateRangeChanged,
           ),
         ),
         if (isLazyLoading)
@@ -764,6 +827,8 @@ class DesktopDashboard extends StatelessWidget {
   final UserDemographicsReportsData? ud;
   final String userName;
   final Map<String, int>? quickStats;
+  final DateTimeRange? customDateRange;
+  final ValueChanged<DateTimeRange?> onDateRangeChanged;
 
   const DesktopDashboard({
     super.key,
@@ -775,6 +840,8 @@ class DesktopDashboard extends StatelessWidget {
     this.ud,
     required this.userName,
     this.quickStats,
+    required this.customDateRange,
+    required this.onDateRangeChanged,
   });
 
   @override
@@ -788,6 +855,8 @@ class DesktopDashboard extends StatelessWidget {
       ud,
       userName,
       quickStats,
+      customDateRange,
+      onDateRangeChanged,
     );
   }
 }
@@ -801,6 +870,8 @@ class TabletDashboard extends StatelessWidget {
   final UserDemographicsReportsData? ud;
   final String userName;
   final Map<String, int>? quickStats;
+    final DateTimeRange? customDateRange;
+  final ValueChanged<DateTimeRange?> onDateRangeChanged;
 
   const TabletDashboard({
     super.key,
@@ -812,6 +883,8 @@ class TabletDashboard extends StatelessWidget {
     this.ud,
     required this.userName,
     this.quickStats,
+    required this.customDateRange,
+    required this.onDateRangeChanged,
   });
 
   @override
@@ -825,6 +898,8 @@ class TabletDashboard extends StatelessWidget {
       ud,
       userName,
       quickStats,
+      customDateRange,
+      onDateRangeChanged,
     );
   }
 }
@@ -838,6 +913,8 @@ class MobileDashboard extends StatelessWidget {
   final UserDemographicsReportsData? ud;
   final String userName;
   final Map<String, int>? quickStats;
+    final DateTimeRange? customDateRange;
+  final ValueChanged<DateTimeRange?> onDateRangeChanged;
 
   const MobileDashboard({
     super.key,
@@ -849,6 +926,8 @@ class MobileDashboard extends StatelessWidget {
     this.ud,
     required this.userName,
     this.quickStats,
+    required this.customDateRange,
+    required this.onDateRangeChanged,
   });
 
   @override
@@ -862,6 +941,8 @@ class MobileDashboard extends StatelessWidget {
       ud,
       userName,
       quickStats,
+      customDateRange,
+      onDateRangeChanged,
     );
   }
 }
@@ -875,6 +956,8 @@ Widget dashboardContents(
   UserDemographicsReportsData? ud,
   String userName,
   Map<String, int>? quickStats,
+    DateTimeRange? customDateRange,
+  ValueChanged<DateTimeRange?> onDateRangeChanged,
 ) {
   final totalMessages = quickStats?['totalMessages'] ?? inq?.totalMessages ?? 0;
   final answeredMessages =
@@ -901,6 +984,9 @@ Widget dashboardContents(
                         '$totalMessages',
                         Colors.blue,
                         Icons.message,
+                        onTap:
+                            () =>
+                                _showMessagesDialog(context, selectedTimeFrame),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -910,6 +996,11 @@ Widget dashboardContents(
                         '$answeredMessages',
                         Colors.green,
                         Icons.check_circle,
+                        onTap:
+                            () => _showAnsweredMessagesDialog(
+                              context,
+                              selectedTimeFrame,
+                            ),
                       ),
                     ),
                   ],
@@ -923,6 +1014,8 @@ Widget dashboardContents(
                         '$totalUsers',
                         Colors.red,
                         Icons.people,
+                        onTap:
+                            () => _showUsersDialog(context, selectedTimeFrame),
                       ),
                     ),
                   ],
@@ -938,6 +1031,8 @@ Widget dashboardContents(
                     '$totalMessages',
                     Colors.blue,
                     Icons.message,
+                    onTap:
+                        () => _showMessagesDialog(context, selectedTimeFrame),
                   ),
                 ),
                 SizedBox(width: isTablet ? 12 : 20),
@@ -947,6 +1042,11 @@ Widget dashboardContents(
                     '$answeredMessages',
                     Colors.green,
                     Icons.check_circle,
+                    onTap:
+                        () => _showAnsweredMessagesDialog(
+                          context,
+                          selectedTimeFrame,
+                        ),
                   ),
                 ),
                 SizedBox(width: isTablet ? 12 : 20),
@@ -956,6 +1056,7 @@ Widget dashboardContents(
                     '$totalUsers',
                     Colors.red,
                     Icons.people,
+                    onTap: () => _showUsersDialog(context, selectedTimeFrame),
                   ),
                 ),
               ],
@@ -964,114 +1065,125 @@ Widget dashboardContents(
         }
 
         Widget cardsSection() {
-          if (isMobile) {
-            return Column(
-              children: [
-                SizedBox(
-                  height: 400,
-                  child: LazyLoadWidget(
-                    delay: const Duration(milliseconds: 100),
-                    builder:
-                        (context) => buildCategoryDistributionCard(
-                          inq?.categoryDistribution ?? {},
-                        ),
+  if (isMobile) {
+    return Column(
+      children: [
+        // SizedBox(
+        //   height: 400,
+        //   child: LazyLoadWidget(
+        //     delay: const Duration(milliseconds: 100),
+        //     builder: (context) => buildCategoryDistributionCard(
+        //       inq?.categoryDistribution ?? {},
+        //       selectedTimeFrame,
+        //       context, // Add context parameter
+        //     ),
+        //   ),
+        // ),
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 400,
+          child: LazyLoadWidget(
+            delay: const Duration(milliseconds: 200),
+            builder: (context) => buildInquiryTrendCard(
+              inq?.inquiryTrend ?? [],
+              selectedTimeFrame,
+              context, // Add context parameter
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 350,
+          child: LazyLoadWidget(
+            delay: const Duration(milliseconds: 300),
+            builder: (context) => buildSystemLogsCard(
+              inq?.recentLogs ?? [],
+              selectedTimeFrame,
+              context, // Add context parameter
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 350,
+          child: LazyLoadWidget(
+            delay: const Duration(milliseconds: 400),
+            builder: (context) => buildMessageLogsCard(
+              inq?.msgLogs ?? [],
+              selectedTimeFrame,
+              context, // Add context parameter
+            ),
+          ),
+        ),
+      ],
+    );
+  } else {
+    // Desktop/Tablet layout - same updates
+    return Column(
+      children: [
+        SizedBox(
+          height: 400,
+          child: Row(
+            children: [
+              // Expanded(
+              //   child: LazyLoadWidget(
+              //     delay: const Duration(milliseconds: 100),
+              //     builder: (context) => buildCategoryDistributionCard(
+              //       inq?.categoryDistribution ?? {},
+              //       selectedTimeFrame,
+              //       context,
+              //     ),
+              //   ),
+              // ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: LazyLoadWidget(
+                  delay: const Duration(milliseconds: 200),
+                  builder: (context) => buildInquiryTrendCard(
+                    inq?.inquiryTrend ?? [],
+                    selectedTimeFrame,
+                    context,
                   ),
                 ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 400,
-                  child: LazyLoadWidget(
-                    delay: const Duration(milliseconds: 200),
-                    builder:
-                        (context) => buildInquiryTrendCard(
-                          inq?.inquiryTrend ?? [],
-                          selectedTimeFrame,
-                        ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 350,
+          child: Row(
+            children: [
+              Expanded(
+                flex: 1,
+                child: LazyLoadWidget(
+                  delay: const Duration(milliseconds: 300),
+                  builder: (context) => buildSystemLogsCard(
+                    inq?.recentLogs ?? [],
+                    selectedTimeFrame,
+                    context,
                   ),
                 ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 350,
-                  child: LazyLoadWidget(
-                    delay: const Duration(milliseconds: 300),
-                    builder:
-                        (context) => buildSystemLogsCard(inq?.recentLogs ?? []),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                flex: 2,
+                child: LazyLoadWidget(
+                  delay: const Duration(milliseconds: 400),
+                  builder: (context) => buildMessageLogsCard(
+                    inq?.msgLogs ?? [],
+                    selectedTimeFrame,
+                    context,
                   ),
                 ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 350,
-                  child: LazyLoadWidget(
-                    delay: const Duration(milliseconds: 400),
-                    builder:
-                        (context) => buildMessageLogsCard(inq?.msgLogs ?? []),
-                  ),
-                ),
-              ],
-            );
-          } else {
-            // Desktop/Tablet: Fixed heights for scrolling
-            return Column(
-              children: [
-                SizedBox(
-                  height: 400,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: LazyLoadWidget(
-                          delay: const Duration(milliseconds: 100),
-                          builder:
-                              (context) => buildCategoryDistributionCard(
-                                inq?.categoryDistribution ?? {},
-                              ),
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: LazyLoadWidget(
-                          delay: const Duration(milliseconds: 200),
-                          builder:
-                              (context) => buildInquiryTrendCard(
-                                inq?.inquiryTrend ?? [],
-                                selectedTimeFrame,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 350,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 1,
-                        child: LazyLoadWidget(
-                          delay: const Duration(milliseconds: 300),
-                          builder:
-                              (context) =>
-                                  buildSystemLogsCard(inq?.recentLogs ?? []),
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        flex: 2,
-                        child: LazyLoadWidget(
-                          delay: const Duration(milliseconds: 400),
-                          builder:
-                              (context) =>
-                                  buildMessageLogsCard(inq?.msgLogs ?? []),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          }
-        }
-
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
           child: Column(
@@ -1083,6 +1195,8 @@ Widget dashboardContents(
                 onRefresh,
                 isRefreshing,
                 userName,
+                customDateRange,
+                onDateRangeChanged,
               ),
               const SizedBox(height: 32),
               statCards(),
@@ -1096,12 +1210,139 @@ Widget dashboardContents(
   );
 }
 
+void _showMessagesDialog(BuildContext context, String timeFrame) {
+  showDialog(
+    context: context,
+    builder: (context) => PaginatedListDialog(
+      title: 'Total Messages',
+      headerColor: Colors.blue,
+      dataFetcher: (page, pageSize) async {
+        final startDate = _getStartDateForDialog(timeFrame);
+        final snapshot = await FirebaseFirestore.instance
+            .collectionGroup('messages')
+            .where('sender', isEqualTo: 'user')
+            .where('sent_at', isGreaterThanOrEqualTo: startDate)
+            .orderBy('sent_at', descending: true)
+            .limit(pageSize)
+            // .offset(page * pageSize)
+            .get();
+
+        return snapshot.docs.map((doc) {
+          final data = doc.data();
+          final timestamp = data['sent_at'] as Timestamp?;
+          return {
+            'Message': data['text'] ?? 'N/A',
+            'Category': data['category'] ?? 'General',
+            'Date': timestamp != null 
+                ? _formatTimestamp(timestamp) 
+                : 'N/A',
+          };
+        }).toList();
+      },
+    ),
+  );
+}
+
+void _showAnsweredMessagesDialog(BuildContext context, String timeFrame) {
+  showDialog(
+    context: context,
+    builder: (context) => PaginatedListDialog(
+      title: 'Answered Messages',
+      headerColor: Colors.green,
+      dataFetcher: (page, pageSize) async {
+        final startDate = _getStartDateForDialog(timeFrame);
+        final snapshot = await FirebaseFirestore.instance
+            .collectionGroup('messages')
+            .where('sender', isEqualTo: 'user')
+            .where('isAnswered', isEqualTo: true)
+            .where('sent_at', isGreaterThanOrEqualTo: startDate)
+            .orderBy('sent_at', descending: true)
+            .limit(pageSize)
+            // .offset(page * pageSize)
+            .get();
+
+        return snapshot.docs.map((doc) {
+          final data = doc.data();
+          final timestamp = data['sent_at'] as Timestamp?;
+          return {
+            'Message': data['text'] ?? 'N/A',
+            'Category': data['category'] ?? 'General',
+            'Date': timestamp != null 
+                ? _formatTimestamp(timestamp) 
+                : 'N/A',
+          };
+        }).toList();
+      },
+    ),
+  );
+}
+
+void _showUsersDialog(BuildContext context, String timeFrame) {
+  showDialog(
+    context: context,
+    builder: (context) => PaginatedListDialog(
+      title: 'Total Users',
+      headerColor: Colors.red,
+      dataFetcher: (page, pageSize) async {
+        Query query = FirebaseFirestore.instance.collection('users');
+        
+        if (timeFrame != 'All') {
+          final startDate = _getStartDateForDialog(timeFrame);
+          query = query.where(
+            'createdAt',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+          );
+        }
+        
+        final snapshot = await query
+            .orderBy('createdAt', descending: true)
+            .limit(pageSize)
+            // .offset(page * pageSize)
+            .get();
+
+        return snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final timestamp = data['createdAt'] as Timestamp?;
+          return {
+            'Name': data['name'] ?? 'N/A',
+            'Email': data['email'] ?? 'N/A',
+            'Program': data['program'] ?? 'N/A',
+            'Year': data['year']?.toString() ?? 'N/A',
+            'Joined': timestamp != null 
+                ? _formatTimestamp(timestamp) 
+                : 'N/A',
+          };
+        }).toList();
+      },
+    ),
+  );
+}
+
+DateTime _getStartDateForDialog(String timeFrame) {
+  final now = DateTime.now();
+  return switch (timeFrame) {
+    'All' => DateTime(2000, 1, 1),
+    'Today' => DateTime(now.year, now.month, now.day),
+    'This Week' => now.subtract(Duration(days: now.weekday - 1)),
+    'This Month' => DateTime(now.year, now.month, 1),
+    'This Year' => DateTime(now.year, 1, 1),
+    _ => DateTime(now.year, now.month, 1),
+  };
+}
+
+String _formatTimestamp(Timestamp timestamp) {
+  final date = timestamp.toDate();
+  return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+}
+
 Widget _buildHeader(
   String selectedTimeFrame,
   ValueChanged<String> onTimeFrameChanged,
   VoidCallback onRefresh,
   bool isRefreshing,
   String userName,
+  DateTimeRange? customDateRange,
+  ValueChanged<DateTimeRange?> onDateRangeChanged,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -1113,69 +1354,95 @@ Widget _buildHeader(
         children: [
           isMobile
               ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Welcome back, $userName!',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      CustomDropdownButton(
-                        items: [
-                          'All',
-                          'Today',
-                          'This Week',
-                          'This Month',
-                          'This Year',
-                        ],
-                        initialValue: selectedTimeFrame,
-                        onChanged: onTimeFrameChanged,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome back, $userName!',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
                       ),
-                    ],
-                  ),
-                ],
-              )
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: CustomDropdownButton(
+                            items: [
+                              'All',
+                              'Today',
+                              'This Week',
+                              'This Month',
+                              'This Year',
+                            ],
+                            initialValue: selectedTimeFrame == 'Custom' 
+                                ? 'This Month' 
+                                : selectedTimeFrame,
+                            onChanged: onTimeFrameChanged,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        DateRangeFilter(
+                          selectedDateRange: customDateRange,
+                          onDateRangeChanged: onDateRangeChanged,
+                        ),
+                      ],
+                    ),
+                  ],
+                )
               : Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Welcome back, $userName!',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      CustomDropdownButton(
-                        items: [
-                          'All',
-                          'Today',
-                          'This Week',
-                          'This Month',
-                          'This Year',
-                        ],
-                        initialValue: selectedTimeFrame,
-                        onChanged: onTimeFrameChanged,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Welcome back, $userName!',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                    Row(
+                      children: [
+                        CustomDropdownButton(
+                          items: [
+                            'All',
+                            'Today',
+                            'This Week',
+                            'This Month',
+                            'This Year',
+                          ],
+                          initialValue: selectedTimeFrame == 'Custom' 
+                              ? 'This Month' 
+                              : selectedTimeFrame,
+                          onChanged: onTimeFrameChanged,
+                        ),
+                        const SizedBox(width: 12),
+                        DateRangeFilter(
+                          selectedDateRange: customDateRange,
+                          onDateRangeChanged: onDateRangeChanged,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
           SizedBox(height: isMobile ? 12 : 8),
           Text(
-            "Here's an overview of recent student inquiries for $selectedTimeFrame.",
+            selectedTimeFrame == 'Custom' && customDateRange != null
+                ? "Here's an overview of student inquiries from ${_formatDate(customDateRange.start)} to ${_formatDate(customDateRange.end)}."
+                : "Here's an overview of recent student inquiries for $selectedTimeFrame.",
             style: TextStyle(fontSize: isMobile ? 13 : 14, color: Colors.grey),
           ),
         ],
       );
     },
   );
+}
+
+String _formatDate(DateTime date) {
+  const months = [
+    '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return '${date.day} ${months[date.month]} ${date.year}';
 }
