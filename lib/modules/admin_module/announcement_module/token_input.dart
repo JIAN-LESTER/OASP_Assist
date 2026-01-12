@@ -34,10 +34,11 @@ class FacebookIntegrationHelper {
     isLoadingApps = true;
 
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('fb_app_credentials')
-          .doc('apps')
-          .get();
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('fb_app_credentials')
+              .doc('apps')
+              .get();
 
       if (doc.exists) {
         final data = doc.data()!;
@@ -47,7 +48,9 @@ class FacebookIntegrationHelper {
           if (config is Map && config.containsKey('addedAt')) {
             apps.add({
               'appId': appId,
-              'addedAt': (config['addedAt'] as Timestamp?)?.toDate().toString() ?? 'Unknown',
+              'addedAt':
+                  (config['addedAt'] as Timestamp?)?.toDate().toString() ??
+                  'Unknown',
             });
           }
         });
@@ -128,169 +131,210 @@ void showTokenStatusDialog(
 
   showDialog(
     context: context,
-    builder: (context) => Dialog(
-      insetPadding: const EdgeInsets.all(20),
-      backgroundColor: Colors.transparent,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 420),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
+    builder:
+        (context) => Dialog(
+          insetPadding: const EdgeInsets.all(20),
+          backgroundColor: Colors.transparent,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 420),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: FacebookIntegrationHelper.fbBlue.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                isExpired
-                    ? Icons.error_rounded
-                    : isUrgent
-                        ? Icons.warning_amber_rounded
-                        : Icons.check_circle_rounded,
-                color: FacebookIntegrationHelper.fbBlue,
-                size: 46,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isExpired
-                  ? "Token Expired"
-                  : isUrgent
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(width: 40), // Balance spacing
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        isExpired
+                            ? Icons.error_rounded
+                            : isUrgent
+                            ? Icons.warning_amber_rounded
+                            : Icons.check_circle_rounded,
+                        color: Colors.grey[700],
+                        size: 46,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: Colors.grey[600],
+                        size: 22,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.grey[100],
+                        padding: EdgeInsets.all(6),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  isExpired
+                      ? "Token Expired"
+                      : isUrgent
                       ? "Token Expiring Soon"
                       : "Token Active",
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              isExpired
-                  ? "Your access token is no longer valid."
-                  : "Here are your current token details.",
-              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            _buildStatusTile(
-              icon: Icons.hourglass_bottom_rounded,
-              label: "Days Remaining",
-              value: isExpired ? "Expired" : "$daysLeft days",
-              color: FacebookIntegrationHelper.fbBlue,
-              bold: true,
-            ),
-            const SizedBox(height: 12),
-            _buildStatusTile(
-              icon: Icons.calendar_month_rounded,
-              label: "Expiration Date",
-              value: tokenStatus.expiresAt != null
-                  ? DateFormat('MMMM d, yyyy').format(
-                      DateTime.fromMillisecondsSinceEpoch(tokenStatus.expiresAt!))
-                  : "Unknown",
-              color: Colors.grey[600]!,
-            ),
-            if (tokenStatus.pageId != null) ...[
-              const SizedBox(height: 12),
-              _buildStatusTile(
-                icon: Icons.tag_rounded,
-                label: "Page ID",
-                value: tokenStatus.pageId!,
-                color: Colors.grey[600]!,
-              ),
-            ],
-            if (isExpired || isUrgent) ...[
-              const SizedBox(height: 22),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: FacebookIntegrationHelper.fbBlue.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: FacebookIntegrationHelper.fbBlue.withOpacity(0.3),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      isExpired ? Icons.error_outline : Icons.info_outline,
-                      color: FacebookIntegrationHelper.fbBlue,
+                const SizedBox(height: 6),
+                Text(
+                  isExpired
+                      ? "Your access token is no longer valid."
+                      : "Here are your current token details.",
+                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                _buildStatusTile(
+                  icon: Icons.hourglass_bottom_rounded,
+                  label: "Days Remaining",
+                  value: isExpired ? "Expired" : "$daysLeft days",
+                  color: Colors.grey[600]!,
+                  valueColor:
+                      isExpired
+                          ? Colors.red[700]!
+                          : daysLeft <= 7
+                          ? Colors.red[700]!
+                          : daysLeft <= 30
+                          ? Colors.orange[700]!
+                          : Colors.green[600]!,
+                  bold: true,
+                ),
+                const SizedBox(height: 12),
+                _buildStatusTile(
+                  icon: Icons.calendar_month_rounded,
+                  label: "Expiration Date",
+                  value:
+                      tokenStatus.expiresAt != null
+                          ? DateFormat('MMMM d, yyyy').format(
+                            DateTime.fromMillisecondsSinceEpoch(
+                              tokenStatus.expiresAt!,
+                            ),
+                          )
+                          : "Unknown",
+                  color: Colors.grey[600]!,
+                ),
+                if (tokenStatus.pageId != null) ...[
+                  const SizedBox(height: 12),
+                  _buildStatusTile(
+                    icon: Icons.tag_rounded,
+                    label: "Page ID",
+                    value: tokenStatus.pageId!,
+                    color: Colors.grey[600]!,
+                  ),
+                ],
+                if (isExpired || isUrgent) ...[
+                  const SizedBox(height: 22),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue[200]!),
                     ),
-                    const SizedBox(width: 12),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isExpired ? Icons.error_outline : Icons.info_outline,
+                          color: Colors.blue[700],
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            isExpired
+                                ? "Renew your token to continue system syncing."
+                                : "You should renew the token soon to avoid interruption.",
+                            style: TextStyle(
+                              color: Colors.blue[900],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 26),
+                Row(
+                  children: [
+                    if (!isExpired && !isUrgent)
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            side: BorderSide(color: Colors.grey[300]!),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            "Close",
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    if (!isExpired && !isUrgent) const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        isExpired
-                            ? "Renew your token to continue system syncing."
-                            : "You should renew the token soon to avoid interruption.",
-                        style: TextStyle(
-                          color: FacebookIntegrationHelper.fbBlue,
-                          fontWeight: FontWeight.w600,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          showTokenInputModal(context, helper, onRefreshNeeded);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[800],
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: Icon(
+                          isExpired
+                              ? Icons.vpn_key_rounded
+                              : Icons.refresh_rounded,
+                          size: 20,
+                        ),
+                        label: Text(
+                          isExpired ? "Renew Now" : "Renew Token",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-            const SizedBox(height: 26),
-            Row(
-              children: [
-                if (!isExpired && !isUrgent)
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(color: Colors.grey[300]!),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        "Close",
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                if (!isExpired && !isUrgent) const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      showTokenInputModal(context, helper, onRefreshNeeded);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: FacebookIntegrationHelper.fbBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: Icon(isExpired ? Icons.vpn_key_rounded : Icons.refresh_rounded),
-                    label: Text(
-                      isExpired ? "Renew Now" : "Renew Token",
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
               ],
             ),
-          ],
+          ),
         ),
-      ),
-    ),
   );
 }
 
@@ -299,6 +343,7 @@ Widget _buildStatusTile({
   required String label,
   required String value,
   required Color color,
+  Color? valueColor,
   bool bold = false,
 }) {
   return Container(
@@ -316,14 +361,17 @@ Widget _buildStatusTile({
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+              Text(
+                label,
+                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              ),
               const SizedBox(height: 3),
               Text(
                 value,
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-                  color: color,
+                  color: valueColor ?? color,
                 ),
               ),
             ],
@@ -353,79 +401,73 @@ Future<void> showAppCredentialsDialog(
   showDialog(
     context: context,
     barrierDismissible: true,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setDialogState) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(16),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 650, maxHeight: 750),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 40,
-                  offset: const Offset(0, 20),
+    builder:
+        (context) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(16),
+              child: Container(
+                constraints: const BoxConstraints(
+                  maxWidth: 650,
+                  maxHeight: 750,
                 ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildAppDialogHeader(context),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(28),
-                    child: _buildAppDialogContent(
-                      context,
-                      helper,
-                      appIdController,
-                      appSecretController,
-                      setDialogState,
-                      onRefreshNeeded,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 40,
+                      offset: const Offset(0, 20),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        );
-      },
-    ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildAppDialogHeader(context),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(28),
+                        child: _buildAppDialogContent(
+                          context,
+                          helper,
+                          appIdController,
+                          appSecretController,
+                          setDialogState,
+                          onRefreshNeeded,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
   );
 }
 
 Widget _buildAppDialogHeader(BuildContext context) {
   return Container(
-    padding: const EdgeInsets.all(28),
+    padding: const EdgeInsets.fromLTRB(24, 24, 20, 20),
     decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [Color(0xFF1877F2), Color(0xFF0C63D4)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
+      color: Colors.white,
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      boxShadow: [
-        BoxShadow(
-          color: Color(0xFF1877F2).withOpacity(0.3),
-          blurRadius: 8,
-          offset: Offset(0, 4),
-        ),
-      ],
+      border: Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1)),
     ),
     child: Row(
       children: [
         Container(
-          padding: EdgeInsets.all(12),
+          padding: EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(16),
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(Icons.apps_rounded, color: Colors.white, size: 32),
+          child: Icon(Icons.apps_rounded, color: Colors.grey[700], size: 24),
         ),
-        SizedBox(width: 16),
+        SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -433,19 +475,20 @@ Widget _buildAppDialogHeader(BuildContext context) {
               Text(
                 'Facebook App Manager',
                 style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey[900],
+                  letterSpacing: -0.3,
                 ),
               ),
-              SizedBox(height: 4),
+              SizedBox(height: 2),
               Text(
                 'Configure multiple Facebook apps for seamless integration',
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 13,
+                  color: Colors.grey[600],
                   fontWeight: FontWeight.w400,
+                  height: 1.3,
                 ),
               ),
             ],
@@ -453,10 +496,10 @@ Widget _buildAppDialogHeader(BuildContext context) {
         ),
         IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.close_rounded, color: Colors.white),
+          icon: Icon(Icons.close_rounded, color: Colors.grey[600], size: 22),
           style: IconButton.styleFrom(
-            backgroundColor: Colors.white.withOpacity(0.2),
-            padding: EdgeInsets.all(8),
+            backgroundColor: Colors.grey[100],
+            padding: EdgeInsets.all(6),
           ),
         ),
       ],
@@ -478,31 +521,22 @@ Widget _buildAppDialogContent(
       Container(
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFE7F3FF), Color(0xFFD0E8FF).withOpacity(0.3)],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Color(0xFFB3D9FF), width: 1.5),
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[300]!, width: 1),
         ),
         child: Row(
           children: [
-            Container(
-              padding: EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Color(0xFF1877F2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.info_outline, color: Colors.white, size: 22),
-            ),
-            SizedBox(width: 14),
+            Icon(Icons.info_outline, color: Colors.grey[600], size: 20),
+            SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Add multiple Facebook apps for token exchange. The system will automatically select the appropriate app for authentication.',
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF0C4A8E),
+                  fontSize: 13,
+                  color: Colors.grey[700],
                   height: 1.4,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ),
@@ -531,11 +565,12 @@ Widget _buildAppDialogContent(
       SizedBox(height: 20),
       SizedBox(
         width: double.infinity,
-        height: 54,
+        height: 50,
         child: ElevatedButton.icon(
-          onPressed: helper.isLoadingApps
-              ? null
-              : () => _handleAddApp(
+          onPressed:
+              helper.isLoadingApps
+                  ? null
+                  : () => _handleAddApp(
                     context,
                     appIdController,
                     appSecretController,
@@ -543,32 +578,47 @@ Widget _buildAppDialogContent(
                     setDialogState,
                     onRefreshNeeded,
                   ),
-          icon: helper.isLoadingApps
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Icon(Icons.add_circle_outline, size: 22),
+          icon:
+              helper.isLoadingApps
+                  ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                  : Icon(Icons.add_circle_outline, size: 20),
           label: Text(
             helper.isLoadingApps ? 'Adding App...' : 'Add App',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0,
+            ),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF1877F2),
+            backgroundColor: Colors.grey[800],
             foregroundColor: Colors.white,
             elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         ),
       ),
       SizedBox(height: 32),
-      _buildSectionHeader('CONFIGURED APPS (${helper.configuredApps.length})', Icons.apps),
+      _buildSectionHeader(
+        'CONFIGURED APPS (${helper.configuredApps.length})',
+        Icons.apps,
+      ),
       SizedBox(height: 16),
-      _buildConfiguredAppsList(context, helper, setDialogState, onRefreshNeeded),
+      _buildConfiguredAppsList(
+        context,
+        helper,
+        setDialogState,
+        onRefreshNeeded,
+      ),
     ],
   );
 }
@@ -576,22 +626,15 @@ Widget _buildAppDialogContent(
 Widget _buildSectionHeader(String title, IconData icon) {
   return Row(
     children: [
-      Container(
-        padding: EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: Color(0xFF1877F2),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: Colors.white, size: 16),
-      ),
-      SizedBox(width: 10),
+      Icon(icon, color: Colors.grey[700], size: 18),
+      SizedBox(width: 8),
       Text(
         title,
         style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
           color: Colors.grey[700],
-          letterSpacing: 0.8,
+          letterSpacing: 0.3,
         ),
       ),
     ],
@@ -610,30 +653,36 @@ Widget _buildAppTextField({
     controller: controller,
     obscureText: obscureText,
     enabled: enabled,
+    style: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w400,
+      color: Colors.grey[900],
+    ),
     decoration: InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[700]),
-      hintText: hint,
-      prefixIcon: Container(
-        margin: EdgeInsets.all(12),
-        padding: EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Color(0xFFE7F3FF),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: Color(0xFF1877F2), size: 20),
+      labelStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: Colors.grey[700],
       ),
+      hintText: hint,
+      hintStyle: TextStyle(fontSize: 14, color: Colors.grey[400]),
+      prefixIcon: Icon(icon, color: Colors.grey[600], size: 20),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Color(0xFF1877F2), width: 2),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.grey[600]!, width: 1.5),
       ),
       filled: true,
-      fillColor: Colors.grey[50],
-      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      fillColor: Colors.white,
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     ),
   );
 }
@@ -657,32 +706,29 @@ Widget _buildConfiguredAppsList(
 
   if (helper.configuredApps.isEmpty) {
     return Container(
-      padding: EdgeInsets.all(48),
+      padding: EdgeInsets.all(40),
       decoration: BoxDecoration(
         color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!, width: 2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
       ),
       child: Center(
         child: Column(
           children: [
-            Container(
-              padding: EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.apps, size: 56, color: Colors.grey[400]),
-            ),
-            SizedBox(height: 16),
+            Icon(Icons.apps_outlined, size: 48, color: Colors.grey[400]),
+            SizedBox(height: 12),
             Text(
               'No apps configured yet',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
             ),
-            SizedBox(height: 8),
+            SizedBox(height: 4),
             Text(
               'Add your first Facebook app to get started',
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
             ),
           ],
         ),
@@ -691,65 +737,68 @@ Widget _buildConfiguredAppsList(
   }
 
   return Column(
-    children: helper.configuredApps.map((app) {
-      return Container(
-        margin: EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [Colors.white, Colors.grey[50]!]),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[300]!, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ListTile(
-          contentPadding: EdgeInsets.all(16),
-          leading: Container(
-            padding: EdgeInsets.all(12),
+    children:
+        helper.configuredApps.map((app) {
+          return Container(
+            margin: EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [Color(0xFF1877F2), Color(0xFF0C63D4)]),
-              borderRadius: BorderRadius.circular(14),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!, width: 1),
             ),
-            child: Icon(Icons.apps, color: Colors.white, size: 24),
-          ),
-          title: Text(
-            app['appId'] ?? 'Unknown',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.grey[800]),
-          ),
-          subtitle: Padding(
-            padding: EdgeInsets.only(top: 6),
-            child: Row(
-              children: [
-                Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
-                SizedBox(width: 6),
-                Text(
-                  'Added: ${app['addedAt'] ?? 'Unknown'}',
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            child: ListTile(
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
+              leading: Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ],
+                child: Icon(Icons.apps, color: Colors.grey[700], size: 20),
+              ),
+              title: Text(
+                app['appId'] ?? 'Unknown',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: Colors.grey[900],
+                ),
+              ),
+              subtitle: Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.access_time, size: 13, color: Colors.grey[500]),
+                    SizedBox(width: 5),
+                    Text(
+                      'Added: ${app['addedAt'] ?? 'Unknown'}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+              trailing: IconButton(
+                icon: Icon(
+                  Icons.delete_outline,
+                  color: Colors.grey[600],
+                  size: 20,
+                ),
+                style: IconButton.styleFrom(padding: EdgeInsets.all(8)),
+                onPressed:
+                    () => _handleDeleteApp(
+                      context,
+                      app,
+                      helper,
+                      setDialogState,
+                      onRefreshNeeded,
+                    ),
+              ),
             ),
-          ),
-          trailing: IconButton(
-            icon: Icon(Icons.delete_rounded, color: Colors.red[600], size: 22),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.red[50],
-              padding: EdgeInsets.all(10),
-            ),
-            onPressed: () => _handleDeleteApp(
-              context,
-              app,
-              helper,
-              setDialogState,
-              onRefreshNeeded,
-            ),
-          ),
-        ),
-      );
-    }).toList(),
+          );
+        }).toList(),
   );
 }
 
@@ -772,12 +821,15 @@ Future<void> _handleAddApp(
   setDialogState(() => helper.isLoadingApps = true);
 
   try {
-    await FirebaseFirestore.instance.collection('fb_app_credentials').doc('apps').set({
-      appId: {
-        'appSecret': appSecret,
-        'addedAt': FieldValue.serverTimestamp(),
-      }
-    }, SetOptions(merge: true));
+    await FirebaseFirestore.instance
+        .collection('fb_app_credentials')
+        .doc('apps')
+        .set({
+          appId: {
+            'appSecret': appSecret,
+            'addedAt': FieldValue.serverTimestamp(),
+          },
+        }, SetOptions(merge: true));
 
     appIdController.clear();
     appSecretController.clear();
@@ -805,51 +857,59 @@ Future<void> _handleDeleteApp(
 ) async {
   showDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
-        children: [
-          Icon(Icons.warning_rounded, color: Colors.orange[700]),
-          SizedBox(width: 12),
-          Text('Remove App'),
-        ],
-      ),
-      content: Text('Are you sure you want to remove ${app['appId']}?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            Navigator.pop(ctx);
-
-            try {
-              await FirebaseFirestore.instance
-                  .collection('fb_app_credentials')
-                  .doc('apps')
-                  .update({app['appId']: FieldValue.delete()});
-
-              await helper.loadConfiguredApps();
-              setDialogState(() {});
-              onRefreshNeeded();
-
-              if (!context.mounted) return;
-              SnackbarUtil.showSuccess(context, '✅ App removed successfully');
-            } catch (e) {
-              if (!context.mounted) return;
-              SnackbarUtil.showError(context, 'Error: $e');
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red[700],
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    builder:
+        (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-          child: Text('Remove'),
+          title: Row(
+            children: [
+              Icon(Icons.warning_rounded, color: Colors.orange[700]),
+              SizedBox(width: 12),
+              Text('Remove App'),
+            ],
+          ),
+          content: Text('Are you sure you want to remove ${app['appId']}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+
+                try {
+                  await FirebaseFirestore.instance
+                      .collection('fb_app_credentials')
+                      .doc('apps')
+                      .update({app['appId']: FieldValue.delete()});
+
+                  await helper.loadConfiguredApps();
+                  setDialogState(() {});
+                  onRefreshNeeded();
+
+                  if (!context.mounted) return;
+                  SnackbarUtil.showSuccess(
+                    context,
+                    '✅ App removed successfully',
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  SnackbarUtil.showError(context, 'Error: $e');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red[700],
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text('Remove'),
+            ),
+          ],
         ),
-      ],
-    ),
   );
 }
 
@@ -873,50 +933,54 @@ Future<void> showTokenInputModal(
   showDialog(
     context: context,
     barrierDismissible: false,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setDialogState) {
-        bool isExchanging = false;
+    builder:
+        (context) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            bool isExchanging = false;
 
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 650),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 40,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildTokenInputHeader(context, helper),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: _buildTokenInputContent(
-                      context,
-                      tokenController,
-                      pageIdController,
-                      appIdController,
-                      helper,
-                      setDialogState,
-                      onRefreshNeeded,
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 650),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 40,
+                      offset: const Offset(0, 12),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        );
-      },
-    ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildTokenInputHeader(context, helper),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: _buildTokenInputContent(
+                          context,
+                          tokenController,
+                          pageIdController,
+                          appIdController,
+                          helper,
+                          setDialogState,
+                          onRefreshNeeded,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
   );
 }
 
@@ -926,16 +990,16 @@ Future<void> showTokenInputModal(
 
 // This continues from the _buildTokenInputHeader function...
 
-Widget _buildTokenInputHeader(BuildContext context, FacebookIntegrationHelper helper) {
+Widget _buildTokenInputHeader(
+  BuildContext context,
+  FacebookIntegrationHelper helper,
+) {
   return Container(
     padding: const EdgeInsets.all(24),
     decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [Color(0xFF1877F2), Color(0xFF0C63D4)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
+      color: Colors.white,
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      border: Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1)),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -943,14 +1007,14 @@ Widget _buildTokenInputHeader(BuildContext context, FacebookIntegrationHelper he
         Row(
           children: [
             Container(
-              padding: EdgeInsets.all(12),
+              padding: EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.grey[100],
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.facebook, color: Colors.white, size: 28),
+              child: Icon(Icons.facebook, color: Colors.grey[700], size: 24),
             ),
-            SizedBox(width: 16),
+            SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -958,58 +1022,59 @@ Widget _buildTokenInputHeader(BuildContext context, FacebookIntegrationHelper he
                   Text(
                     'Facebook Integration',
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
+                      color: Colors.grey[900],
+                      letterSpacing: -0.3,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  SizedBox(height: 2),
                   Text(
                     'Connect your Facebook Page',
                     style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 13,
+                      color: Colors.grey[600],
                       fontWeight: FontWeight.w400,
                     ),
                   ),
                 ],
               ),
             ),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
+            IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: Icon(
+                Icons.close_rounded,
+                color: Colors.grey[600],
+                size: 22,
               ),
-              child: IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.close_rounded, color: Colors.white),
-                padding: EdgeInsets.all(8),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.grey[100],
+                padding: EdgeInsets.all(6),
               ),
             ),
           ],
         ),
         if (helper.tokenStatus != null && helper.tokenStatus!.configured) ...[
-          SizedBox(height: 16),
+          SizedBox(height: 12),
           Container(
-            padding: EdgeInsets.all(14),
+            padding: EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey[300]!, width: 1),
             ),
             child: Row(
               children: [
                 Icon(
                   helper.tokenStatus!.expired
-                      ? Icons.error
+                      ? Icons.error_outline
                       : helper.tokenStatus!.needsRenewal
-                          ? Icons.warning_amber_rounded
-                          : Icons.check_circle,
-                  color: Colors.white,
-                  size: 24,
+                      ? Icons.warning_amber_outlined
+                      : Icons.check_circle_outline,
+                  color: Colors.grey[600],
+                  size: 20,
                 ),
-                SizedBox(width: 12),
+                SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1018,23 +1083,20 @@ Widget _buildTokenInputHeader(BuildContext context, FacebookIntegrationHelper he
                         helper.tokenStatus!.expired
                             ? 'Token Expired'
                             : helper.tokenStatus!.needsRenewal
-                                ? 'Token Expiring Soon'
-                                : 'Token Active',
+                            ? 'Token Expiring Soon'
+                            : 'Token Active',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: Colors.grey[800],
                         ),
                       ),
-                      SizedBox(height: 2),
+                      SizedBox(height: 1),
                       Text(
                         helper.tokenStatus!.expired
                             ? 'Renew your token to continue syncing'
                             : 'Expires in ${helper.tokenStatus!.daysLeft} days',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -1066,85 +1128,95 @@ Widget _buildTokenInputContent(
       // Instructions Section
       Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.blue.shade50, Colors.blue.shade50],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.blue.shade100, width: 1.5),
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[300]!, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                Icon(Icons.info_outline, color: Colors.grey[600], size: 18),
                 SizedBox(width: 8),
                 Text(
                   'SETUP INSTRUCTIONS',
                   style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.blue.shade700,
-                    letterSpacing: 0.5,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                    letterSpacing: 0.3,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            _buildInstructionStep('1', 'Visit developers.facebook.com and log in'),
+            _buildInstructionStep(
+              '1',
+              'Visit developers.facebook.com and log in',
+            ),
             const SizedBox(height: 12),
             _buildInstructionStep('2', 'Click "My Apps" → "Create App"'),
             const SizedBox(height: 12),
             _buildInstructionStep(
-                '3', 'Choose "Manage everything on your Page" as the use case, and select "Business" as the App Type.'),
+              '3',
+              'Choose "Manage everything on your Page" as the use case, and select "Business" as the App Type.',
+            ),
             const SizedBox(height: 12),
             _buildInstructionStep(
-                '4', 'In the right sidebar, open "Use Cases" and select your created app and enable required permissions'),
+              '4',
+              'In the right sidebar, open "Use Cases" and select your created app and enable required permissions',
+            ),
             const SizedBox(height: 12),
             _buildInstructionStep(
-                '5', 'Go to Tools → Graph API Explorer → Select your app and check the same permissions'),
+              '5',
+              'Go to Tools → Graph API Explorer → Select your app and check the same permissions',
+            ),
             const SizedBox(height: 12),
             _buildInstructionStep('6', 'Generate and copy your Access Token'),
             const SizedBox(height: 12),
             _buildInstructionStep(
-                '7',
-                'Page ID: Go to your Facebook Page → About → Page transparency → Page ID. App ID: Find it in your Facebook App dashboard (optional but recommended).'),
+              '7',
+              'Page ID: Go to your Facebook Page → About → Page transparency → Page ID. App ID: Find it in your Facebook App dashboard (optional but recommended).',
+            ),
             const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade200, width: 1.5),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey[300]!, width: 1),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.verified_user, size: 18, color: Colors.green.shade600),
-                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.verified_user,
+                        size: 16,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 7),
                       Text(
                         'Required Permissions',
                         style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.grey[800],
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Text(
                     'pages_read_engagement, pages_manage_posts, pages_show_list, pages_read_user_content, pages_manage_metadata',
                     style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[700],
-                      height: 1.6,
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                      height: 1.5,
                       fontFamily: 'monospace',
                     ),
                   ),
@@ -1187,31 +1259,38 @@ Widget _buildTokenInputContent(
       const SizedBox(height: 12),
       SizedBox(
         width: double.infinity,
+        height: 52,
         child: OutlinedButton.icon(
-          onPressed: isExchanging
-              ? null
-              : () async {
-                  final data = await Clipboard.getData('text/plain');
-                  if (data?.text != null) {
-                    tokenController.text = data!.text!;
-                    if (context.mounted) {
-                      SnackbarUtil.showSuccess(context, '✅ Token pasted from clipboard');
+          onPressed:
+              isExchanging
+                  ? null
+                  : () async {
+                    final data = await Clipboard.getData('text/plain');
+                    if (data?.text != null) {
+                      tokenController.text = data!.text!;
+                      if (context.mounted) {
+                        SnackbarUtil.showSuccess(
+                          context,
+                          'Token pasted from clipboard',
+                        );
+                      }
                     }
-                  }
-                },
+                  },
           icon: Icon(Icons.content_paste_rounded, size: 20),
           label: Text(
             'Paste from Clipboard',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
           ),
           style: OutlinedButton.styleFrom(
-            foregroundColor: Color(0xFF1877F2),
+            foregroundColor: Colors.grey[700],
             side: BorderSide(
-              color: isExchanging ? Colors.grey.shade300 : Color(0xFF1877F2),
-              width: 1.5,
+              color: isExchanging ? Colors.grey.shade300 : Colors.grey[400]!,
+              width: 1,
             ),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         ),
       ),
@@ -1223,20 +1302,26 @@ Widget _buildTokenInputContent(
               onPressed: isExchanging ? null : () => Navigator.pop(context),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.grey[700],
-                side: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                side: BorderSide(color: Colors.grey[300]!, width: 1),
                 padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             flex: 2,
             child: ElevatedButton.icon(
-              onPressed: isExchanging
-                  ? null
-                  : () => _handleTokenExchange(
+              onPressed:
+                  isExchanging
+                      ? null
+                      : () => _handleTokenExchange(
                         context,
                         tokenController,
                         pageIdController,
@@ -1245,27 +1330,35 @@ Widget _buildTokenInputContent(
                         setDialogState,
                         onRefreshNeeded,
                       ),
-              icon: isExchanging
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.check_circle, size: 22),
+              icon:
+                  isExchanging
+                      ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                      : const Icon(Icons.check_circle_outline, size: 22),
               label: Text(
                 isExchanging ? 'Saving...' : 'Save & Connect',
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w400,
+                  fontSize: 16,
+                ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
+                backgroundColor: Colors.grey[800],
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: Colors.grey.shade400,
-                elevation: 2,
+                elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ),
@@ -1280,41 +1373,34 @@ Widget _buildInstructionStep(String number, String text) {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Container(
-        width: 26,
-        height: 26,
+        width: 24,
+        height: 24,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.blue.shade500, Colors.blue.shade600],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: Colors.grey[700],
           shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.blue.withOpacity(0.3),
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
         ),
         child: Center(
           child: Text(
             number,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
           ),
         ),
       ),
-      const SizedBox(width: 12),
+      const SizedBox(width: 10),
       Expanded(
         child: Padding(
-          padding: const EdgeInsets.only(top: 3),
+          padding: const EdgeInsets.only(top: 2),
           child: Text(
             text,
             style: TextStyle(
               fontSize: 13,
-              color: Colors.grey[800],
-              height: 1.5,
-              fontWeight: FontWeight.w500,
+              color: Colors.grey[700],
+              height: 1.4,
+              fontWeight: FontWeight.w400,
             ),
           ),
         ),
@@ -1323,29 +1409,43 @@ Widget _buildInstructionStep(String number, String text) {
   );
 }
 
-Widget _buildInputLabel(String label, IconData icon, {bool isRequired = false, bool isOptional = false}) {
+Widget _buildInputLabel(
+  String label,
+  IconData icon, {
+  bool isRequired = false,
+  bool isOptional = false,
+}) {
   return Row(
     children: [
-      Icon(icon, size: 16, color: Colors.grey[600]),
-      SizedBox(width: 6),
       Text(
-        label.toUpperCase(),
+        label,
         style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: Colors.grey[600],
-          letterSpacing: 0.5,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: Colors.grey[700],
+          letterSpacing: 0,
         ),
       ),
       if (isRequired) ...[
-        SizedBox(width: 4),
-        Text('*', style: TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.bold)),
+        SizedBox(width: 3),
+        Text(
+          '*',
+          style: TextStyle(
+            color: Colors.red,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
       if (isOptional) ...[
-        SizedBox(width: 6),
+        SizedBox(width: 5),
         Text(
           '(Optional)',
-          style: TextStyle(fontSize: 10, color: Colors.grey[500], fontStyle: FontStyle.italic),
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[500],
+            fontStyle: FontStyle.italic,
+          ),
         ),
       ],
     ],
@@ -1365,32 +1465,36 @@ Widget _buildTokenTextField({
     enabled: enabled,
     keyboardType: keyboardType,
     maxLines: maxLines,
-    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey[900]),
+    style: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w400,
+      color: Colors.grey[900],
+    ),
     decoration: InputDecoration(
       hintText: hintText,
-      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14, fontWeight: FontWeight.w400),
+      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
       prefixIcon: Icon(icon, color: Colors.grey[600], size: 20),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Color(0xFF1877F2), width: 2),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.grey[600]!, width: 1.5),
       ),
       disabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[200]!, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
       ),
       filled: true,
-      fillColor: enabled ? Colors.grey[50] : Colors.grey[100],
+      fillColor: enabled ? Colors.white : Colors.grey[100],
       contentPadding: EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: maxLines > 1 ? 14 : 16,
+        horizontal: 14,
+        vertical: maxLines > 1 ? 12 : 14,
       ),
     ),
   );
@@ -1457,7 +1561,8 @@ Future<void> _handleTokenExchange(
 
       Navigator.pop(context);
 
-      String successMessage = 'Token and Page ID saved! Valid for ~$daysValid days.';
+      String successMessage =
+          'Token and Page ID saved! Valid for ~$daysValid days.';
       if (appUsed != null && appUsed.isNotEmpty) {
         successMessage += '\nUsing App ID: $appUsed';
       }
