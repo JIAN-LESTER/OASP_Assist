@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-
 import 'package:capstone_project/modules/admin_module/information_bank_module/ib_format.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -19,7 +18,7 @@ void showEditIBModal(
   String? previousModal,
 }) {
   final userData = userDoc.data() as Map<String, dynamic>;
-  
+
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -69,34 +68,39 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
   late TextEditingController titleController;
   late TextEditingController contentController;
   late String selectedCategory;
-  
+
   final FileService _fileService = FileService();
   final ImagePicker _imagePicker = ImagePicker();
   final TextRecognizer _textRecognizer = TextRecognizer();
-  
+
   bool _isProcessingFile = false;
   String? _uploadedFileName;
-  
+
+  String? _titleError;
+  String? _contentError;
+  String? _categoryError;
+
   final categories = ['Admission', 'Scholarship', 'Placement', 'General'];
 
   @override
-void initState() {
-  super.initState();
-  titleController = TextEditingController(
-    text: widget.userData['ib_title'] ?? widget.userData['title'] ?? '',
-  );
-  
-  // ✅ Use formatForEditing to preserve structure for editing
-  final source = widget.userData['source'] ?? 'Unknown';
-  final originalContent = widget.userData['content'] ?? '';
-  
-  contentController = TextEditingController(
-    text: ContentFormatter.formatForEditing(originalContent, source),
-  );
-  
-  String rawCategory = widget.userData['category'] ?? 'General';
-  selectedCategory = _normalizeCategory(rawCategory);
-}
+  void initState() {
+    super.initState();
+    titleController = TextEditingController(
+      text: widget.userData['ib_title'] ?? widget.userData['title'] ?? '',
+    );
+
+    // ✅ Use formatForEditing to preserve structure for editing
+    final source = widget.userData['source'] ?? 'Unknown';
+    final originalContent = widget.userData['content'] ?? '';
+
+    contentController = TextEditingController(
+      text: ContentFormatter.formatForEditing(originalContent, source),
+    );
+
+    String rawCategory = widget.userData['category'] ?? 'General';
+    selectedCategory = _normalizeCategory(rawCategory);
+  }
+
   @override
   void dispose() {
     titleController.dispose();
@@ -209,7 +213,8 @@ void initState() {
 
       setState(() {
         contentController.text = extractedText;
-        _uploadedFileName = 'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        _uploadedFileName =
+            'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
         _isProcessingFile = false;
       });
 
@@ -375,7 +380,10 @@ void initState() {
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
+                    ),
                   ),
                 ],
               ),
@@ -533,28 +541,48 @@ void initState() {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: titleController,
+                        onChanged: (value) {
+                          if (_titleError != null && value.trim().isNotEmpty) {
+                            setState(() {
+                              _titleError = null;
+                            });
+                          }
+                        },
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                         ),
                         decoration: InputDecoration(
                           hintText: 'Enter document title',
+
+                          errorText: _titleError,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
+                            borderSide: BorderSide(
+                              color:
+                                  _titleError != null
+                                      ? Colors.red
+                                      : const Color(0xFFE2E8F0),
+                              width: _titleError != null ? 2 : 1,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
+                            borderSide: BorderSide(
+                              color:
+                                  _titleError != null
+                                      ? Colors.red
+                                      : const Color(0xFFE2E8F0),
+                              width: _titleError != null ? 2 : 1,
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFF2E7D32),
+                            borderSide: BorderSide(
+                              color:
+                                  _titleError != null
+                                      ? Colors.red
+                                      : const Color(0xFF2E7D32),
                               width: 2,
                             ),
                           ),
@@ -602,7 +630,7 @@ void initState() {
                             ),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 12),
 
                       // Processing indicator
@@ -688,28 +716,50 @@ void initState() {
                         TextFormField(
                           controller: contentController,
                           maxLines: 10,
+                          onChanged: (value) {
+                            if (_contentError != null &&
+                                value.trim().isNotEmpty) {
+                              setState(() {
+                                _contentError = null;
+                              });
+                            }
+                          },
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w400,
                           ),
                           decoration: InputDecoration(
                             hintText: 'Enter or edit document content',
+
+                            errorText: _contentError,
+                            errorMaxLines: 2,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFE2E8F0),
+                              borderSide: BorderSide(
+                                color:
+                                    _contentError != null
+                                        ? Colors.red
+                                        : const Color(0xFFE2E8F0),
+                                width: _contentError != null ? 2 : 1,
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFE2E8F0),
+                              borderSide: BorderSide(
+                                color:
+                                    _contentError != null
+                                        ? Colors.red
+                                        : const Color(0xFFE2E8F0),
+                                width: _contentError != null ? 2 : 1,
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF2E7D32),
+                              borderSide: BorderSide(
+                                color:
+                                    _contentError != null
+                                        ? Colors.red
+                                        : const Color(0xFF2E7D32),
                                 width: 2,
                               ),
                             ),
@@ -733,10 +783,7 @@ void initState() {
                       const SizedBox(height: 24),
 
                       // Category Section
-                      buildSectionHeader(
-                        'Category',
-                        Icons.category_outlined,
-                      ),
+                      buildSectionHeader('Category', Icons.category_outlined),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         value: selectedCategory,
@@ -746,22 +793,35 @@ void initState() {
                           color: Color(0xFF334155),
                         ),
                         decoration: InputDecoration(
+                          // ✅ ADD ERROR STYLING
+                          errorText: _categoryError,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
+                            borderSide: BorderSide(
+                              color:
+                                  _categoryError != null
+                                      ? Colors.red
+                                      : const Color(0xFFE2E8F0),
+                              width: _categoryError != null ? 2 : 1,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
+                            borderSide: BorderSide(
+                              color:
+                                  _categoryError != null
+                                      ? Colors.red
+                                      : const Color(0xFFE2E8F0),
+                              width: _categoryError != null ? 2 : 1,
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFF2E7D32),
+                            borderSide: BorderSide(
+                              color:
+                                  _categoryError != null
+                                      ? Colors.red
+                                      : const Color(0xFF2E7D32),
                               width: 2,
                             ),
                           ),
@@ -772,29 +832,32 @@ void initState() {
                             vertical: 16,
                           ),
                         ),
-                        items: categories.map((category) {
-                          return DropdownMenuItem<String>(
-                            value: category,
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: _getCategoryColor(category),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
+                        items:
+                            categories.map((category) {
+                              return DropdownMenuItem<String>(
+                                value: category,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: _getCategoryColor(category),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(category),
+                                  ],
                                 ),
-                                const SizedBox(width: 12),
-                                Text(category),
-                              ],
-                            ),
-                          );
-                        }).toList(),
+                              );
+                            }).toList(),
                         onChanged: (String? newValue) {
                           if (newValue != null) {
                             setState(() {
                               selectedCategory = newValue;
+                              // ✅ ADD THIS
+                              _categoryError = null;
                             });
                           }
                         },
@@ -826,7 +889,12 @@ void initState() {
     bool isTablet,
     bool isDesktop,
   ) {
-    double buttonHeight = isMobile ? 40 : isTablet ? 44 : 46;
+    double buttonHeight =
+        isMobile
+            ? 40
+            : isTablet
+            ? 44
+            : 46;
     double fontSize = isMobile ? 14 : 15;
     double borderRadius = 10;
 
@@ -836,7 +904,8 @@ void initState() {
           child: SizedBox(
             height: buttonHeight,
             child: OutlinedButton(
-              onPressed: _isProcessingFile ? null : () => Navigator.of(context).pop(),
+              onPressed:
+                  _isProcessingFile ? null : () => Navigator.of(context).pop(),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF6B7280),
                 side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
@@ -847,7 +916,10 @@ void initState() {
               ),
               child: Text(
                 'Cancel',
-                style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -857,24 +929,62 @@ void initState() {
           child: SizedBox(
             height: buttonHeight,
             child: ElevatedButton.icon(
-              onPressed: _isProcessingFile
-                  ? null
-                  : () {
-                      final title = titleController.text.trim();
-                      final content = contentController.text.trim();
-                      _handleSaveChanges(
-                        context,
-                        widget.userDoc,
-                        title,
-                        content,
-                        selectedCategory,
-                        widget.previousModal,
-                      );
-                    },
+              onPressed:
+                  _isProcessingFile
+                      ? null
+                      : () {
+                        // ✅ ADD VALIDATION BEFORE SAVING
+                        setState(() {
+                          _titleError = null;
+                          _contentError = null;
+                          _categoryError = null;
+                        });
+
+                        bool hasError = false;
+
+                        if (titleController.text.trim().isEmpty) {
+                          setState(() {
+                            _titleError = 'Please enter a title';
+                          });
+                          hasError = true;
+                        }
+
+                        if (contentController.text.trim().isEmpty) {
+                          setState(() {
+                            _contentError = 'Content cannot be empty';
+                          });
+                          hasError = true;
+                        }
+
+                        if (selectedCategory.trim().isEmpty) {
+                          setState(() {
+                            _categoryError = 'Please select a category';
+                          });
+                          hasError = true;
+                        }
+
+                        if (hasError) {
+                          return;
+                        }
+
+                        final title = titleController.text.trim();
+                        final content = contentController.text.trim();
+                        _handleSaveChanges(
+                          context,
+                          widget.userDoc,
+                          title,
+                          content,
+                          selectedCategory,
+                          widget.previousModal,
+                        );
+                      },
               icon: const Icon(Icons.save_outlined, size: 18),
               label: Text(
                 'Save Changes',
-                style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2E7D32),
@@ -915,44 +1025,32 @@ Future<void> _handleSaveChanges(
   String category,
   String? previousModal,
 ) async {
-  if (title.isEmpty) {
-    SnackbarUtil.showError(context, 'Please enter a document title');
-    return;
-  }
-
-  if (content.isEmpty) {
-    SnackbarUtil.showError(context, 'Content cannot be empty');
-    return;
-  }
-
   try {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-      ),
+      builder:
+          (context) => const Center(
+            child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+          ),
     );
 
     final userData = userDoc.data() as Map<String, dynamic>;
     final source = userData['source'] ?? 'Unknown';
-    
+
     // ✅ Format both for fair comparison
     final originalContent = ContentFormatter.formatForEditing(
       userData['content'] ?? '',
       source,
     );
-    final newContent = ContentFormatter.formatForEditing(
-      content,
-      source,
-    );
-    
+    final newContent = ContentFormatter.formatForEditing(content, source);
+
     // Compare formatted versions
     final contentChanged = newContent.trim() != originalContent.trim();
 
     if (contentChanged) {
       print('🔄 Content changed - updating Pinecone vectors...');
-      
+
       final fileService = FileService();
       await fileService.updateInformationBankContent(
         documentId: userDoc.id,
@@ -960,11 +1058,11 @@ Future<void> _handleSaveChanges(
         newContent: content, // Save the user's edited version
         newCategory: category,
       );
-      
+
       print('✅ Content and vectors updated successfully');
     } else {
       print('ℹ️ Only metadata changed - updating Firestore only...');
-      
+
       Map<String, dynamic> updateData = {
         'ib_title': title,
         'title': title,
@@ -980,19 +1078,21 @@ Future<void> _handleSaveChanges(
           .update(updateData);
     }
 
-    final updatedDocSnapshot = await FirebaseFirestore.instance
-        .collection('information_bank')
-        .doc(userDoc.id)
-        .get();
+    final updatedDocSnapshot =
+        await FirebaseFirestore.instance
+            .collection('information_bank')
+            .doc(userDoc.id)
+            .get();
 
     final currentUser = FirebaseAuth.instance.currentUser;
     String actorName = 'Unknown';
 
     if (currentUser != null) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         actorName = data['name'] ?? currentUser.email ?? 'Unknown';
@@ -1003,7 +1103,8 @@ Future<void> _handleSaveChanges(
     final logData = {
       'logId': logRef.id,
       'user': actorName,
-      'action': 'Updated document: $title (Category: $category)${contentChanged ? ' [Content Updated]' : ''}',
+      'action':
+          'Updated document: $title (Category: $category)${contentChanged ? ' [Content Updated]' : ''}',
       'time': Timestamp.now(),
     };
     await logRef.set(logData);
@@ -1019,10 +1120,10 @@ Future<void> _handleSaveChanges(
       });
 
       SnackbarUtil.showSuccess(
-        context, 
-        contentChanged 
-          ? 'Document and embeddings updated successfully'
-          : 'Document updated successfully'
+        context,
+        contentChanged
+            ? 'Document and embeddings updated successfully'
+            : 'Document updated successfully',
       );
     }
   } catch (e) {

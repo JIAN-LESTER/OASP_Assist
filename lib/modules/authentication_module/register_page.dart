@@ -62,7 +62,6 @@ class _RegisterPageState extends State<RegisterPage> {
   static final Color textSecondaryColor = Colors.grey[600]!;
   static final Color errorColor = Colors.red[400]!;
 
-
   final List<String> yearOptions = [
     'N/A',
     '1st Year',
@@ -924,12 +923,12 @@ class _RegisterPageState extends State<RegisterPage> {
               height: 120,
               child: Image.asset(
                 'lib/images/oasp.png',
-                fit: BoxFit.contain, // or BoxFit.cover / BoxFit.fitWidth
+                fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Icon(
                     Icons.smart_toy_outlined,
                     color: Color(0xFF2E7D32),
-                    size: 100, // optional smaller icon size
+                    size: 100,
                   );
                 },
               ),
@@ -959,37 +958,43 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ),
             SizedBox(height: sectionSpacing),
+
+            // Keep general error display
             _buildGeneralError(fontSizeMultiplier),
+
+            // Email field with error passed directly
             Textfield(
               controller: emailController,
               hintText: "Email",
               obscureText: false,
               keyboardType: TextInputType.emailAddress,
               onSubmitted: (_) => _submitWithEnter(),
+              errorText: _emailError, // Pass error directly
             ),
-            _buildErrorText(_emailError, fontSizeMultiplier),
 
             SizedBox(height: baseSpacing * 0.5),
 
+            // Password field with error passed directly
             Textfield(
               controller: passwordController,
               hintText: "Password",
               obscureText: true,
               isPasswordField: true,
               onSubmitted: (_) => _submitWithEnter(),
+              errorText: _passwordError, // Pass error directly
             ),
-            _buildErrorText(_passwordError, fontSizeMultiplier),
 
             SizedBox(height: baseSpacing * 0.5),
 
+            // Confirm Password field with error passed directly
             Textfield(
               controller: confirmPasswordController,
               hintText: "Confirm Password",
               obscureText: true,
               isPasswordField: true,
               onSubmitted: (_) => registerUser(),
+              errorText: _confirmPasswordError, // Pass error directly
             ),
-            _buildErrorText(_confirmPasswordError, fontSizeMultiplier),
 
             SizedBox(height: baseSpacing * 0.5),
             SizedBox(height: sectionSpacing),

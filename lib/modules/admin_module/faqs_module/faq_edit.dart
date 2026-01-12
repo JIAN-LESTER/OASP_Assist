@@ -19,6 +19,9 @@ void showEditFAQModal(
   String selectedCategory = faqData['category'] ?? 'General';
   final categories = ['Admission', 'Scholarship', 'Placement', 'General'];
 
+  String? questionError;
+  String? answerError;
+
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -154,42 +157,84 @@ void showEditFAQModal(
                             // Question Section
                             buildSectionHeader('Question', Icons.help_outline),
                             const SizedBox(height: 12),
-                            TextFormField(
-                              controller: questionController,
-                              maxLines: 2,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              decoration: InputDecoration(
-                                hintText:
-                                    'Enter the frequently asked question...',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
+
+                            // ✅ REPLACE WITH ERROR HANDLING
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextFormField(
+                                  controller: questionController,
+                                  onChanged: (value) {
+                                    if (questionError != null &&
+                                        value.trim().isNotEmpty) {
+                                      setState(() {
+                                        questionError = null;
+                                      });
+                                    }
+                                  },
+                                  maxLines: 2,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText:
+                                        'Enter the frequently asked question...',
+                                    errorText: questionError,
+                                    errorMaxLines: 2,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color:
+                                            questionError != null
+                                                ? Colors.red
+                                                : const Color(0xFFE2E8F0),
+                                        width: questionError != null ? 2 : 1,
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color:
+                                            questionError != null
+                                                ? Colors.red
+                                                : const Color(0xFFE2E8F0),
+                                        width: questionError != null ? 2 : 1,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color:
+                                            questionError != null
+                                                ? Colors.red
+                                                : const Color(0xFF2E7D32),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    errorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(
+                                        color: Colors.red,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    focusedErrorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(
+                                        color: Colors.red,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF8FAFC),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 16,
+                                    ),
                                   ),
                                 ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF2E7D32),
-                                    width: 2,
-                                  ),
-                                ),
-                                filled: true,
-                                fillColor: const Color(0xFFF8FAFC),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                              ),
+                              ],
                             ),
 
                             const SizedBox(height: 24),
@@ -200,42 +245,84 @@ void showEditFAQModal(
                               Icons.lightbulb_outline,
                             ),
                             const SizedBox(height: 12),
-                            TextFormField(
-                              controller: answerController,
-                              maxLines: 4,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              decoration: InputDecoration(
-                                hintText:
-                                    'Enter the detailed answer to this question...',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
+
+                            // ✅ REPLACE WITH ERROR HANDLING
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextFormField(
+                                  controller: answerController,
+                                  onChanged: (value) {
+                                    if (answerError != null &&
+                                        value.trim().isNotEmpty) {
+                                      setState(() {
+                                        answerError = null;
+                                      });
+                                    }
+                                  },
+                                  maxLines: 4,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText:
+                                        'Enter the detailed answer to this question...',
+                                    errorText: answerError,
+                                    errorMaxLines: 2,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color:
+                                            answerError != null
+                                                ? Colors.red
+                                                : const Color(0xFFE2E8F0),
+                                        width: answerError != null ? 2 : 1,
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color:
+                                            answerError != null
+                                                ? Colors.red
+                                                : const Color(0xFFE2E8F0),
+                                        width: answerError != null ? 2 : 1,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color:
+                                            answerError != null
+                                                ? Colors.red
+                                                : const Color(0xFF2E7D32),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    errorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(
+                                        color: Colors.red,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    focusedErrorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(
+                                        color: Colors.red,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF8FAFC),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 16,
+                                    ),
                                   ),
                                 ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF2E7D32),
-                                    width: 2,
-                                  ),
-                                ),
-                                filled: true,
-                                fillColor: const Color(0xFFF8FAFC),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                              ),
+                              ],
                             ),
 
                             const SizedBox(height: 24),
@@ -323,6 +410,12 @@ void showEditFAQModal(
                               selectedCategory,
                               previousModal,
                               isMobile,
+                              setState, // ✅ PASS setState
+                              () => questionError, // ✅ PASS error getters
+                              () => answerError,
+                              (error) =>
+                                  questionError = error, // ✅ PASS error setters
+                              (error) => answerError = error,
                             ),
                           ],
                         ),
@@ -361,6 +454,11 @@ Widget _buildActionButtons(
   String selectedCategory,
   String? previousModal,
   bool isMobile,
+  StateSetter setState, // ✅ ADD setState parameter
+  String? Function() getQuestionError, // ✅ ADD error getters
+  String? Function() getAnswerError,
+  Function(String?) setQuestionError, // ✅ ADD error setters
+  Function(String?) setAnswerError,
 ) {
   final screenWidth = MediaQuery.of(context).size.width;
   final isTablet = screenWidth >= 600 && screenWidth < 1100;
@@ -396,15 +494,42 @@ Widget _buildActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: ElevatedButton(
-            onPressed:
-                () => _handleSaveChanges(
-                  context,
-                  userDoc,
-                  questionController.text.trim(),
-                  answerController.text.trim(),
-                  selectedCategory,
-                  previousModal,
-                ),
+            onPressed: () {
+              // ✅ ADD VALIDATION
+              setState(() {
+                setQuestionError(null);
+                setAnswerError(null);
+              });
+
+              bool hasError = false;
+
+              if (questionController.text.trim().isEmpty) {
+                setState(() {
+                  setQuestionError('Please enter a question');
+                });
+                hasError = true;
+              }
+
+              if (answerController.text.trim().isEmpty) {
+                setState(() {
+                  setAnswerError('Please enter an answer');
+                });
+                hasError = true;
+              }
+
+              if (hasError) {
+                return;
+              }
+
+              _handleSaveChanges(
+                context,
+                userDoc,
+                questionController.text.trim(),
+                answerController.text.trim(),
+                selectedCategory,
+                previousModal,
+              );
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2E7D32),
               foregroundColor: Colors.white,
@@ -447,11 +572,6 @@ Future<void> _handleSaveChanges(
   String category,
   String? previousModal,
 ) async {
-  if (question.isEmpty) {
-    SnackbarUtil.showError(context, 'Please enter a FAQ question');
-    return;
-  }
-
   try {
     showDialog(
       context: context,
@@ -496,10 +616,11 @@ Future<void> _handleSaveChanges(
     });
 
     // Fetch the updated document
-    final updatedDoc = await FirebaseFirestore.instance
-        .collection('faqs')
-        .doc(userDoc.id)
-        .get();
+    final updatedDoc =
+        await FirebaseFirestore.instance
+            .collection('faqs')
+            .doc(userDoc.id)
+            .get();
 
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
@@ -520,4 +641,3 @@ Future<void> _handleSaveChanges(
     }
   }
 }
-

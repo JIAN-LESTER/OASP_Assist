@@ -897,14 +897,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   // Mobile Layout
   Widget _buildMobileLayout() {
-    return SafeArea(
-      child: _buildContent(
-        maxWidth: double.infinity,
-        horizontalPadding: 12,
-        iconSize: 80,
-        titleFontSize: 24,
-        descriptionFontSize: 14,
-        buttonHeight: 16,
+    return Container(
+      color: Colors.grey[50],
+      child: SafeArea(
+        child: _buildContent(
+          maxWidth: double.infinity,
+          horizontalPadding: 12,
+          iconSize: 80,
+          titleFontSize: 24,
+          descriptionFontSize: 14,
+          buttonHeight: 16,
+        ),
       ),
     );
   }
@@ -912,7 +915,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: Colors.grey[50], // Match desktop
       body: ResponsiveLayout(
         mobileBody: _buildMobileLayout(),
         tabletBody: const OnboardingTablet(),

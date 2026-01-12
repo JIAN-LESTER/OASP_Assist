@@ -75,7 +75,7 @@ class _OnboardingTabletState extends State<OnboardingTablet> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: Colors.grey[50],
       body: SafeArea(
         child: Center(
           child: Container(
@@ -85,16 +85,12 @@ class _OnboardingTabletState extends State<OnboardingTablet> {
             decoration: BoxDecoration(
               color: backgroundColor,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: primaryColor.withOpacity(0.3),
-                width: 2,
-              ),
+              border: Border.all(color: Colors.grey.shade300, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 3,
-                  blurRadius: 15,
-                  offset: const Offset(0, 3),
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 24,
+                  offset: Offset(0, 6),
                 ),
               ],
             ),
@@ -397,12 +393,16 @@ class _OnboardingTabletState extends State<OnboardingTablet> {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: primaryColor.withOpacity(0.05),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: primaryColor.withOpacity(0.2),
-              width: 1.5,
-            ),
+            border: Border.all(color: Colors.grey.shade300, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: Offset(0, 3),
+              ),
+            ],
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -510,12 +510,9 @@ class _OnboardingTabletState extends State<OnboardingTablet> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: primaryColor.withOpacity(0.05),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: primaryColor.withOpacity(0.2),
-                width: 1.5,
-              ),
+              border: Border.all(color: Colors.grey.shade300, width: 1.5),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -551,15 +548,12 @@ class _OnboardingTabletState extends State<OnboardingTablet> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.green.withOpacity(0.3),
-              width: 1.5,
-            ),
+            border: Border.all(color: Colors.grey.shade300, width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.green.withOpacity(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 10,
+                offset: Offset(0, 4),
               ),
             ],
           ),

@@ -3,7 +3,6 @@ import 'package:capstone_project/modules/admin_module/widgets/pagination.dart';
 import 'package:capstone_project/modules/admin_module/widgets/search_field.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/statcard_management.dart';
 
-
 import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -1401,6 +1400,9 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
   String? _selectedCategory; // NEW: Category field
   List<DocumentSnapshot> _colleges = [];
   bool _loadingColleges = true;
+  String? _nameError;
+  String? _categoryError;
+  String? _collegeError;
 
   bool get isEditing => widget.programDoc != null;
 
@@ -1521,23 +1523,41 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
   }
 
   Future<void> _saveProgram() async {
-    // NEW: Validate category first
+    setState(() {
+      _nameError = null;
+      _categoryError = null;
+      _collegeError = null;
+    });
+
+    bool hasError = false;
+
+    // Validate category first
     if (_selectedCategory == null || _selectedCategory!.isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please select a program category');
-      return;
+      setState(() {
+        _categoryError = 'Please select a program category';
+      });
+      hasError = true;
     }
 
     if (_nameController.text.trim().isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please enter a program name');
-      return;
+      setState(() {
+        _nameError = 'Please enter a program name';
+      });
+      hasError = true;
     }
 
-    // NEW: Only validate college for Bachelor programs
+    // Only validate college for Bachelor programs
     if (_selectedCategory == 'Bachelor') {
       if (_selectedCollegeId == null || _selectedCollegeId!.isEmpty) {
-        SnackbarUtil.showWarning(context, 'Please select a college');
-        return;
+        setState(() {
+          _collegeError = 'Please select a college';
+        });
+        hasError = true;
       }
+    }
+
+    if (hasError) {
+      return;
     }
 
     setState(() => _isSubmitting = true);
@@ -1914,10 +1934,16 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color:
-                          _selectedCategory == 'Bachelor'
+                          _categoryError != null
+                              ? Colors.red
+                              : _selectedCategory == 'Bachelor'
                               ? const Color(0xFF2E7D32)
                               : const Color(0xFFE5E7EB),
-                      width: _selectedCategory == 'Bachelor' ? 2 : 1.5,
+                      width:
+                          _categoryError != null ||
+                                  _selectedCategory == 'Bachelor'
+                              ? 2
+                              : 1.5,
                     ),
                   ),
                   child: Row(
@@ -1928,6 +1954,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                         onChanged: (value) {
                           setState(() {
                             _selectedCategory = value;
+                            _categoryError = null;
                           });
                         },
                         activeColor: const Color(0xFF2E7D32),
@@ -1979,10 +2006,16 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color:
-                          _selectedCategory == 'Masteral'
+                          _categoryError != null
+                              ? Colors.red
+                              : _selectedCategory == 'Masteral'
                               ? const Color(0xFF2E7D32)
                               : const Color(0xFFE5E7EB),
-                      width: _selectedCategory == 'Masteral' ? 2 : 1.5,
+                      width:
+                          _categoryError != null ||
+                                  _selectedCategory == 'Masteral'
+                              ? 2
+                              : 1.5,
                     ),
                   ),
                   child: Row(
@@ -1994,6 +2027,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                           setState(() {
                             _selectedCategory = value;
                             _selectedCollegeId = null;
+                            _categoryError = null;
                           });
                         },
                         activeColor: const Color(0xFF2E7D32),
@@ -2023,6 +2057,21 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
             ),
           ],
         ),
+
+        if (_categoryError != null) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Text(
+              _categoryError!,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.red,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -2084,7 +2133,10 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+            border: Border.all(
+              color: _nameError != null ? Colors.red : const Color(0xFFE5E7EB),
+              width: _nameError != null ? 2 : 1.5,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.02),
@@ -2096,6 +2148,13 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
           child: TextField(
             controller: _nameController,
             enabled: _selectedCategory != null,
+            onChanged: (value) {
+              if (_nameError != null && value.trim().isNotEmpty) {
+                setState(() {
+                  _nameError = null;
+                });
+              }
+            },
             decoration: InputDecoration(
               hintText:
                   _selectedCategory != null
@@ -2136,6 +2195,20 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
             ),
           ),
         ],
+        if (_nameError != null) ...[
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Text(
+              _nameError!,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.red,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -2158,7 +2231,11 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+            border: Border.all(
+              color:
+                  _collegeError != null ? Colors.red : const Color(0xFFE5E7EB),
+              width: _collegeError != null ? 2 : 1.5,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.02),
@@ -2184,14 +2261,21 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                     decoration: InputDecoration(
                       hintText: 'Select a college',
                       hintStyle: TextStyle(
-                        color: Colors.grey[400],
+                        color:
+                            _collegeError != null
+                                ? Colors.red.shade300
+                                : Colors.grey[400],
                         fontSize: 14,
                       ),
-                      prefixIcon: const Icon(
+                      prefixIcon: Icon(
                         Icons.account_balance_outlined,
-                        color: Color(0xFF9CA3AF),
+                        color:
+                            _collegeError != null
+                                ? Colors.red
+                                : const Color(0xFF9CA3AF),
                         size: 20,
                       ),
+                      errorText: _collegeError,
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -2215,6 +2299,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                     onChanged: (value) {
                       setState(() {
                         _selectedCollegeId = value;
+                        _collegeError = null;
                       });
                     },
                     isExpanded: true,

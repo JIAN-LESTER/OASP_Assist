@@ -1,6 +1,5 @@
 import 'dart:io';
 
-
 import 'package:capstone_project/components/textfield.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -183,10 +182,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       // Attempt to sign in
       UserCredential userCredential = await FirebaseAuth.instance
-          .signInWithEmailAndPassword(
-            email: email,
-            password: password,
-          )
+          .signInWithEmailAndPassword(email: email, password: password)
           .timeout(
             const Duration(seconds: 30),
             onTimeout: () {
@@ -195,7 +191,7 @@ class _LoginPageState extends State<LoginPage> {
           );
 
       final user = userCredential.user;
-      
+
       if (user == null) {
         _setGeneralError('Sign in failed. Please try again.');
         setState(() => _isLoading = false);
@@ -231,86 +227,99 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       print("✅ Sign in successful: ${user.email}");
-      
     } on TimeoutException catch (e) {
       print("⏱️ Timeout Error: $e");
-      _setGeneralError('Connection timeout. Please check your internet connection and try again.');
-      
+      _setGeneralError(
+        'Connection timeout. Please check your internet connection and try again.',
+      );
     } on FirebaseAuthException catch (e) {
       print("🔥 Firebase Auth Error: ${e.code} - ${e.message}");
-      
+
       switch (e.code) {
         case 'user-not-found':
           _setEmailError('No account found with this email address');
           break;
-          
+
         case 'wrong-password':
           _setPasswordError('Incorrect password. Please try again.');
           break;
-          
+
         case 'invalid-email':
           _setEmailError('Invalid email address format');
           break;
-          
+
         case 'user-disabled':
-          _setGeneralError('This account has been disabled. Please contact support.');
+          _setGeneralError(
+            'This account has been disabled. Please contact support.',
+          );
           break;
-          
+
         case 'too-many-requests':
-          _setGeneralError('Too many failed login attempts. Please try again later or reset your password.');
+          _setGeneralError(
+            'Too many failed login attempts. Please try again later or reset your password.',
+          );
           break;
-          
+
         case 'invalid-credential':
-          _setGeneralError('Invalid email or password. Please check your credentials.');
+          _setGeneralError(
+            'Invalid email or password. Please check your credentials.',
+          );
           break;
-          
+
         case 'network-request-failed':
-          _setGeneralError('Network error. Please check your internet connection.');
+          _setGeneralError(
+            'Network error. Please check your internet connection.',
+          );
           break;
-          
+
         case 'operation-not-allowed':
-          _setGeneralError('Email/password sign in is not enabled. Please contact support.');
+          _setGeneralError(
+            'Email/password sign in is not enabled. Please contact support.',
+          );
           break;
-          
+
         case 'email-already-in-use':
           _setEmailError('This email is already registered');
           break;
-          
+
         case 'weak-password':
           _setPasswordError('Password is too weak');
           break;
-          
+
         case 'account-exists-with-different-credential':
-          _setGeneralError('An account already exists with a different sign-in method.');
+          _setGeneralError(
+            'An account already exists with a different sign-in method.',
+          );
           break;
-          
+
         case 'invalid-verification-code':
           _setGeneralError('Invalid verification code');
           break;
-          
+
         case 'invalid-verification-id':
           _setGeneralError('Invalid verification ID');
           break;
-          
+
         case 'session-expired':
           _setGeneralError('Session expired. Please try again.');
           break;
-          
+
         default:
           // For unknown Firebase errors, show a user-friendly message
           _setGeneralError(
-            'Login failed: ${_getFriendlyErrorMessage(e.message ?? 'Unknown error')}'
+            'Login failed: ${_getFriendlyErrorMessage(e.message ?? 'Unknown error')}',
           );
       }
-      
     } on SocketException catch (e) {
       print("🌐 Network Error: $e");
-      _setGeneralError('No internet connection. Please check your network and try again.');
-      
+      _setGeneralError(
+        'No internet connection. Please check your network and try again.',
+      );
     } catch (e) {
       print("❌ Unexpected Error: $e");
-      _setGeneralError('An unexpected error occurred. Please try again or contact support.');
-      
+      _setGeneralError(
+        'An unexpected error occurred. Please try again or contact support.',
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -321,7 +330,7 @@ class _LoginPageState extends State<LoginPage> {
   // Helper to convert technical error messages to user-friendly ones
   String _getFriendlyErrorMessage(String technicalMessage) {
     final lowerMessage = technicalMessage.toLowerCase();
-    
+
     if (lowerMessage.contains('network')) {
       return 'Network connection issue';
     } else if (lowerMessage.contains('timeout')) {
@@ -340,27 +349,27 @@ class _LoginPageState extends State<LoginPage> {
   // Email validation helper with comprehensive checks
   bool _isValidEmail(String email) {
     if (email.isEmpty) return false;
-    
+
     // Basic format check
     final emailRegex = RegExp(
-      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
     );
-    
+
     if (!emailRegex.hasMatch(email)) return false;
-    
+
     // Additional checks
     final parts = email.split('@');
     if (parts.length != 2) return false;
-    
+
     final localPart = parts[0];
     final domainPart = parts[1];
-    
+
     // Check local part
     if (localPart.isEmpty || localPart.length > 64) return false;
-    
+
     // Check domain part
     if (domainPart.isEmpty || !domainPart.contains('.')) return false;
-    
+
     return true;
   }
 
@@ -492,7 +501,6 @@ class _LoginPageState extends State<LoginPage> {
     double buttonPadding = 16,
     required double availableHeight,
   }) {
-    // Calculate responsive spacing based on available height
     final baseSpacing = availableHeight * 0.02;
     final sectionSpacing = availableHeight * 0.025;
     final largeSpacing = availableHeight * 0.04;
@@ -504,7 +512,6 @@ class _LoginPageState extends State<LoginPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Top spacing (flexible)
             SizedBox(height: largeSpacing),
 
             SizedBox(
@@ -552,32 +559,50 @@ class _LoginPageState extends State<LoginPage> {
 
             SizedBox(height: sectionSpacing),
 
-            // General error message
+            // General error message (keep this for general/verification errors)
             _buildGeneralError(fontSizeMultiplier),
 
-            // Verification error message (above email field)
-            _buildErrorText(_verificationError, fontSizeMultiplier),
+            // Verification error message
+            if (_verificationError != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
+                child: Text(
+                  _verificationError!,
+                  style: TextStyle(
+                    fontFamily: primaryFontFamily,
+                    fontSize: baseErrorFontSize * fontSizeMultiplier,
+                    color: Colors.red,
+                    fontWeight: FontWeight.w400,
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
 
-            // Email field
+            // Email field with error text passed directly
             Textfield(
               controller: emailController,
               hintText: "Email",
               obscureText: false,
               keyboardType: TextInputType.emailAddress,
               onSubmitted: (_) => signUserIn(),
+              errorText: _emailError, // Pass error directly
             ),
-            _buildErrorText(_emailError, fontSizeMultiplier),
 
             SizedBox(height: baseSpacing * 0.5),
 
+            // Password field with error text passed directly
             Textfield(
               controller: passwordController,
               hintText: "Password",
               obscureText: true,
               isPasswordField: true,
               onSubmitted: (_) => signUserIn(),
+              errorText: _passwordError, // Pass error directly
             ),
-            _buildErrorText(_passwordError, fontSizeMultiplier),
 
             SizedBox(height: baseSpacing),
 
@@ -732,7 +757,6 @@ class _LoginPageState extends State<LoginPage> {
               ],
             ),
 
-            // Bottom spacing (flexible)
             SizedBox(height: largeSpacing),
           ],
         ),

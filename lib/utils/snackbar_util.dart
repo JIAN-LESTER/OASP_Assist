@@ -1,21 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+enum ToastLocation {
+  topLeft,
+  topCenter,
+  topRight,
+  bottomLeft,
+  bottomCenter,
+  bottomRight,
+}
+
+enum AlertType { success, error, warning, info }
 
 class SnackbarUtil {
   /// Shows a success snackbar
   static void showSuccess(
     BuildContext context,
     String message, {
+    String? subtitle,
+    bool showTimestamp = true,
     Duration duration = const Duration(seconds: 5),
     String? actionLabel,
     VoidCallback? onActionPressed,
+    ToastLocation location = ToastLocation.topRight,
   }) {
-    _showTopRightAlert(
+    _showAlert(
       context,
       message: message,
+      subtitle: subtitle,
+      showTimestamp: showTimestamp,
       type: AlertType.success,
       duration: duration,
       actionLabel: actionLabel,
       onActionPressed: onActionPressed,
+      location: location,
     );
   }
 
@@ -23,17 +41,23 @@ class SnackbarUtil {
   static void showError(
     BuildContext context,
     String message, {
+    String? subtitle,
+    bool showTimestamp = true,
     Duration duration = const Duration(seconds: 5),
     String? actionLabel,
     VoidCallback? onActionPressed,
+    ToastLocation location = ToastLocation.topRight,
   }) {
-    _showTopRightAlert(
+    _showAlert(
       context,
       message: message,
+      subtitle: subtitle,
+      showTimestamp: showTimestamp,
       type: AlertType.error,
       duration: duration,
       actionLabel: actionLabel,
       onActionPressed: onActionPressed,
+      location: location,
     );
   }
 
@@ -41,17 +65,23 @@ class SnackbarUtil {
   static void showInfo(
     BuildContext context,
     String message, {
+    String? subtitle,
+    bool showTimestamp = true,
     Duration duration = const Duration(seconds: 5),
     String? actionLabel,
     VoidCallback? onActionPressed,
+    ToastLocation location = ToastLocation.topRight,
   }) {
-    _showTopRightAlert(
+    _showAlert(
       context,
       message: message,
+      subtitle: subtitle,
+      showTimestamp: showTimestamp,
       type: AlertType.info,
       duration: duration,
       actionLabel: actionLabel,
       onActionPressed: onActionPressed,
+      location: location,
     );
   }
 
@@ -59,28 +89,37 @@ class SnackbarUtil {
   static void showWarning(
     BuildContext context,
     String message, {
+    String? subtitle,
+    bool showTimestamp = true,
     Duration duration = const Duration(seconds: 5),
     String? actionLabel,
     VoidCallback? onActionPressed,
+    ToastLocation location = ToastLocation.topRight,
   }) {
-    _showTopRightAlert(
+    _showAlert(
       context,
       message: message,
+      subtitle: subtitle,
+      showTimestamp: showTimestamp,
       type: AlertType.warning,
       duration: duration,
       actionLabel: actionLabel,
       onActionPressed: onActionPressed,
+      location: location,
     );
   }
 
-  /// Internal method to show top-right alert overlay
-  static void _showTopRightAlert(
+  /// Internal method to show alert overlay
+  static void _showAlert(
     BuildContext context, {
     required String message,
+    String? subtitle,
+    bool showTimestamp = true,
     required AlertType type,
     required Duration duration,
     String? actionLabel,
     VoidCallback? onActionPressed,
+    required ToastLocation location,
   }) {
     final overlay = Overlay.of(context);
     late OverlayEntry overlayEntry;
@@ -88,10 +127,17 @@ class SnackbarUtil {
     final isMobile = screenWidth < 600;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
 
+    // Generate timestamp
+    final now = DateTime.now();
+    final formattedTimestamp = DateFormat(
+      'EEEE, MMMM dd, yyyy \'at\' h:mm a',
+    ).format(now);
+
     overlayEntry = OverlayEntry(
       builder:
-          (context) => TopRightAlert(
+          (context) => ToastAlert(
             message: message,
+            subtitle: subtitle ?? (showTimestamp ? formattedTimestamp : null),
             type: type,
             onDismiss: () => overlayEntry.remove(),
             isMobile: isMobile,
@@ -105,6 +151,7 @@ class SnackbarUtil {
                       overlayEntry.remove();
                     }
                     : null,
+            location: location,
           ),
     );
 
@@ -115,10 +162,9 @@ class SnackbarUtil {
   }
 }
 
-enum AlertType { success, error, warning, info }
-
-class TopRightAlert extends StatefulWidget {
+class ToastAlert extends StatefulWidget {
   final String message;
+  final String? subtitle;
   final AlertType type;
   final VoidCallback onDismiss;
   final bool isMobile;
@@ -126,10 +172,12 @@ class TopRightAlert extends StatefulWidget {
   final String? actionLabel;
   final VoidCallback? onActionPressed;
   final Duration duration;
+  final ToastLocation location;
 
-  const TopRightAlert({
+  const ToastAlert({
     super.key,
     required this.message,
+    this.subtitle,
     required this.type,
     required this.onDismiss,
     this.isMobile = false,
@@ -137,32 +185,46 @@ class TopRightAlert extends StatefulWidget {
     this.actionLabel,
     this.onActionPressed,
     this.duration = const Duration(seconds: 5),
+    required this.location,
   });
 
   @override
-  State<TopRightAlert> createState() => _TopRightAlertState();
+  State<ToastAlert> createState() => _ToastAlertState();
 }
 
-class _TopRightAlertState extends State<TopRightAlert>
-    with TickerProviderStateMixin {
+class _ToastAlertState extends State<ToastAlert>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
-  late AnimationController _progressController;
-  late Animation<double> _progressAnimation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
 
+    // Determine slide direction based on location
+    Offset slideBegin;
+    switch (widget.location) {
+      case ToastLocation.topLeft:
+      case ToastLocation.topCenter:
+      case ToastLocation.topRight:
+        slideBegin = const Offset(0, -0.5); // Slide down from top
+        break;
+      case ToastLocation.bottomLeft:
+      case ToastLocation.bottomCenter:
+      case ToastLocation.bottomRight:
+        slideBegin = const Offset(0, 0.5); // Slide up from bottom
+        break;
+    }
+
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(1.2, 0),
+      begin: slideBegin,
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
 
     _fadeAnimation = Tween<double>(
       begin: 0.0,
@@ -170,72 +232,17 @@ class _TopRightAlertState extends State<TopRightAlert>
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _controller.forward();
-
-    // Progress animation for the underline
-    _progressController = AnimationController(
-      duration: widget.duration,
-      vsync: this,
-    );
-
-    _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _progressController, curve: Curves.linear),
-    );
-
-    _progressController.forward();
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _progressController.dispose();
     super.dispose();
   }
 
   void _dismiss() async {
     await _controller.reverse();
     widget.onDismiss();
-  }
-
-  Color _getBackgroundColor() {
-    switch (widget.type) {
-      case AlertType.success:
-        return const Color(0xFF1E3A32);
-      case AlertType.error:
-        return const Color(0xFF3A2327);
-      case AlertType.warning:
-        return const Color(0xFF3A3227);
-      case AlertType.info:
-        return const Color(0xFF2D2D2D);
-    }
-  }
-
-  LinearGradient _getProgressGradient() {
-    switch (widget.type) {
-      case AlertType.success:
-        return const LinearGradient(
-          colors: [Color(0xFF059669), Color(0xFF10B981)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        );
-      case AlertType.error:
-        return const LinearGradient(
-          colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        );
-      case AlertType.warning:
-        return const LinearGradient(
-          colors: [Color(0xFFD97706), Color(0xFFF59E0B)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        );
-      case AlertType.info:
-        return const LinearGradient(
-          colors: [Color(0xFF4B5563), Color(0xFF6B7280)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        );
-    }
   }
 
   Color _getIconBackgroundColor() {
@@ -247,33 +254,7 @@ class _TopRightAlertState extends State<TopRightAlert>
       case AlertType.warning:
         return const Color(0xFFF59E0B);
       case AlertType.info:
-        return const Color(0xFF6B7280);
-    }
-  }
-
-  Color _getActionButtonColor() {
-    switch (widget.type) {
-      case AlertType.success:
-        return const Color(0xFF059669);
-      case AlertType.error:
-        return const Color(0xFF991B1B);
-      case AlertType.warning:
-        return const Color(0xFF92400E);
-      case AlertType.info:
-        return const Color(0xFF4B5563);
-    }
-  }
-
-  Color _getActionTextColor() {
-    switch (widget.type) {
-      case AlertType.success:
-        return const Color(0xFF6EE7B7);
-      case AlertType.error:
-        return const Color(0xFFFCA5A5);
-      case AlertType.warning:
-        return const Color(0xFFFCD34D);
-      case AlertType.info:
-        return Colors.white70;
+        return const Color(0xFF3B82F6);
     }
   }
 
@@ -293,27 +274,59 @@ class _TopRightAlertState extends State<TopRightAlert>
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
     double alertWidth;
-    double topPosition;
-    double rightPosition;
+    double? top;
+    double? bottom;
+    double? left;
+    double? right;
 
+    // Determine width
     if (widget.isMobile) {
       alertWidth = screenWidth - 32;
-      topPosition = 16;
-      rightPosition = 16;
     } else if (widget.isTablet) {
       alertWidth = 420;
-      topPosition = 24;
-      rightPosition = 24;
     } else {
       alertWidth = 460;
-      topPosition = 24;
-      rightPosition = 24;
+    }
+
+    // Determine position based on location
+    const padding = 24.0;
+    const mobilePadding = 16.0;
+    final actualPadding = widget.isMobile ? mobilePadding : padding;
+
+    switch (widget.location) {
+      case ToastLocation.topLeft:
+        top = actualPadding;
+        left = actualPadding;
+        break;
+      case ToastLocation.topCenter:
+        top = actualPadding;
+        left = (screenWidth - alertWidth) / 2;
+        break;
+      case ToastLocation.topRight:
+        top = actualPadding;
+        right = actualPadding;
+        break;
+      case ToastLocation.bottomLeft:
+        bottom = actualPadding;
+        left = actualPadding;
+        break;
+      case ToastLocation.bottomCenter:
+        bottom = actualPadding;
+        left = (screenWidth - alertWidth) / 2;
+        break;
+      case ToastLocation.bottomRight:
+        bottom = actualPadding;
+        right = actualPadding;
+        break;
     }
 
     return Positioned(
-      top: topPosition,
-      right: rightPosition,
+      top: top,
+      bottom: bottom,
+      left: left,
+      right: right,
       child: SlideTransition(
         position: _slideAnimation,
         child: FadeTransition(
@@ -323,190 +336,111 @@ class _TopRightAlertState extends State<TopRightAlert>
             child: Container(
               width: alertWidth,
               decoration: BoxDecoration(
-                color: _getBackgroundColor(),
+                color: Colors.white,
+                border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 12,
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Content
-                  Padding(
-                    padding: EdgeInsets.all(widget.isMobile ? 16 : 18),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Header Row
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: _getIconBackgroundColor(),
-                                borderRadius: BorderRadius.circular(50),
-                              ),
-                              child: Icon(
-                                _getIcon(),
-                                color: Colors.white,
-                                size: widget.isMobile ? 20 : 22,
-                              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Icon
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _getIconBackgroundColor(),
+                        borderRadius: BorderRadius.circular(50),
+                      ),
+                      child: Icon(_getIcon(), color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    // Message and subtitle
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.message,
+                            style: const TextStyle(
+                              color: Color(0xFF1F2937),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              height: 1.4,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Text(
-                                  widget.message,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: widget.isMobile ? 15 : 16,
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: _dismiss,
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  child: Icon(
-                                    Icons.close,
-                                    color: Colors.white.withOpacity(0.7),
-                                    size: widget.isMobile ? 18 : 20,
-                                  ),
-                                ),
+                          ),
+                          if (widget.subtitle != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.subtitle!,
+                              style: const TextStyle(
+                                color: Color(0xFF6B7280),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
+                                height: 1.4,
                               ),
                             ),
                           ],
-                        ),
-                        // Action Buttons
-                        if (widget.actionLabel != null ||
-                            widget.onActionPressed != null) ...[
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              if (widget.actionLabel != null &&
-                                  widget.onActionPressed != null)
-                                Expanded(
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      onTap: widget.onActionPressed,
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 10,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _getActionButtonColor(),
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          widget.actionLabel!,
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: _getActionTextColor(),
-                                            fontSize: widget.isMobile ? 14 : 15,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: _dismiss,
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 10,
-                                      ),
-                                      child: Text(
-                                        'Dismiss',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.9),
-                                          fontSize: widget.isMobile ? 14 : 15,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  // Progress indicator at bottom
-                  ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(12),
-                      bottomRight: Radius.circular(12),
-                    ),
-                    child: SizedBox(
-                      height: 4,
-                      child: Stack(
-                        children: [
-                          // Background
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.3),
-                            ),
-                          ),
-                          // Progress bar with gradient
-                          AnimatedBuilder(
-                            animation: _progressAnimation,
-                            builder: (context, child) {
-                              return Align(
-                                alignment: Alignment.centerLeft,
-                                child: FractionallySizedBox(
-                                  widthFactor: _progressAnimation.value,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      gradient: _getProgressGradient(),
-                                      borderRadius: const BorderRadius.only(
-                                        bottomLeft: Radius.circular(12),
-                                        bottomRight: Radius.circular(12),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    // Action Button (if provided)
+                    if (widget.actionLabel != null &&
+                        widget.onActionPressed != null) ...[
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: widget.onActionPressed,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B82F6),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              widget.actionLabel!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    // Close Button
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(4),
+                        onTap: _dismiss,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          child: const Icon(
+                            Icons.close,
+                            color: Color(0xFF6B7280),
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

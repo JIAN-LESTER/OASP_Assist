@@ -132,11 +132,13 @@ class AddFaqContent extends StatefulWidget {
 }
 
 class _AddFaqContentState extends State<AddFaqContent> {
-  final _formKey = GlobalKey<FormState>();
   final TextEditingController _questionController = TextEditingController();
   final TextEditingController _answerController = TextEditingController();
   String _selectedCategory = 'Admission';
   bool _isSubmitting = false;
+
+  String? _questionError;
+  String? _answerError;
 
   final String _cohereApiKey = "IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
 
@@ -188,17 +190,28 @@ class _AddFaqContentState extends State<AddFaqContent> {
   }
 
   Future<void> _saveFaq() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    setState(() {
+      _questionError = null;
+      _answerError = null;
+    });
+
+    bool hasError = false;
 
     if (_questionController.text.trim().isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please enter a question');
-      return;
+      setState(() {
+        _questionError = 'Please enter a question';
+      });
+      hasError = true;
     }
 
     if (_answerController.text.trim().isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please enter an answer');
+      setState(() {
+        _answerError = 'Please enter an answer';
+      });
+      hasError = true;
+    }
+
+    if (hasError) {
       return;
     }
 
@@ -371,55 +384,229 @@ class _AddFaqContentState extends State<AddFaqContent> {
                 horizontal: widget.isMobile ? 20 : 28,
                 vertical: widget.isMobile ? 20 : 28,
               ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Question Section
-                    buildSectionHeader('Question', Icons.quiz_outlined),
-                    const SizedBox(height: 16),
-                    buildTextField(
-                      controller: _questionController,
-                      isMobile: false,
-                      label: 'FAQ Question',
-                      hint: 'Enter the frequently asked question...',
-                      icon: Icons.help_outline,
-                      maxLines: 2,
-                    ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Question Section
+                      buildSectionHeader('Question', Icons.quiz_outlined),
+                      const SizedBox(height: 16),
 
-                    const SizedBox(height: 24),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextFormField(
+                            controller: _questionController,
+                            onChanged: (value) {
+                              if (_questionError != null &&
+                                  value.trim().isNotEmpty) {
+                                setState(() {
+                                  _questionError = null;
+                                });
+                              }
+                            },
+                            maxLines: 2,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 14,
+                              color: Color(0xFF1F2937),
+                              fontWeight: FontWeight.w400,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'FAQ Question',
+                              hintText:
+                                  'Enter the frequently asked question...',
+                              prefixIcon: Icon(
+                                Icons.help_outline,
+                                color:
+                                    _questionError != null
+                                        ? Colors.red
+                                        : const Color(0xFF6B7280),
+                                size: 20,
+                              ),
+                              errorText: _questionError,
+                              labelStyle: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 14,
+                                color:
+                                    _questionError != null
+                                        ? Colors.red
+                                        : const Color(0xFF6B7280),
+                                fontWeight: FontWeight.w400,
+                              ),
+                              hintStyle: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 14,
+                                color: Color(0xFF9CA3AF),
+                                fontWeight: FontWeight.w300,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color:
+                                      _questionError != null
+                                          ? Colors.red
+                                          : const Color(0xFFE5E7EB),
+                                  width: _questionError != null ? 2 : 1.5,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color:
+                                      _questionError != null
+                                          ? Colors.red
+                                          : const Color(0xFF2E7D32),
+                                  width: 2,
+                                ),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Colors.red,
+                                  width: 2,
+                                ),
+                              ),
+                              focusedErrorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Colors.red,
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFFAFBFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
 
-                    // Category Section
-                    buildSectionHeader('Category', Icons.category_outlined),
-                    const SizedBox(height: 16),
-                    _buildCategorySection(),
+                      const SizedBox(height: 24),
 
-                    const SizedBox(height: 24),
+                      // Category Section
+                      buildSectionHeader('Category', Icons.category_outlined),
+                      const SizedBox(height: 16),
+                      _buildCategorySection(),
 
-                    // Answer Section
-                    buildSectionHeader(
-                      'Answer',
-                      Icons.question_answer_outlined,
-                    ),
-                    const SizedBox(height: 16),
-                    buildTextField(
-                      controller: _answerController,
-                      isMobile: false,
-                      label: 'FAQ Answer',
-                      hint: 'Enter the detailed answer to this question...',
-                      icon: Icons.article_outlined,
-                      maxLines: 5,
-                    ),
+                      const SizedBox(height: 24),
 
-                    const SizedBox(height: 32),
+                      // Answer Section
+                      buildSectionHeader(
+                        'Answer',
+                        Icons.question_answer_outlined,
+                      ),
+                      const SizedBox(height: 16),
 
-                    // Action Buttons
-                    _buildActionButtons(),
+                      // ✅ REPLACE WITH CUSTOM TEXTFIELD WITH ERROR HANDLING
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextFormField(
+                            controller: _answerController,
+                            onChanged: (value) {
+                              if (_answerError != null &&
+                                  value.trim().isNotEmpty) {
+                                setState(() {
+                                  _answerError = null;
+                                });
+                              }
+                            },
+                            maxLines: 5,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 14,
+                              color: Color(0xFF1F2937),
+                              fontWeight: FontWeight.w400,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'FAQ Answer',
+                              hintText:
+                                  'Enter the detailed answer to this question...',
+                              prefixIcon: Icon(
+                                Icons.article_outlined,
+                                color:
+                                    _answerError != null
+                                        ? Colors.red
+                                        : const Color(0xFF6B7280),
+                                size: 20,
+                              ),
+                              errorText: _answerError,
+                              errorMaxLines: 2,
+                              labelStyle: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 14,
+                                color:
+                                    _answerError != null
+                                        ? Colors.red
+                                        : const Color(0xFF6B7280),
+                                fontWeight: FontWeight.w400,
+                              ),
+                              hintStyle: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 14,
+                                color: Color(0xFF9CA3AF),
+                                fontWeight: FontWeight.w300,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color:
+                                      _answerError != null
+                                          ? Colors.red
+                                          : const Color(0xFFE5E7EB),
+                                  width: _answerError != null ? 2 : 1.5,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color:
+                                      _answerError != null
+                                          ? Colors.red
+                                          : const Color(0xFF2E7D32),
+                                  width: 2,
+                                ),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Colors.red,
+                                  width: 2,
+                                ),
+                              ),
+                              focusedErrorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Colors.red,
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFFAFBFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
 
-                    const SizedBox(height: 16),
-                  ],
-                ),
+                      const SizedBox(height: 32),
+
+                      // Action Buttons
+                      _buildActionButtons(),
+
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),

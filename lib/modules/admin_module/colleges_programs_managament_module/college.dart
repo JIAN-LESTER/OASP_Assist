@@ -1333,6 +1333,7 @@ class AddEditCollegeModal extends StatefulWidget {
 class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
   late TextEditingController _nameController;
   bool _isSubmitting = false;
+  String? _nameError;
 
   bool get isEditing => widget.collegeDoc != null;
 
@@ -1354,8 +1355,14 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
   }
 
   Future<void> _saveCollege() async {
+    setState(() {
+      _nameError = null;
+    });
+
     if (_nameController.text.trim().isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please enter a college name');
+      setState(() {
+        _nameError = 'Please enter a college name';
+      });
       return;
     }
 
@@ -1556,12 +1563,89 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
                         Icons.account_balance_outlined,
                       ),
                       const SizedBox(height: 16),
-                      buildTextField(
+                      TextFormField(
                         controller: _nameController,
-                        label: 'College Name',
-                        hint: 'e.g., College of Computer Studies',
-                        icon: Icons.account_balance_outlined,
-                        isMobile: isMobile,
+                        onChanged: (value) {
+                          if (_nameError != null && value.trim().isNotEmpty) {
+                            setState(() {
+                              _nameError = null;
+                            });
+                          }
+                        },
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          color: Color(0xFF1F2937),
+                          fontWeight: FontWeight.w400,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'College Name',
+                          hintText: 'e.g., College of Computer Studies',
+                          prefixIcon: Icon(
+                            Icons.account_balance_outlined,
+                            color:
+                                _nameError != null
+                                    ? Colors.red
+                                    : const Color(0xFF6B7280),
+                            size: 20,
+                          ),
+                          errorText: _nameError,
+                          labelStyle: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 14,
+                            color:
+                                _nameError != null
+                                    ? Colors.red
+                                    : const Color(0xFF6B7280),
+                            fontWeight: FontWeight.w400,
+                          ),
+                          hintStyle: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 14,
+                            color: Color(0xFF9CA3AF),
+                            fontWeight: FontWeight.w300,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color:
+                                  _nameError != null
+                                      ? Colors.red
+                                      : const Color(0xFFE5E7EB),
+                              width: _nameError != null ? 2 : 1.5,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color:
+                                  _nameError != null
+                                      ? Colors.red
+                                      : const Color(0xFF2E7D32),
+                              width: 2,
+                            ),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.red,
+                              width: 2,
+                            ),
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.red,
+                              width: 2,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFFAFBFC),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                        ),
                       ),
                     ],
                   ),

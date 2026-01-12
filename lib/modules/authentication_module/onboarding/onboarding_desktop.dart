@@ -17,6 +17,16 @@ class _OnboardingDesktopState extends State<OnboardingDesktop> {
   static final Color textPrimaryColor = Colors.grey[800]!;
   static final Color textSecondaryColor = Colors.grey[600]!;
 
+  // Borders
+  final borderColor = Colors.grey.shade300;
+  final subtleBorder = Colors.grey.shade200;
+
+  // Shadows
+  final shadowColor = Colors.black.withOpacity(0.06);
+
+  // Backgrounds
+  final cardBg = Colors.white;
+
   @override
   void initState() {
     super.initState();
@@ -85,16 +95,12 @@ class _OnboardingDesktopState extends State<OnboardingDesktop> {
             decoration: BoxDecoration(
               color: backgroundColor,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: primaryColor.withOpacity(0.3),
-                width: 2,
-              ),
+              border: Border.all(color: Colors.grey.shade300, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 4,
-                  blurRadius: 20,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 24,
+                  offset: Offset(0, 6),
                 ),
               ],
             ),
@@ -397,9 +403,16 @@ class _OnboardingDesktopState extends State<OnboardingDesktop> {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: primaryColor.withOpacity(0.05),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: primaryColor.withOpacity(0.2), width: 1.5),
+          border: Border.all(color: Colors.grey.shade300, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -504,12 +517,9 @@ class _OnboardingDesktopState extends State<OnboardingDesktop> {
           constraints: const BoxConstraints(maxWidth: 700),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: primaryColor.withOpacity(0.05),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: primaryColor.withOpacity(0.2),
-              width: 1.5,
-            ),
+            border: Border.all(color: Colors.grey.shade300, width: 1.5),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -544,12 +554,12 @@ class _OnboardingDesktopState extends State<OnboardingDesktop> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green.withOpacity(0.3), width: 1.5),
+          border: Border.all(color: Colors.grey.shade300, width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.green.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: Offset(0, 4),
             ),
           ],
         ),

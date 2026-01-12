@@ -1,13 +1,12 @@
 import 'dart:convert';
 
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
+
 import 'package:capstone_project/utils/snackbar_util.dart';
 
 import 'package:capstone_project/models/admissions.dart';
@@ -156,6 +155,13 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
   bool _isProcessingImage = false;
   bool _fileReady = false;
 
+  String? _titleError;
+  String? _categoryError;
+  String? _fileError;
+
+  int? _fileSizeInBytes;
+  String? _fileSizeWarning;
+
   final List<String> _predefinedCategories = [
     'Admission',
     'Scholarship',
@@ -182,12 +188,15 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
       if (result != null && result.files.single.bytes != null) {
         final fileName = result.files.single.name;
         final fileBytes = result.files.single.bytes!;
+        final fileSize = fileBytes.length;
 
         setState(() {
           _selectedFileName = fileName;
-
+          _fileSizeInBytes = fileSize;
           _fileReady = false;
           _extractedText = null;
+          _fileSizeWarning = _getFileSizeWarning(fileSize);
+          _fileError = null; // Clear file error
         });
 
         String extractedText;
@@ -210,18 +219,46 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
           _extractedText = extractedText;
           _fileReady = true;
           _titleController.text = fileName.split('.').first;
-
         });
 
         SnackbarUtil.showSuccess(context, 'File processed successfully!');
       }
     } catch (e) {
       setState(() {
-
         _fileReady = false;
         _extractedText = null;
+        _fileSizeInBytes = null;
+        _fileSizeWarning = null;
       });
       SnackbarUtil.showError(context, 'Error processing file: $e');
+    }
+  }
+
+  String _getFileSizeWarning(int bytes) {
+    final kb = bytes / 1024;
+    final mb = kb / 1024;
+
+    if (mb > 10) {
+      return 'Large file detected (${mb.toStringAsFixed(1)} MB). Upload may take 2-3 minutes.';
+    } else if (mb > 5) {
+      return 'Medium file size (${mb.toStringAsFixed(1)} MB). Upload may take 1-2 minutes.';
+    } else if (mb > 1) {
+      return 'File size: ${mb.toStringAsFixed(1)} MB. Upload may take 30-60 seconds.';
+    } else if (kb > 500) {
+      return 'File size: ${kb.toStringAsFixed(0)} KB. Upload should be quick.';
+    } else {
+      return 'Small file (${kb.toStringAsFixed(0)} KB). Upload will be fast.';
+    }
+  }
+
+  String _formatFileSize(int bytes) {
+    final kb = bytes / 1024;
+    final mb = kb / 1024;
+
+    if (mb >= 1) {
+      return '${mb.toStringAsFixed(2)} MB';
+    } else {
+      return '${kb.toStringAsFixed(2)} KB';
     }
   }
 
@@ -261,6 +298,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
       _isProcessingImage = true;
       _fileReady = false;
       _extractedText = null;
+      _fileError = null; // Clear file error
     });
 
     try {
@@ -472,47 +510,88 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
   }
 
   Future<void> _uploadDocument() async {
+    // Clear previous errors
+    setState(() {
+      _titleError = null;
+      _categoryError = null;
+      _fileError = null;
+    });
+
+    // Validate fields and set errors
+    bool hasError = false;
+
     if (_extractedText == null || _extractedText!.trim().isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please select a file first');
-      return;
+      setState(() {
+        _fileError = 'Please select a file first';
+      });
+      hasError = true;
     }
 
     if (_titleController.text.trim().isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please enter a title');
-      return;
+      setState(() {
+        _titleError = 'Please enter a title';
+      });
+      hasError = true;
     }
 
     if (_categoryController.text.trim().isEmpty) {
-      SnackbarUtil.showWarning(context, 'Please select or enter a category');
+      setState(() {
+        _categoryError = 'Please select or enter a category';
+      });
+      hasError = true;
+    }
+
+    // Stop if there are validation errors
+    if (hasError) {
       return;
+    }
+
+    // Show upload time warning based on file size
+    if (_fileSizeInBytes != null) {
+      final mb = _fileSizeInBytes! / 1024 / 1024;
+      if (mb > 5) {
+        SnackbarUtil.showInfo(
+          context,
+          'Uploading large file. This may take 1-3 minutes. Please wait...',
+        );
+      } else if (mb > 1) {
+        SnackbarUtil.showInfo(
+          context,
+          'Uploading file. This may take 30-60 seconds...',
+        );
+      }
     }
 
     setState(() {
       _isUploading = true;
     });
- try {
-    final uuid = Uuid();
-    final documentId = uuid.v4(); // 🔥 Generate document ID first
 
-    // Save to Information Bank (the actual document)
-    final informationBank = InformationBank(
-      id: documentId,
-      title: _titleController.text.trim(),
-      content: _extractedText!,
-      embedding: [],
-      source: _selectedFileName ?? 'Unknown',
-      category: _categoryController.text.trim(),
-    );
+    try {
+      final uuid = Uuid();
+      final documentId = uuid.v4();
 
-    // 🔥 Mark as document upload
-    await _fileService.saveToInformationBank(informationBank, isFromUpload: true);
+      final informationBank = InformationBank(
+        id: documentId,
+        title: _titleController.text.trim(),
+        content: _extractedText!,
+        embedding: [],
+        source: _selectedFileName ?? 'Unknown',
+        category: _categoryController.text.trim(),
+      );
 
-    Navigator.of(context).pop(true);
+      await _fileService.saveToInformationBank(
+        informationBank,
+        isFromUpload: true,
+      );
 
-       switch (_categoryController.text.trim()) {
-      case 'Admission':
-        print("🔍 Analyzing admission document...");
-        final admissionCohere = await _cohereService.analyzeAdmission(_extractedText!);
+      Navigator.of(context).pop(true);
+
+      switch (_categoryController.text.trim()) {
+        case 'Admission':
+          print("🔍 Analyzing admission document...");
+          final admissionCohere = await _cohereService.analyzeAdmission(
+            _extractedText!,
+          );
 
           print("📋 Admission analysis result: $admissionCohere");
 
@@ -549,58 +628,67 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
             print("❌ Error processing steps: $e");
             stepsList = <String>[];
           }
- final admissions = Admissions(
-          id: documentId,
-          steps: stepsList,
-          requirements: admissionCohere['requirements'],
-          title: _titleController.text.trim(),
-          content: _extractedText!,
-          contact: contactsList,
-          academicYear: admissionCohere['academicYear'],
-          links: admissionCohere['links'],
-          source: _selectedFileName ?? 'Unknown',
-          createdAt: DateTime.now(),
-        );
 
-        // 🔥 Pass sourceDocumentId to skip Info Bank creation
-        await _fileService.saveToAdmission(admissions, sourceDocumentId: documentId);
-        break;
-
-           case 'Scholarship':
-        print("🔍 Analyzing scholarship document...");
-        final scholarshipCohere = await _cohereService.analyzeScholarship(_extractedText!);
-
-        if (scholarshipCohere['scholarships'] is List &&
-            scholarshipCohere['scholarships'].isNotEmpty) {
-          List<dynamic> scholarshipDataList = scholarshipCohere['scholarships'];
-          List<Scholarship> scholarships = [];
-
-          for (int i = 0; i < scholarshipDataList.length; i++) {
-            final scholarshipData = scholarshipDataList[i];
-            final scholarshipId = i == 0 ? documentId : '${documentId}_$i';
-
-            final scholarship = Scholarship(
-              scholarshipID: scholarshipId,
-              sourceId: scholarshipId,
-              name: scholarshipData['name'] ?? 'Unnamed Scholarship',
-              description: scholarshipData['description'] ?? 'No description available',
-              scholarshipProvider: scholarshipData['scholarshipProvider'] ?? 'Unknown Provider',
-              eligibilityRequirements: scholarshipData['eligibilityRequirements'] ?? <String>[],
-              privileges: scholarshipData['privileges'] ?? <String>[],
-              deadline: scholarshipCohere['deadline'],
-              applicationLink: scholarshipData['application_link'] ?? '',
-              createdAt: DateTime.now(),
-            );
-
-            scholarships.add(scholarship);
-          }
-
-          // 🔥 Pass sourceDocumentId to skip Info Bank creation
-          await _fileService.saveMultipleScholarships(
-            scholarships,
-            sourceDocumentId: documentId,
+          final admissions = Admissions(
+            id: documentId,
+            steps: stepsList,
+            requirements: admissionCohere['requirements'],
+            title: _titleController.text.trim(),
+            content: _extractedText!,
+            contact: contactsList,
+            academicYear: admissionCohere['academicYear'],
+            links: admissionCohere['links'],
+            source: _selectedFileName ?? 'Unknown',
+            createdAt: DateTime.now(),
           );
 
+          await _fileService.saveToAdmission(
+            admissions,
+            sourceDocumentId: documentId,
+          );
+          break;
+
+        case 'Scholarship':
+          print("🔍 Analyzing scholarship document...");
+          final scholarshipCohere = await _cohereService.analyzeScholarship(
+            _extractedText!,
+          );
+
+          if (scholarshipCohere['scholarships'] is List &&
+              scholarshipCohere['scholarships'].isNotEmpty) {
+            List<dynamic> scholarshipDataList =
+                scholarshipCohere['scholarships'];
+            List<Scholarship> scholarships = [];
+
+            for (int i = 0; i < scholarshipDataList.length; i++) {
+              final scholarshipData = scholarshipDataList[i];
+              final scholarshipId = i == 0 ? documentId : '${documentId}_$i';
+
+              final scholarship = Scholarship(
+                scholarshipID: scholarshipId,
+                sourceId: scholarshipId,
+                name: scholarshipData['name'] ?? 'Unnamed Scholarship',
+                description:
+                    scholarshipData['description'] ??
+                    'No description available',
+                scholarshipProvider:
+                    scholarshipData['scholarshipProvider'] ??
+                    'Unknown Provider',
+                eligibilityRequirements:
+                    scholarshipData['eligibilityRequirements'] ?? <String>[],
+                privileges: scholarshipData['privileges'] ?? <String>[],
+                deadline: scholarshipCohere['deadline'],
+                applicationLink: scholarshipData['application_link'] ?? '',
+                createdAt: DateTime.now(),
+              );
+
+              scholarships.add(scholarship);
+            }
+
+            await _fileService.saveMultipleScholarships(
+              scholarships,
+              sourceDocumentId: documentId,
+            );
 
             SnackbarUtil.showSuccess(
               context,
@@ -615,42 +703,50 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
           }
           break;
 
-      
-      case 'Placement':
-        print("🔍 Analyzing placement document...");
-        final placementCohere = await _cohereService.analyzePlacement(_extractedText!);
-
-        if (placementCohere['placements'] is List &&
-            placementCohere['placements'].isNotEmpty) {
-          List<dynamic> placementDataList = placementCohere['placements'];
-          List<Placement> placements = [];
-
-          for (int i = 0; i < placementDataList.length; i++) {
-            final placementData = placementDataList[i];
-            final placementId = i == 0 ? documentId : '${documentId}_$i';
-
-            final placement = Placement(
-              placementID: placementId,
-              isRecruiting: true,
-              partnerCompany: placementData['partnerCompany'] ?? 'Unnamed Placement',
-              contacts: placementData['contacts'] is List
-                  ? List<String>.from(placementData['contacts'].map((e) => e.toString()))
-                  : <String>[],
-              positions: placementData['positions'] is List
-                  ? List<String>.from(placementData['positions'].map((e) => e.toString()))
-                  : <String>[],
-              createdAt: DateTime.tryParse(placementData['createdAt'] ?? '') ?? DateTime.now(),
-            );
-
-            placements.add(placement);
-          }
-
-          // 🔥 Pass sourceDocumentId to skip Info Bank creation
-          await _fileService.saveMultiplePlacements(
-            placements,
-            sourceDocumentId: documentId,
+        case 'Placement':
+          print("🔍 Analyzing placement document...");
+          final placementCohere = await _cohereService.analyzePlacement(
+            _extractedText!,
           );
 
+          if (placementCohere['placements'] is List &&
+              placementCohere['placements'].isNotEmpty) {
+            List<dynamic> placementDataList = placementCohere['placements'];
+            List<Placement> placements = [];
+
+            for (int i = 0; i < placementDataList.length; i++) {
+              final placementData = placementDataList[i];
+              final placementId = i == 0 ? documentId : '${documentId}_$i';
+
+              final placement = Placement(
+                placementID: placementId,
+                isRecruiting: true,
+                partnerCompany:
+                    placementData['partnerCompany'] ?? 'Unnamed Placement',
+                contacts:
+                    placementData['contacts'] is List
+                        ? List<String>.from(
+                          placementData['contacts'].map((e) => e.toString()),
+                        )
+                        : <String>[],
+                positions:
+                    placementData['positions'] is List
+                        ? List<String>.from(
+                          placementData['positions'].map((e) => e.toString()),
+                        )
+                        : <String>[],
+                createdAt:
+                    DateTime.tryParse(placementData['createdAt'] ?? '') ??
+                    DateTime.now(),
+              );
+
+              placements.add(placement);
+            }
+
+            await _fileService.saveMultiplePlacements(
+              placements,
+              sourceDocumentId: documentId,
+            );
 
             SnackbarUtil.showSuccess(
               context,
@@ -715,157 +811,296 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
     }
   }
 
-  Widget _buildFileUploadArea() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFAFBFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color:
-              _fileReady
-                  ? const Color(0xFF2E7D32).withOpacity(0.4)
-                  : const Color(0xFFE5E7EB),
-          width: 2,
+  Widget _buildCustomTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    required bool hasError,
+    required Function(String) onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      style: const TextStyle(
+        fontFamily: 'Poppins',
+        fontSize: 14,
+        color: Color(0xFF1F2937),
+        fontWeight: FontWeight.w400,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(
+          icon,
+          color: hasError ? Colors.red : const Color(0xFF6B7280),
+          size: 20,
+        ),
+        labelStyle: TextStyle(
+          fontFamily: 'Poppins',
+          fontSize: 14,
+          color: hasError ? Colors.red : const Color(0xFF6B7280),
+          fontWeight: FontWeight.w400,
+        ),
+        hintStyle: const TextStyle(
+          fontFamily: 'Poppins',
+          fontSize: 14,
+          color: Color(0xFF9CA3AF),
+          fontWeight: FontWeight.w300,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: hasError ? Colors.red : const Color(0xFFE5E7EB),
+            width: hasError ? 2 : 1.5,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: hasError ? Colors.red : const Color(0xFF2E7D32),
+            width: 2,
+          ),
+        ),
+        filled: true,
+        fillColor: const Color(0xFFFAFBFC),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
         ),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap:
-              _isProcessingImage
-                  ? null
-                  : (widget.isMobile
-                      ? _showUploadOptionsBottomSheet
-                      : _pickFile),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: widget.isMobile ? 20 : 32,
-              vertical: widget.isMobile ? 24 : 32,
+    );
+  }
+
+  Widget _buildFileUploadArea() {
+    final hasError = _fileError != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFAFBFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color:
+                  hasError
+                      ? Colors.red
+                      : (_fileReady
+                          ? const Color(0xFF2E7D32).withOpacity(0.4)
+                          : const Color(0xFFE5E7EB)),
+              width: 2,
             ),
-            child: Column(
-              children: [
-                if (_isProcessingImage)
-                  Column(
-                    children: [
-                      CircularProgressIndicator(color: const Color(0xFF2E7D32)),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Extracting text from image...',
-                        style: TextStyle(
-                          fontSize: widget.isMobile ? 14 : 16,
-                          color: const Color(0xFF374151),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  )
-                else if (_fileReady)
-                  Column(
-                    children: [
-                      Container(
-                        width: widget.isMobile ? 56 : 72,
-                        height: widget.isMobile ? 56 : 72,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2E7D32),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.check_circle_outline,
-                          color: Colors.white,
-                          size: widget.isMobile ? 28 : 32,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _selectedFileName ?? 'File ready for upload',
-                        style: TextStyle(
-                          fontSize: widget.isMobile ? 15 : 16,
-                          color: const Color(0xFF1F2937),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap:
+                  _isProcessingImage
+                      ? null
+                      : (widget.isMobile
+                          ? _showUploadOptionsBottomSheet
+                          : _pickFile),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: widget.isMobile ? 20 : 32,
+                  vertical: widget.isMobile ? 24 : 32,
+                ),
+                child: Column(
+                  children: [
+                    if (_isProcessingImage)
+                      Column(
                         children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: Color(0xFF2E7D32),
-                            size: 16,
+                          CircularProgressIndicator(
+                            color: const Color(0xFF2E7D32),
                           ),
-                          SizedBox(width: 6),
+                          const SizedBox(height: 16),
                           Text(
-                            'File processed successfully',
+                            'Extracting text from image...',
                             style: TextStyle(
-                              fontSize: widget.isMobile ? 13 : 14,
-                              color: Color(0xFF2E7D32),
+                              fontSize: widget.isMobile ? 14 : 16,
+                              color: const Color(0xFF374151),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
-                      ),
-                      if (widget.isMobile) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          'Tap to upload a different file',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF9CA3AF),
+                      )
+                    else if (_fileReady)
+                      Column(
+                        children: [
+                          Container(
+                            width: widget.isMobile ? 56 : 72,
+                            height: widget.isMobile ? 56 : 72,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2E7D32),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.check_circle_outline,
+                              color: Colors.white,
+                              size: widget.isMobile ? 28 : 32,
+                            ),
                           ),
-                        ),
-                      ],
-                    ],
-                  )
-                else
-                  Column(
-                    children: [
-                      Container(
-                        width: widget.isMobile ? 56 : 72,
-                        height: widget.isMobile ? 56 : 72,
-                        decoration: BoxDecoration(
-                          color: Color(0xFF2E7D32).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.upload_file,
-                          color: const Color(0xFF2E7D32),
-                          size: widget.isMobile ? 28 : 32,
-                        ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _selectedFileName ?? 'File ready for upload',
+                            style: TextStyle(
+                              fontSize: widget.isMobile ? 15 : 16,
+                              color: const Color(0xFF1F2937),
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+
+                          if (_fileSizeInBytes != null)
+                            Text(
+                              _formatFileSize(_fileSizeInBytes!),
+                              style: TextStyle(
+                                fontSize: widget.isMobile ? 12 : 13,
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+
+                          const SizedBox(height: 8),
+
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.check_circle,
+                                color: Color(0xFF2E7D32),
+                                size: 16,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'File processed successfully',
+                                style: TextStyle(
+                                  fontSize: widget.isMobile ? 13 : 14,
+                                  color: Color(0xFF2E7D32),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          if (_fileSizeWarning != null) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Color(0xFFFCD34D).withOpacity(0.5),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    color: Color(0xFFB45309),
+                                    size: 16,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      _fileSizeWarning!,
+                                      style: TextStyle(
+                                        fontSize: widget.isMobile ? 11 : 12,
+                                        color: Color(0xFFB45309),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          if (widget.isMobile) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              'Tap to upload a different file',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ],
+                        ],
+                      )
+                    else
+                      Column(
+                        children: [
+                          Container(
+                            width: widget.isMobile ? 56 : 72,
+                            height: widget.isMobile ? 56 : 72,
+                            decoration: BoxDecoration(
+                              color: Color(0xFF2E7D32).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.upload_file,
+                              color: const Color(0xFF2E7D32),
+                              size: widget.isMobile ? 28 : 32,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            widget.isMobile
+                                ? 'Choose upload method below'
+                                : 'Upload Files',
+                            style: TextStyle(
+                              fontSize: widget.isMobile ? 15 : 16,
+                              color: const Color(0xFF1F2937),
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            widget.isMobile
+                                ? 'Select an option below to get started'
+                                : 'Documents in formats (.doc | .docx | .pdf | .txt)',
+                            style: TextStyle(
+                              fontSize: widget.isMobile ? 13 : 14,
+                              color: const Color(0xFF9CA3AF),
+                              fontWeight: FontWeight.w400,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        widget.isMobile
-                            ? 'Choose upload method below'
-                            : 'Upload Files',
-                        style: TextStyle(
-                          fontSize: widget.isMobile ? 15 : 16,
-                          color: const Color(0xFF1F2937),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.isMobile
-                            ? 'Select an option below to get started'
-                            : 'Documents in formats (.doc | .docx | .pdf | .txt)',
-                        style: TextStyle(
-                          fontSize: widget.isMobile ? 13 : 14,
-                          color: const Color(0xFF9CA3AF),
-                          fontWeight: FontWeight.w400,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      ),
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, top: 6),
+            child: Text(
+              _fileError!,
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                color: Colors.red,
+                fontWeight: FontWeight.w400,
+                height: 1.3,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -956,12 +1191,38 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
                   _buildSectionHeader('Document Details', Icons.description),
                   const SizedBox(height: 16),
 
-                  buildTextField(
-                    isMobile: false,
-                    controller: _titleController,
-                    label: 'Document Title',
-                    hint: 'Enter a descriptive title',
-                    icon: Icons.title,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildCustomTextField(
+                        controller: _titleController,
+                        label: 'Document Title',
+                        hint: 'Enter a descriptive title',
+                        icon: Icons.title,
+                        hasError: _titleError != null,
+                        onChanged: (value) {
+                          if (_titleError != null && value.trim().isNotEmpty) {
+                            setState(() {
+                              _titleError = null;
+                            });
+                          }
+                        },
+                      ),
+                      if (_titleError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, top: 6),
+                          child: Text(
+                            _titleError!,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              color: Colors.red,
+                              fontWeight: FontWeight.w400,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
 
                   const SizedBox(height: 20),
@@ -1027,6 +1288,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
                     onTap: () {
                       setState(() {
                         _categoryController.text = isSelected ? '' : category;
+                        _categoryError = null;
                       });
                     },
                     child: Container(
@@ -1066,12 +1328,38 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
               }).toList(),
         ),
         const SizedBox(height: 16),
-        buildTextField(
-          controller: _categoryController,
-          isMobile: false,
-          label: 'Custom Category',
-          hint: 'Or enter a custom category',
-          icon: Icons.category_outlined,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildCustomTextField(
+              controller: _categoryController,
+              label: 'Custom Category',
+              hint: 'Or enter a custom category',
+              icon: Icons.category_outlined,
+              hasError: _categoryError != null,
+              onChanged: (value) {
+                if (_categoryError != null && value.trim().isNotEmpty) {
+                  setState(() {
+                    _categoryError = null;
+                  });
+                }
+              },
+            ),
+            if (_categoryError != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 4, top: 6),
+                child: Text(
+                  _categoryError!,
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    color: Colors.red,
+                    fontWeight: FontWeight.w400,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+          ],
         ),
       ],
     );
