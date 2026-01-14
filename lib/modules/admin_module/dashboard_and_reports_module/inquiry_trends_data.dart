@@ -13,7 +13,7 @@ class InquiryReportsData {
 
   final List<SystemLog> recentLogs;
   final List<MessageLogs> msgLogs;
-  final Map<String, int> seasonalTrends;
+
 
   const InquiryReportsData({
     required this.totalMessages,
@@ -29,7 +29,7 @@ class InquiryReportsData {
     required this.recentLogs,
     required this.msgLogs,
    
-    required this.seasonalTrends,
+
   });
 }
 
@@ -46,6 +46,6 @@ InquiryReportsData getEmptyInquiryReportsData() {
       highestFAQs: {},
       recentLogs: [],
       msgLogs: [],
-      seasonalTrends: {},
+     
     );
   }

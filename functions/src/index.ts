@@ -8,11 +8,35 @@ if (!admin.apps.length) {
 // RAG Chatbot Functions
 export {
   generateAnswer,
-  generateGeminiEmbedding,
+ 
+  generateEmbedding,
 
 
 
 } from "./ragChat";
+
+export {
+  deleteFromPinecone,
+  queryPinecone,
+  insertPineconeDocument,
+  insertPineconeDocumentBatch,
+  
+  deletePineconeDocuments,
+
+  getPineconeStats,
+  fetchPineconeVectors,
+  deleteAllPineconeVectors,
+  generateGeminiEmbedding,
+  generateGeminiResponse,
+  generateCohereEmbedding,
+  generateCohereResponse,
+checkPineconeHealth,
+
+    analyzeCohereAdmission,
+  analyzeCohereScholarship,
+  analyzeCoherePlacement,
+  
+} from "./documentCrud";
 
 // User Management Functions
 export {

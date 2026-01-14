@@ -662,11 +662,7 @@ List<Widget> buildInquiryTrendsReport(
         height: 400,
         child: buildHighestFAQCard(data?.highestFAQs ?? {}),
       ),
-      const SizedBox(height: 16),
-      SizedBox(
-        height: 400,
-        child: buildSeasonalTrendsCard(data?.seasonalTrends ?? {}),
-      ),
+
     ];
   }
 
@@ -746,14 +742,7 @@ List<Widget> buildInquiryTrendsReport(
       ),
     ),
     const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-          Expanded(child: buildSeasonalTrendsCard(data?.seasonalTrends ?? {})),
-        ],
-      ),
-    ),
+
   ];
 }
 

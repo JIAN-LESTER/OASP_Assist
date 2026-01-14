@@ -362,35 +362,34 @@ class _Dashboardmodulestate extends State<DashboardPage> {
     await _fetchAndCacheData();
   }
 
-  Future<void> _fetchAndCacheData() async {
-    try {
-      final results = await Future.wait([
-        _firebaseService.getInquiryReportsData(selectedTimeFrame),
-        _firebaseService.getUserDemographicsReportsData(selectedTimeFrame),
-      ]);
+ Future<void> _fetchAndCacheData() async {
+  try {
+    final results = await Future.wait([
+      _firebaseService.getInquiryReportsData(selectedTimeFrame, customDateRange),
+      _firebaseService.getUserDemographicsReportsData(selectedTimeFrame, customDateRange),
+    ]);
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      final inquiryData = results[0] as InquiryReportsData;
-      final userDemoData = results[1] as UserDemographicsReportsData;
+    final inquiryData = results[0] as InquiryReportsData;
+    final userDemoData = results[1] as UserDemographicsReportsData;
 
-      _cache[selectedTimeFrame] = DashboardCache(
-        inq: inquiryData,
-        ud: userDemoData,
-        timestamp: DateTime.now(),
-        quickStats: quickStats,
-      );
+    _cache[selectedTimeFrame] = DashboardCache(
+      inq: inquiryData,
+      ud: userDemoData,
+      timestamp: DateTime.now(),
+      quickStats: quickStats,
+    );
 
-      setState(() {
-        inq = inquiryData;
-        ud = userDemoData;
-      });
-    } catch (e) {
-      print('Error fetching data: $e');
-      rethrow;
-    }
+    setState(() {
+      inq = inquiryData;
+      ud = userDemoData;
+    });
+  } catch (e) {
+    print('Error fetching data: $e');
+    rethrow;
   }
-
+}
   Future<void> _refreshInBackground() async {
     try {
       await _fetchAndCacheData();
@@ -417,14 +416,14 @@ class _Dashboardmodulestate extends State<DashboardPage> {
     }
   }
 
-  Future<Map<String, int>?> _fetchQuickStats() async {
-    try {
-      return await _firebaseService.getQuickStats(selectedTimeFrame);
-    } catch (e) {
-      print('Error fetching quick stats: $e');
-      return null;
-    }
+Future<Map<String, int>?> _fetchQuickStats() async {
+  try {
+    return await _firebaseService.getQuickStats(selectedTimeFrame, customDateRange);
+  } catch (e) {
+    print('Error fetching quick stats: $e');
+    return null;
   }
+}
 
   Future<void> _refreshData() async {
     if (!mounted || isRefreshing) return;
@@ -464,13 +463,17 @@ class _Dashboardmodulestate extends State<DashboardPage> {
   }
 
  Future<void> _onTimeFrameChanged(String newValue) async {
-  if (newValue == selectedTimeFrame) return;
+  if (newValue == selectedTimeFrame && newValue != 'Custom') return;
 
-  // If Custom is selected, the DateRangeFilter will handle showing the picker
-  // We just need to wait for the result
+  // If Custom is selected, just update the UI to show the DateRangeFilter
   if (newValue == 'Custom') {
-    // Don't do anything here - the DateRangeFilter will handle it
-    // The date range will be set via onDateRangeChanged callback
+    if (mounted) {
+      setState(() {
+        selectedTimeFrame = 'Custom';
+        // Keep existing customDateRange if any, otherwise null
+      });
+    }
+    // Don't load data yet - wait for user to select a date range
     return;
   }
 
@@ -504,6 +507,7 @@ class _Dashboardmodulestate extends State<DashboardPage> {
   }
 }
 
+// Add this new method to handle date range changes:
 Future<void> _onDateRangeChanged(DateTimeRange? range) async {
   if (range == null) {
     // User cleared the date range, revert to "This Month"
@@ -546,6 +550,8 @@ Future<void> _onDateRangeChanged(DateTimeRange? range) async {
     }
   }
 }
+
+
 
 
   void _showSnackBar(String message, {required bool isError}) {
@@ -1135,7 +1141,7 @@ Widget dashboardContents(
               //     ),
               //   ),
               // ),
-              const SizedBox(width: 20),
+          
               Expanded(
                 child: LazyLoadWidget(
                   delay: const Duration(milliseconds: 200),
@@ -1375,18 +1381,19 @@ Widget _buildHeader(
                               'This Week',
                               'This Month',
                               'This Year',
+                              'Custom',
                             ],
-                            initialValue: selectedTimeFrame == 'Custom' 
-                                ? 'This Month' 
-                                : selectedTimeFrame,
+                            initialValue: selectedTimeFrame,
                             onChanged: onTimeFrameChanged,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        DateRangeFilter(
-                          selectedDateRange: customDateRange,
-                          onDateRangeChanged: onDateRangeChanged,
-                        ),
+                        if (selectedTimeFrame == 'Custom') ...[
+                          const SizedBox(width: 8),
+                          DateRangeFilter(
+                            selectedDateRange: customDateRange,
+                            onDateRangeChanged: onDateRangeChanged,
+                          ),
+                        ],
                       ],
                     ),
                   ],
@@ -1411,17 +1418,18 @@ Widget _buildHeader(
                             'This Week',
                             'This Month',
                             'This Year',
+                            'Custom',
                           ],
-                          initialValue: selectedTimeFrame == 'Custom' 
-                              ? 'This Month' 
-                              : selectedTimeFrame,
+                          initialValue: selectedTimeFrame,
                           onChanged: onTimeFrameChanged,
                         ),
-                        const SizedBox(width: 12),
-                        DateRangeFilter(
-                          selectedDateRange: customDateRange,
-                          onDateRangeChanged: onDateRangeChanged,
-                        ),
+                        if (selectedTimeFrame == 'Custom') ...[
+                          const SizedBox(width: 12),
+                          DateRangeFilter(
+                            selectedDateRange: customDateRange,
+                            onDateRangeChanged: onDateRangeChanged,
+                          ),
+                        ],
                       ],
                     ),
                   ],
@@ -1438,6 +1446,7 @@ Widget _buildHeader(
     },
   );
 }
+
 
 String _formatDate(DateTime date) {
   const months = [

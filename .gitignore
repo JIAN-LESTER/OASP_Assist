@@ -12,6 +12,22 @@
 .swiftpm/
 migrate_working_dir/
 
+# .gitignore
+# Environment files - NEVER commit these!
+.env
+.env.local
+.env.*.local
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+
+# Flutter
+*.g.dart
+*.freezed.dart
+build/
+
 # IntelliJ related
 *.iml
 *.ipr

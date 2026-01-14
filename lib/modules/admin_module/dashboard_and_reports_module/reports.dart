@@ -128,138 +128,193 @@ class FirebaseService {
     return userLookup;
   }
 
-  Future<InquiryReportsData> getInquiryReportsData(String timeFrame) async {
-    final cacheKey = 'inquiry_$timeFrame';
+ Future<InquiryReportsData> getInquiryReportsData(
+  String timeFrame, [
+  DateTimeRange? customRange,
+]) async {
+  final cacheKey = timeFrame == 'Custom' && customRange != null
+      ? 'inquiry_${customRange.start.toString()}_${customRange.end.toString()}'
+      : 'inquiry_$timeFrame';
 
-    if (_inquiryCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
-      return _inquiryCache[cacheKey]!;
-    }
-
-    try {
-      final startDate = getStartDate(timeFrame);
-
-      // Parallel fetch with indexed queries
-      final results = await Future.wait([
-        _getMessagesOptimized(startDate),
-        _getFAQs(),
-        _getLogs(),
-        _getEscalatedMessages(),
-        _getResolvedEscalatedMessages(),
-        _getUnansweredMessages(),
-        _getMessageLogs(),
-      ]);
-
-      final data = _processInquiryReportsData(
-        messages: results[0],
-        faqs: results[1],
-        logs: results[2],
-        escalations: results[3],
-        resolvedEscalations: results[4],
-        unanswered: results[5],
-        msgLogs: results[6],
-        startDate: startDate,
-        timeFrame: timeFrame,
-      );
-
-      _inquiryCache[cacheKey] = data;
-      _updateCacheTimestamp(cacheKey);
-
-      return data;
-    } catch (e) {
-      print('Error fetching inquiry data: $e');
-      return getEmptyInquiryReportsData();
-    }
+  if (_inquiryCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
+    return _inquiryCache[cacheKey]!;
   }
 
-  Future<ChatbotUsageReportsData> getChatbotUsageReportsData(
-    String timeFrame,
-  ) async {
-    final cacheKey = 'chatbot_$timeFrame';
+  try {
+    final startDate = getStartDate(timeFrame, customRange);
+    final endDate = getEndDate(timeFrame, customRange);
 
-    if (_chatbotCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
-      return _chatbotCache[cacheKey]!;
-    }
+    // Parallel fetch with indexed queries
+    final results = await Future.wait([
+      _getMessages(startDate, endDate),
+      _getFAQs(),
+      _getLogs(),
+      _getEscalatedMessages(),
+      _getResolvedEscalatedMessages(),
+      _getUnansweredMessages(),
+      _getMessageLogs(),
+    ]);
 
-    try {
-      final startDate = getStartDate(timeFrame);
+    final data = _processInquiryReportsData(
+      messages: results[0],
+      faqs: results[1],
+      logs: results[2],
+      escalations: results[3],
+      resolvedEscalations: results[4],
+      unanswered: results[5],
+      msgLogs: results[6],
+      startDate: startDate,
+      endDate: endDate,
+      timeFrame: timeFrame,
+    );
 
-      // NEW: Get user lookup first (cached)
-      final userLookup = await _getUserLookup();
+    _inquiryCache[cacheKey] = data;
+    _updateCacheTimestamp(cacheKey);
 
-      // Optimized parallel fetch - removed users query since we have it cached
-      final results = await Future.wait([
-        _getConversationsOptimized(startDate),
-        _getMessagesOptimized(startDate),
-      ]);
+    return data;
+  } catch (e) {
+    print('Error fetching inquiry data: $e');
+    return getEmptyInquiryReportsData();
+  }
+}
 
-      final data = _processChatbotUsageReportsData(
-        sessions: results[0],
-        messages: results[1],
-        userLookup: userLookup,
-        startDate: startDate,
-        timeFrame: timeFrame,
-      );
+Future<ChatbotUsageReportsData> getChatbotUsageReportsData(
+  String timeFrame, [
+  DateTimeRange? customRange,
+]) async {
+  final cacheKey = timeFrame == 'Custom' && customRange != null
+      ? 'chatbot_${customRange.start.toString()}_${customRange.end.toString()}'
+      : 'chatbot_$timeFrame';
 
-      _chatbotCache[cacheKey] = data;
-      _updateCacheTimestamp(cacheKey);
-
-      return data;
-    } catch (e) {
-      print('Error fetching chatbot usage data: $e');
-      return getEmptyChatbotUsageReportsData();
-    }
+  if (_chatbotCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
+    return _chatbotCache[cacheKey]!;
   }
 
-  Future<UserDemographicsReportsData> getUserDemographicsReportsData(
-    String timeFrame,
-  ) async {
-    final cacheKey = 'demographics_$timeFrame';
+  try {
+    final startDate = getStartDate(timeFrame, customRange);
+    final endDate = getEndDate(timeFrame, customRange);
 
-    if (_demographicsCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
-      return _demographicsCache[cacheKey]!;
-    }
+    final userLookup = await _getUserLookup();
 
-    try {
-      final startDate = getStartDate(timeFrame);
+    final results = await Future.wait([
+      _getConversationsOptimized(startDate, endDate),
+      _getMessages(startDate, endDate),
+    ]);
 
-      final results = await Future.wait([
-        _getUsers(),
-        _getActiveUsers(),
-        _getNewUsers(timeFrame),
-        _getMessagesOptimized(startDate),
-      ]);
+    final data = _processChatbotUsageReportsData(
+      sessions: results[0],
+      messages: results[1],
+      userLookup: userLookup,
+      startDate: startDate,
+      endDate: endDate,
+      timeFrame: timeFrame,
+    );
 
-      final data = _processUserDemographicsReportsData(
-        users: results[0],
-        activeUsers: results[1],
-        newUsers: results[2],
-        messages: results[3],
-      );
+    _chatbotCache[cacheKey] = data;
+    _updateCacheTimestamp(cacheKey);
 
-      _demographicsCache[cacheKey] = data;
-      _updateCacheTimestamp(cacheKey);
+    return data;
+  } catch (e) {
+    print('Error fetching chatbot usage data: $e');
+    return getEmptyChatbotUsageReportsData();
+  }
+}
 
-      return data;
-    } catch (e) {
-      print('Error fetching user demographics data: $e');
-      return getEmptyUserDemographicsReportsData();
-    }
+Future<UserDemographicsReportsData> getUserDemographicsReportsData(
+  String timeFrame, [
+  DateTimeRange? customRange,
+]) async {
+  final cacheKey = timeFrame == 'Custom' && customRange != null
+      ? 'demographics_${customRange.start.toString()}_${customRange.end.toString()}'
+      : 'demographics_$timeFrame';
+
+  if (_demographicsCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
+    return _demographicsCache[cacheKey]!;
   }
 
-  
+  try {
+    final startDate = getStartDate(timeFrame, customRange);
+    final endDate = getEndDate(timeFrame, customRange);
 
-  Future<List<QueryDocumentSnapshot>> _getMessagesOptimized(
-    DateTime startDate,
-  ) async {
-    final snapshot =
-        await _firestore
-            .collectionGroup('messages')
-            .where('sender', isEqualTo: 'user')
-            .where('sent_at', isGreaterThanOrEqualTo: startDate)
-            .orderBy('sent_at', descending: true)
-            .get();
-    return snapshot.docs;
+    final results = await Future.wait([
+      _getUsers(),
+      _getActiveUsers(),
+      _getNewUsers(timeFrame, customRange),
+      _getMessages(startDate, endDate),
+    ]);
+
+    final data = _processUserDemographicsReportsData(
+      users: results[0],
+      activeUsers: results[1],
+      newUsers: results[2],
+      messages: results[3],
+    );
+
+    _demographicsCache[cacheKey] = data;
+    _updateCacheTimestamp(cacheKey);
+
+    return data;
+  } catch (e) {
+    print('Error fetching user demographics data: $e');
+    return getEmptyUserDemographicsReportsData();
   }
+}
+
+  Future<List<QueryDocumentSnapshot>> _getMessages(
+  DateTime startDate, [
+  DateTime? endDate,
+]) async {
+  Query query = _firestore
+      .collectionGroup('messages')
+      .where('sender', isEqualTo: 'user')
+      .where('sent_at', isGreaterThanOrEqualTo: startDate);
+
+  if (endDate != null) {
+    query = query.where('sent_at', isLessThanOrEqualTo: endDate);
+  }
+
+  final snapshot = await query.orderBy('sent_at', descending: true).get();
+  return snapshot.docs;
+}
+
+Future<List<QueryDocumentSnapshot>> _getConversationsOptimized(
+  DateTime startDate, [
+  DateTime? endDate,
+]) async {
+  Query query = _firestore
+      .collection('conversations')
+      .where('createdAt', isGreaterThanOrEqualTo: startDate);
+
+  if (endDate != null) {
+    query = query.where('createdAt', isLessThanOrEqualTo: endDate);
+  }
+
+  final snapshot = await query.orderBy('createdAt', descending: true).get();
+  return snapshot.docs;
+}
+
+Future<List<QueryDocumentSnapshot>> _getNewUsers(
+  String timeFrame, [
+  DateTimeRange? customRange,
+]) async {
+  final startDate = getStartDate(timeFrame, customRange);
+  final endDate = getEndDate(timeFrame, customRange);
+
+  Query query = _firestore.collection('users').where(
+    'createdAt',
+    isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+  );
+
+  if (endDate != null) {
+    query = query.where(
+      'createdAt',
+      isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+    );
+  }
+
+  final snapshot = await query.orderBy('createdAt', descending: true).get();
+  return snapshot.docs;
+}
 
   Future<List<QueryDocumentSnapshot>> _getLogs() async {
     final snapshot =
@@ -286,29 +341,21 @@ class FirebaseService {
     return snapshot.docs;
   }
 
-  Future<List<QueryDocumentSnapshot>> _getConversationsOptimized([
-    DateTime? startDate,
-  ]) async {
-    Query query = _firestore.collection('conversations');
-
-    if (startDate != null) {
-      query = query.where('createdAt', isGreaterThanOrEqualTo: startDate);
-    }
-
-    final snapshot = await query.orderBy('createdAt', descending: true).get();
-    return snapshot.docs;
-  }
+  
 
   Future<List<QueryDocumentSnapshot>> _getEscalatedMessages() async {
     final snapshot = await _firestore.collection('escalations').get();
     return snapshot.docs;
   }
 
-    Future<List<QueryDocumentSnapshot>> _getResolvedEscalatedMessages() async {
-    final snapshot = await _firestore.collection('escalations').where('status', isEqualTo: 'resolved').get();
+  Future<List<QueryDocumentSnapshot>> _getResolvedEscalatedMessages() async {
+    final snapshot =
+        await _firestore
+            .collection('escalations')
+            .where('status', isEqualTo: 'resolved')
+            .get();
     return snapshot.docs;
   }
-
 
   Future<List<QueryDocumentSnapshot>> _getFAQs() async {
     final snapshot =
@@ -329,19 +376,6 @@ class FirebaseService {
     return snapshot.docs;
   }
 
-  Future<List<QueryDocumentSnapshot>> _getNewUsers(String timeFrame) async {
-    final startDate = getStartDate(timeFrame);
-    final snapshot =
-        await _firestore
-            .collection('users')
-            .where(
-              'createdAt',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
-            )
-            .orderBy('createdAt', descending: true)
-            .get();
-    return snapshot.docs;
-  }
 
   Future<List<QueryDocumentSnapshot>> _getUnansweredMessages() async {
     final snapshot =
@@ -376,9 +410,10 @@ DateTime getStartDate(String timeFrame, [DateTimeRange? customRange]) {
       customRange.start.year,
       customRange.start.month,
       customRange.start.day,
+      0, 0, 0, // Start of day
     );
   }
-  
+
   final now = DateTime.now();
   return switch (timeFrame) {
     'All' => DateTime(2000, 1, 1),
@@ -396,48 +431,49 @@ DateTime? getEndDate(String timeFrame, [DateTimeRange? customRange]) {
       customRange.end.year,
       customRange.end.month,
       customRange.end.day,
-      23,
-      59,
-      59,
+      23, 59, 59, 999, // End of day
     );
   }
   return null; // For other timeframes, no end date filter
 }
-  
-  InquiryReportsData _processInquiryReportsData({
-    required List<QueryDocumentSnapshot> messages,
-    required List<QueryDocumentSnapshot> faqs,
 
-    required List<QueryDocumentSnapshot> logs,
-    required List<QueryDocumentSnapshot> escalations,
-    required List<QueryDocumentSnapshot> resolvedEscalations,
-    required List<QueryDocumentSnapshot> unanswered,
-    required List<QueryDocumentSnapshot> msgLogs,
-    required DateTime startDate,
-    required String timeFrame,
-  }) {
-    final categoryDistribution = <String, int>{};
-    final seasonalTrends = <String, int>{};
-    int answeredMessages = 0;
-    int unAnsweredMessages = 0;
 
-    for (final doc in messages) {
-      final data = doc.data() as Map<String, dynamic>;
+ InquiryReportsData _processInquiryReportsData({
+  required List<QueryDocumentSnapshot> messages,
+  required List<QueryDocumentSnapshot> faqs,
+  required List<QueryDocumentSnapshot> logs,
+  required List<QueryDocumentSnapshot> escalations,
+  required List<QueryDocumentSnapshot> resolvedEscalations,
+  required List<QueryDocumentSnapshot> unanswered,
+  required List<QueryDocumentSnapshot> msgLogs,
+  required DateTime startDate,
+  DateTime? endDate,
+  required String timeFrame,
+}) {
+  // Filter messages within date range
+  final filteredMessages = messages.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final timestamp = data['sent_at'] as Timestamp?;
+    if (timestamp == null) return false;
+    
+    final date = timestamp.toDate();
+    if (endDate != null && date.isAfter(endDate)) return false;
+    return true;
+  }).toList();
 
-      if (data['isAnswered'] == true) answeredMessages++;
-      if (data['isAnswered'] == false) unAnsweredMessages++;
+  final categoryDistribution = <String, int>{};
+  int answeredMessages = 0;
+  int unAnsweredMessages = 0;
 
-      final category = (data['category'] as String?)?.trim() ?? 'General';
-      categoryDistribution[category] =
-          (categoryDistribution[category] ?? 0) + 1;
+  for (final doc in filteredMessages) {
+    final data = doc.data() as Map<String, dynamic>;
 
-      final timestamp = data['sent_at'];
-      if (timestamp is Timestamp) {
-        final month = timestamp.toDate().month;
-        final season = _getSeason(month);
-        seasonalTrends[season] = (seasonalTrends[season] ?? 0) + 1;
-      }
-    }
+    if (data['isAnswered'] == true) answeredMessages++;
+    if (data['isAnswered'] == false) unAnsweredMessages++;
+
+    final category = (data['category'] as String?)?.trim() ?? 'General';
+    categoryDistribution[category] = (categoryDistribution[category] ?? 0) + 1;
+  }
 
     final highestFAQs = <String, int>{};
     for (final doc in faqs) {
@@ -459,19 +495,18 @@ DateTime? getEndDate(String timeFrame, [DateTimeRange? customRange]) {
       messageLogs.add(MessageLogs.fromMap(data));
     }
 
-    return InquiryReportsData(
-      totalMessages: messages.length,
-      answeredMessages: answeredMessages,
-      unAnsweredMessages: unAnsweredMessages,
-      escalatedMessages: escalations.length,
-      resolvedEscalatedMessages: resolvedEscalations.length,
-      mostFrequentCategory: _getMostFrequentCategory(categoryDistribution),
-      categoryDistribution: categoryDistribution,
-      inquiryTrend: generateInquiryTrend(messages, startDate, timeFrame),
+      return InquiryReportsData(
+    totalMessages: filteredMessages.length,
+    answeredMessages: answeredMessages,
+    unAnsweredMessages: unAnsweredMessages,
+    escalatedMessages: escalations.length,
+    resolvedEscalatedMessages: resolvedEscalations.length,
+    mostFrequentCategory: _getMostFrequentCategory(categoryDistribution),
+    categoryDistribution: categoryDistribution,
+    inquiryTrend: generateInquiryTrend(filteredMessages, startDate, timeFrame, endDate),
       highestFAQs: highestFAQs,
       recentLogs: recentLogs,
       msgLogs: messageLogs,
-      seasonalTrends: seasonalTrends,
     );
   }
 
@@ -481,429 +516,474 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
   required List<QueryDocumentSnapshot> messages,
   required Map<String, Map<String, dynamic>> userLookup,
   required DateTime startDate,
+  DateTime? endDate,
   required String timeFrame,
 }) {
-  // Process sessions
-  double totalSessionDuration = 0;
-  int completedSessionsCount = 0;
-  final userSessionCounts = <String, int>{};
-
-  final uniqueUsersByYear = <String, Set<String>>{};
-  final uniqueUsersByProgram = <String, Set<String>>{};
-
-  for (final doc in sessions) {
+  // Filter sessions within date range
+  final filteredSessions = sessions.where((doc) {
     final data = doc.data() as Map<String, dynamic>;
-    final userId = data['userId'] as String? ?? 'unknown';
-    final createdAt = data['createdAt'] as Timestamp?;
-    final endedAt = data['endedAt'] as Timestamp?;
-    final status = data['status'] as String? ?? 'unknown';
+    final timestamp = data['createdAt'] as Timestamp?;
+    if (timestamp == null) return false;
+    
+    final date = timestamp.toDate();
+    if (endDate != null && date.isAfter(endDate)) return false;
+    return true;
+  }).toList();
 
-    final userInfo = userLookup[userId];
-    if (userInfo != null) {
-      final year = userInfo['year'] ?? 'N/A';
-      final program = userInfo['program'] ?? 'N/A';
+  // Filter messages within date range
+  final filteredMessages = messages.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final timestamp = data['sent_at'] as Timestamp?;
+    if (timestamp == null) return false;
+    
+    final date = timestamp.toDate();
+    if (endDate != null && date.isAfter(endDate)) return false;
+    return true;
+  }).toList();
+    // Process sessions
+    double totalSessionDuration = 0;
+    int completedSessionsCount = 0;
+    final userSessionCounts = <String, int>{};
 
-      uniqueUsersByYear.putIfAbsent(year, () => <String>{});
-      uniqueUsersByYear[year]!.add(userId);
+    final uniqueUsersByYear = <String, Set<String>>{};
+    final uniqueUsersByProgram = <String, Set<String>>{};
 
-      uniqueUsersByProgram.putIfAbsent(program, () => <String>{});
-      uniqueUsersByProgram[program]!.add(userId);
-    }
+    for (final doc in sessions) {
+      final data = doc.data() as Map<String, dynamic>;
+      final userId = data['userId'] as String? ?? 'unknown';
+      final createdAt = data['createdAt'] as Timestamp?;
+      final endedAt = data['endedAt'] as Timestamp?;
+      final status = data['status'] as String? ?? 'unknown';
 
-    if (createdAt != null && endedAt != null && status == 'ended') {
-      final duration = endedAt.toDate().difference(createdAt.toDate());
-      
-      if (duration.inSeconds >= 10 && duration.inSeconds <= 7200) {
-        totalSessionDuration += duration.inSeconds.toDouble();
-        completedSessionsCount++;
+      final userInfo = userLookup[userId];
+      if (userInfo != null) {
+        final year = userInfo['year'] ?? 'N/A';
+        final program = userInfo['program'] ?? 'N/A';
+
+        uniqueUsersByYear.putIfAbsent(year, () => <String>{});
+        uniqueUsersByYear[year]!.add(userId);
+
+        uniqueUsersByProgram.putIfAbsent(program, () => <String>{});
+        uniqueUsersByProgram[program]!.add(userId);
       }
+
+      if (createdAt != null && endedAt != null && status == 'ended') {
+        final duration = endedAt.toDate().difference(createdAt.toDate());
+
+        if (duration.inSeconds >= 10 && duration.inSeconds <= 7200) {
+          totalSessionDuration += duration.inSeconds.toDouble();
+          completedSessionsCount++;
+        }
+      }
+
+      userSessionCounts[userId] = (userSessionCounts[userId] ?? 0) + 1;
     }
 
-    userSessionCounts[userId] = (userSessionCounts[userId] ?? 0) + 1;
-  }
+    final sessionYearCounts = <String, int>{};
+    uniqueUsersByYear.forEach((year, userIds) {
+      sessionYearCounts[year] = userIds.length;
+    });
 
-  final sessionYearCounts = <String, int>{};
-  uniqueUsersByYear.forEach((year, userIds) {
-    sessionYearCounts[year] = userIds.length;
-  });
+    final sessionProgramCounts = <String, int>{};
+    uniqueUsersByProgram.forEach((program, userIds) {
+      sessionProgramCounts[program] = userIds.length;
+    });
 
-  final sessionProgramCounts = <String, int>{};
-  uniqueUsersByProgram.forEach((program, userIds) {
-    sessionProgramCounts[program] = userIds.length;
-  });
+    final averageSessionLength =
+        completedSessionsCount > 0
+            ? totalSessionDuration / completedSessionsCount
+            : 0.0;
 
-  final averageSessionLength =
-      completedSessionsCount > 0
-          ? totalSessionDuration / completedSessionsCount
-          : 0.0;
+    final averageMessagesPerUser =
+        userSessionCounts.isNotEmpty
+            ? sessions.length / userSessionCounts.length.toDouble()
+            : 0.0;
 
-  final averageMessagesPerUser =
-      userSessionCounts.isNotEmpty
-          ? sessions.length / userSessionCounts.length.toDouble()
-          : 0.0;
+    // ✅ FIXED: Response time in SECONDS with proper date grouping
+    double totalResponseTime = 0;
+    int responseTimeCount = 0;
+    final responseTimeByDate = <String, List<double>>{};
 
-  // ✅ FIXED: Response time in SECONDS with proper date grouping
-  double totalResponseTime = 0;
-  int responseTimeCount = 0;
-  final responseTimeByDate = <String, List<double>>{};
+    for (final doc in messages) {
+      final data = doc.data() as Map<String, dynamic>;
+      final responseTimeMs = data['responseTimeMs'];
+      final sentAt = data['sent_at'] as Timestamp?;
 
-  for (final doc in messages) {
-    final data = doc.data() as Map<String, dynamic>;
-    final responseTimeMs = data['responseTimeMs'];
-    final sentAt = data['sent_at'] as Timestamp?;
+      if (responseTimeMs != null &&
+          responseTimeMs is num &&
+          responseTimeMs > 0) {
+        final responseTimeSeconds =
+            responseTimeMs.toDouble() / 1000; // Convert to seconds
 
-    if (responseTimeMs != null && responseTimeMs is num && responseTimeMs > 0) {
-      final responseTimeSeconds = responseTimeMs.toDouble() / 1000; // Convert to seconds
-      
-      if (responseTimeSeconds >= 0.1 && responseTimeSeconds <= 60) {
-        totalResponseTime += responseTimeSeconds;
-        responseTimeCount++;
-        
-        if (sentAt != null) {
-          final dateKey = _getDateKey(sentAt.toDate(), timeFrame);
-          responseTimeByDate.putIfAbsent(dateKey, () => []);
-          responseTimeByDate[dateKey]!.add(responseTimeSeconds);
+        if (responseTimeSeconds >= 0.1 && responseTimeSeconds <= 60) {
+          totalResponseTime += responseTimeSeconds;
+          responseTimeCount++;
+
+          if (sentAt != null) {
+            final dateKey = _getDateKey(sentAt.toDate(), timeFrame);
+            responseTimeByDate.putIfAbsent(dateKey, () => []);
+            responseTimeByDate[dateKey]!.add(responseTimeSeconds);
+          }
         }
       }
     }
+
+    final averageResponseTime =
+        responseTimeCount > 0 ? totalResponseTime / responseTimeCount : 0.0;
+
+    // ✅ FIXED: Build complete response time trend with all dates
+    final responseTimeTrend = _buildResponseTimeTrend(
+      responseTimeByDate,
+      timeFrame,
+      startDate,
+    );
+
+    return ChatbotUsageReportsData(
+      
+         totalSessions: filteredSessions.length,
+      averageResponseTime: averageResponseTime,
+      averageMessagesPerUser: averageMessagesPerUser,
+      averageSessionLength: averageSessionLength,
+      usageTrendByTimeOfDay: _generateHourlyUsageTrend(sessions) ?? [],
+
+      // ✅ THIS IS WHAT YOU SHOULD USE FOR THE CHART:
+      dailySessions: _generateDailySessionTrend(sessions, timeFrame) ?? [],
+
+      weeklySessions: _generateWeeklySessionTrend(sessions, timeFrame) ?? [],
+      monthlySessions: _generateMonthlySessionTrend(sessions, timeFrame) ?? [],
+      responseTimeTrend: responseTimeTrend,
+      peakUsageByHour: _generatePeakUsageByHour(sessions),
+      usersByYearLevel:
+          sessionYearCounts.isNotEmpty ? sessionYearCounts : <String, int>{},
+      usersByCourse:
+          sessionProgramCounts.isNotEmpty
+              ? sessionProgramCounts
+              : <String, int>{},
+    );
   }
-
-  final averageResponseTime =
-      responseTimeCount > 0 ? totalResponseTime / responseTimeCount : 0.0;
-
-  // ✅ FIXED: Build complete response time trend with all dates
-  final responseTimeTrend = _buildResponseTimeTrend(
-    responseTimeByDate,
-    timeFrame,
-    startDate,
-  );
-
-   return ChatbotUsageReportsData(
-    totalSessions: sessions.length,
-    averageResponseTime: averageResponseTime,
-    averageMessagesPerUser: averageMessagesPerUser,
-    averageSessionLength: averageSessionLength,
-    usageTrendByTimeOfDay: _generateHourlyUsageTrend(sessions) ?? [],
-    
-    // ✅ THIS IS WHAT YOU SHOULD USE FOR THE CHART:
-    dailySessions: _generateDailySessionTrend(sessions, timeFrame) ?? [],
-    
-    weeklySessions: _generateWeeklySessionTrend(sessions, timeFrame) ?? [],
-    monthlySessions: _generateMonthlySessionTrend(sessions, timeFrame) ?? [],
-    responseTimeTrend: responseTimeTrend,
-    peakUsageByHour: _generatePeakUsageByHour(sessions),
-    usersByYearLevel: sessionYearCounts.isNotEmpty ? sessionYearCounts : <String, int>{},
-    usersByCourse: sessionProgramCounts.isNotEmpty ? sessionProgramCounts : <String, int>{},
-  );
-}
 
   UserDemographicsReportsData _processUserDemographicsReportsData({
-  required List<QueryDocumentSnapshot> users,
-  required List<QueryDocumentSnapshot> activeUsers,
-  required List<QueryDocumentSnapshot> newUsers,
-  required List<QueryDocumentSnapshot> messages,
-}) {
-  final usersByYear = <String, int>{};
-  final usersByProgram = <String, int>{};
-  final enrollmentStatus = <String, int>{'Enrolled': 0, 'Not Enrolled': 0};
-  final scholarshipTypes = <String, int>{};
-  final affiliationTypes = <String, int>{};
+    required List<QueryDocumentSnapshot> users,
+    required List<QueryDocumentSnapshot> activeUsers,
+    required List<QueryDocumentSnapshot> newUsers,
+    required List<QueryDocumentSnapshot> messages,
+  }) {
+    final usersByYear = <String, int>{};
+    final usersByProgram = <String, int>{};
+    final enrollmentStatus = <String, int>{'Enrolled': 0, 'Not Enrolled': 0};
+    final scholarshipTypes = <String, int>{};
+    final affiliationTypes = <String, int>{};
 
-  int affiliationCount = 0; // <-- ONLY Freshman Applicant count
+    int affiliationCount = 0; // <-- ONLY Freshman Applicant count
 
-  for (final doc in users) {
-    final data = doc.data() as Map<String, dynamic>;
+    for (final doc in users) {
+      final data = doc.data() as Map<String, dynamic>;
 
-    final year = data['year']?.toString() ?? 'N/A';
-    final program = data['program']?.toString() ?? 'N/A';
-    final rawAffiliation = data['affiliation']?.toString();
-final affiliationValue = rawAffiliation?.trim();
+      final year = data['year']?.toString() ?? 'N/A';
+      final program = data['program']?.toString() ?? 'N/A';
+      final rawAffiliation = data['affiliation']?.toString();
+      final affiliationValue = rawAffiliation?.trim();
 
-    final scholarshipValue = data['scholarship']?.toString();
-    final isEnrolled = data['isEnrolled'];
+      final scholarshipValue = data['scholarship']?.toString();
+      final isEnrolled = data['isEnrolled'];
 
-    usersByYear[year] = (usersByYear[year] ?? 0) + 1;
-    usersByProgram[program] = (usersByProgram[program] ?? 0) + 1;
+      usersByYear[year] = (usersByYear[year] ?? 0) + 1;
+      usersByProgram[program] = (usersByProgram[program] ?? 0) + 1;
 
-    // --------------------------------------------------------
-    // 1️⃣ affiliationTypes → counts ALL affiliation values
-    // --------------------------------------------------------
-    if (affiliationValue != null &&
-        affiliationValue.isNotEmpty &&
-        affiliationValue != 'null' &&
-        affiliationValue.toLowerCase() != 'null') {
-      affiliationTypes[affiliationValue] =
-          (affiliationTypes[affiliationValue] ?? 0) + 1;
+      // --------------------------------------------------------
+      // 1️⃣ affiliationTypes → counts ALL affiliation values
+      // --------------------------------------------------------
+      if (affiliationValue != null &&
+          affiliationValue.isNotEmpty &&
+          affiliationValue != 'null' &&
+          affiliationValue.toLowerCase() != 'null') {
+        affiliationTypes[affiliationValue] =
+            (affiliationTypes[affiliationValue] ?? 0) + 1;
+      }
+
+      // --------------------------------------------------------
+      // 2️⃣ affiliationCount → ONLY count “Incoming Freshman Applicant”
+      // --------------------------------------------------------
+      const targetAffiliation = 'Incoming Freshman Applicant';
+
+      if (affiliationValue?.toLowerCase() == targetAffiliation.toLowerCase()) {
+        affiliationCount++;
+      }
+
+      // --------------------------------------------------------
+      // Scholarship Type Count
+      // --------------------------------------------------------
+      if (scholarshipValue != null &&
+          scholarshipValue.isNotEmpty &&
+          scholarshipValue != 'null' &&
+          scholarshipValue.toLowerCase() != 'null') {
+        scholarshipTypes[scholarshipValue] =
+            (scholarshipTypes[scholarshipValue] ?? 0) + 1;
+      }
+
+      // --------------------------------------------------------
+      // Enrollment Status Count
+      // --------------------------------------------------------
+      if (isEnrolled == true) {
+        enrollmentStatus['Enrolled'] = (enrollmentStatus['Enrolled'] ?? 0) + 1;
+      } else {
+        enrollmentStatus['Not Enrolled'] =
+            (enrollmentStatus['Not Enrolled'] ?? 0) + 1;
+      }
     }
 
-    // --------------------------------------------------------
-    // 2️⃣ affiliationCount → ONLY count “Incoming Freshman Applicant”
-    // --------------------------------------------------------
-    const targetAffiliation = 'Incoming Freshman Applicant';
-
-  if (affiliationValue?.toLowerCase() == targetAffiliation.toLowerCase()) {
-  affiliationCount++;
-}
-
-
-    // --------------------------------------------------------
-    // Scholarship Type Count
-    // --------------------------------------------------------
-    if (scholarshipValue != null &&
-        scholarshipValue.isNotEmpty &&
-        scholarshipValue != 'null' &&
-        scholarshipValue.toLowerCase() != 'null') {
-      scholarshipTypes[scholarshipValue] =
-          (scholarshipTypes[scholarshipValue] ?? 0) + 1;
-    }
-
-    // --------------------------------------------------------
-    // Enrollment Status Count
-    // --------------------------------------------------------
-    if (isEnrolled == true) {
-      enrollmentStatus['Enrolled'] = (enrollmentStatus['Enrolled'] ?? 0) + 1;
-    } else {
-      enrollmentStatus['Not Enrolled'] =
-          (enrollmentStatus['Not Enrolled'] ?? 0) + 1;
-    }
+    return UserDemographicsReportsData(
+      activeUsers: activeUsers.length,
+      newlyRegisteredUsers: newUsers.length,
+      affiliatedUsers: affiliationCount, // <-- ONLY freshman applicants
+      totalUsers: users.length,
+      usersByYear: usersByYear,
+      usersByProgram: usersByProgram,
+      userAffiliations: affiliationTypes, // <-- ALL affiliations
+      scholarshipTypes: scholarshipTypes,
+      enrollmentStatus: enrollmentStatus,
+    );
   }
-
-  return UserDemographicsReportsData(
-    activeUsers: activeUsers.length,
-    newlyRegisteredUsers: newUsers.length,
-    affiliatedUsers: affiliationCount, // <-- ONLY freshman applicants
-    totalUsers: users.length,
-    usersByYear: usersByYear,
-    usersByProgram: usersByProgram,
-    userAffiliations: affiliationTypes, // <-- ALL affiliations
-    scholarshipTypes: scholarshipTypes,
-    enrollmentStatus: enrollmentStatus,
-  );
-}
 
   String _getDateKey(DateTime date, String timeFrame) {
-  switch (timeFrame) {
-    case 'Today':
-      return "${date.hour.toString().padLeft(2, '0')}:00";
-    case 'This Week':
-      return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-    case 'This Month':
-      final weekOfMonth = ((date.day - 1) ~/ 7) + 1;
-      return "Week $weekOfMonth";
-    case 'This Year':
-      return "${date.year}-${date.month.toString().padLeft(2, '0')}";
-    default:
-      return "${date.year}-${date.month.toString().padLeft(2, '0')}";
-  }
-}
-
-DateTime _getStartOfWeek(DateTime date) {
-  final daysFromMonday = date.weekday - 1;
-  return DateTime(
-    date.year,
-    date.month,
-    date.day,
-  ).subtract(Duration(days: daysFromMonday));
-}
-Future<Map<String, int>> getQuickStats(String timeFrame) async {
-    final startDate = getStartDate(timeFrame);
-
-    try {
-      // Single optimized query for counts
-      final messagesSnapshot = await _firestore
-          .collectionGroup('messages')
-          .where('sender', isEqualTo: 'user')
-          .where('sent_at', isGreaterThanOrEqualTo: startDate)
-          .count()
-          .get();
-
-      final answeredSnapshot = await _firestore
-          .collectionGroup('messages')
-          .where('sender', isEqualTo: 'user')
-          .where('sent_at', isGreaterThanOrEqualTo: startDate)
-          .where('isAnswered', isEqualTo: true)
-          .count()
-          .get();
-
-      final usersSnapshot = await _firestore
-          .collection('users')
-          .count()
-          .get();
-
-      return {
-        'totalMessages': messagesSnapshot.count ?? 0,
-        'answered': answeredSnapshot.count ?? 0,
-        'totalUsers': usersSnapshot.count ?? 0,
-      };
-    } catch (e) {
-      print('Error getting quick stats: $e');
-      return {'totalMessages': 0, 'answered': 0, 'totalUsers': 0};
+    switch (timeFrame) {
+      case 'Today':
+        return "${date.hour.toString().padLeft(2, '0')}:00";
+      case 'This Week':
+        return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      case 'This Month':
+        final weekOfMonth = ((date.day - 1) ~/ 7) + 1;
+        return "Week $weekOfMonth";
+      case 'This Year':
+        return "${date.year}-${date.month.toString().padLeft(2, '0')}";
+      default:
+        return "${date.year}-${date.month.toString().padLeft(2, '0')}";
     }
   }
 
-// ✅ NEW METHOD: Build response time trend
-List<ChartData> _buildResponseTimeTrend(
-  Map<String, List<double>> responseTimeByDate,
-  String timeFrame,
-  DateTime startDate,
-) {
-  if (responseTimeByDate.isEmpty) {
-    return [];
+  DateTime _getStartOfWeek(DateTime date) {
+    final daysFromMonday = date.weekday - 1;
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).subtract(Duration(days: daysFromMonday));
   }
 
-  final now = DateTime.now();
-  final trendData = <ChartData>[];
+  Future<Map<String, int>> getQuickStats(
+  String timeFrame, [
+  DateTimeRange? customRange,
+]) async {
+  final startDate = getStartDate(timeFrame, customRange);
+  final endDate = getEndDate(timeFrame, customRange);
 
-  switch (timeFrame) {
-    case 'Today':
-      // Generate all 24 hours
-      for (int hour = 0; hour < 24; hour++) {
-        final hourKey = "${hour.toString().padLeft(2, '0')}:00";
-        final times = responseTimeByDate[hourKey] ?? [];
-        
-        if (times.isNotEmpty) {
-          final average = times.reduce((a, b) => a + b) / times.length;
-          trendData.add(ChartData(
-            date: hourKey,
-            count: (average * 100).round(), // Store as centiseconds for precision
-          ));
-        } else {
-          trendData.add(ChartData(date: hourKey, count: 0));
-        }
-      }
-      break;
+  try {
+    Query messagesQuery = _firestore
+        .collectionGroup('messages')
+        .where('sender', isEqualTo: 'user')
+        .where('sent_at', isGreaterThanOrEqualTo: startDate);
 
-    case 'This Week':
-      // Generate all 7 days of the week with day names
-      final startOfWeek = _getStartOfWeek(now);
-      final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      
-      for (int i = 0; i < 7; i++) {
-        final date = startOfWeek.add(Duration(days: i));
-        final dateKey = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-        final displayKey = dayNames[i]; // Use day name instead of date
-        final times = responseTimeByDate[dateKey] ?? [];
-        
-        if (times.isNotEmpty) {
-          final average = times.reduce((a, b) => a + b) / times.length;
-          trendData.add(ChartData(
-            date: displayKey,
-            count: (average * 100).round(),
-          ));
-        } else {
-          trendData.add(ChartData(date: displayKey, count: 0));
-        }
-      }
-      break;
+    Query answeredQuery = _firestore
+        .collectionGroup('messages')
+        .where('sender', isEqualTo: 'user')
+        .where('sent_at', isGreaterThanOrEqualTo: startDate)
+        .where('isAnswered', isEqualTo: true);
 
-    case 'This Month':
-      // Generate all weeks of the month
-      for (int week = 1; week <= 5; week++) {
-        final weekKey = "Week $week";
-        final times = responseTimeByDate[weekKey] ?? [];
-        
-        if (times.isNotEmpty) {
-          final average = times.reduce((a, b) => a + b) / times.length;
-          trendData.add(ChartData(
-            date: weekKey,
-            count: (average * 100).round(),
-          ));
-        } else {
-          trendData.add(ChartData(date: weekKey, count: 0));
-        }
-      }
-      break;
+    if (endDate != null) {
+      messagesQuery = messagesQuery.where('sent_at', isLessThanOrEqualTo: endDate);
+      answeredQuery = answeredQuery.where('sent_at', isLessThanOrEqualTo: endDate);
+    }
 
-    case 'This Year':
-    default:
-      // Generate all 12 months
-      final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      for (int month = 1; month <= 12; month++) {
-        final monthKey = "${now.year}-${month.toString().padLeft(2, '0')}";
-        final times = responseTimeByDate[monthKey] ?? [];
-        
-        if (times.isNotEmpty) {
-          final average = times.reduce((a, b) => a + b) / times.length;
-          trendData.add(ChartData(
-            date: monthNames[month - 1],
-            count: (average * 100).round(),
-          ));
-        } else {
-          trendData.add(ChartData(date: monthNames[month - 1], count: 0));
-        }
-      }
-      break;
-  }
+    final messagesSnapshot = await messagesQuery.count().get();
+    final answeredSnapshot = await answeredQuery.count().get();
+    final usersSnapshot = await _firestore.collection('users').count().get();
 
-  return trendData;
-}
-
-
-String _getSeason(int month) {
-  switch (month) {
-    case 1:
-      return 'January';
-    case 2:
-      return 'February';
-    case 3:
-      return 'March';
-    case 4:
-      return 'April';
-    case 5:
-      return 'May';
-    case 6:
-      return 'June';
-    case 7:
-      return 'July';
-    case 8:
-      return 'August';
-    case 9:
-      return 'September';
-    case 10:
-      return 'October';
-    case 11:
-      return 'November';
-    case 12:
-      return 'December';
-    default:
-      return 'Invalid Month';
+    return {
+      'totalMessages': messagesSnapshot.count ?? 0,
+      'answered': answeredSnapshot.count ?? 0,
+      'totalUsers': usersSnapshot.count ?? 0,
+    };
+  } catch (e) {
+    print('Error getting quick stats: $e');
+    return {'totalMessages': 0, 'answered': 0, 'totalUsers': 0};
   }
 }
+  // ✅ NEW METHOD: Build response time trend
+  List<ChartData> _buildResponseTimeTrend(
+    Map<String, List<double>> responseTimeByDate,
+    String timeFrame,
+    DateTime startDate,
+  ) {
+    if (responseTimeByDate.isEmpty) {
+      return [];
+    }
 
-Color getMonthColor(int month) {
-  switch (month) {
-    case 1:
-      return const Color(0xFF4A90E2);
-    case 2:
-      return const Color(0xFFE26A6A);
-    case 3:
-      return const Color(0xFF81C784);
-    case 4:
-      return const Color(0xFFFFC107);
-    case 5:
-      return const Color(0xFFFFA726);
-    case 6:
-      return const Color(0xFF29B6F6);
-    case 7:
-      return const Color(0xFFAB47BC);
-    case 8:
-      return const Color(0xFFD4E157);
-    case 9:
-      return const Color(0xFF66BB6A);
-    case 10:
-      return const Color(0xFFFF7043);
-    case 11:
-      return const Color(0xFF8D6E63);
-    case 12:
-      return const Color(0xFF1976D2);
-    default:
-      return Colors.grey;
+    final now = DateTime.now();
+    final trendData = <ChartData>[];
+
+    switch (timeFrame) {
+      case 'Today':
+        // Generate all 24 hours
+        for (int hour = 0; hour < 24; hour++) {
+          final hourKey = "${hour.toString().padLeft(2, '0')}:00";
+          final times = responseTimeByDate[hourKey] ?? [];
+
+          if (times.isNotEmpty) {
+            final average = times.reduce((a, b) => a + b) / times.length;
+            trendData.add(
+              ChartData(
+                date: hourKey,
+                count:
+                    (average * 100)
+                        .round(), // Store as centiseconds for precision
+              ),
+            );
+          } else {
+            trendData.add(ChartData(date: hourKey, count: 0));
+          }
+        }
+        break;
+
+      case 'This Week':
+        // Generate all 7 days of the week with day names
+        final startOfWeek = _getStartOfWeek(now);
+        final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+        for (int i = 0; i < 7; i++) {
+          final date = startOfWeek.add(Duration(days: i));
+          final dateKey =
+              "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+          final displayKey = dayNames[i]; // Use day name instead of date
+          final times = responseTimeByDate[dateKey] ?? [];
+
+          if (times.isNotEmpty) {
+            final average = times.reduce((a, b) => a + b) / times.length;
+            trendData.add(
+              ChartData(date: displayKey, count: (average * 100).round()),
+            );
+          } else {
+            trendData.add(ChartData(date: displayKey, count: 0));
+          }
+        }
+        break;
+
+      case 'This Month':
+        // Generate all weeks of the month
+        for (int week = 1; week <= 5; week++) {
+          final weekKey = "Week $week";
+          final times = responseTimeByDate[weekKey] ?? [];
+
+          if (times.isNotEmpty) {
+            final average = times.reduce((a, b) => a + b) / times.length;
+            trendData.add(
+              ChartData(date: weekKey, count: (average * 100).round()),
+            );
+          } else {
+            trendData.add(ChartData(date: weekKey, count: 0));
+          }
+        }
+        break;
+
+      case 'This Year':
+      default:
+        // Generate all 12 months
+        final monthNames = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
+        ];
+        for (int month = 1; month <= 12; month++) {
+          final monthKey = "${now.year}-${month.toString().padLeft(2, '0')}";
+          final times = responseTimeByDate[monthKey] ?? [];
+
+          if (times.isNotEmpty) {
+            final average = times.reduce((a, b) => a + b) / times.length;
+            trendData.add(
+              ChartData(
+                date: monthNames[month - 1],
+                count: (average * 100).round(),
+              ),
+            );
+          } else {
+            trendData.add(ChartData(date: monthNames[month - 1], count: 0));
+          }
+        }
+        break;
+    }
+
+    return trendData;
   }
-}
 
+  String _getSeason(int month) {
+    switch (month) {
+      case 1:
+        return 'January';
+      case 2:
+        return 'February';
+      case 3:
+        return 'March';
+      case 4:
+        return 'April';
+      case 5:
+        return 'May';
+      case 6:
+        return 'June';
+      case 7:
+        return 'July';
+      case 8:
+        return 'August';
+      case 9:
+        return 'September';
+      case 10:
+        return 'October';
+      case 11:
+        return 'November';
+      case 12:
+        return 'December';
+      default:
+        return 'Invalid Month';
+    }
+  }
 
-
-
+  Color getMonthColor(int month) {
+    switch (month) {
+      case 1:
+        return const Color(0xFF4A90E2);
+      case 2:
+        return const Color(0xFFE26A6A);
+      case 3:
+        return const Color(0xFF81C784);
+      case 4:
+        return const Color(0xFFFFC107);
+      case 5:
+        return const Color(0xFFFFA726);
+      case 6:
+        return const Color(0xFF29B6F6);
+      case 7:
+        return const Color(0xFFAB47BC);
+      case 8:
+        return const Color(0xFFD4E157);
+      case 9:
+        return const Color(0xFF66BB6A);
+      case 10:
+        return const Color(0xFFFF7043);
+      case 11:
+        return const Color(0xFF8D6E63);
+      case 12:
+        return const Color(0xFF1976D2);
+      default:
+        return Colors.grey;
+    }
+  }
 
   List<ChartData>? _generateHourlyUsageTrend(
     List<QueryDocumentSnapshot> sessions,
@@ -932,129 +1012,144 @@ Color getMonthColor(int month) {
     }
   }
 
-List<ChartData>? _generateDailySessionTrend(
-  List<QueryDocumentSnapshot> sessions,
-  String timeFrame,
-) {
-  try {
-    final now = DateTime.now();
+  List<ChartData>? _generateDailySessionTrend(
+    List<QueryDocumentSnapshot> sessions,
+    String timeFrame,
+  ) {
+    try {
+      final now = DateTime.now();
 
-    switch (timeFrame) {
-      case 'Today':
-        // ✅ Show hourly data for today ONLY
-        final hourlyCounts = <int, int>{};
-        
-        for (final doc in sessions) {
-          final data = doc.data() as Map<String, dynamic>;
-          final timestamp = data['createdAt'];
-          if (timestamp is Timestamp) {
-            final date = timestamp.toDate();
-            // CRITICAL: Only count sessions from TODAY
-            if (date.year == now.year && 
-                date.month == now.month && 
-                date.day == now.day) {
-              hourlyCounts[date.hour] = (hourlyCounts[date.hour] ?? 0) + 1;
-            }
-          }
-        }
-        
-        // Generate all 24 hours
-        return List.generate(24, (hour) {
-          final hourKey = "${hour.toString().padLeft(2, '0')}:00";
-          return ChartData(date: hourKey, count: hourlyCounts[hour] ?? 0);
-        });
+      switch (timeFrame) {
+        case 'Today':
+          // ✅ Show hourly data for today ONLY
+          final hourlyCounts = <int, int>{};
 
-      case 'This Week':
-        // ✅ Show daily data for this week ONLY
-        final startOfWeek = _getStartOfWeek(now);
-        final endOfWeek = startOfWeek.add(const Duration(days: 7));
-        final dailyCounts = <int, int>{}; // Use day of week (0-6) as key
-        
-        for (final doc in sessions) {
-          final data = doc.data() as Map<String, dynamic>;
-          final timestamp = data['createdAt'];
-          if (timestamp is Timestamp) {
-            final date = timestamp.toDate();
-            // CRITICAL: Only count sessions from THIS WEEK
-            if (date.isAfter(startOfWeek.subtract(const Duration(seconds: 1))) &&
-                date.isBefore(endOfWeek)) {
-              // Calculate which day of the week (0 = Mon, 6 = Sun)
-              final daysSinceStart = date.difference(startOfWeek).inDays;
-              if (daysSinceStart >= 0 && daysSinceStart < 7) {
-                dailyCounts[daysSinceStart] = (dailyCounts[daysSinceStart] ?? 0) + 1;
+          for (final doc in sessions) {
+            final data = doc.data() as Map<String, dynamic>;
+            final timestamp = data['createdAt'];
+            if (timestamp is Timestamp) {
+              final date = timestamp.toDate();
+              // CRITICAL: Only count sessions from TODAY
+              if (date.year == now.year &&
+                  date.month == now.month &&
+                  date.day == now.day) {
+                hourlyCounts[date.hour] = (hourlyCounts[date.hour] ?? 0) + 1;
               }
             }
           }
-        }
-        
-        // Generate all 7 days with day names
-        final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        return List.generate(7, (i) {
-          return ChartData(
-            date: dayNames[i],
-            count: dailyCounts[i] ?? 0,
-          );
-        });
 
-      case 'This Month':
-        // ✅ Show weekly data for this month ONLY
-        final weeklyCounts = <int, int>{};
-        
-        for (final doc in sessions) {
-          final data = doc.data() as Map<String, dynamic>;
-          final timestamp = data['createdAt'];
-          if (timestamp is Timestamp) {
-            final date = timestamp.toDate();
-            // CRITICAL: Only count sessions from THIS MONTH
-            if (date.year == now.year && date.month == now.month) {
-              final weekOfMonth = ((date.day - 1) ~/ 7) + 1;
-              weeklyCounts[weekOfMonth] = (weeklyCounts[weekOfMonth] ?? 0) + 1;
+          // Generate all 24 hours
+          return List.generate(24, (hour) {
+            final hourKey = "${hour.toString().padLeft(2, '0')}:00";
+            return ChartData(date: hourKey, count: hourlyCounts[hour] ?? 0);
+          });
+
+        case 'This Week':
+          // ✅ Show daily data for this week ONLY
+          final startOfWeek = _getStartOfWeek(now);
+          final endOfWeek = startOfWeek.add(const Duration(days: 7));
+          final dailyCounts = <int, int>{}; // Use day of week (0-6) as key
+
+          for (final doc in sessions) {
+            final data = doc.data() as Map<String, dynamic>;
+            final timestamp = data['createdAt'];
+            if (timestamp is Timestamp) {
+              final date = timestamp.toDate();
+              // CRITICAL: Only count sessions from THIS WEEK
+              if (date.isAfter(
+                    startOfWeek.subtract(const Duration(seconds: 1)),
+                  ) &&
+                  date.isBefore(endOfWeek)) {
+                // Calculate which day of the week (0 = Mon, 6 = Sun)
+                final daysSinceStart = date.difference(startOfWeek).inDays;
+                if (daysSinceStart >= 0 && daysSinceStart < 7) {
+                  dailyCounts[daysSinceStart] =
+                      (dailyCounts[daysSinceStart] ?? 0) + 1;
+                }
+              }
             }
           }
-        }
-        
-        // Generate all 5 possible weeks in a month
-        return List.generate(5, (week) {
-          final weekNumber = week + 1;
-          final weekKey = "Week $weekNumber";
-          return ChartData(date: weekKey, count: weeklyCounts[weekNumber] ?? 0);
-        });
 
-      case 'This Year':
-      default:
-        // ✅ Show monthly data for this year ONLY
-        final monthlyCounts = <int, int>{};
-        final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        
-        for (final doc in sessions) {
-          final data = doc.data() as Map<String, dynamic>;
-          final timestamp = data['createdAt'];
-          if (timestamp is Timestamp) {
-            final date = timestamp.toDate();
-            // CRITICAL: Only count sessions from THIS YEAR
-            if (date.year == now.year) {
-              monthlyCounts[date.month] = (monthlyCounts[date.month] ?? 0) + 1;
+          // Generate all 7 days with day names
+          final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+          return List.generate(7, (i) {
+            return ChartData(date: dayNames[i], count: dailyCounts[i] ?? 0);
+          });
+
+        case 'This Month':
+          // ✅ Show weekly data for this month ONLY
+          final weeklyCounts = <int, int>{};
+
+          for (final doc in sessions) {
+            final data = doc.data() as Map<String, dynamic>;
+            final timestamp = data['createdAt'];
+            if (timestamp is Timestamp) {
+              final date = timestamp.toDate();
+              // CRITICAL: Only count sessions from THIS MONTH
+              if (date.year == now.year && date.month == now.month) {
+                final weekOfMonth = ((date.day - 1) ~/ 7) + 1;
+                weeklyCounts[weekOfMonth] =
+                    (weeklyCounts[weekOfMonth] ?? 0) + 1;
+              }
             }
           }
-        }
-        
-        // Generate all 12 months
-        return List.generate(12, (i) {
-          final month = i + 1;
-          return ChartData(
-            date: monthNames[i],
-            count: monthlyCounts[month] ?? 0,
-          );
-        });
+
+          // Generate all 5 possible weeks in a month
+          return List.generate(5, (week) {
+            final weekNumber = week + 1;
+            final weekKey = "Week $weekNumber";
+            return ChartData(
+              date: weekKey,
+              count: weeklyCounts[weekNumber] ?? 0,
+            );
+          });
+
+        case 'This Year':
+        default:
+          // ✅ Show monthly data for this year ONLY
+          final monthlyCounts = <int, int>{};
+          final monthNames = [
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
+            'Jul',
+            'Aug',
+            'Sep',
+            'Oct',
+            'Nov',
+            'Dec',
+          ];
+
+          for (final doc in sessions) {
+            final data = doc.data() as Map<String, dynamic>;
+            final timestamp = data['createdAt'];
+            if (timestamp is Timestamp) {
+              final date = timestamp.toDate();
+              // CRITICAL: Only count sessions from THIS YEAR
+              if (date.year == now.year) {
+                monthlyCounts[date.month] =
+                    (monthlyCounts[date.month] ?? 0) + 1;
+              }
+            }
+          }
+
+          // Generate all 12 months
+          return List.generate(12, (i) {
+            final month = i + 1;
+            return ChartData(
+              date: monthNames[i],
+              count: monthlyCounts[month] ?? 0,
+            );
+          });
+      }
+    } catch (e) {
+      print('Error generating daily session trend: $e');
+      return [];
     }
-  } catch (e) {
-    print('Error generating daily session trend: $e');
-    return [];
   }
-}
-
-
 
   List<ChartData>? _generateWeeklySessionTrend(
     List<QueryDocumentSnapshot> sessions,
@@ -1198,16 +1293,32 @@ List<ChartData>? _generateDailySessionTrend(
   }
 }
 
+String _getDataGroupingInterval(DateTimeRange range) {
+  final daysDifference = range.end.difference(range.start).inDays;
+
+  if (daysDifference <= 1) {
+    return 'hourly'; // Show hourly data
+  } else if (daysDifference <= 31) {
+    return 'daily'; // Show daily data
+  } else if (daysDifference <= 90) {
+    return 'weekly'; // Show weekly data
+  } else if (daysDifference <= 365) {
+    return 'monthly'; // Show monthly data
+  } else {
+    return 'yearly'; // Show yearly data
+  }
+}
+
 String _getMostFrequentCategory(Map<String, int> categories) {
   if (categories.isEmpty) return 'Unknown';
   return categories.entries.reduce((a, b) => a.value > b.value ? a : b).key;
 }
-
 List<ChartData> generateInquiryTrend(
   List<QueryDocumentSnapshot> messages,
   DateTime startDate,
-  String timeFrame,
-) {
+  String timeFrame, [
+  DateTime? endDate,
+]) {
   final timeCategoryCounts = <String, Map<String, int>>{};
 
   for (final doc in messages) {
@@ -1215,7 +1326,12 @@ List<ChartData> generateInquiryTrend(
     final timestamp = data['sent_at'];
     if (timestamp is! Timestamp) continue;
 
-    final timeKey = _getTimeKey(timestamp.toDate(), timeFrame);
+    final date = timestamp.toDate();
+    
+    // Additional filter for custom range
+    if (endDate != null && date.isAfter(endDate)) continue;
+
+    final timeKey = _getTimeKey(date, timeFrame);
     final category = (data['category'] as String?)?.trim() ?? 'General';
 
     timeCategoryCounts.putIfAbsent(timeKey, () => {});
@@ -1225,6 +1341,7 @@ List<ChartData> generateInquiryTrend(
 
   return generateTrendData(startDate, timeFrame, timeCategoryCounts);
 }
+
 
 List<ChartData> generateConversationTrend(
   List<QueryDocumentSnapshot> sessions,
@@ -1264,7 +1381,10 @@ List<ChartData> generateTrendData(
   Map<String, Map<String, int>> timeCategoryCounts,
 ) {
   return switch (timeFrame) {
-    'All' => _generateAllTimeTrend(startDate, timeCategoryCounts), // Add this case
+    'All' => _generateAllTimeTrend(
+      startDate,
+      timeCategoryCounts,
+    ), // Add this case
     'Today' => _generateHourlyTrend(timeCategoryCounts),
     'This Week' => _generateWeeklyTrend(startDate, timeCategoryCounts),
     'This Month' => _generateMonthlyTrend(timeCategoryCounts),
@@ -1278,20 +1398,21 @@ List<ChartData> _generateAllTimeTrend(
   Map<String, Map<String, int>> data,
 ) {
   // Find the earliest and latest years in the data
-  final years = data.keys
-      .map((key) => int.tryParse(key))
-      .where((year) => year != null)
-      .cast<int>()
-      .toList();
-  
+  final years =
+      data.keys
+          .map((key) => int.tryParse(key))
+          .where((year) => year != null)
+          .cast<int>()
+          .toList();
+
   if (years.isEmpty) {
     return [];
   }
-  
+
   years.sort();
   final earliestYear = years.first;
   final latestYear = DateTime.now().year;
-  
+
   // Generate data for all years from earliest to current
   final trend = <ChartData>[];
   for (int year = earliestYear; year <= latestYear; year++) {
@@ -1463,8 +1584,6 @@ List<ChartData> _generateYearlyTrend(
     );
   });
 }
-
-
 
 // Utility functions
 int _getWeekOfMonth(DateTime date) {

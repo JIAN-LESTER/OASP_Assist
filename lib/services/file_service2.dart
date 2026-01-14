@@ -57,6 +57,11 @@ class FileService {
 
 Future<void> saveToInformationBank(InformationBank ib, {bool isFromUpload = true}) async {
   try {
+    // ✅ CHECK PLATFORM SUPPORT FIRST
+    if (!_pineconeService.isSupported) {
+      throw UnsupportedError(_pineconeService.unsupportedPlatformMessage);
+    }
+
     final isHealthy = await _pineconeService.isHealthy();
     if (!isHealthy) {
       throw Exception('Pinecone service is not available');
@@ -115,13 +120,13 @@ Future<void> saveToInformationBank(InformationBank ib, {bool isFromUpload = true
 
       // 🔥 CRITICAL: Use finalDocId (with category prefix)
       final metadata = {
-        'docId': finalDocId,  // ← Use prefixed ID
+        'docId': finalDocId,
         'originalDocId': finalDocId,
         'documentId': finalDocId,
         'categoryDocId': ib.category.toLowerCase() == 'admission' || 
                          ib.category.toLowerCase() == 'scholarship' || 
                          ib.category.toLowerCase() == 'placement' 
-            ? ib.id  // Store original ID without prefix
+            ? ib.id
             : finalDocId,
         
         'text': chunk.text,
@@ -141,7 +146,6 @@ Future<void> saveToInformationBank(InformationBank ib, {bool isFromUpload = true
         'chunkSize': chunk.text.length,
         'createdAt': DateTime.now().toIso8601String(),
         
-        // 🔥 NEW: Mark where this came from
         'uploadedViaFlutter': true,
         'syncedFromCategory': false,
       };
@@ -166,27 +170,31 @@ Future<void> saveToInformationBank(InformationBank ib, {bool isFromUpload = true
 
     // Save to Firestore with prefixed ID
     await firestore.collection('information_bank').doc(sanitizedId).set({
-    'ibID': sanitizedId,
-    'id': sanitizedId,
-    'ib_title': ib.title,
-    'title': ib.title,
-    'content': ib.content,
-    'source': ib.source,
-    'category': ib.category,
-    'categoryID': ib.category,
-    'pinecone_id': parentPineconeId,
-    'totalChunks': chunks.length,
-    'chunkIds': chunkIds,
-    'chunked': chunks.length > 1,
-    'chunkSize': maxChunkSize,
-    'chunkOverlap': chunkOverlap,
-    'uploadedViaFlutter': true,
-    'isFromDocumentUpload': isFromUpload, // 🔥 NEW FLAG
-    'createdAt': FieldValue.serverTimestamp(),
-    'updatedAt': FieldValue.serverTimestamp(),
-  });
+      'ibID': sanitizedId,
+      'id': sanitizedId,
+      'ib_title': ib.title,
+      'title': ib.title,
+      'content': ib.content,
+      'source': ib.source,
+      'category': ib.category,
+      'categoryID': ib.category,
+      'pinecone_id': parentPineconeId,
+      'totalChunks': chunks.length,
+      'chunkIds': chunkIds,
+      'chunked': chunks.length > 1,
+      'chunkSize': maxChunkSize,
+      'chunkOverlap': chunkOverlap,
+      'uploadedViaFlutter': true,
+      'isFromDocumentUpload': isFromUpload,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
 
     print('✅ Document saved to Firebase and ${chunks.length} chunks uploaded to Pinecone');
+  } on UnsupportedError catch (e) {
+    // ✅ PLATFORM-SPECIFIC ERROR
+    print('⚠️ Platform not supported: ${e.message}');
+    rethrow;
   } catch (e) {
     print('❌ Error saving document: $e');
     rethrow;
@@ -1784,15 +1792,7 @@ Future<void> syncAnnouncementsToInfoBank() async {
     }
   }
 
-  /// Get all documents statistics from Pinecone for debugging purposes
-  Future<Map<String, dynamic>?> getAllDocumentsStats() async {
-    try {
-      return await _pineconeService.getIndexStats();
-    } catch (e) {
-      print('❌ Error getting documents stats: $e');
-      return null;
-    }
-  }
+  
 
   /// Get document statistics
   Future<Map<String, int>> getDocumentStats() async {
@@ -1894,3 +1894,4 @@ class DocumentChunk {
   String get summary =>
       'Chunk ${chunkIndex + 1}/${totalChunks} of "$originalTitle" (${chunkSize} chars)';
 }
+

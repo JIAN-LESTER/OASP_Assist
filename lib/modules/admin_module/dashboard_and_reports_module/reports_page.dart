@@ -8,6 +8,7 @@ import 'package:capstone_project/modules/admin_module/dashboard_and_reports_modu
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/reports.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/user_demographics_charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/user_demographics_data.dart';
+import 'package:capstone_project/modules/admin_module/widgets/date_range_filter.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -74,74 +75,78 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 
   // ✅ LAZY LOADING: Only load data for the selected report type
-  Future<void> _loadDataForSelectedReport() async {
-    if (!mounted) return;
+ Future<void> _loadDataForSelectedReport() async {
+  if (!mounted) return;
 
-    switch (selectedReportType) {
-      case 'Inquiry Trends':
-        if (!inquiryDataLoaded) {
-          setState(() => isLoadingInquiry = true);
-          try {
-            final data = await _firebaseService.getInquiryReportsData(
-              selectedTimeFrame,
-            );
-            if (!mounted) return;
-            setState(() {
-              inq = data;
-              isLoadingInquiry = false;
-              inquiryDataLoaded = true;
-            });
-          } catch (e) {
-            print('Error loading inquiry data: $e');
-            if (!mounted) return;
-            setState(() => isLoadingInquiry = false);
-          }
+  switch (selectedReportType) {
+    case 'Inquiry Trends':
+      if (!inquiryDataLoaded) {
+        setState(() => isLoadingInquiry = true);
+        try {
+          final data = await _firebaseService.getInquiryReportsData(
+            selectedTimeFrame,
+            customDateRange, // Pass custom date range
+          );
+          if (!mounted) return;
+          setState(() {
+            inq = data;
+            isLoadingInquiry = false;
+            inquiryDataLoaded = true;
+          });
+        } catch (e) {
+          print('Error loading inquiry data: $e');
+          if (!mounted) return;
+          setState(() => isLoadingInquiry = false);
         }
-        break;
+      }
+      break;
 
-      case 'Chatbot Usage':
-        if (!chatbotDataLoaded) {
-          setState(() => isLoadingChatbot = true);
-          try {
-            final data = await _firebaseService.getChatbotUsageReportsData(
-              selectedTimeFrame,
-            );
-            if (!mounted) return;
-            setState(() {
-              cb = data;
-              isLoadingChatbot = false;
-              chatbotDataLoaded = true;
-            });
-          } catch (e) {
-            print('Error loading chatbot data: $e');
-            if (!mounted) return;
-            setState(() => isLoadingChatbot = false);
-          }
+    case 'Chatbot Usage':
+      if (!chatbotDataLoaded) {
+        setState(() => isLoadingChatbot = true);
+        try {
+          final data = await _firebaseService.getChatbotUsageReportsData(
+            selectedTimeFrame,
+            customDateRange, // Pass custom date range
+          );
+          if (!mounted) return;
+          setState(() {
+            cb = data;
+            isLoadingChatbot = false;
+            chatbotDataLoaded = true;
+          });
+        } catch (e) {
+          print('Error loading chatbot data: $e');
+          if (!mounted) return;
+          setState(() => isLoadingChatbot = false);
         }
-        break;
+      }
+      break;
 
-      case 'User Demographics':
-        if (!demographicsDataLoaded) {
-          setState(() => isLoadingDemographics = true);
-          try {
-            final data = await _firebaseService.getUserDemographicsReportsData(
-              selectedTimeFrame,
-            );
-            if (!mounted) return;
-            setState(() {
-              ud = data;
-              isLoadingDemographics = false;
-              demographicsDataLoaded = true;
-            });
-          } catch (e) {
-            print('Error loading demographics data: $e');
-            if (!mounted) return;
-            setState(() => isLoadingDemographics = false);
-          }
+    case 'User Demographics':
+      if (!demographicsDataLoaded) {
+        setState(() => isLoadingDemographics = true);
+        try {
+          final data = await _firebaseService.getUserDemographicsReportsData(
+            selectedTimeFrame,
+            customDateRange, // Pass custom date range
+          );
+          if (!mounted) return;
+          setState(() {
+            ud = data;
+            isLoadingDemographics = false;
+            demographicsDataLoaded = true;
+          });
+        } catch (e) {
+          print('Error loading demographics data: $e');
+          if (!mounted) return;
+          setState(() => isLoadingDemographics = false);
         }
-        break;
-    }
+      }
+      break;
   }
+}
+
 
   // ✅ When report type changes, load only that data
   void _onReportTypeChanged(String newValue) {
@@ -153,8 +158,21 @@ class _ReportsPageState extends State<ReportsPage> {
 
   // ✅ When timeframe changes, invalidate and reload current report
   void _onTimeFrameChanged(String newValue) {
+    // If Custom is selected, just update the UI to show the DateRangeFilter
+    if (newValue == 'Custom') {
+      if (mounted) {
+        setState(() {
+          selectedTimeFrame = 'Custom';
+          // Keep existing customDateRange if any
+        });
+      }
+      // Don't load data yet - wait for user to select a date range
+      return;
+    }
+
     setState(() {
       selectedTimeFrame = newValue;
+      customDateRange = null; // Clear custom range
 
       // Invalidate loaded data flags to force reload
       switch (selectedReportType) {
@@ -172,66 +190,114 @@ class _ReportsPageState extends State<ReportsPage> {
     _loadDataForSelectedReport();
   }
 
+  // Add this new method to handle date range changes:
+  void _onDateRangeChanged(DateTimeRange? range) {
+    if (range == null) {
+      // User cleared the date range, revert to "This Month"
+      setState(() {
+        customDateRange = null;
+        selectedTimeFrame = 'This Month';
+
+        // Invalidate current report data
+        switch (selectedReportType) {
+          case 'Inquiry Trends':
+            inquiryDataLoaded = false;
+            break;
+          case 'Chatbot Usage':
+            chatbotDataLoaded = false;
+            break;
+          case 'User Demographics':
+            demographicsDataLoaded = false;
+            break;
+        }
+      });
+    } else {
+      // User selected a custom date range
+      setState(() {
+        customDateRange = range;
+        selectedTimeFrame = 'Custom';
+
+        // Invalidate current report data
+        switch (selectedReportType) {
+          case 'Inquiry Trends':
+            inquiryDataLoaded = false;
+            break;
+          case 'Chatbot Usage':
+            chatbotDataLoaded = false;
+            break;
+          case 'User Demographics':
+            demographicsDataLoaded = false;
+            break;
+        }
+      });
+    }
+
+    _loadDataForSelectedReport();
+  }
+
   // ✅ Refresh only the currently visible report
-  Future<void> _refreshData() async {
-    if (!mounted || isRefreshing) return;
+ Future<void> _refreshData() async {
+  if (!mounted || isRefreshing) return;
 
-    setState(() => isRefreshing = true);
+  setState(() => isRefreshing = true);
 
-    try {
-      // Only refresh the selected report type
-      switch (selectedReportType) {
-        case 'Inquiry Trends':
-          final data = await _firebaseService.getInquiryReportsData(
-            selectedTimeFrame,
-          );
-          if (!mounted) return;
-          setState(() {
-            inq = data;
-            isRefreshing = false;
-          });
-          break;
-
-        case 'Chatbot Usage':
-          final data = await _firebaseService.getChatbotUsageReportsData(
-            selectedTimeFrame,
-          );
-          if (!mounted) return;
-          setState(() {
-            cb = data;
-            isRefreshing = false;
-          });
-          break;
-
-        case 'User Demographics':
-          final data = await _firebaseService.getUserDemographicsReportsData(
-            selectedTimeFrame,
-          );
-          if (!mounted) return;
-          setState(() {
-            ud = data;
-            isRefreshing = false;
-          });
-          break;
-      }
-
-      // Show success feedback
-      if (mounted) {
-        _showSnackBar(
-          message: 'Reports refreshed successfully',
-          isError: false,
+  try {
+    // Only refresh the selected report type
+    switch (selectedReportType) {
+      case 'Inquiry Trends':
+        final data = await _firebaseService.getInquiryReportsData(
+          selectedTimeFrame,
+          customDateRange, // Pass custom date range
         );
-      }
-    } catch (e) {
-      print('Error refreshing reports data: $e');
-      if (!mounted) return;
-      setState(() => isRefreshing = false);
+        if (!mounted) return;
+        setState(() {
+          inq = data;
+          isRefreshing = false;
+        });
+        break;
 
-      if (mounted) {
-        _showSnackBar(message: 'Failed to refresh reports', isError: true);
-      }
+      case 'Chatbot Usage':
+        final data = await _firebaseService.getChatbotUsageReportsData(
+          selectedTimeFrame,
+          customDateRange, // Pass custom date range
+        );
+        if (!mounted) return;
+        setState(() {
+          cb = data;
+          isRefreshing = false;
+        });
+        break;
+
+      case 'User Demographics':
+        final data = await _firebaseService.getUserDemographicsReportsData(
+          selectedTimeFrame,
+          customDateRange, // Pass custom date range
+        );
+        if (!mounted) return;
+        setState(() {
+          ud = data;
+          isRefreshing = false;
+        });
+        break;
+    }
+
+    // Show success feedback
+    if (mounted) {
+      _showSnackBar(
+        message: 'Reports refreshed successfully',
+        isError: false,
+      );
+    }
+  } catch (e) {
+    print('Error refreshing reports data: $e');
+    if (!mounted) return;
+    setState(() => isRefreshing = false);
+
+    if (mounted) {
+      _showSnackBar(message: 'Failed to refresh reports', isError: true);
     }
   }
+}
 
   void _showSnackBar({required String message, required bool isError}) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -314,7 +380,6 @@ class _ReportsPageState extends State<ReportsPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Only show loading spinner while user name is loading
     if (isLoadingUser) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -335,6 +400,8 @@ class _ReportsPageState extends State<ReportsPage> {
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
+        customDateRange: customDateRange,
+        onDateRangeChanged: _onDateRangeChanged,
       ),
       tabletBody: TabletDashboard(
         selectedTimeFrame: selectedTimeFrame,
@@ -351,6 +418,8 @@ class _ReportsPageState extends State<ReportsPage> {
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
+        customDateRange: customDateRange,
+        onDateRangeChanged: _onDateRangeChanged,
       ),
       desktopBody: DesktopDashboard(
         selectedTimeFrame: selectedTimeFrame,
@@ -367,6 +436,8 @@ class _ReportsPageState extends State<ReportsPage> {
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
+        customDateRange: customDateRange,
+        onDateRangeChanged: _onDateRangeChanged,
       ),
     );
   }
@@ -528,6 +599,8 @@ class DesktopDashboard extends StatelessWidget {
   final DateTime startDate;
   final String timeFrame;
   final Map<String, Map<String, int>> timeCategoryCounts;
+  final DateTimeRange? customDateRange;
+  final ValueChanged<DateTimeRange?> onDateRangeChanged;
 
   const DesktopDashboard({
     super.key,
@@ -545,6 +618,8 @@ class DesktopDashboard extends StatelessWidget {
     required this.startDate,
     required this.timeCategoryCounts,
     required this.timeFrame,
+    required this.customDateRange,
+    required this.onDateRangeChanged,
   });
 
   @override
@@ -564,10 +639,11 @@ class DesktopDashboard extends StatelessWidget {
               onRefresh,
               isRefreshing,
               userName,
+              customDateRange,
+              onDateRangeChanged,
             ),
             const SizedBox(height: 32),
 
-            // ✅ Show skeleton loader for current report
             if (isLoading)
               ...buildSkeletonReport(selectedReportType, isMobile: false)
             else
@@ -589,7 +665,6 @@ class DesktopDashboard extends StatelessWidget {
     );
   }
 }
-
 class TabletDashboard extends StatelessWidget {
   final String selectedTimeFrame;
   final String selectedReportType;
@@ -605,6 +680,8 @@ class TabletDashboard extends StatelessWidget {
   final DateTime startDate;
   final String timeFrame;
   final Map<String, Map<String, int>> timeCategoryCounts;
+    final DateTimeRange? customDateRange;
+  final ValueChanged<DateTimeRange?> onDateRangeChanged;
 
   const TabletDashboard({
     super.key,
@@ -622,6 +699,8 @@ class TabletDashboard extends StatelessWidget {
     required this.timeCategoryCounts,
     required this.timeFrame,
     required this.userName,
+    required this.customDateRange,
+    required this.onDateRangeChanged,
   });
 
   @override
@@ -641,6 +720,8 @@ class TabletDashboard extends StatelessWidget {
               onRefresh,
               isRefreshing,
               userName,
+              customDateRange,
+              onDateRangeChanged,
             ),
             const SizedBox(height: 32),
 
@@ -657,7 +738,7 @@ class TabletDashboard extends StatelessWidget {
                 timeFrame,
                 timeCategoryCounts,
                 isMobile: false,
-                context: context
+                context: context,
               ),
           ],
         ),
@@ -681,6 +762,8 @@ class MobileDashboard extends StatelessWidget {
   final DateTime startDate;
   final String timeFrame;
   final Map<String, Map<String, int>> timeCategoryCounts;
+    final DateTimeRange? customDateRange;
+  final ValueChanged<DateTimeRange?> onDateRangeChanged;
 
   const MobileDashboard({
     super.key,
@@ -698,6 +781,8 @@ class MobileDashboard extends StatelessWidget {
     required this.startDate,
     required this.timeCategoryCounts,
     required this.timeFrame,
+    required this.customDateRange,
+    required this.onDateRangeChanged,
   });
 
   @override
@@ -717,6 +802,8 @@ class MobileDashboard extends StatelessWidget {
               onRefresh,
               isRefreshing,
               userName,
+              customDateRange,
+              onDateRangeChanged,
             ),
             const SizedBox(height: 24),
 
@@ -828,7 +915,11 @@ class ReportsHelper {
       case 'User Demographics':
         return buildUserDemographicsReport(ud, isMobile: isMobile);
       default:
-        return buildInquiryTrendsReport(inq, isMobile: isMobile, context: context);
+        return buildInquiryTrendsReport(
+          inq,
+          isMobile: isMobile,
+          context: context,
+        );
     }
   }
 }
@@ -837,7 +928,7 @@ List<Widget> buildInquiryTrendsReport(
   InquiryReportsData? data, {
   String? selectedTimeFrame,
   bool isMobile = false,
- required BuildContext context,
+  required BuildContext context,
 }) {
   if (isMobile) {
     return [
@@ -928,88 +1019,97 @@ List<Widget> buildInquiryTrendsReport(
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
-        child: buildCategoryDistributionCard(data?.categoryDistribution ?? {}, selectedTimeFrame.toString(), context!),
+        child: buildCategoryDistributionCard(
+          data?.categoryDistribution ?? {},
+          selectedTimeFrame.toString(),
+          context!,
+        ),
       ),
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
         child: buildHighestFAQCard(data?.highestFAQs ?? {}),
       ),
-      const SizedBox(height: 16),
-      SizedBox(
-        height: 400,
-        child: buildSeasonalTrendsCard(data?.seasonalTrends ?? {}),
-      ),
+  
+  
     ];
   }
 
   return [
     SizedBox(
-  height: 120,
-  child: Row(
-    children: [
-      Expanded(
-        child: Builder(
-          builder: (context) => buildStatCard(
-            'Total Messages',
-            '${data?.totalMessages ?? 0}',
-            Colors.blue,
-            Icons.message,
-            onTap: () => _showMessagesDialog(
-              context,
-              selectedTimeFrame ?? 'This Month',
+      height: 120,
+      child: Row(
+        children: [
+          Expanded(
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Total Messages',
+                    '${data?.totalMessages ?? 0}',
+                    Colors.blue,
+                    Icons.message,
+                    onTap:
+                        () => _showMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
-        ),
-      ),
-      const SizedBox(width: 20),
-      Expanded(
-        child: Builder(
-          builder: (context) => buildStatCard(
-            'Answered Messages',
-            '${data?.answeredMessages ?? 0}',
-            Colors.green,
-            Icons.check_circle,
-            onTap: () => _showAnsweredMessagesDialog(
-              context,
-              selectedTimeFrame ?? 'This Month',
+          const SizedBox(width: 20),
+          Expanded(
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Answered Messages',
+                    '${data?.answeredMessages ?? 0}',
+                    Colors.green,
+                    Icons.check_circle,
+                    onTap:
+                        () => _showAnsweredMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
-        ),
-      ),
-      const SizedBox(width: 20),
-      Expanded(
-        child: Builder(
-          builder: (context) => buildStatCard(
-            'Escalated Messages',
-            '${data?.escalatedMessages ?? 0}',
-            Colors.red,
-            Icons.warning_amber_rounded,
-            onTap: () => _showEscalatedMessagesDialog(
-              context,
-              selectedTimeFrame ?? 'This Month',
+          const SizedBox(width: 20),
+          Expanded(
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Escalated Messages',
+                    '${data?.escalatedMessages ?? 0}',
+                    Colors.red,
+                    Icons.warning_amber_rounded,
+                    onTap:
+                        () => _showEscalatedMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
-        ),
-      ),
-      const SizedBox(width: 20),
-      Expanded(
-        child: Builder(
-          builder: (context) => buildStatCard(
-            'Resolved Messages',
-            '${data?.resolvedEscalatedMessages ?? 0}',
-            Colors.orange,
-            Icons.check_circle_outline,
-            onTap: () => _showResolvedMessagesDialog(
-              context,
-              selectedTimeFrame ?? 'This Month',
+          const SizedBox(width: 20),
+          Expanded(
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Resolved Messages',
+                    '${data?.resolvedEscalatedMessages ?? 0}',
+                    Colors.orange,
+                    Icons.check_circle_outline,
+                    onTap:
+                        () => _showResolvedMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
-        ),
+        ],
       ),
-    ],
-  ),
-),
+    ),
 
     const SizedBox(height: 16),
     SizedBox(
@@ -1020,7 +1120,7 @@ List<Widget> buildInquiryTrendsReport(
             child: buildInquiryTrendCard(
               data?.inquiryTrend ?? [],
               selectedTimeFrame.toString(),
-              context
+              context,
             ),
           ),
         ],
@@ -1044,14 +1144,7 @@ List<Widget> buildInquiryTrendsReport(
       ),
     ),
     const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: Row(
-        children: [
-          Expanded(child: buildSeasonalTrendsCard(data?.seasonalTrends ?? {})),
-        ],
-      ),
-    ),
+
   ];
 }
 
@@ -1093,29 +1186,32 @@ List<Widget> buildChatbotUsageReport(
         children: [
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Average Response Time',
-                formatResponseTime(data?.averageResponseTime ?? 0),
-                Colors.blue,
-                Icons.timer,
-                onTap: () => _showResponseTimeDetailsDialog(
-                  context,
-                  timeFrame,
-                  data,
-                ),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Average Response Time',
+                    formatResponseTime(data?.averageResponseTime ?? 0),
+                    Colors.blue,
+                    Icons.timer,
+                    onTap:
+                        () => _showResponseTimeDetailsDialog(
+                          context,
+                          timeFrame,
+                          data,
+                        ),
+                  ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Total Sessions',
-                '${data?.totalSessions ?? 0}',
-                Colors.green,
-                Icons.chat,
-                onTap: () => _showSessionsDialog(context, timeFrame),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Total Sessions',
+                    '${data?.totalSessions ?? 0}',
+                    Colors.green,
+                    Icons.chat,
+                    onTap: () => _showSessionsDialog(context, timeFrame),
+                  ),
             ),
           ),
         ],
@@ -1128,16 +1224,12 @@ List<Widget> buildChatbotUsageReport(
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
-        child: buildPeakUsageHoursCard(
-          data?.peakUsageByHour ?? <int, int>{},
-        ),
+        child: buildPeakUsageHoursCard(data?.peakUsageByHour ?? <int, int>{}),
       ),
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
-        child: buildUsersByCourseCard(
-          data?.usersByCourse ?? <String, int>{},
-        ),
+        child: buildUsersByCourseCard(data?.usersByCourse ?? <String, int>{}),
       ),
       const SizedBox(height: 16),
       SizedBox(
@@ -1167,29 +1259,32 @@ List<Widget> buildChatbotUsageReport(
         children: [
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Average Response Time',
-                formatResponseTime(data?.averageResponseTime ?? 0),
-                Colors.blue,
-                Icons.timer,
-                onTap: () => _showResponseTimeDetailsDialog(
-                  context,
-                  timeFrame,
-                  data,
-                ),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Average Response Time',
+                    formatResponseTime(data?.averageResponseTime ?? 0),
+                    Colors.blue,
+                    Icons.timer,
+                    onTap:
+                        () => _showResponseTimeDetailsDialog(
+                          context,
+                          timeFrame,
+                          data,
+                        ),
+                  ),
             ),
           ),
           const SizedBox(width: 20),
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Total Sessions',
-                '${data?.totalSessions ?? 0}',
-                Colors.green,
-                Icons.chat,
-                onTap: () => _showSessionsDialog(context, timeFrame),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Total Sessions',
+                    '${data?.totalSessions ?? 0}',
+                    Colors.green,
+                    Icons.chat,
+                    onTap: () => _showSessionsDialog(context, timeFrame),
+                  ),
             ),
           ),
           const SizedBox(width: 20),
@@ -1221,9 +1316,7 @@ List<Widget> buildChatbotUsageReport(
     const SizedBox(height: 16),
     SizedBox(
       height: 350,
-      child: buildPeakUsageHoursCard(
-        data?.peakUsageByHour ?? <int, int>{},
-      ),
+      child: buildPeakUsageHoursCard(data?.peakUsageByHour ?? <int, int>{}),
     ),
     const SizedBox(height: 16),
     SizedBox(
@@ -1254,7 +1347,6 @@ List<Widget> buildChatbotUsageReport(
   ];
 }
 
-
 List<Widget> buildUserDemographicsReport(
   UserDemographicsReportsData? data, {
   bool isMobile = false,
@@ -1268,25 +1360,27 @@ List<Widget> buildUserDemographicsReport(
         children: [
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Total Users',
-                '${data?.totalUsers ?? 0}',
-                Colors.blue,
-                Icons.people,
-                onTap: () => _showAllUsersDialog(context),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Total Users',
+                    '${data?.totalUsers ?? 0}',
+                    Colors.blue,
+                    Icons.people,
+                    onTap: () => _showAllUsersDialog(context),
+                  ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Enrolled Users',
-                '${data?.activeUsers ?? 0}',
-                Colors.green,
-                Icons.person_outline,
-                onTap: () => _showEnrolledUsersDialog(context),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Enrolled Users',
+                    '${data?.activeUsers ?? 0}',
+                    Colors.green,
+                    Icons.person_outline,
+                    onTap: () => _showEnrolledUsersDialog(context),
+                  ),
             ),
           ),
         ],
@@ -1296,25 +1390,27 @@ List<Widget> buildUserDemographicsReport(
         children: [
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Users with Scholarships',
-                '${data?.newlyRegisteredUsers ?? 0}',
-                Colors.orange,
-                Icons.school,
-                onTap: () => _showScholarshipUsersDialog(context),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Users with Scholarships',
+                    '${data?.newlyRegisteredUsers ?? 0}',
+                    Colors.orange,
+                    Icons.school,
+                    onTap: () => _showScholarshipUsersDialog(context),
+                  ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Incoming Freshman Users',
-                '${data?.affiliatedUsers ?? 0}',
-                Colors.purple,
-                Icons.business,
-                onTap: () => _showFreshmanUsersDialog(context),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Incoming Freshman Users',
+                    '${data?.affiliatedUsers ?? 0}',
+                    Colors.purple,
+                    Icons.business,
+                    onTap: () => _showFreshmanUsersDialog(context),
+                  ),
             ),
           ),
         ],
@@ -1352,72 +1448,69 @@ List<Widget> buildUserDemographicsReport(
         children: [
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Total Users',
-                '${data?.totalUsers ?? 0}',
-                Colors.blue,
-                Icons.people,
-                onTap: () => _showAllUsersDialog(context),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Total Users',
+                    '${data?.totalUsers ?? 0}',
+                    Colors.blue,
+                    Icons.people,
+                    onTap: () => _showAllUsersDialog(context),
+                  ),
             ),
           ),
           const SizedBox(width: 20),
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Enrolled Users',
-                '${data?.activeUsers ?? 0}',
-                Colors.green,
-                Icons.person_outline,
-                onTap: () => _showEnrolledUsersDialog(context),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Enrolled Users',
+                    '${data?.activeUsers ?? 0}',
+                    Colors.green,
+                    Icons.person_outline,
+                    onTap: () => _showEnrolledUsersDialog(context),
+                  ),
             ),
           ),
           const SizedBox(width: 20),
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Users with Scholarships',
-                '${data?.newlyRegisteredUsers ?? 0}',
-                Colors.orange,
-                Icons.school,
-                onTap: () => _showScholarshipUsersDialog(context),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Users with Scholarships',
+                    '${data?.newlyRegisteredUsers ?? 0}',
+                    Colors.orange,
+                    Icons.school,
+                    onTap: () => _showScholarshipUsersDialog(context),
+                  ),
             ),
           ),
           const SizedBox(width: 20),
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Incoming Freshman Users',
-                '${data?.affiliatedUsers ?? 0}',
-                Colors.purple,
-                Icons.business,
-                onTap: () => _showFreshmanUsersDialog(context),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Incoming Freshman Users',
+                    '${data?.affiliatedUsers ?? 0}',
+                    Colors.purple,
+                    Icons.business,
+                    onTap: () => _showFreshmanUsersDialog(context),
+                  ),
             ),
           ),
         ],
       ),
     ),
     const SizedBox(height: 16),
-    SizedBox(
-      height: 400,
-      child: buildUsersByYearCard(data?.usersByYear ?? {}),
-    ),
+    SizedBox(height: 400, child: buildUsersByYearCard(data?.usersByYear ?? {})),
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
       child: Row(
         children: [
-          Expanded(
-            child: buildUsersByProgramCard(data?.usersByProgram ?? {}),
-          ),
+          Expanded(child: buildUsersByProgramCard(data?.usersByProgram ?? {})),
           const SizedBox(width: 20),
           Expanded(
-            child: buildUserAffiliationsCard(
-              data?.userAffiliations ?? {},
-            ),
+            child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
           ),
         ],
       ),
@@ -1425,43 +1518,50 @@ List<Widget> buildUserDemographicsReport(
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
-      child: buildScholarshipTypesCard(
-        data?.scholarshipTypes ?? {},
-      ),
+      child: buildScholarshipTypesCard(data?.scholarshipTypes ?? {}),
     ),
   ];
 }
 
-void _showMessagesDialog(BuildContext context, String timeFrame) {
+void _showMessagesDialog(
+  BuildContext context,
+  String timeFrame, [
+  DateTimeRange? customRange,
+]) {
   showDialog(
     context: context,
-    builder:
-        (context) => PaginatedListDialog(
-          title: 'Total Messages',
-          headerColor: Colors.blue,
-          dataFetcher: (page, pageSize) async {
-            final startDate = _getStartDateForDialog(timeFrame);
-            final snapshot =
-                await FirebaseFirestore.instance
-                    .collectionGroup('messages')
-                    .where('sender', isEqualTo: 'user')
-                    .where('sent_at', isGreaterThanOrEqualTo: startDate)
-                    .orderBy('sent_at', descending: true)
-                    .limit(pageSize)
-                    // .offset(page * pageSize)
-                    .get();
+    builder: (context) => PaginatedListDialog(
+      title: 'Total Messages',
+      headerColor: Colors.blue,
+      dataFetcher: (page, pageSize) async {
+        final startDate = _getStartDateForDialog(timeFrame, customRange);
+        final endDate = _getEndDateForDialog(timeFrame, customRange);
+        
+        Query query = FirebaseFirestore.instance
+            .collectionGroup('messages')
+            .where('sender', isEqualTo: 'user')
+            .where('sent_at', isGreaterThanOrEqualTo: startDate);
 
-            return snapshot.docs.map((doc) {
-              final data = doc.data();
-              final timestamp = data['sent_at'] as Timestamp?;
-              return {
-                'Message': data['content'] ?? 'N/A',
-                'Category': data['category'] ?? 'General',
-                'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
-              };
-            }).toList();
-          },
-        ),
+        if (endDate != null) {
+          query = query.where('sent_at', isLessThanOrEqualTo: endDate);
+        }
+
+        final snapshot = await query
+            .orderBy('sent_at', descending: true)
+            .limit(pageSize)
+            .get();
+
+        return snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          final timestamp = data?['sent_at'] as Timestamp?;
+          return {
+            'Message': data?['text'] ?? 'N/A',
+            'Category': data?['category'] ?? 'General',
+            'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
+          };
+        }).toList();
+      },
+    ),
   );
 }
 
@@ -1541,7 +1641,16 @@ void _showUsersDialog(BuildContext context, String timeFrame) {
   );
 }
 
-DateTime _getStartDateForDialog(String timeFrame) {
+DateTime _getStartDateForDialog(String timeFrame, [DateTimeRange? customRange]) {
+  if (timeFrame == 'Custom' && customRange != null) {
+    return DateTime(
+      customRange.start.year,
+      customRange.start.month,
+      customRange.start.day,
+      0, 0, 0,
+    );
+  }
+
   final now = DateTime.now();
   return switch (timeFrame) {
     'All' => DateTime(2000, 1, 1),
@@ -1551,6 +1660,18 @@ DateTime _getStartDateForDialog(String timeFrame) {
     'This Year' => DateTime(now.year, 1, 1),
     _ => DateTime(now.year, now.month, 1),
   };
+}
+
+DateTime? _getEndDateForDialog(String timeFrame, [DateTimeRange? customRange]) {
+  if (timeFrame == 'Custom' && customRange != null) {
+    return DateTime(
+      customRange.end.year,
+      customRange.end.month,
+      customRange.end.day,
+      23, 59, 59, 999,
+    );
+  }
+  return null;
 }
 
 // Additional dialog methods for Reports page:
@@ -1884,6 +2005,8 @@ Widget buildHeader(
   VoidCallback onRefresh,
   bool isRefreshing,
   String userName,
+  DateTimeRange? customDateRange,
+  ValueChanged<DateTimeRange?> onDateRangeChanged,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -1918,17 +2041,30 @@ Widget buildHeader(
                     ],
                   ),
                   const SizedBox(height: 8),
-                  CustomDropdownButton(
-                    items: [
-                      'All',
-                      'Today',
-                      'This Week',
-                      'This Month',
-                      'This Year',
-                      'Custom', // Add this
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CustomDropdownButton(
+                          items: [
+                            'All',
+                            'Today',
+                            'This Week',
+                            'This Month',
+                            'This Year',
+                            'Custom',
+                          ],
+                          initialValue: selectedTimeFrame,
+                          onChanged: onTimeFrameChanged,
+                        ),
+                      ),
+                      if (selectedTimeFrame == 'Custom') ...[
+                        const SizedBox(width: 8),
+                        DateRangeFilter(
+                          selectedDateRange: customDateRange,
+                          onDateRangeChanged: onDateRangeChanged,
+                        ),
+                      ],
                     ],
-                    initialValue: selectedTimeFrame,
-                    onChanged: onTimeFrameChanged,
                   ),
                 ],
               )
@@ -1959,18 +2095,29 @@ Widget buildHeader(
                           'This Week',
                           'This Month',
                           'This Year',
-                          'Custom', // Add this
+                          'Custom',
                         ],
                         initialValue: selectedTimeFrame,
                         onChanged: onTimeFrameChanged,
                       ),
+                      if (selectedTimeFrame == 'Custom') ...[
+                        const SizedBox(width: 12),
+                        DateRangeFilter(
+                          selectedDateRange: customDateRange,
+                          onDateRangeChanged: onDateRangeChanged,
+                        ),
+                      ],
                     ],
                   ),
                 ],
               ),
           SizedBox(height: isMobile ? 12 : 8),
           Text(
-            _getReportDescription(selectedReportType, selectedTimeFrame),
+            _getReportDescription(
+              selectedReportType,
+              selectedTimeFrame,
+              customDateRange,
+            ),
             style: TextStyle(fontSize: isMobile ? 13 : 14, color: Colors.grey),
           ),
         ],
@@ -1979,15 +2126,47 @@ Widget buildHeader(
   );
 }
 
-String _getReportDescription(String reportType, String timeFrame) {
+// Update _getReportDescription to handle custom date range:
+String _getReportDescription(
+  String reportType,
+  String timeFrame,
+  DateTimeRange? customDateRange,
+) {
+  String timeFrameText = timeFrame;
+
+  if (timeFrame == 'Custom' && customDateRange != null) {
+    timeFrameText =
+        'from ${_formatDate(customDateRange.start)} to ${_formatDate(customDateRange.end)}';
+  }
+
   switch (reportType) {
     case 'Inquiry Trends':
-      return "Detailed analysis of inquiry patterns and trends for $timeFrame.";
+      return "Detailed analysis of inquiry patterns and trends $timeFrameText.";
     case 'Chatbot Usage':
-      return "Chatbot performance metrics and usage statistics for $timeFrame.";
+      return "Chatbot performance metrics and usage statistics $timeFrameText.";
     case 'User Demographics':
-      return "User demographics and engagement patterns for $timeFrame.";
+      return "User demographics and engagement patterns $timeFrameText.";
     default:
-      return "Here's a complete reports and analytics of OASP Assist for $timeFrame.";
+      return "Here's a complete reports and analytics of OASP Assist $timeFrameText.";
   }
+}
+
+// Helper function to format dates
+String _formatDate(DateTime date) {
+  const months = [
+    '',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${date.day} ${months[date.month]} ${date.year}';
 }

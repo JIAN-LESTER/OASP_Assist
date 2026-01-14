@@ -58,6 +58,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
   String? actualConversationId;
   bool isLoading = true;
+  bool _isDisposing = false;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 

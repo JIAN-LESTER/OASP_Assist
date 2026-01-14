@@ -1,8 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:capstone_project/services/admin_functions.dart'
     show FirebaseFunctionsService;
@@ -1147,83 +1151,171 @@ Future<void> handlePlacementDelete(
 // ============================================================================
 Future<void> _deleteFromPinecone(
   List<String> chunkIds,
+  String? namespace,
+) async {
+  if (chunkIds.isEmpty) return;
+
+  // 1. Check if the platform is Windows
+  // Note: kIsWeb must be checked first because Platform.isWindows throws on Web
+  if (!kIsWeb && Platform.isWindows) {
+    print('🪟 Windows detected: Using direct HTTP client');
+    await _deleteFromPineconeDirect(chunkIds, namespace);
+  } else {
+    print('📱 Mobile/Web detected: Using Firebase Functions');
+    await _deleteFromPineconeFirebase(chunkIds, namespace);
+  }
+}
+
+Future<void> _deleteFromPineconeDirect(
+  List<String> chunkIds,
   String? pineconeNamespace,
 ) async {
+  late final String apiKey;
+  late final String indexHost;
   try {
-    // final apiKey = 'pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa';
-    // // final indexHost = 'https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io';
-    final indexHost =
-        'https://oasp-assist-gemini-tpewr0x.svc.aped-4627-b74a.pinecone.io';
-    final apiKey =
-        'pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa';
-    // final indexHost =
-    //     'https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io';
+    // Fetching from Environment Variables
+    apiKey = dotenv.env['PINECONE_API_KEY'] ?? '';
+    indexHost = dotenv.env['PINECONE_HOST'] ?? '';
+
+    if (apiKey.isEmpty || indexHost.isEmpty) {
+      throw Exception("Missing Pinecone Environment Variables");
+    }
 
     final authHeader = {'Content-Type': 'application/json', 'Api-Key': apiKey};
+    final deleteUrl = Uri.parse('$indexHost/vectors/delete');
 
-    int successfulDeletes = 0;
-    int failedDeletes = 0;
+    final body = jsonEncode({
+      'ids': chunkIds,
+      if (pineconeNamespace != null && pineconeNamespace.isNotEmpty)
+        'namespace': pineconeNamespace,
+    });
 
-    if (chunkIds.isEmpty) {
-      print("ℹ️ No chunk IDs provided for Pinecone deletion");
-      return;
+    final res = await http
+        .post(deleteUrl, headers: authHeader, body: body)
+        .timeout(const Duration(seconds: 30));
+
+    if (res.statusCode == 200) {
+      print("✅ Pinecone vectors deleted successfully via Direct HTTP");
+    } else {
+      throw Exception("Pinecone Direct Delete Failed: ${res.statusCode}");
     }
-
-    try {
-      print(
-        "🗑️ Attempting to delete ${chunkIds.length} vectors from Pinecone...",
-      );
-
-      final deleteUrl = Uri.parse('$indexHost/vectors/delete');
-      final body = jsonEncode({
-        'ids': chunkIds,
-        if (pineconeNamespace != null && pineconeNamespace.isNotEmpty)
-          'namespace': pineconeNamespace,
-      });
-
-      print("📤 Request body: $body");
-
-      final res = await http
-          .post(deleteUrl, headers: authHeader, body: body)
-          .timeout(const Duration(seconds: 30));
-
-      print("📥 Pinecone response status: ${res.statusCode}");
-      print("📥 Pinecone response body: ${res.body}");
-
-      if (res.statusCode == 200) {
-        print("✅ Pinecone vectors deleted successfully");
-        successfulDeletes = chunkIds.length;
-      } else {
-        print(
-          "⚠️ Failed to delete Pinecone vectors: ${res.statusCode} - ${res.body}",
-        );
-        failedDeletes = chunkIds.length;
-        throw Exception(
-          "Pinecone deletion failed with status ${res.statusCode}",
-        );
-      }
-    } catch (e) {
-      print("❌ Error deleting vectors from Pinecone: $e");
-      failedDeletes = chunkIds.length;
-      rethrow; // Propagate error so caller knows deletion failed
-    }
-
-    print("📊 Pinecone cleanup summary:");
-    print("   - Vectors attempted: ${chunkIds.length}");
-    print("   - Successful: $successfulDeletes");
-    print("   - Failed: $failedDeletes");
   } catch (e) {
-    print("❌ Pinecone deletion failed: $e");
+    print("❌ Direct Pinecone Error: $e");
     rethrow;
   }
 }
 
-// Background version (fire and forget)
-void _deleteFromPineconeInBackground(
+Future<void> _deleteFromPineconeFirebase(
   List<String> chunkIds,
-  String? pineconeNamespace,
-) {
-  _deleteFromPinecone(chunkIds, pineconeNamespace).catchError((error) {
-    print("❌ Background Pinecone deletion error: $error");
+  String? namespace,
+) async {
+  final callable = FirebaseFunctions.instance.httpsCallable(
+    'deleteFromPinecone',
+  );
+  final result = await callable.call({
+    'chunkIds': chunkIds,
+    'namespace': namespace,
   });
+  print('✅ Deleted ${result.data['deleted']} Pinecone vectors via Firebase');
 }
+
+
+// Future<void> _deleteFromPinecone(
+//   List<String> chunkIds,
+//   String? namespace,
+// ) async {
+//   if (chunkIds.isEmpty) return;
+
+//   final callable =
+//       FirebaseFunctions.instance.httpsCallable('deleteFromPinecone');
+
+//   final result = await callable.call({
+//     'chunkIds': chunkIds,
+//     'namespace': namespace,
+//   });
+
+//   print('✅ Deleted ${result.data['deleted']} Pinecone vectors');
+// }
+
+// Future<void> _deleteFromPinecone(
+//   List<String> chunkIds,
+//   String? pineconeNamespace,
+// ) async {
+//   try {
+//     // final apiKey = 'pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa';
+//     // // final indexHost = 'https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io';
+//     final indexHost =
+//         'https://oasp-assist-gemini-tpewr0x.svc.aped-4627-b74a.pinecone.io';
+//     final apiKey =
+//         'pcsk_41xXt3_J3U7iPvCEojTLLfUwFhKuQXkFFnuYJu9qcio175Ne2dLNS8t3TTzRie2QmTNdLa';
+//     // final indexHost =
+//     //     'https://oasp-assist-tpewr0x.svc.aped-4627-b74a.pinecone.io';
+
+//     final authHeader = {'Content-Type': 'application/json', 'Api-Key': apiKey};
+
+//     int successfulDeletes = 0;
+//     int failedDeletes = 0;
+
+//     if (chunkIds.isEmpty) {
+//       print("ℹ️ No chunk IDs provided for Pinecone deletion");
+//       return;
+//     }
+
+//     try {
+//       print(
+//         "🗑️ Attempting to delete ${chunkIds.length} vectors from Pinecone...",
+//       );
+
+//       final deleteUrl = Uri.parse('$indexHost/vectors/delete');
+//       final body = jsonEncode({
+//         'ids': chunkIds,
+//         if (pineconeNamespace != null && pineconeNamespace.isNotEmpty)
+//           'namespace': pineconeNamespace,
+//       });
+
+//       print("📤 Request body: $body");
+
+//       final res = await http
+//           .post(deleteUrl, headers: authHeader, body: body)
+//           .timeout(const Duration(seconds: 30));
+
+//       print("📥 Pinecone response status: ${res.statusCode}");
+//       print("📥 Pinecone response body: ${res.body}");
+
+//       if (res.statusCode == 200) {
+//         print("✅ Pinecone vectors deleted successfully");
+//         successfulDeletes = chunkIds.length;
+//       } else {
+//         print(
+//           "⚠️ Failed to delete Pinecone vectors: ${res.statusCode} - ${res.body}",
+//         );
+//         failedDeletes = chunkIds.length;
+//         throw Exception(
+//           "Pinecone deletion failed with status ${res.statusCode}",
+//         );
+//       }
+//     } catch (e) {
+//       print("❌ Error deleting vectors from Pinecone: $e");
+//       failedDeletes = chunkIds.length;
+//       rethrow; // Propagate error so caller knows deletion failed
+//     }
+
+//     print("📊 Pinecone cleanup summary:");
+//     print("   - Vectors attempted: ${chunkIds.length}");
+//     print("   - Successful: $successfulDeletes");
+//     print("   - Failed: $failedDeletes");
+//   } catch (e) {
+//     print("❌ Pinecone deletion failed: $e");
+//     rethrow;
+//   }
+// }
+
+// // Background version (fire and forget)
+// void _deleteFromPineconeInBackground(
+//   List<String> chunkIds,
+//   String? pineconeNamespace,
+// ) {
+//   _deleteFromPinecone(chunkIds, pineconeNamespace).catchError((error) {
+//     print("❌ Background Pinecone deletion error: $error");
+//   });
+// }

@@ -1,5 +1,6 @@
 import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
@@ -137,48 +138,22 @@ class _AddFaqContentState extends State<AddFaqContent> {
   String _selectedCategory = 'Admission';
   bool _isSubmitting = false;
 
-  String? _questionError;
+   String? _questionError;
   String? _answerError;
 
-  final String _cohereApiKey = "IhyfOnMhPrpfgiDSqf3c0ayCmGpHAicG1JqbGVOY";
+ Future<List<double>> _generateEmbedding(String question) async {
+  final callable =
+      FirebaseFunctions.instance.httpsCallable('generateCohereEmbedding');
 
-  Future<List<double>> _generateEmbedding(String text) async {
-    try {
-      print(
-        '🔧 Generating v3 embedding for FAQ: "${text.substring(0, text.length > 50 ? 50 : text.length)}..."',
-      );
+  final result = await callable.call({
+    'text': question,
+  });
 
-      final response = await http.post(
-        Uri.parse("https://api.cohere.ai/v1/embed"),
-        headers: {
-          'Authorization': 'Bearer $_cohereApiKey',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          "texts": [text],
-          "model": "embed-multilingual-v3.0",
-          "input_type": "search_document",
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        print('❌ Cohere API error: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to generate embedding: ${response.statusCode}');
-      }
-
-      final data = jsonDecode(response.body);
-      final embedding =
-          (data['embeddings'][0] as List)
-              .map((e) => (e as num).toDouble())
-              .toList();
-
-      print('✅ Generated v3 embedding: ${embedding.length} dimensions');
-      return embedding;
-    } catch (e) {
-      print('❌ Error generating embedding: $e');
-      rethrow;
-    }
-  }
+  return (result.data['embedding'] as List)
+      .map((e) => (e as num).toDouble())
+      .toList();
+}
+  
 
   final List<String> _categories = ['Admission', 'Scholarship', 'Placement'];
 

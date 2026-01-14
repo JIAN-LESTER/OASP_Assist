@@ -1159,6 +1159,8 @@ class FAQToggleButton extends StatelessWidget {
 
 // FAQInputSection
 
+// FAQInputSection - FIXED VERSION
+
 class FAQInputSection extends StatefulWidget {
   final TextEditingController controller;
   final bool showFAQs;
@@ -1196,12 +1198,6 @@ class _FAQInputSectionState extends State<FAQInputSection> {
     super.initState();
     _textFieldFocusNode = FocusNode();
     _textFieldFocusNode.addListener(_onFocusChange);
-    
-    // Prevent focus issues on Windows
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      _textFieldFocusNode.skipTraversal = false;
-      _textFieldFocusNode.canRequestFocus = true;
-    }
   }
 
   @override
@@ -1217,16 +1213,14 @@ class _FAQInputSectionState extends State<FAQInputSection> {
     }
   }
 
-  // ✅ CRITICAL FIX: Desktop-compatible message sending
+  // ✅ FIXED: Windows/Desktop crash-free message sending
   void _handleSendMessage() {
     if (_isSending || widget.isLoading) return;
     
     final text = widget.controller.text.trim();
     if (text.isEmpty) return;
 
-    print('🚀 _handleSendMessage called');
-    print('   Platform: ${Platform.operatingSystem}');
-    print('   Has focus: ${_textFieldFocusNode.hasFocus}');
+    print('🚀 Sending message on ${Platform.operatingSystem}');
 
     // Prevent multiple sends
     setState(() {
@@ -1238,38 +1232,30 @@ class _FAQInputSectionState extends State<FAQInputSection> {
       widget.onMicrophoneTap!();
     }
 
-    // ✅ DESKTOP FIX: Handle focus removal safely
+    // ✅ CRITICAL FIX: Safe focus removal for Windows/Desktop
     if (_textFieldFocusNode.hasFocus) {
-      print('   Removing focus...');
-      
-      // Schedule focus removal for next frame
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        
-        try {
-          // Use primary focus unfocus for desktop compatibility
-          FocusManager.instance.primaryFocus?.unfocus();
-          print('   ✅ Focus removed successfully');
-        } catch (e) {
-          print('   ⚠️ Focus removal error: $e');
-        }
-      });
+      try {
+        // Request focus to a temporary node first (prevents crash)
+        final tempFocus = FocusNode();
+        FocusScope.of(context).requestFocus(tempFocus);
+        tempFocus.dispose();
+      } catch (e) {
+        print('⚠️ Focus handling error (non-critical): $e');
+      }
     }
 
-    // Send message immediately (don't wait for focus removal)
-    Future.microtask(() {
+    // ✅ Send message in next frame (after focus is handled)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       
-      print('   Calling onSendMessage...');
       widget.onSendMessage();
       
       // Reset sending flag
-      Future.microtask(() {
+      Future.delayed(Duration(milliseconds: 100), () {
         if (mounted) {
           setState(() {
             _isSending = false;
           });
-          print('   ✅ Message sent');
         }
       });
     });
@@ -1322,237 +1308,222 @@ class _FAQInputSectionState extends State<FAQInputSection> {
     final borderColor = Colors.grey.shade300;
 
     return Container(
-      decoration: BoxDecoration(color: surfaceColor),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: verticalPadding,
-              ),
-              child: Container(
-                constraints: BoxConstraints(maxWidth: 900),
-                child: Row(
-                  children: [
-                    // FAQ Toggle Button
-                    Tooltip(
-                      message: widget.showFAQs ? 'Hide FAQs' : 'Show FAQs',
-                      child: Container(
-                        key: widget.faqButtonKey,
-                        width: buttonSize,
-                        height: buttonSize,
-                        decoration: BoxDecoration(
-                          color: Color(0xFFF5F5F5),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Color(0xFFE0E0E0),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: (_isSending || widget.isLoading)
-                                ? null
-                                : () {
-                                    HapticFeedback.lightImpact();
-                                    widget.onFAQToggle();
-                                  },
-                            borderRadius: BorderRadius.circular(8),
-                            child: Center(
-                              child: Icon(
-                                widget.showFAQs
-                                    ? Icons.chat_bubble_outline_rounded
-                                    : Icons.help_outline_rounded,
-                                color: (_isSending || widget.isLoading)
-                                    ? Color(0xFFCCCCCC)
-                                    : Color(0xFF666666),
-                                size: iconSize,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-
-                    // ✅ Text Input with KeyboardListener for Desktop
-                    Expanded(
-                      child: KeyboardListener(
-                        focusNode: FocusNode(),
-                        onKeyEvent: (event) {
-                          // Handle Enter key on desktop
-                          if ((Platform.isWindows ||
-                                  Platform.isLinux ||
-                                  Platform.isMacOS) &&
-                              event is KeyDownEvent &&
-                              event.logicalKey == LogicalKeyboardKey.enter &&
-                              !HardwareKeyboard.instance.isShiftPressed) {
-                            if (!_isSending && !widget.isLoading) {
-                              print('📥 Enter key pressed (desktop)');
-                              _handleSendMessage();
-                            }
-                          }
-                        },
-                        child: Container(
-                          constraints: BoxConstraints(
-                            minHeight: buttonSize,
-                            maxHeight: 100,
-                          ),
-                          decoration: BoxDecoration(
-                            color: (_isSending || widget.isLoading)
-                                ? Colors.grey.shade100
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(borderRadius),
-                            border: Border.all(
-                              color: (_isSending || widget.isLoading)
-                                  ? Colors.grey.shade200
-                                  : borderColor,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: TextField(
-                            controller: widget.controller,
-                            focusNode: _textFieldFocusNode,
-                            enabled: !_isSending && !widget.isLoading,
-                            maxLines: null,
-                            minLines: 1,
-                            textAlignVertical: TextAlignVertical.center,
-                            textInputAction: TextInputAction.send,
-                            style: TextStyle(
-                              fontSize: fontSize,
-                              fontWeight: FontWeight.w500,
-                              color: (_isSending || widget.isLoading)
-                                  ? Colors.grey.shade400
-                                  : Colors.grey.shade900,
-                              height: 1.4,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: (_isSending || widget.isLoading)
-                                  ? 'Sending message...'
-                                  : 'Ask something...',
-                              hintStyle: TextStyle(
-                                color: Colors.grey.shade400,
-                                fontSize: fontSize,
-                                fontWeight: FontWeight.w400,
-                              ),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
-                              isDense: true,
-                            ),
-                            // ✅ Disable onSubmitted on desktop (KeyboardListener handles it)
-                            onSubmitted: (Platform.isWindows ||
-                                    Platform.isLinux ||
-                                    Platform.isMacOS)
-                                ? null
-                                : (_) {
-                                    if (!_isSending && !widget.isLoading) {
-                                      print('📥 Enter key pressed (mobile)');
-                                      _handleSendMessage();
-                                    }
-                                  },
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-
-                    // Microphone Button
-                    if (widget.onMicrophoneTap != null)
-                      Container(
-                        key: widget.audioButtonKey,
-                        width: buttonSize,
-                        height: buttonSize,
-                        decoration: BoxDecoration(
-                          color: widget.isListening
-                              ? primaryColor
-                              : Color(0xFFF5F5F5),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: widget.isListening
-                                ? primaryColor
-                                : Color(0xFFE0E0E0),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: (_isSending || widget.isLoading)
-                                ? null
-                                : () {
-                                    HapticFeedback.mediumImpact();
-                                    widget.onMicrophoneTap!();
-                                  },
-                            borderRadius: BorderRadius.circular(8),
-                            child: Center(
-                              child: Icon(
-                                widget.isListening ? Icons.mic : Icons.mic_none,
-                                color: widget.isListening
-                                    ? Colors.white
-                                    : Color(0xFF666666),
-                                size: iconSize,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    SizedBox(width: 10),
-
-                    // Send Button
-                    Container(
-                      width: buttonSize,
-                      height: buttonSize,
-                      decoration: BoxDecoration(
-                        color: (_isSending || widget.isLoading)
-                            ? Colors.grey.shade400
-                            : primaryColor,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: (_isSending || widget.isLoading)
-                              ? null
-                              : () {
-                                  HapticFeedback.lightImpact();
-                                  print('🖱️ Send button clicked');
-                                  _handleSendMessage();
-                                },
-                          borderRadius: BorderRadius.circular(10),
-                          child: Center(
-                            child: (_isSending || widget.isLoading)
-                                ? SizedBox(
-                                    width: iconSize - 4,
-                                    height: iconSize - 4,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : Icon(
-                                    Icons.arrow_forward_rounded,
-                                    color: Colors.white,
-                                    size: iconSize,
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+      // ✅ CRITICAL: Explicit decoration to ensure visibility
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, -2),
           ),
         ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: verticalPadding,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // FAQ Toggle Button
+              Tooltip(
+                message: widget.showFAQs ? 'Hide FAQs' : 'Show FAQs',
+                child: Container(
+                  key: widget.faqButtonKey,
+                  width: buttonSize,
+                  height: buttonSize,
+                  decoration: BoxDecoration(
+                    color: Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Color(0xFFE0E0E0),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: (_isSending || widget.isLoading)
+                          ? null
+                          : () {
+                              HapticFeedback.lightImpact();
+                              widget.onFAQToggle();
+                            },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Center(
+                        child: Icon(
+                          widget.showFAQs
+                              ? Icons.chat_bubble_outline_rounded
+                              : Icons.help_outline_rounded,
+                          color: (_isSending || widget.isLoading)
+                              ? Color(0xFFCCCCCC)
+                              : Color(0xFF666666),
+                          size: iconSize,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 10),
+
+              // ✅ SIMPLIFIED: Text Input without KeyboardListener
+              Expanded(
+                child: Container(
+                  constraints: BoxConstraints(
+                    minHeight: buttonSize,
+                    maxHeight: 100,
+                  ),
+                  decoration: BoxDecoration(
+                    color: (_isSending || widget.isLoading)
+                        ? Colors.grey.shade100
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(borderRadius),
+                    border: Border.all(
+                      color: (_isSending || widget.isLoading)
+                          ? Colors.grey.shade200
+                          : borderColor,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: TextField(
+                    controller: widget.controller,
+                    focusNode: _textFieldFocusNode,
+                    enabled: !_isSending && !widget.isLoading,
+                    maxLines: null,
+                    minLines: 1,
+                    textAlignVertical: TextAlignVertical.center,
+                    textInputAction: TextInputAction.send,
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.w500,
+                      color: (_isSending || widget.isLoading)
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade900,
+                      height: 1.4,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: (_isSending || widget.isLoading)
+                          ? 'Sending message...'
+                          : 'Ask something...',
+                      hintStyle: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      isDense: true,
+                    ),
+                    // ✅ FIXED: Safe submission for Windows/Desktop
+                    onSubmitted: (_) {
+                      if (_isSending || widget.isLoading) return;
+                      
+                      // Use post-frame callback to prevent crash
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) {
+                          _handleSendMessage();
+                        }
+                      });
+                    },
+                  ),
+                ),
+              ),
+              SizedBox(width: 10),
+
+              // Microphone Button
+              if (widget.onMicrophoneTap != null)
+                Container(
+                  key: widget.audioButtonKey,
+                  width: buttonSize,
+                  height: buttonSize,
+                  decoration: BoxDecoration(
+                    color: widget.isListening
+                        ? primaryColor
+                        : Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: widget.isListening
+                          ? primaryColor
+                          : Color(0xFFE0E0E0),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: (_isSending || widget.isLoading)
+                          ? null
+                          : () {
+                              HapticFeedback.mediumImpact();
+                              widget.onMicrophoneTap!();
+                            },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Center(
+                        child: Icon(
+                          widget.isListening ? Icons.mic : Icons.mic_none,
+                          color: widget.isListening
+                              ? Colors.white
+                              : Color(0xFF666666),
+                          size: iconSize,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              SizedBox(width: 10),
+
+              // Send Button
+              Container(
+                width: buttonSize,
+                height: buttonSize,
+                decoration: BoxDecoration(
+                  color: (_isSending || widget.isLoading)
+                      ? Colors.grey.shade400
+                      : primaryColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: (_isSending || widget.isLoading)
+                        ? null
+                        : () {
+                            HapticFeedback.lightImpact();
+                            _handleSendMessage();
+                          },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Center(
+                      child: (_isSending || widget.isLoading)
+                          ? SizedBox(
+                              width: iconSize - 4,
+                              height: iconSize - 4,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : Icon(
+                              Icons.arrow_forward_rounded,
+                              color: Colors.white,
+                              size: iconSize,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

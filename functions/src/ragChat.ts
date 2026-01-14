@@ -1,6 +1,6 @@
 
 
-import { onRequest } from "firebase-functions/v2/https";
+import { onCall, onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import { Pinecone } from "@pinecone-database/pinecone";
@@ -10,6 +10,7 @@ import { onSchedule } from "firebase-functions/scheduler";
 // Secrets
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
+const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
 
 const db = admin.firestore();
 
@@ -18,6 +19,67 @@ const db = admin.firestore();
 // ============================================================================
 
 const GEMINI_MODEL = "gemini-2.5-flash";
+
+export const generateEmbedding = onCall(
+  { secrets: [GEMINI_API_KEY] },
+  async (request) => {
+    if (!request.auth) throw new Error("Unauthorized");
+
+    const { text } = request.data;
+    if (!text) throw new Error("Text required");
+
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY.value()}`,
+      {
+        model: "models/text-embedding-004",
+        content: { parts: [{ text }] },
+      },
+      { timeout: 30000 }
+    );
+
+    const embedding = response.data?.embedding?.values;
+    if (!Array.isArray(embedding)) {
+      throw new Error("Invalid Gemini embedding");
+    }
+
+    return { embedding };
+  }
+);
+
+// ================= COHERE =================
+
+export const generateCohereEmbedding = onCall(
+  { secrets: [COHERE_API_KEY] },
+  async (request) => {
+    if (!request.auth) throw new Error("Unauthorized");
+
+    const { text } = request.data;
+    if (!text) throw new Error("Text required");
+
+    const response = await axios.post(
+      "https://api.cohere.ai/v1/embed",
+      {
+        texts: [text],
+        model: "embed-multilingual-v3.0",
+        input_type: "search_document",
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${COHERE_API_KEY.value()}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 30000,
+      }
+    );
+
+    const embedding = response.data?.embeddings?.[0];
+    if (!Array.isArray(embedding)) {
+      throw new Error("Invalid Cohere embedding");
+    }
+
+    return { embedding };
+  }
+);
 
 export async function generateGeminiEmbedding(
   text: string,
@@ -62,6 +124,8 @@ export async function generateGeminiEmbedding(
     throw error;
   }
 }
+
+
 
 
 function cosineSimilarity(vecA: number[], vecB: number[]): number {

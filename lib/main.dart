@@ -18,23 +18,25 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/modules/authentication_module/onboarding/onboarding.dart';
 
-
 import 'package:capstone_project/provider/chat_provider.dart';
 import 'package:capstone_project/services/admin_functions.dart';
 import 'package:capstone_project/services/answer_retrieval.dart';
 import 'package:capstone_project/services/cohere_service.dart';
 import 'package:capstone_project/services/pinecone_service.dart';
 import 'package:capstone_project/services/notification_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'firebase_options.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// ✅ NEW: Reusable Loading Overlay Widget
+// Loading Overlay Widget
 class LoadingOverlay {
   static void show(BuildContext context, {String? message}) {
     showDialog(
@@ -126,14 +128,16 @@ class NotificationNavigationHandler {
     }
   }
 
-  void _navigateToEscalationDetail(BuildContext context, Map<String, dynamic> data) async {
+  void _navigateToEscalationDetail(
+    BuildContext context,
+    Map<String, dynamic> data,
+  ) async {
     final escalationId = data['escalationId'];
     if (escalationId == null || escalationId.isEmpty) {
       print('⚠️ No escalation ID provided');
       return;
     }
 
-    // ✅ Show loading overlay
     LoadingOverlay.show(context, message: 'Loading escalation...');
 
     try {
@@ -148,16 +152,15 @@ class NotificationNavigationHandler {
           .collection('users')
           .doc(user.uid)
           .get();
-      
+
       final role = userDoc.data()?['role'] ?? 'user';
-      
       final route = role == 'admin' ? '/admin/home' : '/staff/home';
       final tabIndex = role == 'admin' ? 5 : 2;
-      
+
       print('📍 Navigating $role to escalations (route: $route, tab: $tabIndex)');
-      
+
       LoadingOverlay.hide(context);
-      
+
       Navigator.of(context).pushReplacementNamed(
         route,
         arguments: {
@@ -171,27 +174,23 @@ class NotificationNavigationHandler {
       LoadingOverlay.hide(context);
       Navigator.of(context).pushReplacementNamed(
         '/staff/escalations',
-        arguments: {
-          'escalationId': escalationId,
-          'autoOpen': true,
-        },
+        arguments: {'escalationId': escalationId, 'autoOpen': true},
       );
     }
   }
 
-  Future<void> _showEscalationResponse(BuildContext context, Map<String, dynamic> data) async {
+  Future<void> _showEscalationResponse(
+    BuildContext context,
+    Map<String, dynamic> data,
+  ) async {
     final escalationId = data['escalationId'] ?? data['relatedId'];
-    
-    print('🔍 DEBUG: escalationId = $escalationId');
-    print('🔍 DEBUG: data keys = ${data.keys}');
-    
+
     if (escalationId == null || escalationId.isEmpty) {
       _showErrorDialog(context, 'No escalation ID provided');
       return;
     }
 
     try {
-      // ✅ Use new loading overlay
       LoadingOverlay.show(context, message: 'Loading response...');
 
       final escalationDoc = await FirebaseFirestore.instance
@@ -227,18 +226,32 @@ class NotificationNavigationHandler {
                   color: const Color(0xFF2E7D32).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.support_agent, color: Color(0xFF2E7D32), size: 24),
+                child: const Icon(
+                  Icons.support_agent,
+                  color: Color(0xFF2E7D32),
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Staff Response', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Staff Response',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     if (respondedAt != null)
                       Text(
                         formatTime(respondedAt),
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.normal),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.normal,
+                        ),
                       ),
                   ],
                 ),
@@ -264,11 +277,25 @@ class NotificationNavigationHandler {
                         children: [
                           Icon(Icons.question_answer, size: 16, color: Colors.grey.shade600),
                           const SizedBox(width: 6),
-                          Text('Your Question', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600)),
+                          Text(
+                            'Your Question',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text(userQuestion, style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.4)),
+                      Text(
+                        userQuestion,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade700,
+                          height: 1.4,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -279,7 +306,10 @@ class NotificationNavigationHandler {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [const Color(0xFF2E7D32).withOpacity(0.1), const Color(0xFF388E3C).withOpacity(0.05)],
+                      colors: [
+                        const Color(0xFF2E7D32).withOpacity(0.1),
+                        const Color(0xFF388E3C).withOpacity(0.05),
+                      ],
                     ),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: const Color(0xFF2E7D32).withOpacity(0.3)),
@@ -291,11 +321,25 @@ class NotificationNavigationHandler {
                         children: [
                           const Icon(Icons.support_agent, size: 16, color: Color(0xFF2E7D32)),
                           const SizedBox(width: 6),
-                          Text('Response from $respondedBy', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32))),
+                          Text(
+                            'Response from $respondedBy',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2E7D32),
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text(staffResponse, style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.5)),
+                      Text(
+                        staffResponse,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade800,
+                          height: 1.5,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -305,7 +349,13 @@ class NotificationNavigationHandler {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Close', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+              child: Text(
+                'Close',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
             if (conversationId != null && conversationId.isNotEmpty)
               ElevatedButton(
@@ -323,7 +373,7 @@ class NotificationNavigationHandler {
 
       if (shouldNavigate == true && conversationId != null && conversationId.isNotEmpty) {
         print('✅ Navigating to chat with conversation: $conversationId');
-        
+
         if (context.mounted) {
           Navigator.of(context).pushReplacementNamed(
             '/home',
@@ -344,8 +394,10 @@ class NotificationNavigationHandler {
     }
   }
 
-  Future<void> _navigateToAnnouncement(BuildContext context, Map<String, dynamic> data) async {
-    // ✅ Show loading overlay
+  Future<void> _navigateToAnnouncement(
+    BuildContext context,
+    Map<String, dynamic> data,
+  ) async {
     LoadingOverlay.show(context, message: 'Opening announcement...');
 
     try {
@@ -360,38 +412,26 @@ class NotificationNavigationHandler {
           .collection('users')
           .doc(user.uid)
           .get();
-      
+
       final role = userDoc.data()?['role'] ?? 'user';
       final announcementId = data['announcementId'];
-
-      print('📢 Navigating to announcements for role: $role');
-      print('📢 Announcement ID: $announcementId');
 
       LoadingOverlay.hide(context);
 
       if (role == 'user') {
         Navigator.of(context).pushReplacementNamed(
           '/home',
-          arguments: {
-            'initialTab': 2,
-            'announcementId': announcementId,
-          },
+          arguments: {'initialTab': 2, 'announcementId': announcementId},
         );
       } else if (role == 'staff') {
         Navigator.of(context).pushReplacementNamed(
           '/staff/home',
-          arguments: {
-            'initialTab': 3,
-            'announcementId': announcementId,
-          },
+          arguments: {'initialTab': 3, 'announcementId': announcementId},
         );
       } else if (role == 'admin') {
         Navigator.of(context).pushReplacementNamed(
           '/admin/home',
-          arguments: {
-            'initialTab': 4,
-            'announcementId': announcementId,
-          },
+          arguments: {'initialTab': 4, 'announcementId': announcementId},
         );
       }
     } catch (e) {
@@ -429,78 +469,126 @@ class NotificationNavigationHandler {
   }
 }
 
-  Future<void> initializeServices() async {
+Future<void> initializeServices() async {
   try {
     print('🚀 Initializing services...');
-    
+
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     print('✅ Background handler registered');
-    
-    await NotificationService().initialize(); // ✅ Make this await
+
+    await NotificationService().initialize();
     print('✅ Notifications ready');
-    
+
     NotificationNavigationHandler(navigatorKey).setup();
-    
+
     print('✅ Core services initialized');
   } catch (e, stackTrace) {
     print('⚠️ Service init warning: $e');
     print('Stack: $stackTrace');
   }
 }
-void main() {
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
+
+// ✅ CRITICAL FIX: Properly configure Firebase Functions for production
+void configureFirebaseFunctions() {
+  try {
+    // Get the default Functions instance
+    final functions = FirebaseFunctions.instance;
     
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    // ⚠️ NEVER use emulator in production builds
+    // The emulator should ONLY be used during local development
+    // For production, Firebase Functions automatically connects to your deployed functions
     
-    SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: [SystemUiOverlay.top],
-    );
+    if (kDebugMode) {
+      print('🔧 Firebase Functions configured for: ${functions.app.options.projectId}');
+      print('   Region: us-central1 (default)');
+      
+      // ⚠️ ONLY uncomment these lines if you're actively developing locally with the emulator running
+      // Comment them out or remove them for production builds
+      // functions.useFunctionsEmulator('localhost', 5001);
+      // print('⚙️ Using Functions emulator at localhost:5001');
+    } else {
+      print('✅ Firebase Functions configured for production');
+      print('   Project: ${functions.app.options.projectId}');
+    }
+  } catch (e) {
+    print('⚠️ Error configuring Firebase Functions: $e');
+  }
+}
 
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    print('✅ Firebase initialized');
+void main() async {
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
 
-    initializeServices();
+      // ✅ Load environment variables FIRST
+      try {
+        await dotenv.load(fileName: '.env');
+        print('✅ Environment variables loaded');
+      } catch (e) {
+        print('⚠️ Could not load .env file: $e');
+        print('   Make sure .env exists in project root');
+      }
 
-    
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
 
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.manual,
+        overlays: [SystemUiOverlay.top],
+      );
 
-    runApp(
-      MultiProvider(
-        providers: [
-          Provider<CohereService>(create: (_) => CohereService()),
-          ProxyProvider<CohereService, AnswerRetrievalService>(
-            update: (_, cohere, __) => AnswerRetrievalService(),
-          ),
-          ChangeNotifierProxyProvider<AnswerRetrievalService, ChatProvider>(
-            create: (_) => ChatProvider(AnswerRetrievalService()),
-            update: (_, retriever, __) => ChatProvider(retriever),
-          ),
-          Provider<PineconeCloudService>(create: (_) => PineconeCloudService()),
-          Provider<FirebaseFunctionsService>(
-            create: (_) {
-              print('🔧 Creating FirebaseFunctionsService');
-              return FirebaseFunctionsService();
-            },
-            dispose: (_, __) {},
-          ),
-          Provider<NotificationService>.value(
-            value: NotificationService(),
-          ),
-        ],
-        child: const MyApp(),
-      ),
-    );
-  }, (error, stackTrace) {
-    print('🔴 Zone Error: $error');
-    print('🧩 StackTrace: $stackTrace');
-  });
+      // ✅ Initialize Firebase FIRST
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      print('✅ Firebase initialized');
+      
+      // ✅ Wait a moment for Firebase to fully initialize
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // ✅ Configure Functions IMMEDIATELY after Firebase init
+      configureFirebaseFunctions();
+
+      // ✅ Then initialize other services
+      await initializeServices();
+
+      runApp(
+        MultiProvider(
+          providers: [
+            Provider<CohereService>(create: (_) => CohereService()),
+            ProxyProvider<CohereService, AnswerRetrievalService>(
+              update: (_, cohere, __) => AnswerRetrievalService(),
+            ),
+            ChangeNotifierProxyProvider<AnswerRetrievalService, ChatProvider>(
+              create: (_) => ChatProvider(AnswerRetrievalService()),
+              update: (_, retriever, __) => ChatProvider(retriever),
+            ),
+            Provider<PineconeCloudService>(
+              create: (_) {
+                print('🔧 Creating PineconeCloudService');
+                return PineconeCloudService();
+              },
+            ),
+            Provider<FirebaseFunctionsService>(
+              create: (_) {
+                print('🔧 Creating FirebaseFunctionsService');
+                return FirebaseFunctionsService();
+              },
+              dispose: (_, __) {},
+            ),
+            Provider<NotificationService>.value(value: NotificationService()),
+          ],
+          child: const MyApp(),
+        ),
+      );
+    },
+    (error, stackTrace) {
+      print('🔴 Zone Error: $error');
+      print('🧩 StackTrace: $stackTrace');
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -580,17 +668,19 @@ class MyApp extends StatelessWidget {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
           final escalationId = args?['escalationId'] as String?;
           final autoOpen = args?['autoOpen'] as bool? ?? false;
-            final serviceUnit = args?['serviceUnit'] as String;
+          final serviceUnit = args?['serviceUnit'] as String;
           return HumanEscalation(
             initialEscalationId: escalationId,
             autoOpen: autoOpen,
-            serviceUnit: serviceUnit
+            serviceUnit: serviceUnit,
           );
         },
       },
     );
   }
 }
+
+// [Rest of your code remains exactly the same - OnboardingManager, AppInitializer, SplashScreen, ErrorScreen]
 
 class OnboardingManager {
   static const String _appOnboardingKey = 'app_onboarding_completed';
@@ -616,19 +706,18 @@ class OnboardingManager {
     await prefs.setBool('${_userOnboardingPrefix}_$userId', true);
   }
 
-  
-
-  static Future<void> handleFirstTimeLogin(BuildContext context, String userId, String userName) async {
+  static Future<void> handleFirstTimeLogin(
+    BuildContext context,
+    String userId,
+    String userName,
+  ) async {
     try {
       final hasSeenUserOnboarding = await OnboardingManager.hasSeenUserOnboarding(userId);
-      
+
       if (!hasSeenUserOnboarding) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => UserOnboardingScreen(
-              userId: userId,
-              userName: userName,
-            ),
+            builder: (context) => UserOnboardingScreen(userId: userId, userName: userName),
           ),
         );
       } else {
@@ -669,7 +758,6 @@ class AppInitializer extends StatelessWidget {
   }
 }
 
-// ✅ IMPROVED: Enhanced splash screen with animation
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
 
@@ -690,13 +778,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
 
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
-    );
+    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
     _controller.forward();
   }
@@ -715,10 +801,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF667EEA),
-              Color(0xFF764BA2),
-            ],
+            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
           ),
         ),
         child: Center(
@@ -801,7 +884,11 @@ class ErrorScreen extends StatelessWidget {
                   color: Colors.red.shade50,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.error_outline, size: 80, color: Colors.red.shade600),
+                child: Icon(
+                  Icons.error_outline,
+                  size: 80,
+                  color: Colors.red.shade600,
+                ),
               ),
               const SizedBox(height: 32),
               const Text(
@@ -823,8 +910,13 @@ class ErrorScreen extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF667EEA),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 48,
+                    vertical: 16,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 4,
                 ),
                 child: const Text(

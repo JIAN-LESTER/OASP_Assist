@@ -58,7 +58,7 @@ class _CategoryDistributionDetailDialogState
         messages = snapshot.docs.map((doc) {
           final data = doc.data();
           return {
-            'text': data['text'] ?? 'N/A',
+            'content': data['content'] ?? 'N/A',
             'category': data['category'] ?? 'General',
             'timestamp': (data['sent_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
             'isAnswered': data['isAnswered'] ?? false,

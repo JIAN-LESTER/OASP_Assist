@@ -1,6 +1,9 @@
 
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
@@ -586,19 +589,28 @@ Future<bool> _isEmailUnique(String email, {String? excludeUserId}) async {
     final functionsService = FirebaseFunctionsService();
     String uid;
 
-        Map<String, dynamic> userData = {
-      'name': fullName,
-      'email': email,
-      'role': _selectedRole.toLowerCase().trim(),
-      'isActive': true,
+ // 1. Check if we are on Windows/Direct path
+bool useDirect = !kIsWeb && Platform.isWindows;
 
-      'profileCompleted': true,
-      'onboardingCompleted': true,
-      'isVerified': true,
-      'emailVerified': true,
-  
-    };
+Map<String, dynamic> userData = {
+  'name': fullName.trim(),
+  'email': email.trim().toLowerCase(),
+  'role': _selectedRole.toLowerCase().trim(),
+  'isActive': true,
+  'profileCompleted': true,
+  'onboardingCompleted': true,
+  'isVerified': true,
+  'emailVerified': true,
 
+  // FIX: Use a string for Windows/JSON calls, and FieldValue for Firebase
+  'createdAt': useDirect 
+      ? DateTime.now().toUtc().toIso8601String() 
+      : FieldValue.serverTimestamp(),
+      
+  'updatedAt': useDirect 
+      ? DateTime.now().toUtc().toIso8601String() 
+      : FieldValue.serverTimestamp(),
+};
     try {
       uid = await functionsService.createUserAuth(
         email: email,

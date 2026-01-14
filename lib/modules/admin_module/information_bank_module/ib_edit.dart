@@ -1110,8 +1110,8 @@ Future<void> _handleSaveChanges(
     await logRef.set(logData);
 
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
-      Navigator.of(context).pop(); // Close edit modal
+      Navigator.of(context).pop(); 
+      Navigator.of(context).pop(); 
 
       Future.delayed(const Duration(milliseconds: 200), () {
         if (previousModal == 'info') {

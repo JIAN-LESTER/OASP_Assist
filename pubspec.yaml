@@ -25,6 +25,7 @@ dependencies:
   pdf: ^3.11.3
   
   syncfusion_flutter_pdf: ^29.2.5
+  flutter_dotenv: ^6.0.0
   foundation: ^0.0.5
   intl: ^0.20.2
   uuid: ^4.5.1
@@ -85,3 +86,4 @@ flutter:
     - lib/images/phone_number.png
     - lib/images/guest.png
     - lib/images/oasp.png
+    - .env
