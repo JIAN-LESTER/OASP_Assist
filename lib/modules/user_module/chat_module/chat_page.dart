@@ -605,37 +605,43 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 // ✅ CONTENT WITH TEXT SELECTION ENABLED
-                         isUser
-    ? SelectableLinkify(
-        onOpen: _onLinkTap,
-        text: _convertMarkdownLinksToPlainUrls(displayContent), // ✅ Convert markdown links
-        textAlign: TextAlign.justify,
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 15,
-          height: 1.5,
-          fontWeight: FontWeight.w500,
-        ),
-        linkStyle: TextStyle(
-          decoration: TextDecoration.underline,
-          color: Colors.yellow[100],
-          fontWeight: FontWeight.w600,
-        ),
-        options: LinkifyOptions(
-          humanize: false,
-          looseUrl: true,
-          defaultToHttps: true,
-        ),
-      )
-    : MarkdownBody(
-        data: _convertMarkdownLinksToPlainUrls(displayContent), // ✅ Convert markdown links
-        selectable: true,
-        onTapLink: (text, href, title) {
-          if (href != null) {
-            _onLinkTap(LinkableElement(href, text));
-          }
-        },
-        styleSheet: MarkdownStyleSheet(
+                                isUser
+                                    ? SelectableLinkify(
+                                      onOpen: _onLinkTap,
+                                      text: _convertMarkdownLinksToPlainUrls(
+                                        displayContent,
+                                      ), // ✅ Convert markdown links
+                                      textAlign: TextAlign.justify,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        height: 1.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      linkStyle: TextStyle(
+                                        decoration: TextDecoration.underline,
+                                        color: Colors.yellow[100],
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      options: LinkifyOptions(
+                                        humanize: false,
+                                        looseUrl: true,
+                                        defaultToHttps: true,
+                                      ),
+                                    )
+                                    : MarkdownBody(
+                                      data: _convertMarkdownLinksToPlainUrls(
+                                        displayContent,
+                                      ), // ✅ Convert markdown links
+                                      selectable: true,
+                                      onTapLink: (text, href, title) {
+                                        if (href != null) {
+                                          _onLinkTap(
+                                            LinkableElement(href, text),
+                                          );
+                                        }
+                                      },
+                                      styleSheet: MarkdownStyleSheet(
                                         p: TextStyle(
                                           color:
                                               message.sender == 'staff' ||
@@ -818,16 +824,14 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     );
   }
 
-String _convertMarkdownLinksToPlainUrls(String text) {
-  return text.replaceAllMapped(
-    RegExp(r'\[([^\]]+)\]\(([^\)]+)\)'),
-    (match) {
+  String _convertMarkdownLinksToPlainUrls(String text) {
+    return text.replaceAllMapped(RegExp(r'\[([^\]]+)\]\(([^\)]+)\)'), (match) {
       final linkText = match.group(1) ?? '';
       final url = match.group(2) ?? '';
       return '$linkText ($url)'; // ✅ Shows both text and URL
-    },
-  );
-}
+    });
+  }
+
   // ✅ NEW: Simpler typing cursor widget
   Widget _buildTypingCursor() {
     return TweenAnimationBuilder<double>(
@@ -1879,10 +1883,9 @@ String _convertMarkdownLinksToPlainUrls(String text) {
 
       final uid = FirebaseAuth.instance.currentUser!.uid;
 
-final userDoc =
-    await _firestore.collection('users').doc(uid).get();
+      final userDoc = await _firestore.collection('users').doc(uid).get();
 
-final userName = userDoc.data()?['name'] ?? 'Unknown User';
+      final userName = userDoc.data()?['name'] ?? 'Unknown User';
 
       final escalationRef = _firestore.collection('escalations').doc();
       final escalationId = escalationRef.id;
@@ -2487,80 +2490,80 @@ final userName = userDoc.data()?['name'] ?? 'Unknown User';
   }
 
   void _sendMessage(ChatProvider chatProvider) async {
-  final text = _controller.text.trim();
-  if (text.isEmpty || chatProvider.isLoading) return;
+    final text = _controller.text.trim();
+    if (text.isEmpty || chatProvider.isLoading) return;
 
-  final remainingMessages =
-      ChatProvider.MAX_DAILY_MESSAGES - chatProvider.userDailyMessageCount;
+    final remainingMessages =
+        ChatProvider.MAX_DAILY_MESSAGES - chatProvider.userDailyMessageCount;
 
+    if (remainingMessages == 2) {
+      final bool? shouldContinue = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder:
+            (context) => MessageLimitWarningDialog(
+              remainingMessages: remainingMessages,
+              timeUntilReset: chatProvider.getTimeUntilReset(),
+            ),
+      );
 
+      if (shouldContinue != true) {
+        return;
+      }
+    }
 
-  if (remainingMessages == 2) {
-    final bool? shouldContinue = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => MessageLimitWarningDialog(
-        remainingMessages: remainingMessages,
-        timeUntilReset: chatProvider.getTimeUntilReset(),
-      ),
-    );
+    // ✅ Check if completely out of messages
+    if (chatProvider.isMessageLimitReached) {
+      final timeUntilReset = chatProvider.getTimeUntilReset();
 
-    if (shouldContinue != true) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => MessageLimitDialog(timeUntilReset: timeUntilReset),
+      );
       return;
     }
-  }
 
-  // ✅ Check if completely out of messages
-  if (chatProvider.isMessageLimitReached) {
-    final timeUntilReset = chatProvider.getTimeUntilReset();
+    // ✅ CRITICAL FIX 2: Clear controller and hide FAQs immediately
+    _controller.clear();
 
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => MessageLimitDialog(timeUntilReset: timeUntilReset),
-    );
-    return;
-  }
+    if (_showFAQs && mounted) {
+      setState(() {
+        _showFAQs = false;
+      });
+    }
 
-  // ✅ CRITICAL FIX 2: Clear controller and hide FAQs immediately
-  _controller.clear();
-
-  if (_showFAQs && mounted) {
-    setState(() {
-      _showFAQs = false;
-    });
-  }
-
-  try {
-    // ✅ Send message - the scroll callback will be triggered automatically
-    await chatProvider.askQuestionWithStreaming(context, text);
-  } catch (e) {
-    debugPrint('Error sending message: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                Icons.error_outline_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-              SizedBox(width: 12),
-              Expanded(child: Text('Error sending message: ${e.toString()}')),
-            ],
+    try {
+      // ✅ Send message - the scroll callback will be triggered automatically
+      await chatProvider.askQuestionWithStreaming(context, text);
+    } catch (e) {
+      debugPrint('Error sending message: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  Icons.error_outline_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                SizedBox(width: 12),
+                Expanded(child: Text('Error sending message: ${e.toString()}')),
+              ],
+            ),
+            backgroundColor: Colors.red.shade400,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: EdgeInsets.all(16),
           ),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: EdgeInsets.all(16),
-        ),
-      );
+        );
+      }
     }
   }
-}
 
   @override
   void dispose() {
@@ -2623,45 +2626,48 @@ final userName = userDoc.data()?['name'] ?? 'Unknown User';
 
   Widget _buildEmptyChatState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Image.asset('lib/images/oasp.png', fit: BoxFit.contain),
-            ),
-          ),
-          SizedBox(height: 20),
-          Text(
-            'Start Chatting!',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Colors.grey.shade800,
-              letterSpacing: 0.5,
-            ),
-          ),
-          SizedBox(height: 8),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              'Type a message below or tap the help icon to see FAQs',
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey.shade600,
-                height: 1.4,
+      child: Container(
+        constraints: BoxConstraints(maxWidth: 800), // ✅ Added max width
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(16),
               ),
-              textAlign: TextAlign.center,
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Image.asset('lib/images/oasp.png', fit: BoxFit.contain),
+              ),
             ),
-          ),
-        ],
+            SizedBox(height: 20),
+            Text(
+              'Start Chatting!',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: Colors.grey.shade800,
+                letterSpacing: 0.5,
+              ),
+            ),
+            SizedBox(height: 8),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'Type a message below or tap the help icon to see FAQs',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.grey.shade600,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2805,14 +2811,19 @@ final userName = userDoc.data()?['name'] ?? 'Unknown User';
       itemCount: messages.length + (chatProvider.showTypingIndicator ? 1 : 0),
       padding: EdgeInsets.only(top: 16, bottom: 24, left: 8, right: 8),
       itemBuilder: (context, index) {
-        // ✅ Show typing indicator at the end
+        //  Show typing indicator at the end
         if (chatProvider.showTypingIndicator && index == messages.length) {
-          return _buildTypingIndicatorBubble();
+          return Center(
+            child: Container(
+              constraints: BoxConstraints(maxWidth: 1250), //  Added max width
+              child: _buildTypingIndicatorBubble(),
+            ),
+          );
         }
 
         final Message message = messages[index];
 
-        // ✅ NEW: Skip rendering bot messages that are currently streaming and empty
+        //  NEW: Skip rendering bot messages that are currently streaming and empty
         final streamingContent = chatProvider.getStreamingContent(message.id);
         final isStreaming = streamingContent != null;
 
@@ -2826,12 +2837,20 @@ final userName = userDoc.data()?['name'] ?? 'Unknown User';
         final bool isUser = message.sender == 'user';
         final bool isLastMessage = index == messages.length - 1;
 
-        return AnimatedOpacity(
-          opacity: 1.0,
-          duration: Duration(milliseconds: 200),
-          child: Padding(
-            padding: EdgeInsets.only(bottom: isLastMessage ? 16 : 4),
-            child: _buildMessageBubble(message, isUser),
+        return Center(
+          //  Added Center widget
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: 1250, //  Added max width constraint
+            ),
+            child: AnimatedOpacity(
+              opacity: 1.0,
+              duration: Duration(milliseconds: 200),
+              child: Padding(
+                padding: EdgeInsets.only(bottom: isLastMessage ? 16 : 4),
+                child: _buildMessageBubble(message, isUser),
+              ),
+            ),
           ),
         );
       },
@@ -2864,7 +2883,7 @@ class FirstTimeWelcomeDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ✅ Fixed Header (Green, compact)
+            //  Fixed Header (Green, compact)
             Container(
               width: double.infinity,
               padding: EdgeInsets.all(isMobile ? 20 : 24),
@@ -2926,7 +2945,7 @@ class FirstTimeWelcomeDialog extends StatelessWidget {
               ),
             ),
 
-            // ✅ Scrollable Content
+            // Scrollable Content
             Flexible(
               child: SingleChildScrollView(
                 padding: EdgeInsets.all(isMobile ? 20 : 24),
