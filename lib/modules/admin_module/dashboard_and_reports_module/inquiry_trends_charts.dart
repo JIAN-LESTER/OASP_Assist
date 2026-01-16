@@ -572,8 +572,10 @@ Widget buildHighestFAQCard(Map<String, int> highestFAQ) {
 Widget buildInquiryTrendCard(
   List<ChartData> trendData,
   String timeFrame,
-  BuildContext context,
-) {
+  BuildContext context, {
+  DateTime? startDate,  // Add these
+  DateTime? endDate,    // Add these
+}) {
   Set<String> allCategories = {};
   for (var data in trendData) {
     allCategories.addAll(data.categoryBreakdown.keys);
@@ -931,35 +933,39 @@ Widget buildInquiryTrendCard(
                             },
                           ),
                         ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 32,
-                            interval: _getBottomTitleInterval(
-                              trendData.length,
-                              timeFrame,
-                            ),
-                            getTitlesWidget: (value, meta) {
-                              if (value < 0 || value >= trendData.length) {
-                                return const SizedBox.shrink();
-                              }
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  _formatBottomTitle(
-                                    trendData[value.toInt()].date,
-                                    timeFrame,
-                                  ),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+          bottomTitles: AxisTitles(
+  sideTitles: SideTitles(
+    showTitles: true,
+    reservedSize: 32,
+    interval: _getBottomTitleInterval(
+      trendData.length,
+      timeFrame,
+      startDate,  // Pass these if available
+      endDate,    // Pass these if available
+    ),
+    getTitlesWidget: (value, meta) {
+      if (value < 0 || value >= trendData.length) {
+        return const SizedBox.shrink();
+      }
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          _formatBottomTitle(
+            trendData[value.toInt()].date,
+            timeFrame,
+            startDate,  // Pass these if available
+            endDate,    // Pass these if available
+          ),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[600],
+          ),
+        ),
+      );
+    },
+  ),
+),
                       ),
                       borderData: FlBorderData(
                         show: true,
@@ -1131,7 +1137,27 @@ double _getGridInterval(List<ChartData> trendData) {
   return (maxCount / 5).ceil().toDouble();
 }
 
-double _getBottomTitleInterval(int dataLength, String timeFrame) {
+double _getBottomTitleInterval(int dataLength, String timeFrame, [DateTime? startDate, DateTime? endDate]) {
+  // Handle custom date ranges
+  if (timeFrame == 'Custom' && startDate != null && endDate != null) {
+    final daysDiff = endDate.difference(startDate).inDays;
+    
+    if (daysDiff == 0) {
+      // Hourly: show every 3-4 hours
+      return dataLength <= 24 ? 3.0 : 4.0;
+    } else if (daysDiff <= 7) {
+      // Daily: show all days if 7 or fewer
+      return 1.0;
+    } else if (daysDiff <= 31) {
+      // Weekly: show all weeks
+      return 1.0;
+    } else {
+      // Monthly: show every other month if more than 6 months
+      return dataLength <= 6 ? 1.0 : 2.0;
+    }
+  }
+
+  // Existing preset timeframe logic
   switch (timeFrame) {
     case 'All':
       return 1.0;
@@ -1150,7 +1176,34 @@ double _getBottomTitleInterval(int dataLength, String timeFrame) {
   }
 }
 
-String _formatBottomTitle(String date, String timeFrame) {
+String _formatBottomTitle(String date, String timeFrame, [DateTime? startDate, DateTime? endDate]) {
+  // Handle custom date ranges
+  if (timeFrame == 'Custom' && startDate != null && endDate != null) {
+    final daysDiff = endDate.difference(startDate).inDays;
+    
+    if (daysDiff == 0) {
+      // Hourly format: "12AM", "3PM", etc.
+      if (date.contains(":")) {
+        int hour = int.tryParse(date.split(":")[0]) ?? 0;
+        if (hour == 0) return "12AM";
+        if (hour < 12) return "${hour}AM";
+        if (hour == 12) return "12PM";
+        return "${hour - 12}PM";
+      }
+      return date;
+    } else if (daysDiff <= 7) {
+      // Daily format: already formatted as "Mon", "Tue", etc.
+      return date;
+    } else if (daysDiff <= 31) {
+      // Weekly format: "W1", "W2", etc.
+      return date.replaceAll("Week ", "W");
+    } else {
+      // Monthly format: "Jan", "Feb", etc.
+      return date;
+    }
+  }
+
+  // Existing preset timeframe logic
   switch (timeFrame) {
     case 'All':
       return date;
@@ -1171,5 +1224,29 @@ String _formatBottomTitle(String date, String timeFrame) {
       return date;
     default:
       return date.length <= 3 ? date : date.substring(0, 3);
+  }
+}
+
+String _getTimeFrameDescription(String timeFrame, [DateTime? startDate, DateTime? endDate]) {
+  if (timeFrame == 'Custom' && startDate != null && endDate != null) {
+    final daysDiff = endDate.difference(startDate).inDays;
+    
+    if (daysDiff == 0) return 'by hour';
+    if (daysDiff <= 7) return 'by day';
+    if (daysDiff <= 31) return 'by week';
+    return 'by month';
+  }
+
+  switch (timeFrame) {
+    case 'Today':
+      return 'by hour';
+    case 'This Week':
+      return 'by day';
+    case 'This Month':
+      return 'by week';
+    case 'This Year':
+      return 'by month';
+    default:
+      return 'over time';
   }
 }

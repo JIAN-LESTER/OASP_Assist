@@ -9,7 +9,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:capstone_project/modules/authentication_module/onboarding/userOnboarding.dart';
 
-
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
 
@@ -58,8 +57,6 @@ class _AuthPageState extends State<AuthPage> {
             // CHECK EMAIL VERIFICATION FIRST
             if (!user.emailVerified) {
               print('⚠️ Email not verified for ${user.email}');
-              // Just show login page - don't sign out
-              // The register page handles the sign out flow
               return const LoginPage();
             }
 
@@ -100,7 +97,6 @@ class RoleBasedRouter extends StatelessWidget {
           );
         }
 
-        // ✅ Handle errors by showing retry - don't sign out
         if (snapshot.hasError || !snapshot.hasData) {
           print('❌ Error in RoleBasedRouter: ${snapshot.error}');
 
@@ -133,7 +129,6 @@ class RoleBasedRouter extends StatelessWidget {
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
                       onPressed: () {
-                        // Force rebuild to retry
                         (context as Element).markNeedsBuild();
                       },
                       icon: const Icon(Icons.refresh),
@@ -161,20 +156,23 @@ class RoleBasedRouter extends StatelessWidget {
         print('✅ Routing user: ${userData.name}');
         print('📌 Role: ${userData.role}');
         print('📋 Profile Completed: ${userData.isProfileCompleted}');
+        print('📋 Onboarding Completed: ${userData.isOnboardingCompleted}');
+        
         switch (userData.role) {
           case 'admin':
             return AdminMainPage();
           case 'staff':
             return StaffMainPage();
           case 'user':
-            if (!userData.isProfileCompleted) {
-              print('📝 Profile incomplete - showing onboarding');
+            // ✅ FIXED: Check BOTH onboardingCompleted AND profileCompleted
+            if (!userData.isOnboardingCompleted || !userData.isProfileCompleted) {
+              print('📝 Onboarding/Profile incomplete - showing onboarding');
               return UserOnboardingScreen(
                 userId: user?.uid ?? '',
                 userName: userData.name,
               );
             } else {
-              print('✅ Profile complete - going to main page');
+              print('✅ Onboarding and profile complete - going to main page');
               return UserMainPage();
             }
           default:
@@ -193,28 +191,29 @@ class RoleBasedRouter extends StatelessWidget {
       }
 
       print('🔍 Fetching user data for: ${user.uid}');
-      final doc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
 
       String role = 'user';
       String name = user.displayName ?? user.email?.split('@')[0] ?? 'User';
       bool profileCompleted = false;
+      bool onboardingCompleted = false;
 
       if (doc.exists) {
         final data = doc.data()!;
         role = data['role'] ?? 'user';
         name = data['name'] ?? name;
         profileCompleted = data['profileCompleted'] ?? false;
+        onboardingCompleted = data['onboardingCompleted'] ?? false;
 
         print('📊 User data found:');
         print('   - Role: $role');
         print('   - Name: $name');
         print('   - Profile Completed: $profileCompleted');
+        print('   - Onboarding Completed: $onboardingCompleted');
 
-        // Update last login (don't fail if this fails)
         try {
           await FirebaseFirestore.instance
               .collection('users')
@@ -226,7 +225,6 @@ class RoleBasedRouter extends StatelessWidget {
       } else {
         print('⚠️ User document not found, creating new one');
 
-        // Create a user doc if not existing
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'email': user.email ?? '',
@@ -241,14 +239,13 @@ class RoleBasedRouter extends StatelessWidget {
           'hasSeenOnboardingGuide': false,
           'isVerified': user.emailVerified,
           'linkedProviders': ['password'],
-          'dailyMessageCount': 0, // ✅ Initialize to 0
-          'lastMessageResetDate': FieldValue.serverTimestamp(), // ✅ Set to now
+          'dailyMessageCount': 0,
+          'lastMessageResetDate': FieldValue.serverTimestamp(),
         });
 
         print('✅ New user document created');
       }
 
-      // Log login (don't fail if logging fails)
       try {
         await _logLogin(user.uid, name);
       } catch (e) {
@@ -259,10 +256,10 @@ class RoleBasedRouter extends StatelessWidget {
         role: role,
         name: name,
         isProfileCompleted: profileCompleted,
+        isOnboardingCompleted: onboardingCompleted,
       );
     } catch (e) {
       print('❌ Error getting user data: $e');
-      // ✅ Re-throw the error so UI can show retry option
       rethrow;
     }
   }
@@ -280,20 +277,21 @@ class RoleBasedRouter extends StatelessWidget {
       print('📝 Login event logged');
     } catch (e) {
       print('⚠️ Failed to log login event: $e');
-      // Don't throw here - logging failure shouldn't prevent login
     }
   }
 }
 
-// Helper class to hold user data
+// ✅ FIXED: Added isOnboardingCompleted field
 class UserData {
   final String role;
   final String name;
   final bool isProfileCompleted;
+  final bool isOnboardingCompleted;
 
   UserData({
     required this.role,
     required this.name,
     required this.isProfileCompleted,
+    required this.isOnboardingCompleted,
   });
 }

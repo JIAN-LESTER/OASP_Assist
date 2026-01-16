@@ -1008,14 +1008,16 @@ List<Widget> buildInquiryTrendsReport(
         ],
       ),
       const SizedBox(height: 24),
-      SizedBox(
-        height: 400,
-        child: buildInquiryTrendCard(
-          data?.inquiryTrend ?? [],
-          selectedTimeFrame.toString(),
-          context!,
-        ),
-      ),
+  SizedBox(
+    height: 400,
+    child: buildInquiryTrendCard(
+      data?.inquiryTrend ?? [],
+      selectedTimeFrame.toString(),
+      context,
+      startDate: selectedTimeFrame == 'Custom' ? null : null,
+      endDate: selectedTimeFrame == 'Custom' ? null : null,
+    ),
+  ),
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
@@ -1219,7 +1221,7 @@ List<Widget> buildChatbotUsageReport(
       const SizedBox(height: 24),
       SizedBox(
         height: 400,
-        child: buildConversationsOverTimeCard(conversationTrend, timeFrame),
+        child: buildConversationsOverTimeCard(conversationTrend, timeFrame, startDate: timeFrame == 'Custom' ? null : null, endDate: timeFrame == 'Custom' ? null : null,),
       ),
       const SizedBox(height: 16),
       SizedBox(
@@ -1244,6 +1246,8 @@ List<Widget> buildChatbotUsageReport(
         height: 400,
         child: buildResponseTimeTrendCard(
           data?.responseTimeTrend ?? <ChartData>[],
+          startDate: timeFrame == 'Custom' ? null : null,
+          endDate: timeFrame == 'Custom' ? null : null,
         ),
       ),
     ];

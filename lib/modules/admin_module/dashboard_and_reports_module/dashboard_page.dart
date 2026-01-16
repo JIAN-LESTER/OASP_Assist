@@ -1094,6 +1094,8 @@ Widget dashboardContents(
               inq?.inquiryTrend ?? [],
               selectedTimeFrame,
               context, // Add context parameter
+              startDate: selectedTimeFrame == 'Custom' ? null : null,
+              endDate: selectedTimeFrame == 'Custom' ? null : null,
             ),
           ),
         ),

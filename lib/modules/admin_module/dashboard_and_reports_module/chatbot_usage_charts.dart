@@ -6,7 +6,12 @@ import 'package:flutter/material.dart';
 
 
 
-Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
+Widget buildResponseTimeTrendCard(
+  List<ChartData> responseTimeTrend, {
+  String? timeFrame,    // Add this
+  DateTime? startDate,  // Add these
+  DateTime? endDate,    // Add these
+}) {
   // Calculate statistics - values are in centiseconds, convert to seconds
   double avgResponseTime = 0;
   double minResponseTime = double.infinity;
@@ -179,29 +184,39 @@ Widget buildResponseTimeTrendCard(List<ChartData> responseTimeTrend) {
                             },
                           ),
                         ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            interval: _getBottomTitleInterval(responseTimeTrend.length),
-                            getTitlesWidget: (value, meta) {
-                              if (value.toInt() >= 0 && 
-                                  value.toInt() < responseTimeTrend.length) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text(
-                                    responseTimeTrend[value.toInt()].date,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                );
-                              }
-                              return const Text('');
-                            },
-                          ),
-                        ),
+         bottomTitles: AxisTitles(
+  sideTitles: SideTitles(
+    showTitles: true,
+    reservedSize: 32,
+    interval: _getBottomTitleInterval(
+      responseTimeTrend.length,
+      timeFrame ?? 'All',
+      startDate,  
+      endDate,  
+    ),
+    getTitlesWidget: (value, meta) {
+      if (value < 0 || value >= responseTimeTrend.length) {
+        return const SizedBox.shrink();
+      }
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          _formatBottomTitle(
+            responseTimeTrend[value.toInt()].date,
+            timeFrame ?? 'All',
+            startDate,  // Pass these if available
+            endDate,    // Pass these if available
+          ),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[600],
+          ),
+        ),
+      );
+    },
+  ),
+),
                         topTitles: const AxisTitles(
                           sideTitles: SideTitles(showTitles: false)
                         ),
@@ -422,11 +437,12 @@ Widget _buildEmptyState({
   );
 }
 
-
 Widget buildConversationsOverTimeCard(
   List<ChartData> conversationTrend,
-  String timeFrame,
-) {
+  String timeFrame, {
+  DateTime? startDate,  // Add these
+  DateTime? endDate,    // Add these
+}){
   // Calculate statistics
   int totalConversations = 0;
   int peakConversations = 0;
@@ -479,7 +495,7 @@ Widget buildConversationsOverTimeCard(
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Chat session frequency - ${_getTimeFrameDescription(timeFrame)}',
+                    'Chat session frequency - ${_getTimeFrameDescription(timeFrame, startDate, endDate)}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -776,20 +792,7 @@ double _getConversationBottomInterval(int dataLength, String timeFrame) {
   }
 }
 
-String _getTimeFrameDescription(String timeFrame) {
-  switch (timeFrame) {
-    case 'Today':
-      return 'by hour';
-    case 'This Week':
-      return 'by day';
-    case 'This Month':
-      return 'by week';
-    case 'This Year':
-      return 'by month';
-    default:
-      return 'over time';
-  }
-}
+
 
 // ============================================
 Widget buildPeakUsageHoursCard(Map<int, int> hourlyData) {
@@ -1621,12 +1624,8 @@ double _getResponseTimeInterval(List<ChartData> data) {
   return (maxValue / 5).ceilToDouble();
 }
 
-double _getBottomTitleInterval(int dataLength) {
-  if (dataLength <= 7) return 1.0;
-  if (dataLength <= 14) return 2.0;
-  if (dataLength <= 30) return 5.0;
-  return (dataLength / 6).ceil().toDouble();
-}
+
+
 Color _getHeatmapColor(double intensity) {
   if (intensity >= 0.8) return Colors.red[600]!;
   if (intensity >= 0.6) return Colors.orange[600]!;
@@ -1663,4 +1662,117 @@ Color _getYearLevelColor(int index) {
 }
 
 
+double _getBottomTitleInterval(int dataLength, String timeFrame, [DateTime? startDate, DateTime? endDate]) {
+  // Handle custom date ranges
+  if (timeFrame == 'Custom' && startDate != null && endDate != null) {
+    final daysDiff = endDate.difference(startDate).inDays;
+    
+    if (daysDiff == 0) {
+      // Hourly: show every 3-4 hours
+      return dataLength <= 24 ? 3.0 : 4.0;
+    } else if (daysDiff <= 7) {
+      // Daily: show all days if 7 or fewer
+      return 1.0;
+    } else if (daysDiff <= 31) {
+      // Weekly: show all weeks
+      return 1.0;
+    } else {
+      // Monthly: show every other month if more than 6 months
+      return dataLength <= 6 ? 1.0 : 2.0;
+    }
+  }
+
+  // Existing preset timeframe logic
+  switch (timeFrame) {
+    case 'All':
+      return 1.0;
+    case 'Today':
+      return dataLength <= 12 ? 2.0 : 4.0;
+    case 'This Week':
+      return 1.0;
+    case 'This Month':
+      return dataLength <= 5 ? 1.0 : 1.0;
+    case 'This Year':
+      return dataLength <= 6 ? 1.0 : 2.0;
+    default:
+      if (dataLength <= 7) return 1.0;
+      if (dataLength <= 14) return 2.0;
+      return (dataLength / 6).ceil().toDouble();
+  }
+}
+
+String _formatBottomTitle(String date, String timeFrame, [DateTime? startDate, DateTime? endDate]) {
+  // Handle custom date ranges
+  if (timeFrame == 'Custom' && startDate != null && endDate != null) {
+    final daysDiff = endDate.difference(startDate).inDays;
+    
+    if (daysDiff == 0) {
+      // Hourly format: "12AM", "3PM", etc.
+      if (date.contains(":")) {
+        int hour = int.tryParse(date.split(":")[0]) ?? 0;
+        if (hour == 0) return "12AM";
+        if (hour < 12) return "${hour}AM";
+        if (hour == 12) return "12PM";
+        return "${hour - 12}PM";
+      }
+      return date;
+    } else if (daysDiff <= 7) {
+      // Daily format: already formatted as "Mon", "Tue", etc.
+      return date;
+    } else if (daysDiff <= 31) {
+      // Weekly format: "W1", "W2", etc.
+      return date.replaceAll("Week ", "W");
+    } else {
+      // Monthly format: "Jan", "Feb", etc.
+      return date;
+    }
+  }
+
+  // Existing preset timeframe logic
+  switch (timeFrame) {
+    case 'All':
+      return date;
+    case 'Today':
+      if (date.contains(":")) {
+        int hour = int.tryParse(date.split(":")[0]) ?? 0;
+        if (hour == 0) return "12AM";
+        if (hour < 12) return "${hour}AM";
+        if (hour == 12) return "12PM";
+        return "${hour - 12}PM";
+      }
+      return date;
+    case 'This Week':
+      return date;
+    case 'This Month':
+      return date.replaceAll("Week ", "W");
+    case 'This Year':
+      return date;
+    default:
+      return date.length <= 3 ? date : date.substring(0, 3);
+  }
+}
+
+String _getTimeFrameDescription(String timeFrame, [DateTime? startDate, DateTime? endDate]) {
+  if (timeFrame == 'Custom' && startDate != null && endDate != null) {
+    final daysDiff = endDate.difference(startDate).inDays;
+    
+    if (daysDiff == 0) return 'by hour';
+    if (daysDiff <= 7) return 'by day';
+    if (daysDiff <= 31) return 'by week';
+    return 'by month';
+  }
+
+  switch (timeFrame) {
+    case 'Today':
+      return 'by hour';
+    case 'This Week':
+      return 'by day';
+    case 'This Month':
+      return 'by week';
+    case 'This Year':
+      return 'by month';
+    default:
+      return 'over time';
+  }
+}
 
