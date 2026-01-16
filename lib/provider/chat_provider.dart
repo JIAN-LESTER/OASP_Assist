@@ -89,49 +89,49 @@
     ];
 
     void listenToUserMessageCount() {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-      if (userId == null) return;
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
 
-      _userMessageCountSubscription?.cancel();
+    _userMessageCountSubscription?.cancel();
 
-      _userMessageCountSubscription = _firestore
-          .collection('users')
-          .doc(userId)
-          .snapshots()
-          .listen(
-            (snapshot) {
-              if (snapshot.exists) {
-                final data = snapshot.data()!;
-                final newCount = data['dailyMessageCount'] ?? 0;
-                final newResetDate =
-                    (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+    _userMessageCountSubscription = _firestore
+        .collection('users')
+        .doc(userId)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            if (snapshot.exists) {
+              final data = snapshot.data()!;
+              final newCount = data['dailyMessageCount'] ?? 0;
+              final newResetDate =
+                  (data['lastMessageResetDate'] as Timestamp?)?.toDate();
 
-                // ✅ Only update if values actually changed
-                if (newCount != _userDailyMessageCount ||
-                    newResetDate != _userLastResetDate) {
-                  _userDailyMessageCount = newCount;
-                  _userLastResetDate = newResetDate;
+              // ✅ Only update if values actually changed
+              if (newCount != _userDailyMessageCount ||
+                  newResetDate != _userLastResetDate) {
+                _userDailyMessageCount = newCount;
+                _userLastResetDate = newResetDate;
 
-                  print(
-                    '📊 Real-time update: User message count = $_userDailyMessageCount',
-                  );
-                  notifyListeners();
-                }
-              } else {
-                // Document doesn't exist yet - initialize
                 print(
-                  '⚠️ User document not found - will be created on first message',
+                  '📊 Real-time update: User message count = $_userDailyMessageCount',
                 );
-                _userDailyMessageCount = 0;
-                _userLastResetDate = null;
                 notifyListeners();
               }
-            },
-            onError: (error) {
-              print('❌ Error in message count listener: $error');
-            },
-          );
-    }
+            } else {
+              // Document doesn't exist yet - initialize
+              print(
+                '⚠️ User document not found - will be created on first message',
+              );
+              _userDailyMessageCount = 0;
+              _userLastResetDate = null;
+              notifyListeners();
+            }
+          },
+          onError: (error) {
+            print('❌ Error in message count listener: $error');
+          },
+        );
+  }
 
     void setScrollCallback(VoidCallback callback) {
       _onMessageAdded = callback;
@@ -317,7 +317,7 @@
             'lastMessageResetDate': Timestamp.now(),
           }, SetOptions(merge: true));
 
-          _userDailyMessageCount = 1;
+          _userDailyMessageCount = 0;
           _userLastResetDate = now;
 
           print('✅ New user first message - count set to 1');
@@ -360,11 +360,11 @@
         if (shouldReset) {
           // ✅ FIX: Reset to 1 (for current message), not 0
           await userRef.update({
-            'dailyMessageCount': 1,
+            'dailyMessageCount': 0,
             'lastMessageResetDate': Timestamp.now(),
           });
 
-          _userDailyMessageCount = 1;
+          _userDailyMessageCount = 0;
           _userLastResetDate = now;
 
           print('✅ Message count RESET - new count: 1');
@@ -793,6 +793,7 @@ Future<void> askQuestionWithStreaming(
     try {
       final newConversationId = await UserConstant.createNewConversation(userId);
       await setConversationId(newConversationId);
+      // ✅ REDUCED: from 300ms to 100ms
       await Future.delayed(Duration(milliseconds: 100));
     } catch (e) {
       print('❌ Error creating conversation: $e');
@@ -809,31 +810,29 @@ Future<void> askQuestionWithStreaming(
   notifyListeners();
 
   final startTime = DateTime.now();
-  
-  // ✅ CRITICAL: Track if widget is still mounted
-  bool _isMounted = true;
 
   try {
     _cohere ??= CohereService();
     final userId = FirebaseAuth.instance.currentUser?.uid;
 
-    // Start embedding and FAQ load
+    // ✅ OPTIMIZED: Start embedding and FAQ load immediately, DON'T wait
     final embeddingFuture = _generateEmbeddingCached(question);
     final faqFuture = _ensureFAQCacheLoaded();
 
-    // Create user message
-    final userMessageRef = _firestore
-        .collection('conversations')
-        .doc(conversationId!)
-        .collection('messages')
-        .doc();
+    // Create user message IMMEDIATELY (don't wait for embedding)
+    final userMessageRef =
+        _firestore
+            .collection('conversations')
+            .doc(conversationId!)
+            .collection('messages')
+            .doc();
 
     final userMsg = Message(
       id: userMessageRef.id,
       conversationId: conversationId!,
       content: question,
       userID: userId,
-      category: 'General',
+      category: 'General', // Will update later
       sender: 'user',
       status: 'sent',
       isAnswered: false,
@@ -842,26 +841,24 @@ Future<void> askQuestionWithStreaming(
       count: count,
     );
 
-    // Add to UI immediately
+    // ✅ INSTANT: Add to UI immediately (fastest visual feedback)
     _messages.add(userMsg);
     _processedMessages.add(userMsg.id);
-    
-    // ✅ Safe notification
-    if (_isMounted) {
-      notifyListeners();
-      _onMessageAdded?.call();
-    }
+    notifyListeners();
+    _onMessageAdded?.call();
 
-    // Save to Firestore in background
+    // ✅ INSTANT: Save to Firestore in background (don't await)
     unawaited(userMessageRef.set(_messageToMap(userMsg)));
+
+    // ✅ INSTANT: Update message count in background
     unawaited(_updateUserMessageCount());
 
-    // Wait for embedding and FAQ
+    // NOW wait for embedding and FAQ results
     await Future.wait([embeddingFuture, faqFuture]);
     final currentEmbedding = await embeddingFuture;
     final existingFAQ = _findBestFAQMatch(question, currentEmbedding);
 
-    // Determine category
+    // Determine category (in background if possible)
     String questionCategory;
     if (existingFAQ != null && existingFAQ['category'] != null) {
       questionCategory = existingFAQ['category'] as String;
@@ -869,199 +866,134 @@ Future<void> askQuestionWithStreaming(
       questionCategory = await _classifyQuestionCategoryFast(question);
     }
 
+    // Update category in background
     unawaited(userMessageRef.update({'category': questionCategory}));
 
-    // Update title if needed
+    // Update title if needed (background)
     if (currentConversation != null) {
       final title = currentConversation!.title.toLowerCase();
-      final shouldUpdateTitle = (title.contains('new conversation') ||
+      final shouldUpdateTitle =
+          (title.contains('new conversation') ||
               title == 'untitled' ||
               title.trim().isEmpty) &&
           _messages.where((m) => m.sender == 'user').length <= 1;
-
+      
       if (shouldUpdateTitle) {
         unawaited(_updateConversationTitleNow(question));
       }
     }
 
     // Build conversation history
-    final allMessages = _messages.where((m) => m.conversationId == conversationId).toList();
+    final allMessages =
+        _messages.where((m) => m.conversationId == conversationId).toList();
     allMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
-    final recentHistory = allMessages.length > 10
-        ? allMessages.sublist(allMessages.length - 10)
-        : allMessages;
+    final recentHistory =
+        allMessages.length > 10
+            ? allMessages.sublist(allMessages.length - 10)
+            : allMessages;
 
-    // Show typing indicator
-    _showTypingIndicator = true;
-    if (_isMounted) {
-      notifyListeners();
-      _onMessageAdded?.call();
-    }
+    // ✅ SHOW TYPING INDICATOR immediately
+  _showTypingIndicator = true;
+    notifyListeners();
+    _onMessageAdded?.call();
 
-    // Create bot message ID
+    // Create bot message ID for streaming
     final botMessageId = "bot_${userMsg.id}";
+    
+    // ✅ DON'T add message to UI yet - just register for streaming
     _streamingContent[botMessageId] = "";
 
     String finalAnswer = "";
 
-    // ✅ CRITICAL FIX: Wrap streaming in try-catch
-    try {
-      if (existingFAQ != null) {
-        // FAQ streaming
-        final String answer = existingFAQ["answer"];
-        final int chunkSize = 30;
-        bool messageAdded = false;
+    // ✅ OPTIMIZED: Faster FAQ streaming
+    if (existingFAQ != null) {
+      // Hide typing indicator when content starts
+         final String answer = existingFAQ["answer"];
+      final int chunkSize = 30;
+      bool messageAdded = false;
 
-        for (int i = 0; i < answer.length; i += chunkSize) {
-          // ✅ Check if still mounted before each chunk
-          if (!_isMounted) {
-            print('⚠️ Widget disposed during FAQ streaming, stopping');
-            break;
-          }
+      for (int i = 0; i < answer.length; i += chunkSize) {
+        final chunk = answer.substring(
+          i,
+          (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
+        );
 
-          final chunk = answer.substring(
-            i,
-            (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
-          );
+        _streamingContent[botMessageId] =
+            _streamingContent[botMessageId]! + chunk;
 
-          _streamingContent[botMessageId] = _streamingContent[botMessageId]! + chunk;
-
-          if (!messageAdded) {
-            _showTypingIndicator = false;
-
-            final botMessage = Message(
-              id: botMessageId,
-              conversationId: conversationId!,
-              content: "",
-              sender: "bot",
-              status: "sent",
-              type: "text",
-              sentAt: DateTime.now(),
-              count: count,
-            );
-
-            _messages.add(botMessage);
-            _processedMessages.add(botMessageId);
-            messageAdded = true;
-          }
-
-          if (i % (chunkSize * 2) == 0 && _isMounted) {
-            notifyListeners();
-            _onMessageAdded?.call();
-          }
-        }
-
-        finalAnswer = answer;
-        unawaited(_incrementFAQSimilarityCountAsync(existingFAQ["question"]));
-        
-      } else {
-        // ✅ CRITICAL: RAG streaming with error handling
-        int chunkCounter = 0;
-        bool messageAdded = false;
-        
-        // ✅ WINDOWS FIX: Add timeout and error handling to stream
-        Stream<String> ragStream;
-        
-        try {
-          ragStream = _retriever.generateAnswerStream(
-            question,
-            conversationHistory: recentHistory,
+        // ✅ On FIRST chunk, hide typing and add message
+        if (!messageAdded) {
+          _showTypingIndicator = false;
+          
+          final botMessage = Message(
+            id: botMessageId,
             conversationId: conversationId!,
-          ).timeout(
-            Duration(seconds: 60), // ✅ Add timeout
-            onTimeout: (sink) {
-              print('⚠️ RAG stream timeout - closing');
-              sink.close();
-            },
-          ).handleError((error, stackTrace) {
-            // ✅ CRITICAL: Catch stream errors
-            print('❌ RAG stream error: $error');
-            print('Stack trace: $stackTrace');
-            throw error; // Re-throw to be caught by outer try-catch
-          });
-        } catch (e) {
-          print('❌ Error creating RAG stream: $e');
-          throw Exception('Failed to initialize streaming: $e');
+            content: "",
+            sender: "bot",
+            status: "sent",
+            type: "text",
+            sentAt: DateTime.now(),
+            count: count,
+          );
+          
+          _messages.add(botMessage);
+          _processedMessages.add(botMessageId);
+          messageAdded = true;
         }
 
-        // ✅ CRITICAL: Listen to stream with error handling
-        await for (final streamedText in ragStream) {
-          // ✅ Check if still mounted
-          if (!_isMounted) {
-            print('⚠️ Widget disposed during RAG streaming, stopping');
-            break;
-          }
-
-          chunkCounter++;
-          _streamingContent[botMessageId] = streamedText;
-
-          if (!messageAdded) {
-            _showTypingIndicator = false;
-
-            final botMessage = Message(
-              id: botMessageId,
-              conversationId: conversationId!,
-              content: "",
-              sender: "bot",
-              status: "sent",
-              type: "text",
-              sentAt: DateTime.now(),
-              count: count,
-            );
-
-            _messages.add(botMessage);
-            _processedMessages.add(botMessageId);
-            messageAdded = true;
-          }
-
-          // Update UI every 2 chunks
-          if (chunkCounter % 2 == 0 && _isMounted) {
-            try {
-              notifyListeners();
-              _onMessageAdded?.call();
-            } catch (e) {
-              print('⚠️ Error notifying listeners: $e');
-              // Continue streaming even if notification fails
-            }
-          }
-
-          finalAnswer = streamedText;
+        // Update UI every 2 chunks
+        if (i % (chunkSize * 2) == 0) {
+          notifyListeners();
+          _onMessageAdded?.call();
         }
       }
-    } on TimeoutException catch (e) {
-      print('❌ Streaming timeout: $e');
-      finalAnswer = "I apologize, but the response took too long. Please try again.";
-    } catch (streamError, stackTrace) {
-      print('❌ CRITICAL STREAMING ERROR: $streamError');
-      print('Stack trace: $stackTrace');
-      
-      // ✅ Provide fallback response instead of crashing
-      finalAnswer = "I apologize, but I encountered an error while generating the response. Please try asking your question again.";
-      
-      // ✅ Show error to user if context is still available
-      if (context.mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    Icon(Icons.error_outline, color: Colors.white, size: 20),
-                    SizedBox(width: 12),
-                    Expanded(child: Text('Streaming error: ${streamError.toString()}')),
-                  ],
-                ),
-                backgroundColor: Colors.red.shade600,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            );
-          }
-        });
+
+      finalAnswer = answer;
+      unawaited(_incrementFAQSimilarityCountAsync(existingFAQ["question"]));
+    } else {
+      // ✅ OPTIMIZED: Faster RAG streaming
+      int chunkCounter = 0;
+      bool messageAdded = false;
+
+      await for (final streamedText in _retriever.generateAnswerStream(
+        question,
+        conversationHistory: recentHistory,
+        conversationId: conversationId!,
+      )) {
+        chunkCounter++;
+        _streamingContent[botMessageId] = streamedText;
+
+        // ✅ On FIRST chunk, hide typing and add message
+        if (!messageAdded) {
+          _showTypingIndicator = false;
+          
+          final botMessage = Message(
+            id: botMessageId,
+            conversationId: conversationId!,
+            content: "",
+            sender: "bot",
+            status: "sent",
+            type: "text",
+            sentAt: DateTime.now(),
+            count: count,
+          );
+          
+          _messages.add(botMessage);
+          _processedMessages.add(botMessageId);
+          messageAdded = true;
+        }
+
+        // Update UI every 2 chunks
+        if (chunkCounter % 2 == 0) {
+          notifyListeners();
+          _onMessageAdded?.call();
+        }
+
+        finalAnswer = streamedText;
       }
     }
 
-    // Hide typing indicator
+    // Hide typing indicator if still showing
     if (_showTypingIndicator) {
       _showTypingIndicator = false;
     }
@@ -1084,93 +1016,49 @@ Future<void> askQuestionWithStreaming(
       _messages[idx] = _messages[idx].copyWith(content: verified);
     }
 
-    if (_isMounted) {
-      notifyListeners();
-      _onMessageAdded?.call();
-    }
+    notifyListeners();
+    _onMessageAdded?.call();
 
     final totalMs = DateTime.now().difference(startTime).inMilliseconds;
     print("⚡ Total response time: ${totalMs}ms");
 
-    // Save to Firestore in background
+    // ✅ OPTIMIZED: Save to Firestore in background (don't await)
     unawaited(() async {
-      try {
-        final batch = _firestore.batch();
+      final batch = _firestore.batch();
 
-        final botRef = _firestore
-            .collection('conversations')
-            .doc(conversationId!)
-            .collection('messages')
-            .doc(botMessageId);
+      final botRef = _firestore
+          .collection('conversations')
+          .doc(conversationId!)
+          .collection('messages')
+          .doc(botMessageId);
 
-        batch.set(botRef, _messageToMap(_messages[idx]));
+      batch.set(botRef, _messageToMap(_messages[idx]));
 
-        batch.update(userMessageRef, {
-          "isAnswered": true,
-          "answeredAt": Timestamp.now(),
-          "responseTimeMs": totalMs,
-        });
+      batch.update(userMessageRef, {
+        "isAnswered": true,
+        "answeredAt": Timestamp.now(),
+        "responseTimeMs": totalMs,
+      });
 
-        await batch.commit();
-      } catch (e) {
-        print('❌ Error saving messages to Firestore: $e');
-      }
+      await batch.commit();
     }());
 
-    // Background tasks
-    if (context.mounted) {
-      unawaited(
-        _handlePostResponseTasks(
-          context,
-          question,
-          verified,
-          currentEmbedding,
-          questionCategory,
-          userId,
-        ),
-      );
-    }
-    
-  } catch (e, stackTrace) {
-    print('❌ FATAL ERROR in askQuestionWithStreaming: $e');
-    print('Stack trace: $stackTrace');
-    
-    // ✅ Show error dialog to user
-    if (context.mounted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.red),
-                  SizedBox(width: 12),
-                  Text('Error'),
-                ],
-              ),
-              content: Text(
-                'An error occurred while processing your message. Please try again.\n\nError: ${e.toString()}',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('OK'),
-                ),
-              ],
-            ),
-          );
-        }
-      });
-    }
+    // Background tasks (don't wait)
+    unawaited(
+      _handlePostResponseTasks(
+        context,
+        question,
+        verified,
+        currentEmbedding,
+        questionCategory,
+        userId,
+      ),
+    );
   } finally {
     _isLoading = false;
-    _showTypingIndicator = false;
-    
-    if (_isMounted) {
-      notifyListeners();
-      _onMessageAdded?.call();
-    }
+    _showTypingIndicator = false; // Ensure it's hidden
+    notifyListeners();
+    _onMessageAdded?.call();
   }
 }
 

@@ -44,7 +44,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen> with Ticker
   String _selectedCourse = '';
   String? _selectedCourseId;
   String _selectedProgram = '';
-  String? _selectedScholarship;
+  String? _selectedScholarship = '';
   bool? _isEnrolledInMasters;
   String _selectedMastersProgram = '';
   String _firstChoiceProgram = '';
@@ -440,14 +440,21 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen> with Ticker
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            setState(() {
-              if (_selectedRole == role) return;
-              _selectedRole = role;
-              _resetFields();
-              _isEditingFromSummary = false;
-            });
-          },
+    onTap: () {
+  setState(() {
+    if (_selectedRole == role) {
+      // UNSELECT → collapse
+      _selectedRole = null;
+      _resetFields();
+      return;
+    }
+
+    // SELECT → expand
+    _selectedRole = role;
+    _resetFields();
+    _isEditingFromSummary = false;
+  });
+},
           borderRadius: BorderRadius.circular(16),
           child: Column(
             children: [
@@ -611,14 +618,14 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen> with Ticker
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.white,
-                  primaryColor.withOpacity(0.01),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              // gradient: LinearGradient(
+              //   colors: [
+              //     Colors.white,
+              //     primaryColor.withOpacity(0.01),
+              //   ],
+              //   begin: Alignment.topLeft,
+              //   end: Alignment.bottomRight,
+              // ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: primaryColor.withOpacity(0.2), width: 1.5),
               boxShadow: [
@@ -1053,13 +1060,13 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen> with Ticker
       switch (_selectedRole) {
         case 'CMU Undergraduate Student':
           return _studentIdController.text.trim().length >= 5 && _selectedYear.isNotEmpty && 
-                 _selectedCourse.isNotEmpty && _selectedProgram.isNotEmpty;
+                 _selectedCourse.isNotEmpty && _selectedProgram.isNotEmpty && _selectedScholarship!.isNotEmpty;
         case 'CMU Student – Graduate Level':
           return _selectedCourse.isNotEmpty && _selectedProgram.isNotEmpty && _isEnrolledInMasters != null && 
                  (_isEnrolledInMasters == false || _selectedMastersProgram.isNotEmpty);
         case 'Freshman Applicant':
           return _lrnController.text.trim().length == 12 && _firstChoiceProgram.isNotEmpty && 
-                 _secondChoiceProgram.isNotEmpty && _firstChoiceProgram != _secondChoiceProgram;
+                 _secondChoiceProgram.isNotEmpty && _firstChoiceProgram != _secondChoiceProgram && _selectedScholarship!.isNotEmpty;
         case 'Master\'s Applicant':
           return _intendedMastersProgram.isNotEmpty;
         case 'Other (Non-student)':
