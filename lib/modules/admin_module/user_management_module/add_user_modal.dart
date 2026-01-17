@@ -411,7 +411,9 @@ Future<bool> _isEmailUnique(String email, {String? excludeUserId}) async {
     }
   }
 
- Future<void> _saveUser() async {
+ // REPLACE the entire _saveUser() method with this fixed version:
+
+Future<void> _saveUser() async {
   if (!_formKey.currentState!.validate()) {
     return;
   }
@@ -547,8 +549,6 @@ Future<bool> _isEmailUnique(String email, {String? excludeUserId}) async {
         return;
       }
 
-
-
       if (_selectedScholarship == 'Others' &&
           _customScholarship.trim().isEmpty) {
         SnackbarUtil.showWarning(
@@ -579,8 +579,6 @@ Future<bool> _isEmailUnique(String email, {String? excludeUserId}) async {
   });
 
   try {
-
-    
     final fullName =
         '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
     final email = _emailController.text.trim();
@@ -589,48 +587,22 @@ Future<bool> _isEmailUnique(String email, {String? excludeUserId}) async {
     final functionsService = FirebaseFunctionsService();
     String uid;
 
- // 1. Check if we are on Windows/Direct path
-bool useDirect = !kIsWeb && Platform.isWindows;
+    // ✅ FIX: Don't include timestamps in userData - Cloud Function handles them
+    Map<String, dynamic> userData = {
+      'name': fullName.trim(),
+      'email': email.trim().toLowerCase(),
+      'role': _selectedRole.toLowerCase().trim(),
+      'isActive': true,
+      'profileCompleted': true,
+      'onboardingCompleted': true,
+      'isVerified': true,
+      'emailVerified': true,
+      // ❌ REMOVED: Don't send timestamps to Cloud Function
+      // 'createdAt': FieldValue.serverTimestamp(),
+      // 'updatedAt': FieldValue.serverTimestamp(),
+    };
 
-Map<String, dynamic> userData = {
-  'name': fullName.trim(),
-  'email': email.trim().toLowerCase(),
-  'role': _selectedRole.toLowerCase().trim(),
-  'isActive': true,
-  'profileCompleted': true,
-  'onboardingCompleted': true,
-  'isVerified': true,
-  'emailVerified': true,
-
-  // FIX: Use a string for Windows/JSON calls, and FieldValue for Firebase
-  'createdAt': useDirect 
-      ? DateTime.now().toUtc().toIso8601String() 
-      : FieldValue.serverTimestamp(),
-      
-  'updatedAt': useDirect 
-      ? DateTime.now().toUtc().toIso8601String() 
-      : FieldValue.serverTimestamp(),
-};
-    try {
-      uid = await functionsService.createUserAuth(
-        email: email,
-        password: password,
-        displayName: fullName,
-     userData: userData
-      );
-    } catch (e) {
-      SnackbarUtil.showError(
-        context,
-        'Failed to create user account: ${e.toString()}',
-      );
-      setState(() {
-        _isSubmitting = false;
-      });
-      return;
-    }
-
-
-
+    // Add role-specific fields to userData BEFORE calling Cloud Function
     if (_selectedRole.toLowerCase() == 'user') {
       userData['affiliation'] = _selectedAffiliation;
       userData['isEnrolled'] =
@@ -645,12 +617,12 @@ Map<String, dynamic> userData = {
           userData['college'] = _selectedCollege;
           userData['collegeId'] = _selectedCollegeId;
           userData['program'] = _selectedProgram;
-        userData['scholarship'] =
-    _selectedScholarship == 'Others'
-        ? _customScholarship
-        : (_selectedScholarship != 'N/A'
-            ? _selectedScholarship
-            : null);
+          userData['scholarship'] =
+              _selectedScholarship == 'Others'
+                  ? _customScholarship
+                  : (_selectedScholarship != 'N/A'
+                      ? _selectedScholarship
+                      : null);
           userData['graduateType'] = null;
           userData['graduatedCollege'] = null;
           userData['graduatedCollegeId'] = null;
@@ -732,27 +704,27 @@ Map<String, dynamic> userData = {
       userData['serviceUnit'] = _selectedServiceUnit;
     }
 
+    // ✅ Call Cloud Function with complete userData
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .set(userData);
+      uid = await functionsService.createUserAuth(
+        email: email,
+        password: password,
+        displayName: fullName,
+        userData: userData,
+      );
     } catch (e) {
-      try {
-        await functionsService.deleteUserAuth(uid);
-      } catch (cleanupError) {
-        // Silent cleanup failure
-      }
-
       SnackbarUtil.showError(
         context,
-        'Failed to create user document: ${e.toString()}',
+        'Failed to create user account: ${e.toString()}',
       );
       setState(() {
         _isSubmitting = false;
       });
       return;
     }
+
+    // ✅ The Cloud Function already created the Firestore document
+    // No need to create it again here
 
     await _logCreateAction(fullName);
 
