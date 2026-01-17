@@ -99,45 +99,40 @@ class FirebaseFunctionsService {
   }
 
   Future<String> createUserAuth({
-    required String email,
-    required String password,
-    String? displayName,
-    String? affiliation,
-    String? scholarship,
-     required Map<String, dynamic> userData, // 👈 Pass all data
-  }) async {
-    try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        throw Exception('You must be logged in as an admin');
-      }
-
-      final data = {
-        'email': email,
-        'password': password,
-        if (displayName != null && displayName.isNotEmpty) 
-          'displayName': displayName,
-        if (affiliation != null && affiliation.isNotEmpty) 
-          'affiliation': affiliation,
-        if (scholarship != null && scholarship.isNotEmpty) 
-          'scholarship': scholarship,
-        if(userData != null && userData.isNotEmpty)
-         ...userData, 
-      };
-      
-      final responseData = await _callFunction('createUser', data);
-
-      if (responseData['success'] == true) {
-        return responseData['uid'] as String;
-      }
-
-      throw Exception(responseData['message'] ?? 'User creation failed');
-      
-    } on FirebaseFunctionsException catch (e) {
-      _handleFunctionsException(e);
-      rethrow;
+  required String email,
+  required String password,
+  String? displayName,
+  required Map<String, dynamic> userData, // Accept all user data
+}) async {
+  try {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('You must be logged in as an admin');
     }
+
+    // ✅ Merge all data together - Cloud Function will handle timestamps
+    final data = {
+      'email': email,
+      'password': password,
+      if (displayName != null && displayName.isNotEmpty) 
+        'displayName': displayName,
+      // ✅ Spread all userData fields into the request
+      ...userData,
+    };
+    
+    final responseData = await _callFunction('createUser', data);
+
+    if (responseData['success'] == true) {
+      return responseData['uid'] as String;
+    }
+
+    throw Exception(responseData['message'] ?? 'User creation failed');
+    
+  } on FirebaseFunctionsException catch (e) {
+    _handleFunctionsException(e);
+    rethrow;
   }
+}
 
   Future<void> deleteUserAuth(String uid) async {
     try {
