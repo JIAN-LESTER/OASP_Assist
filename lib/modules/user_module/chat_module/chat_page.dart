@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:capstone_project/modules/user_module/chat_module/chat_utilities.dart';
+import 'package:capstone_project/modules/user_module/chat_module/typing_animation.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -143,21 +144,26 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
         });
       }
 
-      // ✅ IMPROVED: Multi-step scroll approach for reliability
-      if (hasMessages) {
-        // Immediate scroll
+      // ✅ IMPROVED: Multiple scroll attempts with longer delays
+      if (hasMessages && mounted) {
+        // First attempt - immediate
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _scrollController.hasClients) {
+          if (_scrollController.hasClients) {
             _scrollToBottomInstant();
           }
         });
 
-        // Backup scroll after short delay
-        Future.delayed(Duration(milliseconds: 200), () {
-          if (mounted && _scrollController.hasClients) {
-            _scrollToBottomInstant();
-          }
-        });
+        // Second attempt - after 100ms
+        await Future.delayed(Duration(milliseconds: 100));
+        if (mounted && _scrollController.hasClients) {
+          _scrollToBottomInstant();
+        }
+
+        // Third attempt - after 300ms (for slower devices)
+        await Future.delayed(Duration(milliseconds: 200));
+        if (mounted && _scrollController.hasClients) {
+          _scrollToBottomInstant();
+        }
       }
 
       print('✅ Conversation initialized: ${widget.conversationId}');
@@ -221,6 +227,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
         _initializeConversation();
         chatProvider.loadUserMessageCount();
         chatProvider.listenToUserMessageCount();
+        chatProvider.cleanExistingConversationTitles();
         _isInitialized = true;
       }
     });
@@ -353,14 +360,11 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       _showFAQs = !_showFAQs;
     });
 
-    // ✅ NEW: Scroll to bottom when switching from FAQs to chat
+    // ✅ INSTANT: Scroll when switching from FAQs to chat
     if (!_showFAQs && chatProvider.messages.isNotEmpty) {
-      // Wait for rebuild to complete, then scroll
-      Future.delayed(Duration(milliseconds: 100), () {
-        if (mounted && _scrollController.hasClients) {
-          _scrollToBottomInstant();
-        }
-      });
+      if (mounted && _scrollController.hasClients) {
+        _scrollToBottomInstant();
+      }
     }
 
     if (widget.onFAQToggle != null) {
@@ -377,40 +381,42 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     // Set the question in the controller
     _controller.text = question;
 
-    // Close FAQs immediately
+    // ✅ INSTANT: Close FAQs immediately
     if (mounted) {
       setState(() {
         _showFAQs = false;
       });
     }
 
-    // ✅ NEW: Scroll to bottom when closing FAQs
-    Future.delayed(Duration(milliseconds: 100), () {
-      if (mounted &&
-          _scrollController.hasClients &&
-          chatProvider.messages.isNotEmpty) {
-        _scrollToBottomInstant();
-      }
-    });
+    // ✅ INSTANT: Scroll to bottom when closing FAQs
+    if (mounted &&
+        _scrollController.hasClients &&
+        chatProvider.messages.isNotEmpty) {
+      _scrollToBottomInstant();
+    }
 
-    // Send the message after a short delay
-    Future.delayed(Duration(milliseconds: 150), () {
-      if (mounted && !chatProvider.isLoading) {
-        _sendMessage(chatProvider);
-      }
-    });
+    // ✅ INSTANT: Send message immediately
+    if (mounted && !chatProvider.isLoading) {
+      _sendMessage(chatProvider);
+    }
   }
+
+  // Replace the content section in _buildMessageBubble with this updated version
 
   Widget _buildMessageBubble(Message message, bool isUser) {
     return FutureBuilder<String?>(
       future: isUser ? _getUserAvatarUrl() : null,
       builder: (context, snapshot) {
-        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+        final chatProvider = Provider.of<ChatProvider>(context, listen: true);
         final streamingContent = chatProvider.getStreamingContent(message.id);
         final isStreaming = streamingContent != null;
 
         // Use streaming content if streaming, otherwise use message content
         final displayContent = isStreaming ? streamingContent : message.content;
+
+        // Check if this is an empty bot message that's actively streaming
+        final isEmptyStreaming =
+            !isUser && isStreaming && displayContent.trim().isEmpty;
 
         final isEscalatedMessage =
             message.sender == 'bot' && message.rating == 'dislike';
@@ -435,6 +441,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                           ? CrossAxisAlignment.end
                           : CrossAxisAlignment.start,
                   children: [
+                    // Escalation badge (unchanged)
                     if (isEscalated)
                       Container(
                         margin: EdgeInsets.only(
@@ -496,6 +503,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                               : MainAxisAlignment.start,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
+                        // Bot avatar
                         if (!isUser)
                           Container(
                             width: 32,
@@ -540,6 +548,8 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                                       ),
                             ),
                           ),
+
+                        // Message bubble
                         Flexible(
                           child: Container(
                             decoration: BoxDecoration(
@@ -604,148 +614,386 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                                       : CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                // ✅ CONTENT WITH TEXT SELECTION ENABLED
-                                isUser
-                                    ? SelectableLinkify(
-                                      onOpen: _onLinkTap,
-                                      text: _convertMarkdownLinksToPlainUrls(
-                                        displayContent,
-                                      ), // ✅ Convert markdown links
-                                      textAlign: TextAlign.justify,
-                                      style: TextStyle(
-                                        color: Colors.white,
+                                // ✅ CONTENT SECTION - Simple direct display with cursor
+                                if (isStreaming && displayContent.isNotEmpty)
+                                  // ✅ Streaming with content - show text + cursor
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Flexible(
+                                        child:
+                                            isUser
+                                                ? SelectableLinkify(
+                                                  onOpen: _onLinkTap,
+                                                  text:
+                                                      _convertMarkdownLinksToPlainUrls(
+                                                        displayContent,
+                                                      ),
+                                                  textAlign: TextAlign.justify,
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 15,
+                                                    height: 1.5,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                  linkStyle: TextStyle(
+                                                    decoration:
+                                                        TextDecoration
+                                                            .underline,
+                                                    color: Colors.yellow[100],
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                  options: LinkifyOptions(
+                                                    humanize: false,
+                                                    looseUrl: true,
+                                                    defaultToHttps: true,
+                                                  ),
+                                                )
+                                                : MarkdownBody(
+                                                  data:
+                                                      _convertMarkdownLinksToPlainUrls(
+                                                        displayContent,
+                                                      ),
+                                                  selectable: true,
+                                                  onTapLink: (
+                                                    text,
+                                                    href,
+                                                    title,
+                                                  ) {
+                                                    if (href != null) {
+                                                      _onLinkTap(
+                                                        LinkableElement(
+                                                          href,
+                                                          text,
+                                                        ),
+                                                      );
+                                                    }
+                                                  },
+                                                  styleSheet: MarkdownStyleSheet(
+                                                    p: TextStyle(
+                                                      color:
+                                                          message.sender ==
+                                                                      'staff' ||
+                                                                  message.sender ==
+                                                                      'admin'
+                                                              ? Colors
+                                                                  .green
+                                                                  .shade900
+                                                              : Colors
+                                                                  .grey
+                                                                  .shade800,
+                                                      fontSize: 15,
+                                                      height: 1.5,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                    strong: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          message.sender ==
+                                                                      'staff' ||
+                                                                  message.sender ==
+                                                                      'admin'
+                                                              ? Colors
+                                                                  .green
+                                                                  .shade900
+                                                              : Colors
+                                                                  .grey
+                                                                  .shade900,
+                                                    ),
+                                                    em: TextStyle(
+                                                      fontStyle:
+                                                          FontStyle.italic,
+                                                      color:
+                                                          message.sender ==
+                                                                      'staff' ||
+                                                                  message.sender ==
+                                                                      'admin'
+                                                              ? Colors
+                                                                  .green
+                                                                  .shade900
+                                                              : Colors
+                                                                  .grey
+                                                                  .shade800,
+                                                    ),
+                                                    a: TextStyle(
+                                                      decoration:
+                                                          TextDecoration
+                                                              .underline,
+                                                      color: Colors.blue,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                    listBullet: TextStyle(
+                                                      color:
+                                                          message.sender ==
+                                                                      'staff' ||
+                                                                  message.sender ==
+                                                                      'admin'
+                                                              ? Colors
+                                                                  .green
+                                                                  .shade900
+                                                              : Colors
+                                                                  .grey
+                                                                  .shade800,
+                                                      fontSize: 15,
+                                                    ),
+                                                    h1: TextStyle(
+                                                      fontSize: 20,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          message.sender ==
+                                                                      'staff' ||
+                                                                  message.sender ==
+                                                                      'admin'
+                                                              ? Colors
+                                                                  .green
+                                                                  .shade900
+                                                              : Colors
+                                                                  .grey
+                                                                  .shade900,
+                                                    ),
+                                                    h2: TextStyle(
+                                                      fontSize: 18,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          message.sender ==
+                                                                      'staff' ||
+                                                                  message.sender ==
+                                                                      'admin'
+                                                              ? Colors
+                                                                  .green
+                                                                  .shade900
+                                                              : Colors
+                                                                  .grey
+                                                                  .shade900,
+                                                    ),
+                                                    h3: TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          message.sender ==
+                                                                      'staff' ||
+                                                                  message.sender ==
+                                                                      'admin'
+                                                              ? Colors
+                                                                  .green
+                                                                  .shade900
+                                                              : Colors
+                                                                  .grey
+                                                                  .shade900,
+                                                    ),
+                                                    code: TextStyle(
+                                                      backgroundColor:
+                                                          Colors.grey.shade100,
+                                                      color:
+                                                          Colors.red.shade700,
+                                                      fontFamily: 'monospace',
+                                                      fontSize: 14,
+                                                    ),
+                                                    blockquote: TextStyle(
+                                                      color:
+                                                          Colors.grey.shade700,
+                                                      fontStyle:
+                                                          FontStyle.italic,
+                                                    ),
+                                                    blockquoteDecoration:
+                                                        BoxDecoration(
+                                                          color:
+                                                              Colors
+                                                                  .grey
+                                                                  .shade100,
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                4,
+                                                              ),
+                                                          border: Border(
+                                                            left: BorderSide(
+                                                              color:
+                                                                  Colors
+                                                                      .grey
+                                                                      .shade400,
+                                                              width: 4,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                  ),
+                                                  extensionSet: md.ExtensionSet(
+                                                    md
+                                                        .ExtensionSet
+                                                        .gitHubFlavored
+                                                        .blockSyntaxes,
+                                                    [
+                                                      md.EmojiSyntax(),
+                                                      ...md
+                                                          .ExtensionSet
+                                                          .gitHubFlavored
+                                                          .inlineSyntaxes,
+                                                    ],
+                                                  ),
+                                                ),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Padding(
+                                        padding: EdgeInsets.only(top: 2),
+                                        child: BlinkingCursor(
+                                          color:
+                                              isUser
+                                                  ? Colors.white70
+                                                  : Color(0xFF2E7D32),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                else if (isUser)
+                                  // User message - not streaming
+                                  SelectableLinkify(
+                                    onOpen: _onLinkTap,
+                                    text: _convertMarkdownLinksToPlainUrls(
+                                      displayContent,
+                                    ),
+                                    textAlign: TextAlign.justify,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      height: 1.5,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    linkStyle: TextStyle(
+                                      decoration: TextDecoration.underline,
+                                      color: Colors.yellow[100],
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    options: LinkifyOptions(
+                                      humanize: false,
+                                      looseUrl: true,
+                                      defaultToHttps: true,
+                                    ),
+                                  )
+                                else
+                                  // Bot message - not streaming
+                                  MarkdownBody(
+                                    data: _convertMarkdownLinksToPlainUrls(
+                                      displayContent,
+                                    ),
+                                    selectable: true,
+                                    onTapLink: (text, href, title) {
+                                      if (href != null) {
+                                        _onLinkTap(LinkableElement(href, text));
+                                      }
+                                    },
+                                    styleSheet: MarkdownStyleSheet(
+                                      p: TextStyle(
+                                        color:
+                                            message.sender == 'staff' ||
+                                                    message.sender == 'admin'
+                                                ? Colors.green.shade900
+                                                : Colors.grey.shade800,
                                         fontSize: 15,
                                         height: 1.5,
                                         fontWeight: FontWeight.w500,
                                       ),
-                                      linkStyle: TextStyle(
+                                      strong: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color:
+                                            message.sender == 'staff' ||
+                                                    message.sender == 'admin'
+                                                ? Colors.green.shade900
+                                                : Colors.grey.shade900,
+                                      ),
+                                      em: TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                        color:
+                                            message.sender == 'staff' ||
+                                                    message.sender == 'admin'
+                                                ? Colors.green.shade900
+                                                : Colors.grey.shade800,
+                                      ),
+                                      a: TextStyle(
                                         decoration: TextDecoration.underline,
-                                        color: Colors.yellow[100],
+                                        color: Colors.blue,
                                         fontWeight: FontWeight.w600,
                                       ),
-                                      options: LinkifyOptions(
-                                        humanize: false,
-                                        looseUrl: true,
-                                        defaultToHttps: true,
+                                      listBullet: TextStyle(
+                                        color:
+                                            message.sender == 'staff' ||
+                                                    message.sender == 'admin'
+                                                ? Colors.green.shade900
+                                                : Colors.grey.shade800,
+                                        fontSize: 15,
                                       ),
-                                    )
-                                    : MarkdownBody(
-                                      data: _convertMarkdownLinksToPlainUrls(
-                                        displayContent,
-                                      ), // ✅ Convert markdown links
-                                      selectable: true,
-                                      onTapLink: (text, href, title) {
-                                        if (href != null) {
-                                          _onLinkTap(
-                                            LinkableElement(href, text),
-                                          );
-                                        }
-                                      },
-                                      styleSheet: MarkdownStyleSheet(
-                                        p: TextStyle(
-                                          color:
-                                              message.sender == 'staff' ||
-                                                      message.sender == 'admin'
-                                                  ? Colors.green.shade900
-                                                  : Colors.grey.shade800,
-                                          fontSize: 15,
-                                          height: 1.5,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        strong: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color:
-                                              message.sender == 'staff' ||
-                                                      message.sender == 'admin'
-                                                  ? Colors.green.shade900
-                                                  : Colors.grey.shade900,
-                                        ),
-                                        em: TextStyle(
-                                          fontStyle: FontStyle.italic,
-                                          color:
-                                              message.sender == 'staff' ||
-                                                      message.sender == 'admin'
-                                                  ? Colors.green.shade900
-                                                  : Colors.grey.shade800,
-                                        ),
-                                        a: TextStyle(
-                                          decoration: TextDecoration.underline,
-                                          color: Colors.blue,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        listBullet: TextStyle(
-                                          color:
-                                              message.sender == 'staff' ||
-                                                      message.sender == 'admin'
-                                                  ? Colors.green.shade900
-                                                  : Colors.grey.shade800,
-                                          fontSize: 15,
-                                        ),
-                                        h1: TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          color:
-                                              message.sender == 'staff' ||
-                                                      message.sender == 'admin'
-                                                  ? Colors.green.shade900
-                                                  : Colors.grey.shade900,
-                                        ),
-                                        h2: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color:
-                                              message.sender == 'staff' ||
-                                                      message.sender == 'admin'
-                                                  ? Colors.green.shade900
-                                                  : Colors.grey.shade900,
-                                        ),
-                                        h3: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color:
-                                              message.sender == 'staff' ||
-                                                      message.sender == 'admin'
-                                                  ? Colors.green.shade900
-                                                  : Colors.grey.shade900,
-                                        ),
-                                        code: TextStyle(
-                                          backgroundColor: Colors.grey.shade100,
-                                          color: Colors.red.shade700,
-                                          fontFamily: 'monospace',
-                                          fontSize: 14,
-                                        ),
-                                        blockquote: TextStyle(
-                                          color: Colors.grey.shade700,
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                        blockquoteDecoration: BoxDecoration(
-                                          color: Colors.grey.shade100,
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                          border: Border(
-                                            left: BorderSide(
-                                              color: Colors.grey.shade400,
-                                              width: 4,
-                                            ),
+                                      h1: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color:
+                                            message.sender == 'staff' ||
+                                                    message.sender == 'admin'
+                                                ? Colors.green.shade900
+                                                : Colors.grey.shade900,
+                                      ),
+                                      h2: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color:
+                                            message.sender == 'staff' ||
+                                                    message.sender == 'admin'
+                                                ? Colors.green.shade900
+                                                : Colors.grey.shade900,
+                                      ),
+                                      h3: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color:
+                                            message.sender == 'staff' ||
+                                                    message.sender == 'admin'
+                                                ? Colors.green.shade900
+                                                : Colors.grey.shade900,
+                                      ),
+                                      code: TextStyle(
+                                        backgroundColor: Colors.grey.shade100,
+                                        color: Colors.red.shade700,
+                                        fontFamily: 'monospace',
+                                        fontSize: 14,
+                                      ),
+                                      blockquote: TextStyle(
+                                        color: Colors.grey.shade700,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                      blockquoteDecoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border(
+                                          left: BorderSide(
+                                            color: Colors.grey.shade400,
+                                            width: 4,
                                           ),
                                         ),
-                                      ),
-                                      extensionSet: md.ExtensionSet(
-                                        md
-                                            .ExtensionSet
-                                            .gitHubFlavored
-                                            .blockSyntaxes,
-                                        [
-                                          md.EmojiSyntax(),
-                                          ...md
-                                              .ExtensionSet
-                                              .gitHubFlavored
-                                              .inlineSyntaxes,
-                                        ],
                                       ),
                                     ),
+                                    extensionSet: md.ExtensionSet(
+                                      md
+                                          .ExtensionSet
+                                          .gitHubFlavored
+                                          .blockSyntaxes,
+                                      [
+                                        md.EmojiSyntax(),
+                                        ...md
+                                            .ExtensionSet
+                                            .gitHubFlavored
+                                            .inlineSyntaxes,
+                                      ],
+                                    ),
+                                  ),
+
                                 SizedBox(height: 6),
+
+                                // Timestamp and streaming indicator
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -759,24 +1007,11 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                                                 : Colors.grey.shade600,
                                       ),
                                     ),
-                                    if (isStreaming) ...[
-                                      SizedBox(width: 8),
-                                      SizedBox(
-                                        width: 10,
-                                        height: 10,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 1.5,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                isUser
-                                                    ? Colors.white70
-                                                    : Color(0xFF2E7D32),
-                                              ),
-                                        ),
-                                      ),
-                                    ],
+                                    // ✅ REMOVED loading spinner - typing animation shows progress
                                   ],
                                 ),
+
+                                // Rating buttons (unchanged)
                                 if (!isUser &&
                                     message.sender == 'bot' &&
                                     !isStreaming &&
@@ -787,6 +1022,8 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                             ),
                           ),
                         ),
+
+                        // User avatar (unchanged)
                         if (isUser)
                           Container(
                             width: 32,
@@ -878,9 +1115,19 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   void _scrollToBottomInstant() {
     if (!_scrollController.hasClients) return;
 
+    // Use multiple frame callbacks to ensure scroll happens
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
+      if (_scrollController.hasClients && mounted) {
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+
+        // Double-check after another frame
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients && mounted) {
+            _scrollController.jumpTo(
+              _scrollController.position.maxScrollExtent,
+            );
+          }
+        });
       }
     });
   }
@@ -2745,37 +2992,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildTypingDot(int index) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 600),
-      curve: Curves.easeInOut,
-      builder: (context, value, child) {
-        final adjustedValue = ((value + (index * 0.33)) % 1.0);
-        final scale = 0.5 + (adjustedValue * 0.5);
-        final opacity = 0.3 + (adjustedValue * 0.7);
-
-        return Transform.scale(
-          scale: scale,
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: Color(0xFF2E7D32).withOpacity(opacity),
-              shape: BoxShape.circle,
-            ),
-          ),
-        );
-      },
-      onEnd: () {
-        // Restart animation
-        if (mounted) {
-          setState(() {});
-        }
-      },
-    );
-  }
-
+  
   // OPTIMIZED: Faster scroll with reduced delay
   void _scrollToBottomSmooth() {
     if (!_scrollController.hasClients) return;
@@ -2791,9 +3008,10 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
         return;
       }
 
-      // Calculate duration based on distance
+      // ✅ FASTER: Reduced duration calculation
       final double distance = (targetPosition - currentPosition).abs();
-      final int duration = (distance / 3).clamp(150, 600).toInt();
+      final int duration =
+          (distance / 5).clamp(100, 400).toInt(); // Faster than before
 
       _scrollController.animateTo(
         targetPosition,
@@ -2811,38 +3029,44 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       itemCount: messages.length + (chatProvider.showTypingIndicator ? 1 : 0),
       padding: EdgeInsets.only(top: 16, bottom: 24, left: 8, right: 8),
       itemBuilder: (context, index) {
-        //  Show typing indicator at the end
+        // Show typing indicator at the end
         if (chatProvider.showTypingIndicator && index == messages.length) {
           return Center(
             child: Container(
-              constraints: BoxConstraints(maxWidth: 1250), //  Added max width
+              constraints: BoxConstraints(maxWidth: 1250),
               child: _buildTypingIndicatorBubble(),
             ),
           );
         }
 
         final Message message = messages[index];
-
-        //  NEW: Skip rendering bot messages that are currently streaming and empty
-        final streamingContent = chatProvider.getStreamingContent(message.id);
-        final isStreaming = streamingContent != null;
-
-        // If this message is streaming but has no content yet, don't show it
-        // The typing indicator will show instead
-        if (isStreaming &&
-            (streamingContent.isEmpty || streamingContent.trim().isEmpty)) {
-          return SizedBox.shrink(); // Don't render anything
-        }
-
         final bool isUser = message.sender == 'user';
         final bool isLastMessage = index == messages.length - 1;
 
-        return Center(
-          //  Added Center widget
-          child: Container(
-            constraints: BoxConstraints(
-              maxWidth: 1250, //  Added max width constraint
+        // ✅ FIXED: Check if this is an empty streaming bot message OR if typing indicator is still showing
+        final streamingContent = chatProvider.getStreamingContent(message.id);
+        final isEmptyStreaming =
+            !isUser &&
+            streamingContent != null &&
+            streamingContent.trim().isEmpty;
+
+        // ✅ KEEP showing typing bubble until we have content
+        final shouldShowTyping =
+            isEmptyStreaming ||
+            (chatProvider.showTypingIndicator && isLastMessage && !isUser);
+
+        if (shouldShowTyping) {
+          return Center(
+            child: Container(
+              constraints: BoxConstraints(maxWidth: 1250),
+              child: _buildTypingIndicatorBubble(),
             ),
+          );
+        }
+
+        return Center(
+          child: Container(
+            constraints: BoxConstraints(maxWidth: 1250),
             child: AnimatedOpacity(
               opacity: 1.0,
               duration: Duration(milliseconds: 200),
@@ -3075,6 +3299,78 @@ class FirstTimeWelcomeDialog extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+Widget _buildTypingDot(int index) {
+  return _AnimatedTypingDot(index: index);
+}
+
+// ✅ NEW: Stateful widget for continuous animation
+class _AnimatedTypingDot extends StatefulWidget {
+  final int index;
+  
+  const _AnimatedTypingDot({required this.index});
+  
+  @override
+  State<_AnimatedTypingDot> createState() => _AnimatedTypingDotState();
+}
+
+class _AnimatedTypingDotState extends State<_AnimatedTypingDot> 
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    
+    // Create staggered animation based on dot index
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Interval(
+          widget.index * 0.2,
+          0.6 + (widget.index * 0.2),
+          curve: Curves.easeInOut,
+        ),
+      ),
+    );
+    
+    _controller.repeat(); // ✅ This makes it loop forever
+  }
+  
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        final scale = 0.5 + (_animation.value * 0.5);
+        final opacity = 0.3 + (_animation.value * 0.7);
+        
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: Color(0xFF2E7D32).withOpacity(opacity),
+              shape: BoxShape.circle,
+            ),
+          ),
+        );
+      },
     );
   }
 }
