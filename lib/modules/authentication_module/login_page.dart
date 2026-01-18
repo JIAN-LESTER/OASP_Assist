@@ -150,12 +150,6 @@ class _LoginPageState extends State<LoginPage> {
       return false;
     }
 
-    // Check minimum length
-    if (password.length < 6) {
-      _setPasswordError('Password must be at least 6 characters');
-      return false;
-    }
-
     _passwordErrorTimer?.cancel();
     setState(() => _passwordError = null);
     return true;
