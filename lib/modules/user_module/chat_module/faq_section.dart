@@ -1143,19 +1143,41 @@ class FAQInputSection extends StatefulWidget {
   State<FAQInputSection> createState() => _FAQInputSectionState();
 }
 
+// Replace the FAQInputSection build method with this optimized version:
+
+// Replace the FAQInputSection build method with this improved version:
+
+// Replace the FAQInputSection build method with this improved version:
+
 class _FAQInputSectionState extends State<FAQInputSection> {
   late FocusNode _textFieldFocusNode;
+  bool _hasText = false; // ✅ Track text state locally
 
   @override
   void initState() {
     super.initState();
     _textFieldFocusNode = FocusNode();
+    
+    // ✅ Listen to text changes
+    widget.controller.addListener(_onTextChanged);
+    _hasText = widget.controller.text.trim().isNotEmpty;
   }
 
   @override
   void dispose() {
+    widget.controller.removeListener(_onTextChanged);
     _textFieldFocusNode.dispose();
     super.dispose();
+  }
+
+  // ✅ Update state when text changes
+  void _onTextChanged() {
+    final hasText = widget.controller.text.trim().isNotEmpty;
+    if (hasText != _hasText) {
+      setState(() {
+        _hasText = hasText;
+      });
+    }
   }
 
   Map<String, double> _getResponsiveSizes(BuildContext context) {
@@ -1190,12 +1212,12 @@ class _FAQInputSectionState extends State<FAQInputSection> {
     }
   }
 
-  // ✅ SIMPLIFIED: Just call the callback directly
   void _handleSendMessage() {
-    if (widget.isLoading) return;
-    
     final text = widget.controller.text.trim();
     if (text.isEmpty) return;
+
+    // Don't allow sending if already loading
+    if (widget.isLoading) return;
 
     // Unfocus keyboard
     _textFieldFocusNode.unfocus();
@@ -1270,7 +1292,7 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: widget.isLoading ? null : () {
+                            onTap: () {
                               HapticFeedback.lightImpact();
                               widget.onFAQToggle();
                             },
@@ -1285,9 +1307,7 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                                       ? Icons.chat_bubble_outline_rounded
                                       : Icons.help_outline_rounded,
                                   key: ValueKey(widget.showFAQs),
-                                  color: widget.isLoading
-                                      ? Color(0xFFCCCCCC)
-                                      : Color(0xFF666666),
+                                  color: Color(0xFF666666),
                                   size: iconSize,
                                 ),
                               ),
@@ -1306,14 +1326,10 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                           maxHeight: 100,
                         ),
                         decoration: BoxDecoration(
-                          color: widget.isLoading
-                              ? Colors.grey.shade100
-                              : Colors.white,
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(borderRadius),
                           border: Border.all(
-                            color: widget.isLoading
-                                ? Colors.grey.shade200
-                                : borderColor,
+                            color: borderColor,
                             width: 1.5,
                           ),
                           boxShadow: [
@@ -1327,7 +1343,6 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                         child: TextField(
                           controller: widget.controller,
                           focusNode: _textFieldFocusNode,
-                          enabled: !widget.isLoading,
                           maxLines: null,
                           minLines: 1,
                           textAlignVertical: TextAlignVertical.center,
@@ -1336,16 +1351,12 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                           style: TextStyle(
                             fontSize: fontSize,
                             fontWeight: FontWeight.w500,
-                            color: widget.isLoading
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade900,
+                            color: Colors.grey.shade900,
                             height: 1.4,
                           ),
 
                           decoration: InputDecoration(
-                            hintText: widget.isLoading
-                                ? 'Sending message...'
-                                : 'Ask something...',
+                            hintText: 'Ask something...',
                             hintStyle: TextStyle(
                               color: Colors.grey.shade400,
                               fontSize: fontSize,
@@ -1359,12 +1370,7 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                             isDense: true,
                           ),
 
-                          // ✅ ONLY onSubmitted - no onEditingComplete
-                          onSubmitted: (_) {
-                            if (!widget.isLoading) {
-                              _handleSendMessage();
-                            }
-                          },
+                          onSubmitted: (_) => _handleSendMessage(),
                         ),
                       ),
                     ),
@@ -1394,16 +1400,12 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                           decoration: BoxDecoration(
                             color: widget.isListening
                                 ? primaryColor
-                                : widget.isLoading
-                                    ? Color(0xFFEEEEEE)
-                                    : Color(0xFFF5F5F5),
+                                : Color(0xFFF5F5F5),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: widget.isListening
                                   ? primaryColor
-                                  : widget.isLoading
-                                      ? Color(0xFFDDDDDD)
-                                      : Color(0xFFE0E0E0),
+                                  : Color(0xFFE0E0E0),
                               width: 1.5,
                             ),
                             boxShadow: [
@@ -1419,12 +1421,10 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: widget.isLoading
-                                  ? null
-                                  : () {
-                                      HapticFeedback.mediumImpact();
-                                      widget.onMicrophoneTap!();
-                                    },
+                              onTap: () {
+                                HapticFeedback.mediumImpact();
+                                widget.onMicrophoneTap!();
+                              },
                               borderRadius: BorderRadius.circular(8),
                               splashColor: widget.isListening
                                   ? Colors.white.withOpacity(0.2)
@@ -1442,9 +1442,7 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                                     key: ValueKey(widget.isListening),
                                     color: widget.isListening
                                         ? Colors.white
-                                        : widget.isLoading
-                                            ? Color(0xFFCCCCCC)
-                                            : Color(0xFF666666),
+                                        : Color(0xFF666666),
                                     size: iconSize,
                                   ),
                                 ),
@@ -1455,53 +1453,37 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                       ),
                     SizedBox(width: 10),
 
-                    // Send Button
-                    Container(
-                      width: buttonSize,
-                      height: buttonSize,
-                      decoration: BoxDecoration(
-                        color: widget.isLoading
-                            ? Colors.grey.shade400
-                            : primaryColor,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: widget.isLoading
-                            ? []
-                            : [
-                                BoxShadow(
-                                  color: primaryColor.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: widget.isLoading ? null : _handleSendMessage,
+                    // ✅ FIXED: Send Button - Now properly tracks text changes
+                    AnimatedOpacity(
+                      duration: Duration(milliseconds: 200),
+                      opacity: _hasText ? 1.0 : 0.5,
+                      child: Container(
+                        width: buttonSize,
+                        height: buttonSize,
+                        decoration: BoxDecoration(
+                          color: primaryColor,
                           borderRadius: BorderRadius.circular(10),
-                          splashColor: Colors.white.withOpacity(0.2),
-                          highlightColor: Colors.white.withOpacity(0.1),
-                          child: Center(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              child: widget.isLoading
-                                  ? SizedBox(
-                                      width: iconSize - 4,
-                                      height: iconSize - 4,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
-                                        ),
-                                      ),
-                                    )
-                                  : Icon(
-                                      Icons.arrow_forward_rounded,
-                                      color: Colors.white,
-                                      size: iconSize,
-                                      key: ValueKey('send'),
-                                    ),
+                          boxShadow: _hasText ? [
+                            BoxShadow(
+                              color: primaryColor.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ] : [],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _hasText ? _handleSendMessage : null,
+                            borderRadius: BorderRadius.circular(10),
+                            splashColor: _hasText ? Colors.white.withOpacity(0.2) : null,
+                            highlightColor: _hasText ? Colors.white.withOpacity(0.1) : null,
+                            child: Center(
+                              child: Icon(
+                                Icons.arrow_forward_rounded,
+                                color: Colors.white,
+                                size: iconSize,
+                              ),
                             ),
                           ),
                         ),
