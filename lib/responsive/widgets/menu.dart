@@ -443,7 +443,12 @@ class UniversalUIComponents {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.favorite, color: Colors.grey[300], size: 28),
+            Image.asset(
+              'lib/images/oasp.png',
+              width: 72,
+              height: 72,
+              // color: Colors.grey[300],
+            ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -492,7 +497,7 @@ class UniversalUIComponents {
                 ),
       ),
       child: Center(
-        child: Icon(Icons.favorite, color: Colors.grey[300], size: 28),
+        child: Image.asset('lib/images/oasp.png', width: 54, height: 54),
       ),
     );
   }
@@ -504,7 +509,7 @@ class UniversalUIComponents {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white),
       child: Center(
-        child: Icon(Icons.favorite, size: 28, color: Colors.grey[300]),
+        child: Image.asset('lib/images/oasp.png', width: 72, height: 72),
       ),
     );
   }

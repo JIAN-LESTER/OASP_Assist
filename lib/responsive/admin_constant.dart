@@ -339,10 +339,11 @@ class AdminConstant {
                       border: null,
                     ),
                     child: Center(
-                      child: Icon(
-                        Icons.favorite,
-                        color: Colors.grey[300],
-                        size: 28,
+                      child: Image.asset(
+                        'lib/images/oasp.png',
+                        width: 28,
+                        height: 28,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
@@ -1037,7 +1038,12 @@ class AdminConstant {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: Colors.white, border: null),
             child: Center(
-              child: Icon(Icons.favorite, size: 28, color: Colors.grey[300]),
+              child: Image.asset(
+                'lib/images/oasp.png',
+                width: 28,
+                height: 28,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
 

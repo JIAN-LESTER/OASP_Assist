@@ -1,6 +1,5 @@
-  import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-
 
 class CategoryStyle {
   final String displayName;
@@ -18,7 +17,7 @@ CategoryStyle getCategoryStyle(String category) {
     case 'scholarship':
       return CategoryStyle('Scholarship', Colors.purple, Colors.white);
     case 'placement':
-      return CategoryStyle('Placement', Colors.yellow, Colors.black);
+      return CategoryStyle('Placement', Colors.teal[600]!, Colors.black);
     case 'general':
       return CategoryStyle('General', Colors.green, Colors.white);
     default:
@@ -88,83 +87,81 @@ List<Color> getbar(String label) {
 }
 
 IconData getCategoryIcon(String? category) {
-    switch (category?.toLowerCase()) {
-      case 'admission':
-        return Icons.school;
-      case 'scholarship':
-        return Icons.event;
-      case 'placement':
-        return Icons.priority_high;
-      case 'general':
-        return Icons.info;
-      default:
-        return Icons.campaign;
-    }
+  switch (category?.toLowerCase()) {
+    case 'admission':
+      return Icons.school;
+    case 'scholarship':
+      return Icons.event;
+    case 'placement':
+      return Icons.priority_high;
+    case 'general':
+      return Icons.info;
+    default:
+      return Icons.campaign;
   }
+}
 
-  Color getCategoryColor(String? category) {
-    switch (category?.toLowerCase()) {
-      case 'admission':
-        return Colors.blue;
-      case 'scholarship':
-        return Colors.purple;
-      case 'placement':
-        return Colors.yellow;
-      case 'general':
-        return Colors.green;
-      default:
-        return Colors.green;
-    }
+Color getCategoryColor(String? category) {
+  switch (category?.toLowerCase()) {
+    case 'admission':
+      return Colors.blue;
+    case 'scholarship':
+      return Colors.purple;
+    case 'placement':
+      return Colors.teal[600]!;
+    case 'general':
+      return Colors.green;
+    default:
+      return Colors.green;
   }
+}
 
+String formatTime(Timestamp? timestamp) {
+  if (timestamp == null) return '';
 
-  String formatTime(Timestamp? timestamp) {
-    if (timestamp == null) return '';
+  final now = DateTime.now();
+  final date = timestamp.toDate();
+  final difference = now.difference(date);
 
-    final now = DateTime.now();
-    final date = timestamp.toDate();
-    final difference = now.difference(date);
-
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
+  if (difference.inMinutes < 1) {
+    return 'Just now';
+  } else if (difference.inMinutes < 60) {
+    return '${difference.inMinutes}m ago';
+  } else if (difference.inHours < 24) {
+    return '${difference.inHours}h ago';
+  } else if (difference.inDays < 7) {
+    return '${difference.inDays}d ago';
+  } else {
+    return '${date.day}/${date.month}/${date.year}';
   }
+}
 
-  IconData getNotificationIcon(String? type) {
-    switch (type?.toLowerCase()) {
-      case 'announcement':
-        return Icons.campaign_rounded;
-      case 'deadline_reminder':
-        return Icons.alarm_on_rounded;
-      case 'escalation_reply':
-        return Icons.reply_rounded;
-      case 'new_escalation':
-        return Icons.help_rounded;
-      default:
-        return Icons.notifications_rounded;
-    }
+IconData getNotificationIcon(String? type) {
+  switch (type?.toLowerCase()) {
+    case 'announcement':
+      return Icons.campaign_rounded;
+    case 'deadline_reminder':
+      return Icons.alarm_on_rounded;
+    case 'escalation_reply':
+      return Icons.reply_rounded;
+    case 'new_escalation':
+      return Icons.help_rounded;
+    default:
+      return Icons.notifications_rounded;
   }
+}
 
-  Color getNotificationColor(String? type) {
-    switch (type?.toLowerCase()) {
-      case 'announcement':
-        return const Color(0xFF2E7D32);
-      case 'deadline_reminder':
-        return const Color(0xFFFF6F00);
-      case 'escalation_reply':
-        return const Color(0xFF1976D2);
-      case 'new_escalation':
-        return const Color(0xFFF57C00);
-      default:
-        return const Color(0xFF2E7D32);
-    }
+Color getNotificationColor(String? type) {
+  switch (type?.toLowerCase()) {
+    case 'announcement':
+      return const Color(0xFF2E7D32);
+    case 'deadline_reminder':
+      return const Color(0xFFFF6F00);
+    case 'escalation_reply':
+      return const Color(0xFF1976D2);
+    case 'new_escalation':
+      return const Color(0xFFF57C00);
+    default:
+      return const Color(0xFF2E7D32);
   }
-
+}
