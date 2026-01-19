@@ -59,7 +59,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
   List<String> _scholarships = [];
 
   bool? _hasScholarship; // for undergraduate
-  bool? _hasScholarshipFreshman; // for freshman applicant
+  bool? _hasScholarshipFreshmen; // for freshman applicant
   bool _hasConfirmedCustomAffiliation = false; // for others confirmation
 
   final List<String> _otherAffiliations = [
@@ -80,7 +80,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
   final List<String> _roles = [
     'CMU Undergraduate Student',
     'CMU Student – Graduate Level',
-    'Freshman Applicant',
+    'Freshmen Applicant',
     'Master\'s Applicant',
     'Other (Non-student)',
   ];
@@ -980,17 +980,12 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
         'icon': Icons.psychology_outlined,
         'title': 'AI-Powered Assistant',
         'description':
-            'Advanced chatbot delivers intelligent, context-aware responses to your academic questions.',
+            'Advanced chatbot delivers fast, intelligent, context-aware responses to your academic questions.',
       },
-      {
-        'icon': Icons.flash_on_outlined,
-        'title': 'Lightning-Fast Replies',
-        'description':
-            'Get immediate answers to your inquiries without any waiting time.',
-      },
+
       {
         'icon': Icons.school_outlined,
-        'title': 'OASP Services Hub',
+        'title': 'OASP Services',
         'description':
             'Comprehensive access to admission, scholarship, and placement information in one place.',
       },
@@ -1059,42 +1054,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
           ),
           const SizedBox(height: 20),
 
-          // Features Disclaimer
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  primaryColor.withOpacity(0.08),
-                  primaryColor.withOpacity(0.03),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: primaryColor.withOpacity(0.2),
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.auto_awesome, color: primaryColor, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'OASP Assist combines cutting-edge AI technology with dedicated human support to provide you with the best assistance possible.',
-                    style: TextStyle(
-                      fontSize: descriptionFontSize * 0.9,
-                      color: textPrimaryColor,
-                      fontWeight: FontWeight.w500,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+    
 
           const SizedBox(height: 24),
 
@@ -1480,7 +1440,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
         ]);
         break;
 
-      case 'Freshman Applicant':
+      case 'Freshmen Applicant':
         items.addAll([
           const SizedBox(height: 18),
           Divider(height: 1, color: primaryColor.withOpacity(0.1)),
@@ -1672,7 +1632,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              'Perfect! You\'re ready to explore OASP Assist. Let\'s start with a conversation with our AI assistant.',
+              'Perfect! You\'re ready to explore OASP Assist. Let\'s start with a conversation with our inquiry assistant.',
               style: TextStyle(
                 fontSize: descriptionFontSize,
                 color: textSecondaryColor,
@@ -1718,10 +1678,10 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                   (_isEnrolledInMasters == true &&
                       _selectedMastersProgram.isNotEmpty));
 
-        case 'Freshman Applicant':
+        case 'Freshmen Applicant':
           bool scholarshipValid =
-              _hasScholarshipFreshman == false ||
-              (_hasScholarshipFreshman == true &&
+              _hasScholarshipFreshmen == false ||
+              (_hasScholarshipFreshmen == true &&
                   _selectedScholarship != null &&
                   _selectedScholarship!.isNotEmpty &&
                   (_selectedScholarship != 'Others' ||
@@ -1731,7 +1691,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
               _firstChoiceProgram.isNotEmpty &&
               _secondChoiceProgram.isNotEmpty &&
               _firstChoiceProgram != _secondChoiceProgram &&
-              _hasScholarshipFreshman != null &&
+              _hasScholarshipFreshmen != null &&
               scholarshipValid;
 
         case 'Master\'s Applicant':
@@ -1858,7 +1818,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
               _isEnrolledInMasters == true ? _selectedMastersProgram : null,
         });
         break;
-      case 'Freshman Applicant':
+      case 'Freshmen Applicant':
         updateData.addAll({
           'lrn': _lrnController.text.trim(),
           'firstChoiceProgram': _firstChoiceProgram,
@@ -1896,7 +1856,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     _selectedProgram = '';
     _selectedScholarship = null;
     _hasScholarship = null;
-    _hasScholarshipFreshman = null;
+    _hasScholarshipFreshmen = null;
     _isEnrolledInMasters = null;
     _selectedMastersProgram = '';
     _firstChoiceProgram = '';
@@ -2081,7 +2041,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
           ],
         );
 
-      case 'Freshman Applicant':
+      case 'Freshmen Applicant':
         List<String> allPrograms = [];
         _programsByCourse.forEach((key, programs) {
           if (key.contains('Bachelor')) allPrograms.addAll(programs);
@@ -2161,22 +2121,22 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
             const SizedBox(height: 16),
             _buildResponsiveYesNoQuestion(
               question: 'Do you have a scholarship?',
-              currentValue: _hasScholarshipFreshman,
+              currentValue: _hasScholarshipFreshmen,
               onYes:
                   () => setState(() {
-                    _hasScholarshipFreshman = true;
+                    _hasScholarshipFreshmen = true;
                     _selectedScholarship = null;
                   }),
               onNo:
                   () => setState(() {
-                    _hasScholarshipFreshman = false;
+                    _hasScholarshipFreshmen = false;
                     _selectedScholarship = null;
                     _customScholarshipController.clear();
                   }),
               fontSize: fontSize,
               cardPadding: cardPadding,
             ),
-            if (_hasScholarshipFreshman == true) ...[
+            if (_hasScholarshipFreshmen == true) ...[
               const SizedBox(height: 16),
               _buildModernDropdown(
                 label: 'Scholarship',

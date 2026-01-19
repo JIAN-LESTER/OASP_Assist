@@ -1146,11 +1146,12 @@ class FirebaseService {
     //       final data = doc.data() as Map<String, dynamic>;
     //       return EscalatedMessage.fromMap(data);
     //     }).toList();
+final topEscalations = pendingEscalations.take(5).map((doc) {
+    print('📝 Mapping escalation: ${doc.id}'); // DEBUG
+    return EscalatedMessage.fromMap(doc.data() as Map<String, dynamic>);
+  }).toList();
 
-            final topEscalations =
-        pendingEscalations.take(5).map((doc) => EscalatedMessage.fromMap(doc.data() as Map<String, dynamic>)).toList();
-
-
+ print('✅ Total top escalations: ${topEscalations.length}'); // DEBUG
 
     // Escalations over time
     final escalationsOverTime = _generateEscalationsTrend(

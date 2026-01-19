@@ -235,10 +235,17 @@ class _LazyLoadWidgetState extends State<LazyLoadWidget> {
 class DashboardCache {
   final InquiryReportsData? inq;
   final UserDemographicsReportsData? ud;
+  final AdminDashboardData? ad;  // ✅ ADD THIS
   final DateTime timestamp;
   final Map<String, dynamic>? quickStats;
 
-  DashboardCache({this.inq, this.ud, required this.timestamp, this.quickStats});
+  DashboardCache({
+    this.inq,
+    this.ud,
+    this.ad,  // ✅ ADD THIS
+    required this.timestamp,
+    this.quickStats,
+  });
 
   bool get isValid {
     final now = DateTime.now();
@@ -339,31 +346,31 @@ class _Dashboardmodulestate extends State<DashboardPage> {
     });
   }
 
-  Future<void> _loadFullData() async {
-    // Check cache first
-    if (_cache.containsKey(selectedTimeFrame) &&
-        _cache[selectedTimeFrame]!.isValid) {
-      final cached = _cache[selectedTimeFrame]!;
+Future<void> _loadFullData() async {
+  // Check cache first
+  if (_cache.containsKey(selectedTimeFrame) &&
+      _cache[selectedTimeFrame]!.isValid) {
+    final cached = _cache[selectedTimeFrame]!;
 
-      if (mounted) {
-        setState(() {
-          inq = cached.inq;
-          ud = cached.ud;
-          quickStats = cached.quickStats as Map<String, int>?;
-        });
-      }
-
-      // Refresh in background if stale
-      if (cached.isStale) {
-        _refreshInBackground();
-      }
-      return;
+    if (mounted) {
+      setState(() {
+        inq = cached.inq;
+        ud = cached.ud;
+        ad = cached.ad;  // ✅ LOAD FROM CACHE
+        quickStats = cached.quickStats as Map<String, int>?;
+      });
     }
 
-    // Fetch fresh data
-    await _fetchAndCacheData();
+    // Refresh in background if stale
+    if (cached.isStale) {
+      _refreshInBackground();
+    }
+    return;
   }
 
+  // Fetch fresh data
+  await _fetchAndCacheData();
+}
  Future<void> _fetchAndCacheData() async {
   try {
     final results = await Future.wait([
@@ -382,7 +389,7 @@ class _Dashboardmodulestate extends State<DashboardPage> {
     final adminData = results[0] as AdminDashboardData;
     final userDemoData = results[1] as UserDemographicsReportsData;
 
-    // ✅ FIX: Properly map AdminDashboardData to InquiryReportsData
+    // Create inquiry data from admin data
     final inquiryData = InquiryReportsData(
       totalMessages: adminData.totalMessages,
       userMessages: 0,
@@ -397,20 +404,35 @@ class _Dashboardmodulestate extends State<DashboardPage> {
       escalationsOverTime: adminData.escalationsOverTime,
       staffPerformance: {},
       botVsHumanAnswers: {'bot': 0, 'human': 0},
-      recentLogs: adminData.systemLogs,  // ✅ FIX: Use adminData.systemLogs
+      recentLogs: adminData.systemLogs,
       msgLogs: adminData.messageLogs,
     );
 
+    // ✅ UPDATE CACHE
+    _cache[selectedTimeFrame] = DashboardCache(
+      inq: inquiryData,
+      ud: userDemoData,
+      ad: adminData,  // ✅ STORE IT IN CACHE
+      timestamp: DateTime.now(),
+    );
+
     setState(() {
-      inq = inquiryData;
-      ud = userDemoData;
-      ad = adminData;  // ✅ FIX: Store AdminDashboardData
-    });
+  inq = inquiryData;
+  ud = userDemoData;
+  ad = adminData;
+  
+  // ✅ DEBUG PRINTS
+  print('📊 Admin Data Updated:');
+  print('   Pending Escalations: ${adminData.pendingEscalations}');
+  print('   Top Escalated Messages: ${adminData.topEscalatedMessages.length}');
+  print('   First Message: ${adminData.topEscalatedMessages.isNotEmpty ? adminData.topEscalatedMessages.first.userMessage : "none"}');
+});
   } catch (e) {
     print('Error fetching data: $e');
     rethrow;
   }
 }
+
 
 
   Future<void> _refreshInBackground() async {
@@ -645,6 +667,7 @@ class _Dashboardmodulestate extends State<DashboardPage> {
             isRefreshing: isRefreshing,
             inq: inq,
             ud: ud,
+            ad: ad,
             userName: userName!,
             quickStats: quickStats,
             customDateRange: customDateRange,
@@ -657,6 +680,7 @@ class _Dashboardmodulestate extends State<DashboardPage> {
             isRefreshing: isRefreshing,
             inq: inq,
             ud: ud,
+            ad: ad,
             userName: userName!,
             quickStats: quickStats,
             customDateRange: customDateRange,
@@ -669,6 +693,7 @@ class _Dashboardmodulestate extends State<DashboardPage> {
             isRefreshing: isRefreshing,
             inq: inq,
             ud: ud,
+            ad:ad,
             userName: userName!,
             quickStats: quickStats,
             customDateRange: customDateRange,

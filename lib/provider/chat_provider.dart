@@ -141,7 +141,7 @@ class ChatProvider extends ChangeNotifier {
     _onMessageAdded = null;
   }
 
- bool get canSendMessage {
+bool get canSendMessage {
   final userId = FirebaseAuth.instance.currentUser?.uid;
   if (userId == null) return false;
 
@@ -153,13 +153,10 @@ class ChatProvider extends ChangeNotifier {
     return true;
   }
 
-  // ✅ FIXED: Reset check with correct time comparison
+  // ✅ RESET CHECK: Check if it's past 8 AM and last reset was before today's 8 AM
   if (_userLastResetDate != null) {
     final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
 
-    // Should reset if:
-    // 1. Current time is after 8 AM today AND
-    // 2. Last reset was before 8 AM today
     final shouldReset =
         now.isAfter(resetTime) && _userLastResetDate!.isBefore(resetTime);
 
@@ -169,95 +166,334 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  // ✅ LIMIT CHECK: Can send if count is LESS than limit
+  // ✅ FIX: User can send if count is STRICTLY LESS than max
+  // This means: 0,1,2,3,4 = can send (total 5 messages)
+  // 5 or more = cannot send
   final canSend = _userDailyMessageCount < MAX_DAILY_MESSAGES;
 
   print('🔍 Message limit check:');
   print('   Current count: $_userDailyMessageCount');
   print('   Max allowed: $MAX_DAILY_MESSAGES');
   print('   Can send: $canSend');
+  print('   Messages sent today: $_userDailyMessageCount/$MAX_DAILY_MESSAGES');
 
   return canSend;
 }
 
+  static const int MAX_DAILY_ESCALATIONS = 2;
 
+  StreamSubscription<DocumentSnapshot>? _userEscalationCountSubscription;
+
+  int _userDailyEscalationCount = 0;
+  DateTime? _userLastEscalationResetDate;
+
+  int get userDailyEscalationCount => _userDailyEscalationCount;
+
+  bool get canEscalate {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return false;
+
+    final now = DateTime.now();
+
+    // New user check
+    if (_userDailyEscalationCount == 0 &&
+        _userLastEscalationResetDate == null) {
+      print('ℹ️ New user - allowing first escalation');
+      return true;
+    }
+
+    // Reset check
+    if (_userLastEscalationResetDate != null) {
+      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
+
+      final shouldReset =
+          now.isAfter(resetTime) &&
+          _userLastEscalationResetDate!.isBefore(resetTime);
+
+      if (shouldReset) {
+        print('ℹ️ Escalation reset time reached - allowing escalation');
+        return true;
+      }
+    }
+
+    final canEsc = _userDailyEscalationCount < MAX_DAILY_ESCALATIONS;
+
+    print('🔍 Escalation limit check:');
+    print('   Current count: $_userDailyEscalationCount');
+    print('   Max allowed: $MAX_DAILY_ESCALATIONS');
+    print('   Can escalate: $canEsc');
+
+    return canEsc;
+  }
+
+  bool get isEscalationLimitReached => !canEscalate;
+
+  Duration getTimeUntilEscalationReset() {
+    final now = DateTime.now();
+    DateTime nextReset;
+
+    final todayReset = DateTime(now.year, now.month, now.day, 8, 0, 0);
+
+    if (now.isBefore(todayReset)) {
+      nextReset = todayReset;
+    } else {
+      nextReset = DateTime(now.year, now.month, now.day + 1, 8, 0, 0);
+    }
+
+    final duration = nextReset.difference(now);
+
+    print('⏰ Time until escalation reset:');
+    print('   Current time: ${now.toString()}');
+    print('   Next reset: ${nextReset.toString()}');
+    print('   Duration: ${duration.inHours}h ${duration.inMinutes % 60}m');
+
+    return duration;
+  }
+
+  Future<void> updateUserEscalationCount() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final now = DateTime.now();
+      final userRef = _firestore.collection('users').doc(userId);
+
+      final userDoc = await userRef.get();
+
+      if (!userDoc.exists) {
+        await userRef.set({
+          'dailyEscalationCount': 1,
+          'lastEscalationResetDate': Timestamp.now(),
+        }, SetOptions(merge: true));
+
+        _userDailyEscalationCount = 1;
+        _userLastEscalationResetDate = now;
+
+        print('✅ New user first escalation - count set to 1');
+        notifyListeners();
+        return;
+      }
+
+      final data = userDoc.data()!;
+      final currentCount = data['dailyEscalationCount'] ?? 0;
+      final lastReset =
+          (data['lastEscalationResetDate'] as Timestamp?)?.toDate();
+
+      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
+
+      bool shouldReset = false;
+
+      if (lastReset == null) {
+        shouldReset = true;
+        print('🔄 Escalation reset needed: No previous reset recorded');
+      } else {
+        if (lastReset.isBefore(resetTime) && now.isAfter(resetTime)) {
+          shouldReset = true;
+          print(
+            '🔄 Escalation reset needed: Last reset was before today\'s 8 AM',
+          );
+        }
+      }
+
+      if (shouldReset) {
+        await userRef.update({
+          'dailyEscalationCount': 1,
+          'lastEscalationResetDate': Timestamp.now(),
+        });
+
+        _userDailyEscalationCount = 1;
+        _userLastEscalationResetDate = now;
+
+        print('✅ Escalation count RESET - new count: 1');
+      } else {
+        await _firestore.runTransaction((transaction) async {
+          final snapshot = await transaction.get(userRef);
+          final currentCount = snapshot.data()?['dailyEscalationCount'] ?? 0;
+          final newCount = currentCount + 1;
+
+          transaction.update(userRef, {'dailyEscalationCount': newCount});
+        });
+
+        _userDailyEscalationCount = currentCount + 1;
+
+        print('✅ Escalation count incremented to $_userDailyEscalationCount');
+      }
+
+      notifyListeners();
+    } catch (e) {
+      print('❌ Error updating escalation count: $e');
+    }
+  }
+
+  // Add to initState listener setup
+  void listenToUserEscalationCount() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    _userEscalationCountSubscription?.cancel();
+
+    _userEscalationCountSubscription = _firestore
+        .collection('users')
+        .doc(userId)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            if (snapshot.exists) {
+              final data = snapshot.data()!;
+              final newCount = data['dailyEscalationCount'] ?? 0;
+              final newResetDate =
+                  (data['lastEscalationResetDate'] as Timestamp?)?.toDate();
+
+              if (newCount != _userDailyEscalationCount ||
+                  newResetDate != _userLastEscalationResetDate) {
+                _userDailyEscalationCount = newCount;
+                _userLastEscalationResetDate = newResetDate;
+
+                print(
+                  '📊 Real-time update: Escalation count = $_userDailyEscalationCount',
+                );
+                notifyListeners();
+              }
+            } else {
+              _userDailyEscalationCount = 0;
+              _userLastEscalationResetDate = null;
+              notifyListeners();
+            }
+          },
+          onError: (error) {
+            print('❌ Error in escalation count listener: $error');
+          },
+        );
+  }
+
+  Future<void> loadUserEscalationCount() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        _userDailyEscalationCount = data['dailyEscalationCount'] ?? 0;
+        _userLastEscalationResetDate =
+            (data['lastEscalationResetDate'] as Timestamp?)?.toDate();
+
+        print(
+          '✅ Loaded escalation count: $_userDailyEscalationCount/$MAX_DAILY_ESCALATIONS',
+        );
+      } else {
+        _userDailyEscalationCount = 0;
+        _userLastEscalationResetDate = null;
+
+        await _firestore.collection('users').doc(userId).set({
+          'dailyEscalationCount': 0,
+          'lastEscalationResetDate': Timestamp.now(),
+        }, SetOptions(merge: true));
+
+        print(
+          '✅ Initialized new user escalation count: 0/$MAX_DAILY_ESCALATIONS',
+        );
+      }
+
+      notifyListeners();
+    } catch (e) {
+      print('❌ Error loading escalation count: $e');
+    }
+  }
+
+  // Add to dispose method
+  @override
+  void dispose() {
+    print('🧹 ChatProvider disposing...');
+    _isDisposed = true;
+
+    _messagesSubscription?.cancel();
+    _escalationSubscription?.cancel();
+    _userMessageCountSubscription?.cancel();
+    _userEscalationCountSubscription?.cancel(); // NEW
+
+    _messages.clear();
+    _streamingContent.clear();
+    _processedMessages.clear();
+
+    super.dispose();
+    print('✅ ChatProvider disposed');
+  }
 
   // Keep the old getter for backward compatibility but use the new logic
   bool get isMessageLimitReached => !canSendMessage;
 
   Duration getTimeUntilReset() {
-  final now = DateTime.now();
-  DateTime nextReset;
-
-  // Reset time is 8:00 AM
-  final todayReset = DateTime(now.year, now.month, now.day, 8, 0, 0);
-
-  if (now.isBefore(todayReset)) {
-    // It's before 8 AM today - next reset is today at 8 AM
-    nextReset = todayReset;
-  } else {
-    // It's after 8 AM today - next reset is tomorrow at 8 AM
-    nextReset = DateTime(now.year, now.month, now.day + 1, 8, 0, 0);
-  }
-
-  final duration = nextReset.difference(now);
-
-  print('⏰ Time until reset calculation:');
-  print('   Current time: ${now.toString()}');
-  print('   Next reset: ${nextReset.toString()}');
-  print('   Duration: ${duration.inHours}h ${duration.inMinutes % 60}m');
-
-  return duration;
-}
-
-
- Future<void> resetAllUserMessageCounts() async {
-  try {
     final now = DateTime.now();
-    final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
+    DateTime nextReset;
 
-    print('🔄 Starting manual message count reset at ${now.toString()}');
-    print('   Reset time: ${resetTime.toString()}');
+    // Reset time is 8:00 AM
+    final todayReset = DateTime(now.year, now.month, now.day, 8, 0, 0);
 
-    final usersSnapshot = await _firestore.collection('users').get();
-    final batch = _firestore.batch();
-    int resetCount = 0;
-
-    for (var doc in usersSnapshot.docs) {
-      final data = doc.data();
-      final lastReset =
-          (data['lastMessageResetDate'] as Timestamp?)?.toDate();
-
-      // Reset everyone who hasn't been reset today after reset time
-      if (lastReset == null || lastReset.isBefore(resetTime)) {
-        batch.update(doc.reference, {
-          'dailyMessageCount': 0,
-          'lastMessageResetDate': Timestamp.now(),
-        });
-        resetCount++;
-      }
-    }
-
-    if (resetCount > 0) {
-      await batch.commit();
-      print('✅ Reset complete: $resetCount users reset');
+    if (now.isBefore(todayReset)) {
+      // It's before 8 AM today - next reset is today at 8 AM
+      nextReset = todayReset;
     } else {
-      print('ℹ️ No users needed reset');
+      // It's after 8 AM today - next reset is tomorrow at 8 AM
+      nextReset = DateTime(now.year, now.month, now.day + 1, 8, 0, 0);
     }
 
-    // Update local state if this is the current user
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId != null) {
-      _userDailyMessageCount = 0;
-      _userLastResetDate = now;
-      notifyListeners();
-    }
-  } catch (e) {
-    print('❌ Error in manual reset: $e');
+    final duration = nextReset.difference(now);
+
+    print('⏰ Time until reset calculation:');
+    print('   Current time: ${now.toString()}');
+    print('   Next reset: ${nextReset.toString()}');
+    print('   Duration: ${duration.inHours}h ${duration.inMinutes % 60}m');
+
+    return duration;
   }
-}
 
+  Future<void> resetAllUserMessageCounts() async {
+    try {
+      final now = DateTime.now();
+      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
 
+      print('🔄 Starting manual message count reset at ${now.toString()}');
+      print('   Reset time: ${resetTime.toString()}');
+
+      final usersSnapshot = await _firestore.collection('users').get();
+      final batch = _firestore.batch();
+      int resetCount = 0;
+
+      for (var doc in usersSnapshot.docs) {
+        final data = doc.data();
+        final lastReset =
+            (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+
+        // Reset everyone who hasn't been reset today after reset time
+        if (lastReset == null || lastReset.isBefore(resetTime)) {
+          batch.update(doc.reference, {
+            'dailyMessageCount': 0,
+            'lastMessageResetDate': Timestamp.now(),
+          });
+          resetCount++;
+        }
+      }
+
+      if (resetCount > 0) {
+        await batch.commit();
+        print('✅ Reset complete: $resetCount users reset');
+      } else {
+        print('ℹ️ No users needed reset');
+      }
+
+      // Update local state if this is the current user
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        _userDailyMessageCount = 0;
+        _userLastResetDate = now;
+        notifyListeners();
+      }
+    } catch (e) {
+      print('❌ Error in manual reset: $e');
+    }
+  }
 
   Future<void> loadUserMessageCount() async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
@@ -298,92 +534,90 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> _updateUserMessageCount() async {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
-  if (userId == null) return;
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
 
-  try {
-    final now = DateTime.now();
-    final userRef = _firestore.collection('users').doc(userId);
+    try {
+      final now = DateTime.now();
+      final userRef = _firestore.collection('users').doc(userId);
 
-    // Get current data
-    final userDoc = await userRef.get();
+      // Get current data
+      final userDoc = await userRef.get();
 
-    if (!userDoc.exists) {
-      // ✅ Brand new user - create document and set count to 1
-      await userRef.set({
-        'dailyMessageCount': 1,
-        'lastMessageResetDate': Timestamp.now(),
-      }, SetOptions(merge: true));
+      if (!userDoc.exists) {
+        // ✅ Brand new user - create document and set count to 1
+        await userRef.set({
+          'dailyMessageCount': 1,
+          'lastMessageResetDate': Timestamp.now(),
+        }, SetOptions(merge: true));
 
-      _userDailyMessageCount = 1;
-      _userLastResetDate = now;
+        _userDailyMessageCount = 1;
+        _userLastResetDate = now;
 
-      print('✅ New user first message - count set to 1');
-      notifyListeners();
-      return;
-    }
-
-    // Existing user - check if reset needed
-    final data = userDoc.data()!;
-    final currentCount = data['dailyMessageCount'] ?? 0;
-    final lastReset = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
-
-    // ✅ FIXED: Reset time is 8:00 AM today
-    final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
-
-    // ✅ FIXED: Simplified reset check
-    bool shouldReset = false;
-
-    if (lastReset == null) {
-      // No last reset recorded - reset needed
-      shouldReset = true;
-      print('🔄 Reset needed: No previous reset recorded');
-    } else {
-      // ✅ FIXED: Check if last reset was BEFORE today's 8 AM
-      if (lastReset.isBefore(resetTime) && now.isAfter(resetTime)) {
-        shouldReset = true;
-        print('🔄 Reset needed: Last reset was before today\'s 8 AM');
-        print('   Last reset: ${lastReset.toString()}');
-        print('   Reset time: ${resetTime.toString()}');
-        print('   Current time: ${now.toString()}');
+        print('✅ New user first message - count set to 1');
+        notifyListeners();
+        return;
       }
+
+      // Existing user - check if reset needed
+      final data = userDoc.data()!;
+      final currentCount = data['dailyMessageCount'] ?? 0;
+      final lastReset = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+
+      // ✅ FIXED: Reset time is 8:00 AM today
+      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
+
+      // ✅ FIXED: Simplified reset check
+      bool shouldReset = false;
+
+      if (lastReset == null) {
+        // No last reset recorded - reset needed
+        shouldReset = true;
+        print('🔄 Reset needed: No previous reset recorded');
+      } else {
+        // ✅ FIXED: Check if last reset was BEFORE today's 8 AM
+        if (lastReset.isBefore(resetTime) && now.isAfter(resetTime)) {
+          shouldReset = true;
+          print('🔄 Reset needed: Last reset was before today\'s 8 AM');
+          print('   Last reset: ${lastReset.toString()}');
+          print('   Reset time: ${resetTime.toString()}');
+          print('   Current time: ${now.toString()}');
+        }
+      }
+
+      if (shouldReset) {
+        // ✅ FIX: Reset to 1 (for current message), not 0
+        await userRef.update({
+          'dailyMessageCount': 1,
+          'lastMessageResetDate': Timestamp.now(),
+        });
+
+        _userDailyMessageCount = 1;
+        _userLastResetDate = now;
+
+        print('✅ Message count RESET - new count: 1');
+        print('   Previous count was: $currentCount');
+      } else {
+        // ✅ No reset needed - increment using transaction
+        await _firestore.runTransaction((transaction) async {
+          final snapshot = await transaction.get(userRef);
+          final currentCount = snapshot.data()?['dailyMessageCount'] ?? 0;
+          final newCount = currentCount + 1;
+
+          transaction.update(userRef, {'dailyMessageCount': newCount});
+        });
+
+        _userDailyMessageCount = currentCount + 1;
+
+        print('✅ User message count incremented to $_userDailyMessageCount');
+        print('   No reset needed');
+      }
+
+      notifyListeners();
+    } catch (e) {
+      print('❌ Error updating user message count: $e');
     }
-
-    if (shouldReset) {
-      // ✅ FIX: Reset to 1 (for current message), not 0
-      await userRef.update({
-        'dailyMessageCount': 1,
-        'lastMessageResetDate': Timestamp.now(),
-      });
-
-      _userDailyMessageCount = 1;
-      _userLastResetDate = now;
-
-      print('✅ Message count RESET - new count: 1');
-      print('   Previous count was: $currentCount');
-    } else {
-      // ✅ No reset needed - increment using transaction
-      await _firestore.runTransaction((transaction) async {
-        final snapshot = await transaction.get(userRef);
-        final currentCount = snapshot.data()?['dailyMessageCount'] ?? 0;
-        final newCount = currentCount + 1;
-
-        transaction.update(userRef, {'dailyMessageCount': newCount});
-      });
-
-      _userDailyMessageCount = currentCount + 1;
-
-      print('✅ User message count incremented to $_userDailyMessageCount');
-      print('   No reset needed');
-    }
-
-    notifyListeners();
-  } catch (e) {
-    print('❌ Error updating user message count: $e');
   }
-}
-
-
 
   StreamSubscription<QuerySnapshot>? _messagesSubscription;
   bool _isSettingConversation = false;
@@ -404,23 +638,18 @@ class ChatProvider extends ChangeNotifier {
     _isSettingConversation = true;
 
     try {
-      // Cancel old subscriptions
       _messagesSubscription?.cancel();
       _messagesSubscription = null;
-      _escalationSubscription
-          ?.cancel(); // ✅ NEW: Cancel old escalation listener
+      _escalationSubscription?.cancel();
       _escalationSubscription = null;
 
-      // Clear all state
       _messages.clear();
       _processedMessages.clear();
       _streamingContent.clear();
       _pendingRatingsCache.clear();
 
-      // Reset loading flags
       _isLoading = false;
 
-      // Set new conversation ID
       conversationId = id;
       currentConversation = null;
 
@@ -430,25 +659,23 @@ class ChatProvider extends ChangeNotifier {
 
       await Future.delayed(Duration(milliseconds: 100));
 
-      // Load conversation info
       await loadConversationInfo();
-
-      // Load messages
       await loadExistingMessages();
 
-      // Start message subscription
       listenToMessages();
-
-      // ✅ NEW: Start escalation response listener
       listenToEscalationResponses();
+
+      // ✅ NEW: Ensure escalation tracking is loaded
+      await loadUserEscalationCount();
 
       await Future.delayed(Duration(milliseconds: 100));
 
-      print('✅ ChatProvider setup complete (with escalation listener)');
+      print('✅ ChatProvider setup complete');
       print('   - Conversation ID: $conversationId');
       print('   - Messages: ${_messages.length}');
-      print('   - Message subscription: ${_messagesSubscription != null}');
-      print('   - Escalation subscription: ${_escalationSubscription != null}');
+      print(
+        '   - Escalations left: ${MAX_DAILY_ESCALATIONS - _userDailyEscalationCount}',
+      );
     } finally {
       _isSettingConversation = false;
     }
@@ -766,136 +993,138 @@ class ChatProvider extends ChangeNotifier {
 
   // Key changes in askQuestionWithStreaming method:
 
-Future<void> askQuestionWithStreaming(
-  BuildContext context,
-  String question,
-) async {
-  if (_isLoading) return;
+  Future<void> askQuestionWithStreaming(
+    BuildContext context,
+    String question,
+  ) async {
+    if (_isLoading) return;
 
-  if (isMessageLimitReached) {
-    print('❌ User daily message limit reached');
-    return;
-  }
-
-  // Create conversation if needed
-  if (conversationId == null || conversationId!.isEmpty) {
-    print('⚠️ No conversation ID - creating new conversation');
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
-
-    try {
-      final newConversationId = await UserConstant.createNewConversation(userId);
-      await setConversationId(newConversationId);
-    } catch (e) {
-      print('❌ Error creating conversation: $e');
+    if (isMessageLimitReached) {
+      print('❌ User daily message limit reached');
       return;
     }
-  }
 
-  if (conversationId == null || conversationId!.isEmpty) {
-    print('❌ Still no conversation ID after creation attempt');
-    return;
-  }
+    // Create conversation if needed
+    if (conversationId == null || conversationId!.isEmpty) {
+      print('⚠️ No conversation ID - creating new conversation');
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return;
 
-  _isLoading = true;
-  
-  // ✅ INSTANT: Show typing indicator IMMEDIATELY (before anything else)
-  _showTypingIndicator = true;
-  notifyListeners();
-  _onMessageAdded?.call();
-
-  final startTime = DateTime.now();
-
-  try {
-    _cohere ??= CohereService();
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-
-    // Create user message reference
-    final userMessageRef =
-        _firestore
-            .collection('conversations')
-            .doc(conversationId!)
-            .collection('messages')
-            .doc();
-
-    final userMsg = Message(
-      id: userMessageRef.id,
-      conversationId: conversationId!,
-      content: question,
-      userID: userId,
-      category: 'General',
-      sender: 'user',
-      status: 'sent',
-      isAnswered: false,
-      type: 'text',
-      sentAt: DateTime.now(),
-      count: count,
-    );
-
-    // ✅ INSTANT: Add user message to UI
-    _messages.add(userMsg);
-    _processedMessages.add(userMsg.id);
-    notifyListeners();
-    _onMessageAdded?.call();
-
-    // ✅ FIRE-AND-FORGET: All background tasks (don't await)
-    userMessageRef.set(_messageToMap(userMsg)).catchError((e) {
-      print('⚠️ Background save error: $e');
-    });
-
-    _updateUserMessageCount().catchError((e) {
-      print('⚠️ Background count update error: $e');
-    });
-
-    // Start background tasks in parallel
-    final embeddingFuture = _generateEmbeddingCached(question);
-    final faqFuture = _ensureFAQCacheLoaded();
-
-    // NOW wait for embedding and FAQ (happens in parallel)
-    await Future.wait([embeddingFuture, faqFuture]);
-    final currentEmbedding = await embeddingFuture;
-    final existingFAQ = _findBestFAQMatch(question, currentEmbedding);
-
-    // Determine category
-    String questionCategory;
-    if (existingFAQ != null && existingFAQ['category'] != null) {
-      questionCategory = existingFAQ['category'] as String;
-    } else {
-      questionCategory = await _classifyQuestionCategoryFast(question);
-    }
-
-    // Background category update
-    userMessageRef.update({'category': questionCategory}).catchError((e) {
-      print('⚠️ Background category update error: $e');
-    });
-
-    // Background title update
-    if (currentConversation != null) {
-      final title = currentConversation!.title.toLowerCase();
-      final shouldUpdateTitle =
-          (title.contains('new conversation') ||
-              title == 'untitled' ||
-              title.trim().isEmpty) &&
-          _messages.where((m) => m.sender == 'user').length <= 1;
-      
-      if (shouldUpdateTitle) {
-        _updateConversationTitleNow(question).catchError((e) {
-          print('⚠️ Background title update error: $e');
-        });
+      try {
+        final newConversationId = await UserConstant.createNewConversation(
+          userId,
+        );
+        await setConversationId(newConversationId);
+      } catch (e) {
+        print('❌ Error creating conversation: $e');
+        return;
       }
     }
 
-    // Build conversation history
-    final allMessages =
-        _messages.where((m) => m.conversationId == conversationId).toList();
-    allMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
-    final recentHistory =
-        allMessages.length > 10
-            ? allMessages.sublist(allMessages.length - 10)
-            : allMessages;
+    if (conversationId == null || conversationId!.isEmpty) {
+      print('❌ Still no conversation ID after creation attempt');
+      return;
+    }
 
-    // ✅ CREATE BOT MESSAGE INSTANTLY (before streaming starts)
-final botMessageId = "bot_${userMsg.id}";
+    _isLoading = true;
+
+    // ✅ INSTANT: Show typing indicator IMMEDIATELY (before anything else)
+    // _showTypingIndicator = true;
+    notifyListeners();
+    _onMessageAdded?.call();
+
+    final startTime = DateTime.now();
+
+    try {
+      _cohere ??= CohereService();
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+
+      // Create user message reference
+      final userMessageRef =
+          _firestore
+              .collection('conversations')
+              .doc(conversationId!)
+              .collection('messages')
+              .doc();
+
+      final userMsg = Message(
+        id: userMessageRef.id,
+        conversationId: conversationId!,
+        content: question,
+        userID: userId,
+        category: 'General',
+        sender: 'user',
+        status: 'sent',
+        isAnswered: false,
+        type: 'text',
+        sentAt: DateTime.now(),
+        count: count,
+      );
+
+      // ✅ INSTANT: Add user message to UI
+      _messages.add(userMsg);
+      _processedMessages.add(userMsg.id);
+      notifyListeners();
+      _onMessageAdded?.call();
+
+      // ✅ FIRE-AND-FORGET: All background tasks (don't await)
+      userMessageRef.set(_messageToMap(userMsg)).catchError((e) {
+        print('⚠️ Background save error: $e');
+      });
+
+      _updateUserMessageCount().catchError((e) {
+        print('⚠️ Background count update error: $e');
+      });
+
+      // Start background tasks in parallel
+      final embeddingFuture = _generateEmbeddingCached(question);
+      final faqFuture = _ensureFAQCacheLoaded();
+
+      // NOW wait for embedding and FAQ (happens in parallel)
+      await Future.wait([embeddingFuture, faqFuture]);
+      final currentEmbedding = await embeddingFuture;
+      final existingFAQ = _findBestFAQMatch(question, currentEmbedding);
+
+      // Determine category
+      String questionCategory;
+      if (existingFAQ != null && existingFAQ['category'] != null) {
+        questionCategory = existingFAQ['category'] as String;
+      } else {
+        questionCategory = await _classifyQuestionCategoryFast(question);
+      }
+
+      // Background category update
+      userMessageRef.update({'category': questionCategory}).catchError((e) {
+        print('⚠️ Background category update error: $e');
+      });
+
+      // Background title update
+      if (currentConversation != null) {
+        final title = currentConversation!.title.toLowerCase();
+        final shouldUpdateTitle =
+            (title.contains('new conversation') ||
+                title == 'untitled' ||
+                title.trim().isEmpty) &&
+            _messages.where((m) => m.sender == 'user').length <= 1;
+
+        if (shouldUpdateTitle) {
+          _updateConversationTitleNow(question).catchError((e) {
+            print('⚠️ Background title update error: $e');
+          });
+        }
+      }
+
+      // Build conversation history
+      final allMessages =
+          _messages.where((m) => m.conversationId == conversationId).toList();
+      allMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      final recentHistory =
+          allMessages.length > 10
+              ? allMessages.sublist(allMessages.length - 10)
+              : allMessages;
+
+      // ✅ CREATE BOT MESSAGE INSTANTLY (before streaming starts)
+     final botMessageId = "bot_${userMsg.id}";
 
 final botMessage = Message(
   id: botMessageId,
@@ -908,22 +1137,22 @@ final botMessage = Message(
   count: count,
 );
 
-// ✅ DON'T add bot message to UI yet - wait for first content
-// _messages.add(botMessage);  // ❌ REMOVED
-// _processedMessages.add(botMessageId);  // ❌ REMOVED
+// ✅ FIX: Add bot message to UI IMMEDIATELY (before streaming)
+_messages.add(botMessage);
+_processedMessages.add(botMessageId);
 
-// ✅ INSTANT: Hide typing indicator
-_showTypingIndicator = false;
-
-// ✅ Register for streaming with empty string (but don't show in UI yet)
+// ✅ Register for streaming with empty string
+// This will trigger the typing bubble in _buildMessagesList
 _streamingContent[botMessageId] = "";
 
-// Don't notify yet - wait for content
-// notifyListeners();  // ❌ REMOVED
-// _onMessageAdded?.call();  // ❌ REMOVED
+// ✅ NOTE: We don't need _showTypingIndicator anymore
+// The typing bubble is shown when streamingContent exists but is empty
+
+// ✅ FIX: Notify UI to show the typing bubble for this message
+notifyListeners();
+_onMessageAdded?.call();
 
 String finalAnswer = "";
-bool hasAddedBotMessage = false; // ✅ NEW: Track if we've added the message to UI
 
 // FAQ STREAMING
 if (existingFAQ != null) {
@@ -936,15 +1165,9 @@ if (existingFAQ != null) {
       (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
     );
 
+    // ✅ FIX: Update streaming content
     _streamingContent[botMessageId] =
         _streamingContent[botMessageId]! + chunk;
-
-    // ✅ Add message to UI on first chunk
-    if (!hasAddedBotMessage) {
-      _messages.add(botMessage);
-      _processedMessages.add(botMessageId);
-      hasAddedBotMessage = true;
-    }
 
     notifyListeners();
     _onMessageAdded?.call();
@@ -959,22 +1182,13 @@ if (existingFAQ != null) {
   });
 } else {
   // RAG STREAMING
-  int chunkCounter = 0;
-
   await for (final streamedText in _retriever.generateAnswerStream(
     question,
     conversationHistory: recentHistory,
     conversationId: conversationId!,
   )) {
-    chunkCounter++;
+    // ✅ FIX: Always update streaming content (even if empty initially)
     _streamingContent[botMessageId] = streamedText;
-
-    // ✅ Add message to UI on first chunk
-    if (!hasAddedBotMessage && streamedText.isNotEmpty) {
-      _messages.add(botMessage);
-      _processedMessages.add(botMessageId);
-      hasAddedBotMessage = true;
-    }
 
     notifyListeners();
     _onMessageAdded?.call();
@@ -983,197 +1197,187 @@ if (existingFAQ != null) {
   }
 }
 
-// ✅ If somehow no content arrived, add the message now
-if (!hasAddedBotMessage) {
-  _messages.add(botMessage);
-  _processedMessages.add(botMessageId);
-}
+// Remove streaming content (will trigger final message render)
+_streamingContent.remove(botMessageId);
 
-    // Hide typing indicator if still showing
-    if (_showTypingIndicator) {
-      _showTypingIndicator = false;
-    }
-
-    // Remove streaming content
-    _streamingContent.remove(botMessageId);
-
-    // Remove duplication
-    String verified = finalAnswer;
-    if (verified.length > 300) {
-      final half = verified.length ~/ 2;
-      if (verified.substring(0, half) == verified.substring(half)) {
-        verified = verified.substring(0, half);
+      // Remove duplication
+      String verified = finalAnswer;
+      if (verified.length > 300) {
+        final half = verified.length ~/ 2;
+        if (verified.substring(0, half) == verified.substring(half)) {
+          verified = verified.substring(0, half);
+        }
       }
-    }
 
-    // Update bot message locally
-    final idx = _messages.indexWhere((m) => m.id == botMessageId);
-    if (idx >= 0) {
-      _messages[idx] = _messages[idx].copyWith(content: verified);
-    }
+      // Update bot message locally
+      final idx = _messages.indexWhere((m) => m.id == botMessageId);
+      if (idx >= 0) {
+        _messages[idx] = _messages[idx].copyWith(content: verified);
+      }
 
-    notifyListeners();
-    _onMessageAdded?.call();
+      notifyListeners();
+      _onMessageAdded?.call();
 
-    final totalMs = DateTime.now().difference(startTime).inMilliseconds;
-    print("⚡ Total response time: ${totalMs}ms");
+      final totalMs = DateTime.now().difference(startTime).inMilliseconds;
+      print("⚡ Total response time: ${totalMs}ms");
 
-    // Save to Firestore in background
-    Future(() async {
-      final batch = _firestore.batch();
+      // Save to Firestore in background
+      Future(() async {
+        final batch = _firestore.batch();
 
-      final botRef = _firestore
-          .collection('conversations')
-          .doc(conversationId!)
-          .collection('messages')
-          .doc(botMessageId);
+        final botRef = _firestore
+            .collection('conversations')
+            .doc(conversationId!)
+            .collection('messages')
+            .doc(botMessageId);
 
-      batch.set(botRef, _messageToMap(_messages[idx]));
+        batch.set(botRef, _messageToMap(_messages[idx]));
 
-      batch.update(userMessageRef, {
-        "isAnswered": true,
-        "answeredAt": Timestamp.now(),
-        "responseTimeMs": totalMs,
+        batch.update(userMessageRef, {
+          "isAnswered": true,
+          "answeredAt": Timestamp.now(),
+          "responseTimeMs": totalMs,
+        });
+
+        await batch.commit();
+      }).catchError((e) {
+        print('⚠️ Background batch save error: $e');
       });
 
-      await batch.commit();
-    }).catchError((e) {
-      print('⚠️ Background batch save error: $e');
-    });
-
-    // Background post-response tasks
-    _handlePostResponseTasks(
-      context,
-      question,
-      verified,
-      currentEmbedding,
-      questionCategory,
-      userId,
-    ).catchError((e) {
-      print('⚠️ Background post-response error: $e');
-    });
-  } finally {
-    _isLoading = false;
-    _showTypingIndicator = false;
-    notifyListeners();
-    _onMessageAdded?.call();
+      // Background post-response tasks
+      _handlePostResponseTasks(
+        context,
+        question,
+        verified,
+        currentEmbedding,
+        questionCategory,
+        userId,
+      ).catchError((e) {
+        print('⚠️ Background post-response error: $e');
+      });
+    } finally {
+      _isLoading = false;
+      // _showTypingIndicator = false;
+      notifyListeners();
+      _onMessageAdded?.call();
+    }
   }
-}
 
-String _cleanTitle(String title) {
-  // Remove leading and trailing quotes
-  String cleaned = title.trim();
-  
-  // Remove quotes at start and end if they exist
-  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-    cleaned = cleaned.substring(1, cleaned.length - 1);
+  String _cleanTitle(String title) {
+    // Remove leading and trailing quotes
+    String cleaned = title.trim();
+
+    // Remove quotes at start and end if they exist
+    if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+      cleaned = cleaned.substring(1, cleaned.length - 1);
+    }
+    if (cleaned.startsWith("'") && cleaned.endsWith("'")) {
+      cleaned = cleaned.substring(1, cleaned.length - 1);
+    }
+
+    return cleaned.trim();
   }
-  if (cleaned.startsWith("'") && cleaned.endsWith("'")) {
-    cleaned = cleaned.substring(1, cleaned.length - 1);
-  }
-  
-  return cleaned.trim();
-}
 
-// ✅ UPDATE: _updateConversationTitleNow method to clean the title
-Future<void> _updateConversationTitleNow(String question) async {
-  if (conversationId == null) return;
+  // ✅ UPDATE: _updateConversationTitleNow method to clean the title
+  Future<void> _updateConversationTitleNow(String question) async {
+    if (conversationId == null) return;
 
-  try {
-    print('🔄 Updating conversation title for first message...');
+    try {
+      print('🔄 Updating conversation title for first message...');
 
-    final titlePrompt = '''
+      final titlePrompt = '''
 Generate a short, descriptive title (max 5 words) for the following user question:
 
 Question:
 $question
 ''';
 
-    final newTitle = await _cohere!.generateResponse(titlePrompt);
-    print('Generated title from Cohere: "$newTitle"');
+      final newTitle = await _cohere!.generateResponse(titlePrompt);
+      print('Generated title from Cohere: "$newTitle"');
 
-    if (newTitle != null && newTitle.trim().isNotEmpty) {
-      // ✅ CLEAN the title to remove quotes
-      final updatedTitle = _cleanTitle(newTitle);
+      if (newTitle != null && newTitle.trim().isNotEmpty) {
+        // ✅ CLEAN the title to remove quotes
+        final updatedTitle = _cleanTitle(newTitle);
 
-      // ✅ Update Firestore
-      await _firestore
-          .collection('conversations')
-          .doc(conversationId!)
-          .update({'title': updatedTitle});
+        // ✅ Update Firestore
+        await _firestore
+            .collection('conversations')
+            .doc(conversationId!)
+            .update({'title': updatedTitle});
 
-      print('✅ Updated conversation title to: "$updatedTitle"');
+        print('✅ Updated conversation title to: "$updatedTitle"');
 
-      // ✅ Update local state
-      if (currentConversation != null) {
-        currentConversation = Conversation(
-          id: currentConversation!.id,
-          userId: currentConversation!.userId,
-          title: updatedTitle,
-          status: currentConversation!.status,
-          createdAt: currentConversation!.createdAt,
+        // ✅ Update local state
+        if (currentConversation != null) {
+          currentConversation = Conversation(
+            id: currentConversation!.id,
+            userId: currentConversation!.userId,
+            title: updatedTitle,
+            status: currentConversation!.status,
+            createdAt: currentConversation!.createdAt,
+          );
+        }
+
+        // ✅ Update UserConstant cache
+        final convIndex = UserConstant.recentConversations.indexWhere(
+          (c) => c['id'] == conversationId,
         );
+        if (convIndex != -1) {
+          UserConstant.recentConversations[convIndex]['title'] = updatedTitle;
+        }
+
+        // ✅ Force UI update
+        notifyListeners();
+
+        print('✅ Title update complete and UI notified');
       }
-
-      // ✅ Update UserConstant cache
-      final convIndex = UserConstant.recentConversations.indexWhere(
-        (c) => c['id'] == conversationId,
-      );
-      if (convIndex != -1) {
-        UserConstant.recentConversations[convIndex]['title'] = updatedTitle;
-      }
-
-      // ✅ Force UI update
-      notifyListeners();
-
-      print('✅ Title update complete and UI notified');
+    } catch (titleError) {
+      print('❌ Error updating conversation title: $titleError');
     }
-  } catch (titleError) {
-    print('❌ Error updating conversation title: $titleError');
   }
-}
 
-Future<void> cleanExistingConversationTitles() async {
-  try {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
+  Future<void> cleanExistingConversationTitles() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return;
 
-    print('🧹 Cleaning existing conversation titles...');
+      print('🧹 Cleaning existing conversation titles...');
 
-    final conversationsSnapshot = await _firestore
-        .collection('conversations')
-        .where('userId', isEqualTo: userId)
-        .get();
+      final conversationsSnapshot =
+          await _firestore
+              .collection('conversations')
+              .where('userId', isEqualTo: userId)
+              .get();
 
-    final batch = _firestore.batch();
-    int cleanedCount = 0;
+      final batch = _firestore.batch();
+      int cleanedCount = 0;
 
-    for (var doc in conversationsSnapshot.docs) {
-      final data = doc.data();
-      final currentTitle = data['title'] as String?;
+      for (var doc in conversationsSnapshot.docs) {
+        final data = doc.data();
+        final currentTitle = data['title'] as String?;
 
-      if (currentTitle != null && currentTitle.isNotEmpty) {
-        final cleanedTitle = _cleanTitle(currentTitle);
+        if (currentTitle != null && currentTitle.isNotEmpty) {
+          final cleanedTitle = _cleanTitle(currentTitle);
 
-        // Only update if title actually changed
-        if (cleanedTitle != currentTitle) {
-          batch.update(doc.reference, {'title': cleanedTitle});
-          cleanedCount++;
-          print('   Cleaning: "$currentTitle" → "$cleanedTitle"');
+          // Only update if title actually changed
+          if (cleanedTitle != currentTitle) {
+            batch.update(doc.reference, {'title': cleanedTitle});
+            cleanedCount++;
+            print('   Cleaning: "$currentTitle" → "$cleanedTitle"');
+          }
         }
       }
-    }
 
-    if (cleanedCount > 0) {
-      await batch.commit();
-      print('✅ Cleaned $cleanedCount conversation titles');
-    } else {
-      print('ℹ️ No titles needed cleaning');
+      if (cleanedCount > 0) {
+        await batch.commit();
+        print('✅ Cleaned $cleanedCount conversation titles');
+      } else {
+        print('ℹ️ No titles needed cleaning');
+      }
+    } catch (e) {
+      print('❌ Error cleaning titles: $e');
     }
-  } catch (e) {
-    print('❌ Error cleaning titles: $e');
   }
-}
 
   Map<String, dynamic>? _findBestFAQMatch(
     String question,
@@ -2808,24 +3012,6 @@ Future<void> cleanExistingConversationTitles() async {
     if (!_isDisposed) {
       super.notifyListeners();
     }
-  }
-
-  @override
-  void dispose() {
-    print('🧹 ChatProvider disposing...');
-    _isDisposed = true; // ✅ Set flag first
-
-    _messagesSubscription?.cancel();
-    _escalationSubscription?.cancel();
-    _userMessageCountSubscription?.cancel();
-
-    // Clear all data
-    _messages.clear();
-    _streamingContent.clear();
-    _processedMessages.clear();
-
-    super.dispose();
-    print('✅ ChatProvider disposed');
   }
 }
 

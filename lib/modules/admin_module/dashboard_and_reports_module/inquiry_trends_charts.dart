@@ -1308,8 +1308,9 @@ Widget buildEscalatedMessagesList(
                           color: const Color(0xff1a1a1a),
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
-                        '${data.length} messages requiring attention',
+                        'Recent escalations requiring attention',
                         style: TextStyle(
                           fontSize: isMobile ? 11 : 13,
                           color: Colors.grey[600],
@@ -1318,23 +1319,6 @@ Widget buildEscalatedMessagesList(
                     ],
                   ),
                 ),
-                // "See more" button added to match System Logs pattern
-                // TextButton.icon(
-                //   onPressed: () => _showEscalatedMessagesDialog(context, timeFrame),
-                //   icon: Icon(
-                //     Icons.arrow_forward,
-                //     size: isMobile ? 14 : 16,
-                //     color: Colors.orange[800],
-                //   ),
-                //   label: Text(
-                //     'See more',
-                //     style: TextStyle(
-                //       fontSize: isMobile ? 11 : 12,
-                //       color: Colors.orange[800],
-                //       fontWeight: FontWeight.w600,
-                //     ),
-                //   ),
-                // ),
               ],
             ),
             SizedBox(height: isMobile ? 12 : 16),
@@ -1361,8 +1345,7 @@ Widget buildEscalatedMessagesList(
                       ),
                     )
                   : ListView.separated(
-                      // Limit preview to top 5 items like System Logs
-                      itemCount: data.length > 5 ? 5 : data.length,
+                      itemCount: data.length,
                       separatorBuilder: (context, index) => Divider(
                         height: isMobile ? 16 : 20,
                         color: Colors.grey[200],
@@ -1390,7 +1373,9 @@ Widget buildEscalatedMessagesList(
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: categoryColor.withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(6),
@@ -1405,7 +1390,28 @@ Widget buildEscalatedMessagesList(
                                     ),
                                   ),
                                   const Spacer(),
-                                  _buildStatusBadge(message.status, isMobile),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: message.status == 'pending'
+                                          ? const Color(0xffef4444).withOpacity(0.1)
+                                          : const Color(0xff10b981).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      message.status.toUpperCase(),
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 9 : 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: message.status == 'pending'
+                                            ? const Color(0xffef4444)
+                                            : const Color(0xff10b981),
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 8),
@@ -1416,8 +1422,45 @@ Widget buildEscalatedMessagesList(
                                   color: Colors.grey[800],
                                   height: 1.4,
                                 ),
-                                maxLines: 1, // Preview mode: single line
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.access_time,
+                                    size: 12,
+                                    color: Colors.grey[500],
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _formatDateTime(message.escalatedAt),
+                                    style: TextStyle(
+                                      fontSize: isMobile ? 10 : 11,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  if (message.resolvedBy != null) ...[
+                                    const SizedBox(width: 12),
+                                    Icon(
+                                      Icons.person,
+                                      size: 12,
+                                      color: Colors.grey[500],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        'By ${message.resolvedBy}',
+                                        style: TextStyle(
+                                          fontSize: isMobile ? 10 : 11,
+                                          color: Colors.grey[600],
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ],
                           ),

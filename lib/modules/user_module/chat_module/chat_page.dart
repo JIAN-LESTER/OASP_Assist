@@ -198,14 +198,10 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     );
 
     _scrollController.addListener(() {
-      // This helps with auto-scroll behavior
       if (_scrollController.hasClients) {
         final isAtBottom =
             _scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 100;
-
-        // If user scrolls to bottom manually, we can detect it here
-        // This is useful for future enhancements
       }
     });
 
@@ -214,19 +210,22 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     _initChatSpeechToText();
     chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-    // ✅ Set scroll callback BEFORE initialization
     chatProvider.setScrollCallback(() {
       if (mounted && !_showFAQs && _scrollController.hasClients) {
         _scrollToBottomSmooth();
       }
     });
 
-    // Initialize conversation in postFrameCallback
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isInitialized) {
         _initializeConversation();
         chatProvider.loadUserMessageCount();
         chatProvider.listenToUserMessageCount();
+
+        // ✅ NEW: Load and listen to escalation counts
+        chatProvider.loadUserEscalationCount();
+        chatProvider.listenToUserEscalationCount();
+
         chatProvider.cleanExistingConversationTitles();
         _isInitialized = true;
       }
@@ -613,410 +612,220 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                                       ? CrossAxisAlignment.end
                                       : CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
+
+                              // Replace the content section in _buildMessageBubble method
+                              // (the section that handles streaming content display)
                               children: [
-                                // ✅ CONTENT SECTION - Simple direct display with cursor
-                                if (isStreaming && displayContent.isNotEmpty)
-                                  // ✅ Streaming with content - show text + cursor
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Flexible(
-                                        child:
-                                            isUser
-                                                ? SelectableLinkify(
-                                                  onOpen: _onLinkTap,
-                                                  text:
-                                                      _convertMarkdownLinksToPlainUrls(
-                                                        displayContent,
-                                                      ),
-                                                  textAlign: TextAlign.justify,
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 15,
-                                                    height: 1.5,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                  linkStyle: TextStyle(
-                                                    decoration:
-                                                        TextDecoration
-                                                            .underline,
-                                                    color: Colors.yellow[100],
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                  options: LinkifyOptions(
-                                                    humanize: false,
-                                                    looseUrl: true,
-                                                    defaultToHttps: true,
-                                                  ),
-                                                )
-                                                : MarkdownBody(
-                                                  data:
-                                                      _convertMarkdownLinksToPlainUrls(
-                                                        displayContent,
-                                                      ),
-                                                  selectable: true,
-                                                  onTapLink: (
-                                                    text,
-                                                    href,
-                                                    title,
-                                                  ) {
-                                                    if (href != null) {
-                                                      _onLinkTap(
-                                                        LinkableElement(
-                                                          href,
-                                                          text,
+                                // ✅ CONTENT SECTION - Show content if available
+                                if (displayContent.trim().isNotEmpty)
+                                  // ✅ Has content - show text (with cursor if streaming)
+                                  if (isStreaming)
+                                    // Streaming with content
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Flexible(
+                                          child:
+                                              isUser
+                                                  ? SelectableLinkify(
+                                                    onOpen: _onLinkTap,
+                                                    text:
+                                                        _convertMarkdownLinksToPlainUrls(
+                                                          displayContent,
                                                         ),
-                                                      );
-                                                    }
-                                                  },
-                                                  styleSheet: MarkdownStyleSheet(
-                                                    p: TextStyle(
-                                                      color:
-                                                          message.sender ==
-                                                                      'staff' ||
-                                                                  message.sender ==
-                                                                      'admin'
-                                                              ? Colors
-                                                                  .green
-                                                                  .shade900
-                                                              : Colors
-                                                                  .grey
-                                                                  .shade800,
+                                                    textAlign:
+                                                        TextAlign.justify,
+                                                    style: TextStyle(
+                                                      color: Colors.white,
                                                       fontSize: 15,
                                                       height: 1.5,
                                                       fontWeight:
                                                           FontWeight.w500,
                                                     ),
-                                                    strong: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color:
-                                                          message.sender ==
-                                                                      'staff' ||
-                                                                  message.sender ==
-                                                                      'admin'
-                                                              ? Colors
-                                                                  .green
-                                                                  .shade900
-                                                              : Colors
-                                                                  .grey
-                                                                  .shade900,
-                                                    ),
-                                                    em: TextStyle(
-                                                      fontStyle:
-                                                          FontStyle.italic,
-                                                      color:
-                                                          message.sender ==
-                                                                      'staff' ||
-                                                                  message.sender ==
-                                                                      'admin'
-                                                              ? Colors
-                                                                  .green
-                                                                  .shade900
-                                                              : Colors
-                                                                  .grey
-                                                                  .shade800,
-                                                    ),
-                                                    a: TextStyle(
+                                                    linkStyle: TextStyle(
                                                       decoration:
                                                           TextDecoration
                                                               .underline,
-                                                      color: Colors.blue,
+                                                      color: Colors.yellow[100],
                                                       fontWeight:
                                                           FontWeight.w600,
                                                     ),
-                                                    listBullet: TextStyle(
-                                                      color:
-                                                          message.sender ==
-                                                                      'staff' ||
-                                                                  message.sender ==
-                                                                      'admin'
-                                                              ? Colors
-                                                                  .green
-                                                                  .shade900
-                                                              : Colors
-                                                                  .grey
-                                                                  .shade800,
-                                                      fontSize: 15,
+                                                    options: LinkifyOptions(
+                                                      humanize: false,
+                                                      looseUrl: true,
+                                                      defaultToHttps: true,
                                                     ),
-                                                    h1: TextStyle(
-                                                      fontSize: 20,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color:
-                                                          message.sender ==
-                                                                      'staff' ||
-                                                                  message.sender ==
-                                                                      'admin'
-                                                              ? Colors
-                                                                  .green
-                                                                  .shade900
-                                                              : Colors
-                                                                  .grey
-                                                                  .shade900,
-                                                    ),
-                                                    h2: TextStyle(
-                                                      fontSize: 18,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color:
-                                                          message.sender ==
-                                                                      'staff' ||
-                                                                  message.sender ==
-                                                                      'admin'
-                                                              ? Colors
-                                                                  .green
-                                                                  .shade900
-                                                              : Colors
-                                                                  .grey
-                                                                  .shade900,
-                                                    ),
-                                                    h3: TextStyle(
-                                                      fontSize: 16,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color:
-                                                          message.sender ==
-                                                                      'staff' ||
-                                                                  message.sender ==
-                                                                      'admin'
-                                                              ? Colors
-                                                                  .green
-                                                                  .shade900
-                                                              : Colors
-                                                                  .grey
-                                                                  .shade900,
-                                                    ),
-                                                    code: TextStyle(
-                                                      backgroundColor:
-                                                          Colors.grey.shade100,
-                                                      color:
-                                                          Colors.red.shade700,
-                                                      fontFamily: 'monospace',
-                                                      fontSize: 14,
-                                                    ),
-                                                    blockquote: TextStyle(
-                                                      color:
-                                                          Colors.grey.shade700,
-                                                      fontStyle:
-                                                          FontStyle.italic,
-                                                    ),
-                                                    blockquoteDecoration:
-                                                        BoxDecoration(
-                                                          color:
-                                                              Colors
-                                                                  .grey
-                                                                  .shade100,
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                4,
-                                                              ),
-                                                          border: Border(
-                                                            left: BorderSide(
-                                                              color:
-                                                                  Colors
-                                                                      .grey
-                                                                      .shade400,
-                                                              width: 4,
-                                                            ),
+                                                  )
+                                                  : MarkdownBody(
+                                                    data:
+                                                        _convertMarkdownLinksToPlainUrls(
+                                                          displayContent,
+                                                        ),
+                                                    selectable: true,
+                                                    onTapLink: (
+                                                      text,
+                                                      href,
+                                                      title,
+                                                    ) {
+                                                      if (href != null) {
+                                                        _onLinkTap(
+                                                          LinkableElement(
+                                                            href,
+                                                            text,
                                                           ),
+                                                        );
+                                                      }
+                                                    },
+                                                    styleSheet: MarkdownStyleSheet(
+                                                      // ... (keep existing styles)
+                                                      p: TextStyle(
+                                                        color:
+                                                            message.sender ==
+                                                                        'staff' ||
+                                                                    message.sender ==
+                                                                        'admin'
+                                                                ? Colors
+                                                                    .green
+                                                                    .shade900
+                                                                : Colors
+                                                                    .grey
+                                                                    .shade800,
+                                                        fontSize: 15,
+                                                        height: 1.5,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                      ),
+                                                      // ... (rest of your styles)
+                                                    ),
+                                                    extensionSet:
+                                                        md.ExtensionSet(
+                                                          md
+                                                              .ExtensionSet
+                                                              .gitHubFlavored
+                                                              .blockSyntaxes,
+                                                          [
+                                                            md.EmojiSyntax(),
+                                                            ...md
+                                                                .ExtensionSet
+                                                                .gitHubFlavored
+                                                                .inlineSyntaxes,
+                                                          ],
                                                         ),
                                                   ),
-                                                  extensionSet: md.ExtensionSet(
-                                                    md
-                                                        .ExtensionSet
-                                                        .gitHubFlavored
-                                                        .blockSyntaxes,
-                                                    [
-                                                      md.EmojiSyntax(),
-                                                      ...md
-                                                          .ExtensionSet
-                                                          .gitHubFlavored
-                                                          .inlineSyntaxes,
-                                                    ],
-                                                  ),
-                                                ),
+                                        ),
+                                        SizedBox(width: 4),
+                                        Padding(
+                                          padding: EdgeInsets.only(top: 2),
+                                          child: BlinkingCursor(
+                                            color:
+                                                isUser
+                                                    ? Colors.white70
+                                                    : Color(0xFF2E7D32),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  else if (!isStreaming &&
+                                      displayContent.trim().isNotEmpty)
+                                    // ✅ Not streaming - show final content
+                                    if (isUser)
+                                      SelectableLinkify(
+                                        onOpen: _onLinkTap,
+                                        text: _convertMarkdownLinksToPlainUrls(
+                                          displayContent,
+                                        ),
+                                        textAlign: TextAlign.justify,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                          height: 1.5,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        linkStyle: TextStyle(
+                                          decoration: TextDecoration.underline,
+                                          color: Colors.yellow[100],
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        options: LinkifyOptions(
+                                          humanize: false,
+                                          looseUrl: true,
+                                          defaultToHttps: true,
+                                        ),
+                                      )
+                                    else
+                                      MarkdownBody(
+                                        data: _convertMarkdownLinksToPlainUrls(
+                                          displayContent,
+                                        ),
+                                        selectable: true,
+                                        onTapLink: (text, href, title) {
+                                          if (href != null) {
+                                            _onLinkTap(
+                                              LinkableElement(href, text),
+                                            );
+                                          }
+                                        },
+                                        styleSheet: MarkdownStyleSheet(
+                                          // ... (keep all your existing markdown styles)
+                                          p: TextStyle(
+                                            color:
+                                                message.sender == 'staff' ||
+                                                        message.sender ==
+                                                            'admin'
+                                                    ? Colors.green.shade900
+                                                    : Colors.grey.shade800,
+                                            fontSize: 15,
+                                            height: 1.5,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          // ... (rest of styles)
+                                        ),
+                                        extensionSet: md.ExtensionSet(
+                                          md
+                                              .ExtensionSet
+                                              .gitHubFlavored
+                                              .blockSyntaxes,
+                                          [
+                                            md.EmojiSyntax(),
+                                            ...md
+                                                .ExtensionSet
+                                                .gitHubFlavored
+                                                .inlineSyntaxes,
+                                          ],
+                                        ),
                                       ),
-                                      SizedBox(width: 4),
-                                      Padding(
-                                        padding: EdgeInsets.only(top: 2),
-                                        child: BlinkingCursor(
+
+                                // ✅ Only show timestamp if there's content
+                                if (displayContent.trim().isNotEmpty) ...[
+                                  SizedBox(height: 6),
+
+                                  // Timestamp
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _formatTimestamp(message.sentAt),
+                                        style: TextStyle(
+                                          fontSize: 11,
                                           color:
                                               isUser
                                                   ? Colors.white70
-                                                  : Color(0xFF2E7D32),
+                                                  : Colors.grey.shade600,
                                         ),
                                       ),
                                     ],
-                                  )
-                                else if (isUser)
-                                  // User message - not streaming
-                                  SelectableLinkify(
-                                    onOpen: _onLinkTap,
-                                    text: _convertMarkdownLinksToPlainUrls(
-                                      displayContent,
-                                    ),
-                                    textAlign: TextAlign.justify,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      height: 1.5,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    linkStyle: TextStyle(
-                                      decoration: TextDecoration.underline,
-                                      color: Colors.yellow[100],
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    options: LinkifyOptions(
-                                      humanize: false,
-                                      looseUrl: true,
-                                      defaultToHttps: true,
-                                    ),
-                                  )
-                                else
-                                  // Bot message - not streaming
-                                  MarkdownBody(
-                                    data: _convertMarkdownLinksToPlainUrls(
-                                      displayContent,
-                                    ),
-                                    selectable: true,
-                                    onTapLink: (text, href, title) {
-                                      if (href != null) {
-                                        _onLinkTap(LinkableElement(href, text));
-                                      }
-                                    },
-                                    styleSheet: MarkdownStyleSheet(
-                                      p: TextStyle(
-                                        color:
-                                            message.sender == 'staff' ||
-                                                    message.sender == 'admin'
-                                                ? Colors.green.shade900
-                                                : Colors.grey.shade800,
-                                        fontSize: 15,
-                                        height: 1.5,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      strong: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color:
-                                            message.sender == 'staff' ||
-                                                    message.sender == 'admin'
-                                                ? Colors.green.shade900
-                                                : Colors.grey.shade900,
-                                      ),
-                                      em: TextStyle(
-                                        fontStyle: FontStyle.italic,
-                                        color:
-                                            message.sender == 'staff' ||
-                                                    message.sender == 'admin'
-                                                ? Colors.green.shade900
-                                                : Colors.grey.shade800,
-                                      ),
-                                      a: TextStyle(
-                                        decoration: TextDecoration.underline,
-                                        color: Colors.blue,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      listBullet: TextStyle(
-                                        color:
-                                            message.sender == 'staff' ||
-                                                    message.sender == 'admin'
-                                                ? Colors.green.shade900
-                                                : Colors.grey.shade800,
-                                        fontSize: 15,
-                                      ),
-                                      h1: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color:
-                                            message.sender == 'staff' ||
-                                                    message.sender == 'admin'
-                                                ? Colors.green.shade900
-                                                : Colors.grey.shade900,
-                                      ),
-                                      h2: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color:
-                                            message.sender == 'staff' ||
-                                                    message.sender == 'admin'
-                                                ? Colors.green.shade900
-                                                : Colors.grey.shade900,
-                                      ),
-                                      h3: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color:
-                                            message.sender == 'staff' ||
-                                                    message.sender == 'admin'
-                                                ? Colors.green.shade900
-                                                : Colors.grey.shade900,
-                                      ),
-                                      code: TextStyle(
-                                        backgroundColor: Colors.grey.shade100,
-                                        color: Colors.red.shade700,
-                                        fontFamily: 'monospace',
-                                        fontSize: 14,
-                                      ),
-                                      blockquote: TextStyle(
-                                        color: Colors.grey.shade700,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                      blockquoteDecoration: BoxDecoration(
-                                        color: Colors.grey.shade100,
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border(
-                                          left: BorderSide(
-                                            color: Colors.grey.shade400,
-                                            width: 4,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    extensionSet: md.ExtensionSet(
-                                      md
-                                          .ExtensionSet
-                                          .gitHubFlavored
-                                          .blockSyntaxes,
-                                      [
-                                        md.EmojiSyntax(),
-                                        ...md
-                                            .ExtensionSet
-                                            .gitHubFlavored
-                                            .inlineSyntaxes,
-                                      ],
-                                    ),
                                   ),
+                                ],
 
-                                SizedBox(height: 6),
-
-                                // Timestamp and streaming indicator
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      _formatTimestamp(message.sentAt),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color:
-                                            isUser
-                                                ? Colors.white70
-                                                : Colors.grey.shade600,
-                                      ),
-                                    ),
-                                    // ✅ REMOVED loading spinner - typing animation shows progress
-                                  ],
-                                ),
-
-                                // Rating buttons (unchanged)
+                                // Rating buttons (only show if not streaming and has content)
                                 if (!isUser &&
                                     message.sender == 'bot' &&
                                     !isStreaming &&
+                                    displayContent.trim().isNotEmpty &&
                                     (!isEscalated || !isResolved)) ...[
-                                  _buildLikeDislikeButtons(message),
+                                  _buildEscalateButton(message),
                                 ],
                               ],
                             ),
@@ -1152,173 +961,195 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
   }
 
-  Widget _buildLikeDislikeButtons(Message message) {
-    final localRating = _localRatings[message.id];
+  // ✅ FIXED: Updated _buildEscalateButton to hide when resolved
+Widget _buildEscalateButton(Message message) {
+  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  final isLoadingEscalation = _ratingLoading[message.id] ?? false;
+  final hasEscalated = _localRatings[message.id] == 'escalated';
 
-    if (localRating != null) {
-      return _buildRatingButtonsUI(message.id, localRating, message);
-    }
+  // Check if user can still escalate
+  final canEscalate = chatProvider.canEscalate;
+  final remainingEscalations =
+      ChatProvider.MAX_DAILY_ESCALATIONS - chatProvider.userDailyEscalationCount;
 
-    final cachedRating = Provider.of<ChatProvider>(
-      context,
-      listen: false,
-    ).getCachedRating(message.id);
+  return FutureBuilder<Map<String, dynamic>?>(
+    future: hasEscalated ? _getEscalationStatus(message.id) : Future.value(null),
+    builder: (context, escalationSnapshot) {
+      final escalationData = escalationSnapshot.data;
+      final isResolved = escalationData?['status'] == 'resolved';
 
-    if (cachedRating != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_localRatings.containsKey(message.id)) {
-          setState(() {
-            _localRatings[message.id] = cachedRating;
-          });
-        }
-      });
-      return _buildRatingButtonsUI(message.id, cachedRating, message);
-    }
+      // ✅ FIX: Hide button completely if escalation is resolved
+      if (hasEscalated && isResolved) {
+        return SizedBox.shrink(); // Don't show button at all
+      }
 
-    if (message.rating != null && message.rating!.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_localRatings.containsKey(message.id)) {
-          setState(() {
-            _localRatings[message.id] = message.rating;
-          });
-        }
-      });
-      return _buildRatingButtonsUI(message.id, message.rating, message);
-    }
-
-    return _buildRatingButtonsUI(message.id, null, message);
-  }
-
-  Widget _buildRatingButtonsUI(
-    String messageId,
-    String? currentRating,
-    Message message,
-  ) {
-    final isLoadingRating = _ratingLoading[messageId] ?? false;
-
-    return Container(
-      margin: EdgeInsets.only(top: 8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Helpful Button (NO LOADING - unchanged)
-          InkWell(
-            onTap: () => _handleLikeDislike(messageId, true),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
+      return Container(
+        margin: EdgeInsets.only(top: 8),
+        child: InkWell(
+          onTap:
+              isLoadingEscalation || hasEscalated
+                  ? null
+                  : () => _handleEscalation(message, chatProvider),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color:
+                  hasEscalated
+                      ? Colors.orange.withOpacity(0.1)
+                      : Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
                 color:
-                    currentRating == 'like'
-                        ? Color(0xFF2E7D32).withOpacity(0.1)
-                        : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color:
-                      currentRating == 'like'
-                          ? Color(0xFF2E7D32)
-                          : Colors.grey.shade300,
-                  width: 1,
-                ),
+                    hasEscalated
+                        ? Colors.orange
+                        : isLoadingEscalation
+                        ? Colors.grey.shade200
+                        : Colors.grey.shade300,
+                width: 1.5,
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isLoadingEscalation)
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                    ),
+                  )
+                else
                   Icon(
-                    Icons.thumb_up_outlined,
-                    size: 16,
+                    hasEscalated ? Icons.check_circle : Icons.support_agent,
+                    size: 18,
+                    color: hasEscalated ? Colors.orange : Colors.grey.shade700,
+                  ),
+                SizedBox(width: 6),
+                Text(
+                  hasEscalated
+                      ? 'Escalated to Staff'
+                      : canEscalate
+                      ? 'Escalate to Staff ($remainingEscalations left)'
+                      : 'No escalations left',
+                  style: TextStyle(
+                    fontSize: 13,
                     color:
-                        currentRating == 'like'
-                            ? Color(0xFF2E7D32)
-                            : Colors.grey.shade600,
+                        hasEscalated
+                            ? Colors.orange
+                            : isLoadingEscalation
+                            ? Colors.grey.shade400
+                            : canEscalate
+                            ? Colors.grey.shade700
+                            : Colors.red.shade600,
+                    fontWeight: FontWeight.w600,
                   ),
-                  SizedBox(width: 4),
-                  Text(
-                    'Helpful',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color:
-                          currentRating == 'like'
-                              ? Color(0xFF2E7D32)
-                              : Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(width: 8),
-          // Not Helpful Button (WITH LOADING)
-          InkWell(
-            onTap:
-                isLoadingRating
-                    ? null
-                    : () => _handleLikeDislike(messageId, false, message),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color:
-                    currentRating == 'dislike'
-                        ? Colors.red.withOpacity(0.1)
-                        : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color:
-                      currentRating == 'dislike'
-                          ? Colors.red
-                          : isLoadingRating
-                          ? Colors.grey.shade200
-                          : Colors.grey.shade300,
-                  width: 1,
                 ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ✅ Show spinner ONLY when loading "Not helpful"
-                  if (isLoadingRating)
-                    SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
-                      ),
-                    )
-                  else
-                    Icon(
-                      Icons.thumb_down_outlined,
-                      size: 16,
-                      color:
-                          currentRating == 'dislike'
-                              ? Colors.red
-                              : Colors.grey.shade600,
-                    ),
-                  SizedBox(width: 4),
-                  Text(
-                    'Not helpful',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color:
-                          currentRating == 'dislike'
-                              ? Colors.red
-                              : isLoadingRating
-                              ? Colors.grey.shade400
-                              : Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
           ),
-        ],
-      ),
-    );
+        ),
+      );
+    },
+  );
+}
+  Future<void> _handleEscalation(
+    Message message,
+    ChatProvider chatProvider,
+  ) async {
+    if (!mounted) return;
+
+    // Check if user has escalations left
+    if (chatProvider.isEscalationLimitReached) {
+      final timeUntilReset = chatProvider.getTimeUntilEscalationReset();
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => EscalationLimitDialog(timeUntilReset: timeUntilReset),
+      );
+      return;
+    }
+
+    // Show warning when 1 escalation left
+    if (chatProvider.userDailyEscalationCount ==
+        ChatProvider.MAX_DAILY_ESCALATIONS - 1) {
+      final bool? shouldContinue = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder:
+            (context) => EscalationWarningDialog(
+              remainingEscalations: 1,
+              timeUntilReset: chatProvider.getTimeUntilEscalationReset(),
+            ),
+      );
+
+      if (shouldContinue != true) {
+        return;
+      }
+    }
+
+    // Start loading
+    setState(() {
+      _ratingLoading[message.id] = true;
+      _localRatings[message.id] = 'escalated';
+    });
+
+    try {
+      // Show escalation dialog and get reason
+      final bool? shouldEscalate = await _showEscalationReasonDialog(message);
+
+      if (shouldEscalate == true && mounted) {
+        // Increment escalation count
+        await chatProvider.updateUserEscalationCount();
+
+        // Update message rating in Firestore
+        await chatProvider.rateMessage(
+          message.id,
+          false, // false = dislike/escalated
+          chatProvider.conversationId ?? widget.conversationId,
+        );
+
+        print('✅ Message escalated successfully');
+      } else {
+        // User cancelled - revert UI
+        if (mounted) {
+          setState(() {
+            _localRatings.remove(message.id);
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error escalating message: $e');
+
+      if (mounted) {
+        setState(() {
+          _localRatings.remove(message.id);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to escalate message'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _ratingLoading[message.id] = false;
+        });
+      }
+    }
   }
 
+  Future<bool?> _showEscalationReasonDialog(Message message) async {
+    final success = await _processManualEscalation(message);
+    return success;
+  }
   //  DIALOG 1: Need Better Help?
 
   Future<void> _handleLikeDislike(
@@ -1615,7 +1446,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
   // DIALOG 2: Request Staff Assistance
 
-  Future<void> _processManualEscalation(Message message) async {
+  Future<bool> _processManualEscalation(Message message) async {
     String selectedReason = 'Bot response not accurate';
     String? userReason;
 
@@ -2098,7 +1929,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       // ✅ Handle dialog result
       if (result == null || result['submit'] != true || !mounted) {
         print('ℹ️ Escalation cancelled by user');
-        return;
+        return false;
       }
 
       selectedReason = result['selectedReason'] as String;
@@ -2164,6 +1995,8 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       if (mounted) {
         await _showEscalationSuccessDialog();
       }
+
+      return true;
     } catch (e) {
       print('❌ Error creating manual escalation: $e');
       if (mounted) {
@@ -2184,6 +2017,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
           ),
         );
       }
+      return false;
     }
   }
 
@@ -2736,81 +2570,81 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
   }
 
-  void _sendMessage(ChatProvider chatProvider) async {
-    final text = _controller.text.trim();
-    if (text.isEmpty || chatProvider.isLoading) return;
+ void _sendMessage(ChatProvider chatProvider) async {
+  final text = _controller.text.trim();
+  if (text.isEmpty || chatProvider.isLoading) return;
 
-    final remainingMessages =
-        ChatProvider.MAX_DAILY_MESSAGES - chatProvider.userDailyMessageCount;
+  // ✅ FIX 1: Check if user has reached the limit BEFORE sending
+  if (chatProvider.isMessageLimitReached) {
+    final timeUntilReset = chatProvider.getTimeUntilReset();
 
-    if (remainingMessages == 2) {
-      final bool? shouldContinue = await showDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder:
-            (context) => MessageLimitWarningDialog(
-              remainingMessages: remainingMessages,
-              timeUntilReset: chatProvider.getTimeUntilReset(),
-            ),
-      );
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => MessageLimitDialog(timeUntilReset: timeUntilReset),
+    );
+    return; // Stop here - don't proceed
+  }
 
-      if (shouldContinue != true) {
-        return;
-      }
-    }
+  // ✅ FIX 2: Calculate remaining messages correctly
+  final remainingMessages =
+      ChatProvider.MAX_DAILY_MESSAGES - chatProvider.userDailyMessageCount;
 
-    // ✅ Check if completely out of messages
-    if (chatProvider.isMessageLimitReached) {
-      final timeUntilReset = chatProvider.getTimeUntilReset();
+  // ✅ FIX 3: Show warning when user has exactly 1 message left (not 2)
+  if (remainingMessages == 1) {
+    final bool? shouldContinue = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => MessageLimitWarningDialog(
+        remainingMessages: remainingMessages,
+        timeUntilReset: chatProvider.getTimeUntilReset(),
+      ),
+    );
 
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder:
-            (context) => MessageLimitDialog(timeUntilReset: timeUntilReset),
-      );
+    if (shouldContinue != true) {
       return;
     }
+  }
 
-    // ✅ CRITICAL FIX 2: Clear controller and hide FAQs immediately
-    _controller.clear();
+  // ✅ Clear controller and hide FAQs immediately
+  _controller.clear();
 
-    if (_showFAQs && mounted) {
-      setState(() {
-        _showFAQs = false;
-      });
-    }
+  if (_showFAQs && mounted) {
+    setState(() {
+      _showFAQs = false;
+    });
+  }
 
-    try {
-      // ✅ Send message - the scroll callback will be triggered automatically
-      await chatProvider.askQuestionWithStreaming(context, text);
-    } catch (e) {
-      debugPrint('Error sending message: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  Icons.error_outline_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                SizedBox(width: 12),
-                Expanded(child: Text('Error sending message: ${e.toString()}')),
-              ],
-            ),
-            backgroundColor: Colors.red.shade400,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: EdgeInsets.all(16),
+  try {
+    // Send message - the scroll callback will be triggered automatically
+    await chatProvider.askQuestionWithStreaming(context, text);
+  } catch (e) {
+    debugPrint('Error sending message: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              SizedBox(width: 12),
+              Expanded(child: Text('Error sending message: ${e.toString()}')),
+            ],
           ),
-        );
-      }
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: EdgeInsets.all(16),
+        ),
+      );
     }
   }
+}
 
   @override
   void dispose() {
@@ -2992,7 +2826,6 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     );
   }
 
-  
   // OPTIMIZED: Faster scroll with reduced delay
   void _scrollToBottomSmooth() {
     if (!_scrollController.hasClients) return;
@@ -3022,48 +2855,47 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   }
 
   //  IMPROVED: Messages list with better scroll behavior
+
   Widget _buildMessagesList(List<Message> messages, ChatProvider chatProvider) {
     return ListView.builder(
       controller: _scrollController,
       physics: BouncingScrollPhysics(),
-      itemCount: messages.length + (chatProvider.showTypingIndicator ? 1 : 0),
+      itemCount:
+          messages
+              .length, // ✅ REMOVED: + (chatProvider.showTypingIndicator ? 1 : 0)
       padding: EdgeInsets.only(top: 16, bottom: 24, left: 8, right: 8),
       itemBuilder: (context, index) {
-        // Show typing indicator at the end
-        if (chatProvider.showTypingIndicator && index == messages.length) {
-          return Center(
-            child: Container(
-              constraints: BoxConstraints(maxWidth: 1250),
-              child: _buildTypingIndicatorBubble(),
-            ),
-          );
-        }
-
         final Message message = messages[index];
         final bool isUser = message.sender == 'user';
         final bool isLastMessage = index == messages.length - 1;
 
-        // ✅ FIXED: Check if this is an empty streaming bot message OR if typing indicator is still showing
+        // ✅ FIX: Better streaming detection
         final streamingContent = chatProvider.getStreamingContent(message.id);
-        final isEmptyStreaming =
-            !isUser &&
-            streamingContent != null &&
-            streamingContent.trim().isEmpty;
+        final isStreaming = streamingContent != null;
+        final hasContent =
+            isStreaming
+                ? streamingContent.trim().isNotEmpty
+                : message.content.trim().isNotEmpty;
 
-        // ✅ KEEP showing typing bubble until we have content
-        final shouldShowTyping =
-            isEmptyStreaming ||
-            (chatProvider.showTypingIndicator && isLastMessage && !isUser);
-
-        if (shouldShowTyping) {
+        // ✅ FIX: For bot messages that are streaming without content yet
+        // Show typing bubble WITHIN the message list item (not as separate item)
+        if (!isUser && isStreaming && !hasContent) {
           return Center(
             child: Container(
               constraints: BoxConstraints(maxWidth: 1250),
-              child: _buildTypingIndicatorBubble(),
+              child: AnimatedOpacity(
+                opacity: 1.0,
+                duration: Duration(milliseconds: 200),
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: isLastMessage ? 16 : 4),
+                  child: _buildTypingIndicatorBubble(),
+                ),
+              ),
             ),
           );
         }
 
+        // ✅ Regular message rendering (has content or is user message)
         return Center(
           child: Container(
             constraints: BoxConstraints(maxWidth: 1250),
@@ -3310,18 +3142,18 @@ Widget _buildTypingDot(int index) {
 // ✅ NEW: Stateful widget for continuous animation
 class _AnimatedTypingDot extends StatefulWidget {
   final int index;
-  
+
   const _AnimatedTypingDot({required this.index});
-  
+
   @override
   State<_AnimatedTypingDot> createState() => _AnimatedTypingDotState();
 }
 
-class _AnimatedTypingDotState extends State<_AnimatedTypingDot> 
+class _AnimatedTypingDotState extends State<_AnimatedTypingDot>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
-  
+
   @override
   void initState() {
     super.initState();
@@ -3329,7 +3161,7 @@ class _AnimatedTypingDotState extends State<_AnimatedTypingDot>
       duration: Duration(milliseconds: 1200),
       vsync: this,
     );
-    
+
     // Create staggered animation based on dot index
     _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
@@ -3341,16 +3173,16 @@ class _AnimatedTypingDotState extends State<_AnimatedTypingDot>
         ),
       ),
     );
-    
+
     _controller.repeat(); // ✅ This makes it loop forever
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -3358,7 +3190,7 @@ class _AnimatedTypingDotState extends State<_AnimatedTypingDot>
       builder: (context, child) {
         final scale = 0.5 + (_animation.value * 0.5);
         final opacity = 0.3 + (_animation.value * 0.7);
-        
+
         return Transform.scale(
           scale: scale,
           child: Container(
@@ -3371,6 +3203,283 @@ class _AnimatedTypingDotState extends State<_AnimatedTypingDot>
           ),
         );
       },
+    );
+  }
+}
+
+class EscalationWarningDialog extends StatelessWidget {
+  final int remainingEscalations;
+  final Duration timeUntilReset;
+
+  const EscalationWarningDialog({
+    Key? key,
+    required this.remainingEscalations,
+    required this.timeUntilReset,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final hours = timeUntilReset.inHours;
+    final minutes = timeUntilReset.inMinutes % 60;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        constraints: BoxConstraints(maxWidth: 400),
+        padding: EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange.shade700,
+                size: 48,
+              ),
+            ),
+            SizedBox(height: 20),
+            Text(
+              'Last Escalation Today',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade900,
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'You have $remainingEscalations escalation remaining today.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey.shade700,
+                height: 1.5,
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade100),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.access_time,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Resets in ${hours}h ${minutes}m (8:00 AM)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.blue.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      side: BorderSide(color: Colors.grey.shade300, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Continue',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Limit Reached Dialog (0 escalations left)
+class EscalationLimitDialog extends StatelessWidget {
+  final Duration timeUntilReset;
+
+  const EscalationLimitDialog({Key? key, required this.timeUntilReset})
+    : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final hours = timeUntilReset.inHours;
+    final minutes = timeUntilReset.inMinutes % 60;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        constraints: BoxConstraints(maxWidth: 400),
+        padding: EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.block_rounded,
+                color: Colors.red.shade700,
+                size: 48,
+              ),
+            ),
+            SizedBox(height: 20),
+            Text(
+              'Daily Limit Reached',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade900,
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'You\'ve used all 2 escalations for today.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey.shade700,
+                height: 1.5,
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.shade100),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        color: Colors.orange.shade700,
+                        size: 20,
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Resets in ${hours}h ${minutes}m',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.orange.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Your escalation limit will reset at 8:00 AM tomorrow',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Try browsing FAQs or rephrase your question',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.blue.shade900,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF2E7D32),
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Got it',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
