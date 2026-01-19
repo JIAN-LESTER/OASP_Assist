@@ -5,7 +5,6 @@ import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
 
-
 import 'package:capstone_project/modules/admin_module/user_management_module/user_info.dart';
 import 'package:capstone_project/services/admin_functions.dart';
 
@@ -66,7 +65,6 @@ class EditUserModal extends StatefulWidget {
 }
 
 class _EditUserModalState extends State<EditUserModal> {
-
   late final TextEditingController _firstNameController;
   late final TextEditingController _lastNameController;
   late final TextEditingController _emailController;
@@ -102,8 +100,17 @@ class _EditUserModalState extends State<EditUserModal> {
     'Parent',
     'Faculty',
     'CMU Staff',
+    'Alumni',
+    'Visitor',
     'Masteral (Not CMU Graduate)',
+    'Others', // Add this for custom affiliation input
   ];
+
+  final _customAffiliationController = TextEditingController();
+
+  // ADD this state variable:
+  String _customAffiliation = '';
+
   final List<String> _scholarships = ['N/A'];
   final List<String> _serviceUnits = [
     'N/A',
@@ -138,7 +145,6 @@ class _EditUserModalState extends State<EditUserModal> {
   String _graduatedProgram = 'N/A';
 
   Map<String, List<String>> _programsByCollege = {};
-
 
   List<String> get displayRoles =>
       roles.map((role) => role[0].toUpperCase() + role.substring(1)).toList();
@@ -181,9 +187,16 @@ class _EditUserModalState extends State<EditUserModal> {
         _selectedAffiliation.toLowerCase() == 'incoming freshman applicant';
   }
 
+  // UPDATE the shouldShowMasteralNotCMUFields getter:
   bool get shouldShowMasteralNotCMUFields {
     return _selectedRole.toLowerCase() == 'user' &&
         _selectedAffiliation.toLowerCase() == 'masteral (not cmu graduate)';
+  }
+
+  // ADD a new getter for showing "Others" fields:
+  bool get shouldShowOthersFields {
+    return _selectedRole.toLowerCase() == 'user' &&
+        _selectedAffiliation == 'Others';
   }
 
   bool get shouldShowServiceUnit {
@@ -297,6 +310,12 @@ class _EditUserModalState extends State<EditUserModal> {
     _graduatedProgram = userData['graduatedProgram'] ?? 'N/A';
     _selectedCollege = userData['college'] ?? 'N/A';
     _selectedCollegeId = userData['collegeId'] ?? '';
+    _customAffiliationController.text = userData['customAffiliation'] ?? '';
+    _customAffiliation = userData['customAffiliation'] ?? '';
+
+    if (_customAffiliation.isNotEmpty && _selectedAffiliation != 'Others') {
+      _selectedAffiliation = 'Others';
+    }
 
     _fetchPrograms();
     _fetchScholarships();
@@ -409,6 +428,7 @@ class _EditUserModalState extends State<EditUserModal> {
     _studentIdController.dispose();
     _lrnController.dispose();
     _customScholarshipController.dispose();
+    _customAffiliationController.dispose();
     super.dispose();
   }
 
@@ -672,9 +692,32 @@ class _EditUserModalState extends State<EditUserModal> {
                               _lrnController.clear();
                               _customScholarship = '';
                               _customScholarshipController.clear();
+
+                              // Reset custom affiliation if not "Others"
+                              if (value != 'Others') {
+                                _customAffiliation = '';
+                                _customAffiliationController.clear();
+                              }
                             });
                           },
                         ),
+
+                        // ADD this right after the Affiliation dropdown (before the SizedBox(height: 16)):
+                        if (_selectedAffiliation == 'Others') ...[
+                          const SizedBox(height: 16),
+                          buildTextField(
+                            controller: _customAffiliationController,
+                            label: 'Custom Affiliation',
+                            hint: 'Enter your affiliation...',
+                            icon: Icons.edit_outlined,
+                            isMobile: false,
+                            onChanged: (value) {
+                              setState(() {
+                                _customAffiliation = value.trim();
+                              });
+                            },
+                          ),
+                        ],
                         const SizedBox(height: 16),
                       ],
 
@@ -1315,8 +1358,6 @@ class _EditUserModalState extends State<EditUserModal> {
             SnackbarUtil.showWarning(context, 'Please select a program');
             return;
           }
-
-   
         }
 
         if (_selectedStudentType == 'graduate') {
@@ -1367,8 +1408,6 @@ class _EditUserModalState extends State<EditUserModal> {
           return;
         }
 
-   
-
         if (_selectedScholarship == 'Others' &&
             _customScholarship.trim().isEmpty) {
           SnackbarUtil.showWarning(context, 'Please specify scholarship name');
@@ -1381,6 +1420,13 @@ class _EditUserModalState extends State<EditUserModal> {
           SnackbarUtil.showWarning(context, 'Please select a masteral program');
           return;
         }
+      }
+    }
+
+    if (_selectedAffiliation == 'Others') {
+      if (_customAffiliation.trim().isEmpty) {
+        SnackbarUtil.showWarning(context, 'Please specify your affiliation');
+        return;
       }
     }
 
@@ -1516,19 +1562,35 @@ class _EditUserModalState extends State<EditUserModal> {
           updateData['graduatedCollege'] = null;
           updateData['graduatedCollegeId'] = null;
           updateData['graduatedProgram'] = null;
+        } else if (_selectedAffiliation == 'Others') {
+          userData['customAffiliation'] = _customAffiliation;
+          userData['lrn'] = null;
+          userData['scholarship'] = null;
+          userData['year'] = null;
+          userData['college'] = null;
+          userData['collegeId'] = null;
+          userData['program'] = null;
+          userData['studentId'] = null;
+          userData['studentType'] = null;
+          userData['graduateType'] = null;
+          userData['graduatedCollege'] = null;
+          userData['graduatedCollegeId'] = null;
+          userData['graduatedProgram'] = null;
         } else {
-          updateData['lrn'] = null;
-          updateData['scholarship'] = null;
-          updateData['year'] = null;
-          updateData['college'] = null;
-          updateData['collegeId'] = null;
-          updateData['program'] = null;
-          updateData['studentId'] = null;
-          updateData['studentType'] = null;
-          updateData['graduateType'] = null;
-          updateData['graduatedCollege'] = null;
-          updateData['graduatedCollegeId'] = null;
-          updateData['graduatedProgram'] = null;
+          // For Parent, Faculty, CMU Staff, Alumni, Visitor
+          userData['lrn'] = null;
+          userData['scholarship'] = null;
+          userData['year'] = null;
+          userData['college'] = null;
+          userData['collegeId'] = null;
+          userData['program'] = null;
+          userData['studentId'] = null;
+          userData['studentType'] = null;
+          userData['graduateType'] = null;
+          userData['graduatedCollege'] = null;
+          userData['graduatedCollegeId'] = null;
+          userData['graduatedProgram'] = null;
+          userData['customAffiliation'] = null;
         }
       } else if (_selectedRole.toLowerCase() == 'staff') {
         updateData['serviceUnit'] = _selectedServiceUnit;

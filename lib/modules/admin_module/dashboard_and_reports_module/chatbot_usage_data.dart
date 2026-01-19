@@ -1,36 +1,33 @@
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/reports.dart';
 
-
 class ChatbotUsageReportsData {
-  final int totalSessions;
-  final double averageResponseTime;
-  final List<ChartData>? usageTrendByTimeOfDay;
-  final Map<int, int> peakUsageByHour;
+  // Stat Cards
+ final double averageResponseTime; // in seconds
+  final int totalConversations;
   final double averageMessagesPerUser;
-  final double averageSessionLength;
-  final List<ChartData>? dailySessions;
-  final List<ChartData>? weeklySessions;
-  final List<ChartData>? monthlySessions;
-  final Map<String, int>? usersByYearLevel;
-  final Map<String, int>? usersByCourse;
-  final List<ChartData>? responseTimeTrend;
-
+  final double averageConversationTime; // in seconds
+  
+  // Charts
+  final List<ChartData> conversationsOverTime; // renamed from dailySessions
+  final Map<int, int> peakUsageByHour; // Hour (0-23) -> conversation count
+  final Map<String, int>? peakUsageByDay; // Day name -> conversation count (for weekly)
+  final Map<String, int>? peakUsageByMonth; // Month name -> conversation count (for yearly)
+  final List<ChartData> responseTimeTrend; // Response time over selected period
+  final Map<String, int> unansweredReasonsDistribution; // Reason -> count
+  
   const ChatbotUsageReportsData({
-    required this.totalSessions,
     required this.averageResponseTime,
-    required this.usageTrendByTimeOfDay,
-    required this.peakUsageByHour,
+    required this.totalConversations,
     required this.averageMessagesPerUser,
-    required this.averageSessionLength,
-    required this.dailySessions,
-    required this.weeklySessions,
-    required this.monthlySessions,
-    required this.usersByYearLevel,
-    required this.usersByCourse,
+    required this.averageConversationTime,
+    required this.conversationsOverTime,
+    required this.peakUsageByHour,
+    this.peakUsageByDay,
+    this.peakUsageByMonth,
     required this.responseTimeTrend,
+    required this.unansweredReasonsDistribution,
   });
 
-  // ✅ Optional: Add helper methods for formatted display
   String get formattedAverageResponseTime {
     if (averageResponseTime < 1) {
       return '${(averageResponseTime * 1000).toStringAsFixed(0)}ms';
@@ -38,8 +35,8 @@ class ChatbotUsageReportsData {
     return '${averageResponseTime.toStringAsFixed(2)}s';
   }
 
-  String get formattedAverageSessionLength {
-    final seconds = averageSessionLength.round();
+  String get formattedAverageConversationTime {
+    final seconds = averageConversationTime.round();
     if (seconds < 60) {
       return '${seconds}s';
     }
@@ -48,51 +45,44 @@ class ChatbotUsageReportsData {
     return '${minutes}m ${remainingSeconds}s';
   }
 
-  // ✅ Optional: Copy with method for immutability
   ChatbotUsageReportsData copyWith({
-    int? totalSessions,
     double? averageResponseTime,
-    List<ChartData>? usageTrendByTimeOfDay,
-    Map<int, int>? peakUsageByHour,
+    int? totalConversations,
     double? averageMessagesPerUser,
-    double? averageSessionLength,
-    List<ChartData>? dailySessions,
-    List<ChartData>? weeklySessions,
-    List<ChartData>? monthlySessions,
-    Map<String, int>? usersByYearLevel,
-    Map<String, int>? usersByCourse,
+    double? averageConversationTime,
+    List<ChartData>? conversationsOverTime,
+    Map<int, int>? peakUsageByHour,
+    Map<String, int>? peakUsageByDay,
+    Map<String, int>? peakUsageByMonth,
     List<ChartData>? responseTimeTrend,
+    Map<String, int>? unansweredReasonsDistribution,
   }) {
     return ChatbotUsageReportsData(
-      totalSessions: totalSessions ?? this.totalSessions,
       averageResponseTime: averageResponseTime ?? this.averageResponseTime,
-      usageTrendByTimeOfDay: usageTrendByTimeOfDay ?? this.usageTrendByTimeOfDay,
-      peakUsageByHour: peakUsageByHour ?? this.peakUsageByHour,
+      totalConversations: totalConversations ?? this.totalConversations,
       averageMessagesPerUser: averageMessagesPerUser ?? this.averageMessagesPerUser,
-      averageSessionLength: averageSessionLength ?? this.averageSessionLength,
-      dailySessions: dailySessions ?? this.dailySessions,
-      weeklySessions: weeklySessions ?? this.weeklySessions,
-      monthlySessions: monthlySessions ?? this.monthlySessions,
-      usersByYearLevel: usersByYearLevel ?? this.usersByYearLevel,
-      usersByCourse: usersByCourse ?? this.usersByCourse,
+      averageConversationTime: averageConversationTime ?? this.averageConversationTime,
+      conversationsOverTime: conversationsOverTime ?? this.conversationsOverTime,
+      peakUsageByHour: peakUsageByHour ?? this.peakUsageByHour,
+      peakUsageByDay: peakUsageByDay ?? this.peakUsageByDay,
+      peakUsageByMonth: peakUsageByMonth ?? this.peakUsageByMonth,
       responseTimeTrend: responseTimeTrend ?? this.responseTimeTrend,
+      unansweredReasonsDistribution: unansweredReasonsDistribution ?? this.unansweredReasonsDistribution,
     );
   }
 }
 
 ChatbotUsageReportsData getEmptyChatbotUsageReportsData() {
   return ChatbotUsageReportsData(
-    totalSessions: 0,
     averageResponseTime: 0.0,
-    usageTrendByTimeOfDay: <ChartData>[],
+    totalConversations: 0,
     averageMessagesPerUser: 0.0,
-    averageSessionLength: 0.0,
-    dailySessions: <ChartData>[],
-    weeklySessions: <ChartData>[],
-    monthlySessions: <ChartData>[],
+    averageConversationTime: 0.0,
+    conversationsOverTime: <ChartData>[],
     peakUsageByHour: <int, int>{},
-    usersByYearLevel: <String, int>{},
-    usersByCourse: <String, int>{},
+    peakUsageByDay: <String, int>{},
+    peakUsageByMonth: <String, int>{},
     responseTimeTrend: <ChartData>[],
+    unansweredReasonsDistribution: <String, int>{},
   );
 }

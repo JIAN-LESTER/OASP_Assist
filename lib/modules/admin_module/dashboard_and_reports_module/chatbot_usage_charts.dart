@@ -1776,3 +1776,463 @@ String _getTimeFrameDescription(String timeFrame, [DateTime? startDate, DateTime
   }
 }
 
+
+// ============================================================================
+// PEAK USAGE (DYNAMIC BY TIMEFRAME)
+// ============================================================================
+Widget buildPeakUsageCard(
+  Map<int, int>? peakByHour,
+  Map<String, int>? peakByDay,
+  Map<String, int>? peakByMonth,
+  String timeFrame,
+) {
+  // Determine which data to show based on timeframe
+  final bool showHourly = timeFrame == 'Today' || (peakByHour != null && peakByDay == null && peakByMonth == null);
+  final bool showDaily = timeFrame == 'This Week' || timeFrame == 'Custom' && peakByDay != null;
+  final bool showMonthly = timeFrame == 'This Year' || timeFrame == 'All' || peakByMonth != null;
+
+  String title;
+  String subtitle;
+  Map<String, int> dataToShow = {};
+
+  if (showHourly && peakByHour != null) {
+    title = 'Peak Usage Hours';
+    subtitle = 'Busiest hours of the day';
+    peakByHour.forEach((hour, count) {
+      final hourStr = hour == 0
+          ? '12AM'
+          : hour < 12
+              ? '${hour}AM'
+              : hour == 12
+                  ? '12PM'
+                  : '${hour - 12}PM';
+      dataToShow[hourStr] = count;
+    });
+  } else if (showDaily && peakByDay != null) {
+    title = 'Peak Usage Days';
+    subtitle = 'Busiest days of the week';
+    dataToShow = peakByDay;
+  } else if (showMonthly && peakByMonth != null) {
+    title = 'Peak Usage Months';
+    subtitle = 'Busiest months';
+    dataToShow = peakByMonth;
+  } else {
+    title = 'Peak Usage';
+    subtitle = 'No data available';
+  }
+
+  final sortedData = dataToShow.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  final topData = sortedData.take(10).toList();
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xfff59e0b).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.timeline_rounded,
+                color: Color(0xfff59e0b),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff1a1a1a),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: topData.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.show_chart, size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No usage data available',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                      ),
+                    ],
+                  ),
+                )
+              : BarChart(
+                  BarChartData(
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: topData.first.value.toDouble() * 1.15,
+                    minY: 0,
+                    groupsSpace: 12,
+                    barTouchData: BarTouchData(
+                      enabled: true,
+                      touchTooltipData: BarTouchTooltipData(
+                        getTooltipColor: (group) => const Color(0xff1a1a1a),
+                        tooltipPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        tooltipRoundedRadius: 8,
+                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                          if (groupIndex < topData.length) {
+                            final entry = topData[groupIndex];
+                            return BarTooltipItem(
+                              '${entry.key}\n',
+                              const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: '${entry.value} sessions',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 40,
+                          getTitlesWidget: (value, meta) {
+                            if (value.toInt() < topData.length) {
+                              final entry = topData[value.toInt()];
+                              return Transform.rotate(
+                                angle: -0.3,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    entry.key,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[700],
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 40,
+                          getTitlesWidget: (value, meta) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Text(
+                                value.toInt().toString(),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      getDrawingHorizontalLine: (value) => FlLine(
+                        color: Colors.grey.withOpacity(0.15),
+                        strokeWidth: 1,
+                      ),
+                    ),
+                    borderData: FlBorderData(
+                      show: true,
+                      border: Border(
+                        left: BorderSide(color: Colors.grey[300]!, width: 1),
+                        bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                      ),
+                    ),
+                    barGroups: topData.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final data = entry.value;
+                      final Color barColor = _getPeakBarColor(index, topData.length);
+
+                      return BarChartGroupData(
+                        x: index,
+                        barRods: [
+                          BarChartRodData(
+                            toY: data.value.toDouble(),
+                            width: 32,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(8),
+                              topRight: Radius.circular(8),
+                            ),
+                            gradient: LinearGradient(
+                              colors: [
+                                barColor,
+                                barColor.withOpacity(0.7),
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                  swapAnimationDuration: const Duration(milliseconds: 600),
+                  swapAnimationCurve: Curves.easeInOutCubic,
+                ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ============================================================================
+// UNANSWERED REASONS DISTRIBUTION
+// ============================================================================
+Widget buildUnansweredReasonsCard(Map<String, int> unansweredReasons) {
+  final sortedReasons = unansweredReasons.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  final total = unansweredReasons.values.fold(0, (sum, count) => sum + count);
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xffef4444).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.help_outline_rounded,
+                color: Color(0xffef4444),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Unanswered Reasons',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff1a1a1a),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Why questions went unanswered',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: sortedReasons.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 12),
+                      Text(
+                        'All questions answered!',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                      ),
+                    ],
+                  ),
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: PieChart(
+                        PieChartData(
+                          sectionsSpace: 2,
+                          centerSpaceRadius: 50,
+                          sections: sortedReasons.map((entry) {
+                            final index = sortedReasons.indexOf(entry);
+                            final color = _getReasonColor(index);
+                            final percentage = (entry.value / total * 100);
+
+                            return PieChartSectionData(
+                              color: color,
+                              value: entry.value.toDouble(),
+                              title: '${percentage.toStringAsFixed(1)}%',
+                              radius: 50,
+                              titleStyle: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: sortedReasons.map((entry) {
+                          final index = sortedReasons.indexOf(entry);
+                          final color = _getReasonColor(index);
+                          final percentage = (entry.value / total * 100);
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        entry.key,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        '${entry.value} (${percentage.toStringAsFixed(1)}%)',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ============================================================================
+// HELPER METHODS
+// ============================================================================
+
+Color _getPeakBarColor(int index, int total) {
+  final colors = [
+    const Color(0xfff59e0b), // Amber
+    const Color(0xffef4444), // Red
+    const Color(0xff3b82f6), // Blue
+    const Color(0xff10b981), // Green
+    const Color(0xff8b5cf6), // Purple
+    const Color(0xfff97316), // Orange
+    const Color(0xff06b6d4), // Cyan
+    const Color(0xffec4899), // Pink
+    const Color(0xff84cc16), // Lime
+    const Color(0xff6366f1), // Indigo
+  ];
+  return colors[index % colors.length];
+}
+
+Color _getReasonColor(int index) {
+  final colors = [
+    const Color(0xffef4444), // Red
+    const Color(0xfff59e0b), // Amber
+    const Color(0xff8b5cf6), // Purple
+    const Color(0xff3b82f6), // Blue
+    const Color(0xff10b981), // Green
+    const Color(0xffec4899), // Pink
+    const Color(0xff06b6d4), // Cyan
+  ];
+  return colors[index % colors.length];
+}

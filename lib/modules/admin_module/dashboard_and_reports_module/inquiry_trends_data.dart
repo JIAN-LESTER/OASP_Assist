@@ -1,51 +1,64 @@
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/reports.dart';
 
 class InquiryReportsData {
+  // Stat Cards
   final int totalMessages;
-  final int answeredMessages;
-  final int unAnsweredMessages;
+  final int userMessages;
+  final int botMessages;
   final int escalatedMessages;
-  final int resolvedEscalatedMessages;
-  final String mostFrequentCategory;
-  final Map<String, int> categoryDistribution;
-  final List<ChartData> inquiryTrend;
-  final Map<String, int> highestFAQs;
+  final double escalationRate;
+  final int resolvedMessages;
+  final double resolutionRate;
 
+  // Charts
+  final List<ChartData> inquiryTrend; // Long chart
+  final Map<String, int> categoryDistribution; // Short chart
+  final Map<String, int> topQuestions; // Short chart - top FAQs
+  final List<ChartData>
+  escalationsOverTime; // Long chart with category breakdown
+  final Map<String, double>
+  staffPerformance; // Staff name -> avg resolution rate
+  final Map<String, int> botVsHumanAnswers; // {'bot': count, 'human': count}
+
+  // Logs
   final List<SystemLog> recentLogs;
   final List<MessageLogs> msgLogs;
 
-
   const InquiryReportsData({
     required this.totalMessages,
-    required this.answeredMessages,
-    required this.unAnsweredMessages,
+    required this.userMessages,
+    required this.botMessages,
     required this.escalatedMessages,
-    required this.resolvedEscalatedMessages,
-    required this.mostFrequentCategory,
-    required this.categoryDistribution,
+    required this.escalationRate,
+    required this.resolvedMessages,
+    required this.resolutionRate,
     required this.inquiryTrend,
-    required this.highestFAQs,
-
+    required this.categoryDistribution,
+    required this.topQuestions,
+    required this.escalationsOverTime,
+    required this.staffPerformance,
+    required this.botVsHumanAnswers,
     required this.recentLogs,
     required this.msgLogs,
-   
-
   });
 }
 
 InquiryReportsData getEmptyInquiryReportsData() {
-    return const InquiryReportsData(
-      totalMessages: 0,
-      answeredMessages: 0,
-      unAnsweredMessages: 0,
-      escalatedMessages: 0,
-      resolvedEscalatedMessages: 0,
-      mostFrequentCategory: 'Unknown',
-      categoryDistribution: {},
-      inquiryTrend: [],
-      highestFAQs: {},
-      recentLogs: [],
-      msgLogs: [],
-     
-    );
-  }
+  return const InquiryReportsData(
+    totalMessages: 0,
+    userMessages: 0,
+    botMessages: 0,
+    escalatedMessages: 0,
+    escalationRate: 0.0,
+    resolvedMessages: 0,
+    resolutionRate: 0.0,
+    inquiryTrend: [],
+    categoryDistribution: {},
+    topQuestions: {},
+    escalationsOverTime: [],
+    staffPerformance: {},
+    botVsHumanAnswers: {'bot': 0, 'human': 0},
+    recentLogs: [],
+    msgLogs: [],
+  );
+}

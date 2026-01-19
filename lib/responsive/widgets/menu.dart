@@ -497,7 +497,7 @@ class UniversalUIComponents {
                 ),
       ),
       child: Center(
-        child: Image.asset('lib/images/oasp.png', width: 54, height: 54),
+        child: Image.asset('lib/images/oasp.png', width: 80, height: 80),
       ),
     );
   }
@@ -509,7 +509,7 @@ class UniversalUIComponents {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white),
       child: Center(
-        child: Image.asset('lib/images/oasp.png', width: 72, height: 72),
+        child: Image.asset('lib/images/oasp.png', width: 90, height: 90),
       ),
     );
   }

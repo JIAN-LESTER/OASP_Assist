@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:capstone_project/components/textfield.dart';
+import 'package:capstone_project/components/square_tile.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,9 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
-import '../../components/square_tile.dart';
 import 'forgot_password_page.dart';
-import 'register_page.dart';
+import '../data/register_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,53 +22,30 @@ class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
   String? _emailError;
   String? _passwordError;
   String? _generalError;
   String? _verificationError;
 
-  // Timers for error handling
   Timer? _emailErrorTimer;
   Timer? _passwordErrorTimer;
   Timer? _generalErrorTimer;
   Timer? _verificationErrorTimer;
 
-  // FONT CONFIGURATION
   static const String primaryFontFamily = 'Poppins';
-
-  //  font sizes
-  static const double baseTitleFontSize = 28.0;
-  static const double baseSubtitleFontSize = 16.0;
-  static const double baseButtonFontSize = 15.0;
-  static const double baseLinkFontSize = 14.0;
-  static const double baseLabelFontSize = 13.0;
-  static const double baseErrorFontSize = 12.0;
-
-  // font weights
-  static const FontWeight titleFontWeight = FontWeight.w600;
-  static const FontWeight subtitleFontWeight = FontWeight.w400;
-  static const FontWeight buttonFontWeight = FontWeight.w500;
-  static const FontWeight linkFontWeight = FontWeight.w500;
-  static const FontWeight labelFontWeight = FontWeight.w400;
-
-  // Color scheme
   static const Color primaryColor = Color.fromARGB(255, 8, 121, 11);
   static const Color linkColor = Color.fromARGB(255, 0, 81, 255);
   static final Color textPrimaryColor = Colors.grey[800]!;
   static final Color textSecondaryColor = Colors.grey[600]!;
   static final Color errorColor = Colors.red[400]!;
-
-  // Error duration constant
   static const Duration errorDuration = Duration(seconds: 10);
 
-  // Set error with timer
   void _setEmailError(String error) {
     _emailErrorTimer?.cancel();
     setState(() => _emailError = error);
     _emailErrorTimer = Timer(errorDuration, () {
-      if (mounted) {
-        setState(() => _emailError = null);
-      }
+      if (mounted) setState(() => _emailError = null);
     });
   }
 
@@ -77,9 +53,7 @@ class _LoginPageState extends State<LoginPage> {
     _passwordErrorTimer?.cancel();
     setState(() => _passwordError = error);
     _passwordErrorTimer = Timer(errorDuration, () {
-      if (mounted) {
-        setState(() => _passwordError = null);
-      }
+      if (mounted) setState(() => _passwordError = null);
     });
   }
 
@@ -87,9 +61,7 @@ class _LoginPageState extends State<LoginPage> {
     _generalErrorTimer?.cancel();
     setState(() => _generalError = error);
     _generalErrorTimer = Timer(errorDuration, () {
-      if (mounted) {
-        setState(() => _generalError = null);
-      }
+      if (mounted) setState(() => _generalError = null);
     });
   }
 
@@ -97,13 +69,10 @@ class _LoginPageState extends State<LoginPage> {
     _verificationErrorTimer?.cancel();
     setState(() => _verificationError = error);
     _verificationErrorTimer = Timer(errorDuration, () {
-      if (mounted) {
-        setState(() => _verificationError = null);
-      }
+      if (mounted) setState(() => _verificationError = null);
     });
   }
 
-  // Clear all errors and timers
   void _clearErrors() {
     _emailErrorTimer?.cancel();
     _passwordErrorTimer?.cancel();
@@ -117,64 +86,47 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  // Validate email
   bool _validateEmail(String email) {
-    // Check if empty
     if (email.trim().isEmpty) {
       _setEmailError('Email address is required');
       return false;
     }
-
-    // Check if valid email format
     if (!_isValidEmail(email.trim())) {
       _setEmailError('Please enter a valid email address');
       return false;
     }
-
-    // Check email length
     if (email.trim().length > 320) {
       _setEmailError('Email address is too long');
       return false;
     }
-
     _emailErrorTimer?.cancel();
     setState(() => _emailError = null);
     return true;
   }
 
-  // Validate password
   bool _validatePassword(String password) {
-    // Check if empty
     if (password.isEmpty) {
       _setPasswordError('Password is required');
       return false;
     }
-
     _passwordErrorTimer?.cancel();
     setState(() => _passwordError = null);
     return true;
   }
 
-  // Enhanced sign in method with better error handling
   void signUserIn() async {
-    // Clear all previous errors
     _clearErrors();
-
-    // Validate inputs
     final email = emailController.text.trim();
     final password = passwordController.text;
 
     bool isEmailValid = _validateEmail(email);
     bool isPasswordValid = _validatePassword(password);
 
-    if (!isEmailValid || !isPasswordValid) {
-      return;
-    }
+    if (!isEmailValid || !isPasswordValid) return;
 
     setState(() => _isLoading = true);
 
     try {
-      // Attempt to sign in
       UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password)
           .timeout(
@@ -185,14 +137,12 @@ class _LoginPageState extends State<LoginPage> {
           );
 
       final user = userCredential.user;
-
       if (user == null) {
         _setGeneralError('Sign in failed. Please try again.');
         setState(() => _isLoading = false);
         return;
       }
 
-      // Check email verification
       if (!user.emailVerified) {
         await FirebaseAuth.instance.signOut();
         if (mounted) {
@@ -204,7 +154,6 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      // Update Firestore verification status
       try {
         await FirebaseFirestore.instance
             .collection('users')
@@ -217,7 +166,6 @@ class _LoginPageState extends State<LoginPage> {
             .timeout(const Duration(seconds: 10));
       } catch (firestoreError) {
         print('⚠️ Failed to update verification status: $firestoreError');
-        // Don't block login if this fails
       }
 
       print("✅ Sign in successful: ${user.email}");
@@ -233,73 +181,33 @@ class _LoginPageState extends State<LoginPage> {
         case 'user-not-found':
           _setEmailError('No account found with this email address');
           break;
-
         case 'wrong-password':
           _setPasswordError('Incorrect password. Please try again.');
           break;
-
         case 'invalid-email':
           _setEmailError('Invalid email address format');
           break;
-
         case 'user-disabled':
           _setGeneralError(
             'This account has been disabled. Please contact support.',
           );
           break;
-
         case 'too-many-requests':
           _setGeneralError(
             'Too many failed login attempts. Please try again later or reset your password.',
           );
           break;
-
         case 'invalid-credential':
           _setGeneralError(
             'Invalid email or password. Please check your credentials.',
           );
           break;
-
         case 'network-request-failed':
           _setGeneralError(
             'Network error. Please check your internet connection.',
           );
           break;
-
-        case 'operation-not-allowed':
-          _setGeneralError(
-            'Email/password sign in is not enabled. Please contact support.',
-          );
-          break;
-
-        case 'email-already-in-use':
-          _setEmailError('This email is already registered');
-          break;
-
-        case 'weak-password':
-          _setPasswordError('Password is too weak');
-          break;
-
-        case 'account-exists-with-different-credential':
-          _setGeneralError(
-            'An account already exists with a different sign-in method.',
-          );
-          break;
-
-        case 'invalid-verification-code':
-          _setGeneralError('Invalid verification code');
-          break;
-
-        case 'invalid-verification-id':
-          _setGeneralError('Invalid verification ID');
-          break;
-
-        case 'session-expired':
-          _setGeneralError('Session expired. Please try again.');
-          break;
-
         default:
-          // For unknown Firebase errors, show a user-friendly message
           _setGeneralError(
             'Login failed: ${_getFriendlyErrorMessage(e.message ?? 'Unknown error')}',
           );
@@ -315,120 +223,265 @@ class _LoginPageState extends State<LoginPage> {
         'An unexpected error occurred. Please try again or contact support.',
       );
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Helper to convert technical error messages to user-friendly ones
   String _getFriendlyErrorMessage(String technicalMessage) {
     final lowerMessage = technicalMessage.toLowerCase();
-
-    if (lowerMessage.contains('network')) {
-      return 'Network connection issue';
-    } else if (lowerMessage.contains('timeout')) {
-      return 'Connection timed out';
-    } else if (lowerMessage.contains('permission')) {
-      return 'Permission denied';
-    } else if (lowerMessage.contains('not found')) {
-      return 'Resource not found';
-    } else if (lowerMessage.contains('already exists')) {
-      return 'Already exists';
-    } else {
-      return 'Please try again';
-    }
+    if (lowerMessage.contains('network')) return 'Network connection issue';
+    if (lowerMessage.contains('timeout')) return 'Connection timed out';
+    if (lowerMessage.contains('permission')) return 'Permission denied';
+    if (lowerMessage.contains('not found')) return 'Resource not found';
+    if (lowerMessage.contains('already exists')) return 'Already exists';
+    return 'Please try again';
   }
 
-  // Email validation helper with comprehensive checks
   bool _isValidEmail(String email) {
     if (email.isEmpty) return false;
-
-    // Basic format check
     final emailRegex = RegExp(
       r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
     );
-
     if (!emailRegex.hasMatch(email)) return false;
-
-    // Additional checks
     final parts = email.split('@');
     if (parts.length != 2) return false;
-
     final localPart = parts[0];
     final domainPart = parts[1];
-
-    // Check local part
     if (localPart.isEmpty || localPart.length > 64) return false;
-
-    // Check domain part
     if (domainPart.isEmpty || !domainPart.contains('.')) return false;
-
     return true;
   }
 
-  // Build error text widget with animation
-  Widget _buildErrorText(String? error, double fontSizeMultiplier) {
-    if (error == null) return const SizedBox.shrink();
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.only(left: 20, top: 8, right: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: errorColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: errorColor.withOpacity(0.3)),
-      ),
-      child: Row(
+  Widget _buildModernTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    bool obscureText = false,
+    bool isPassword = false,
+    TextInputType? keyboardType,
+    String? errorText,
+    double cardPadding = 20,
+    ValueChanged<String>? onSubmitted,
+  }) {
+    if (cardPadding <= 20) {
+      // Mobile layout
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.error_outline, color: errorColor, size: 16),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              error,
-              style: TextStyle(
-                fontFamily: primaryFontFamily,
-                fontSize: baseErrorFontSize * fontSizeMultiplier,
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: textPrimaryColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller,
+            obscureText: isPassword ? _obscurePassword : obscureText,
+            keyboardType: keyboardType,
+            onChanged: (_) => setState(() {}),
+            onFieldSubmitted: onSubmitted,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: textPrimaryColor,
+            ),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(
+                color: textSecondaryColor.withOpacity(0.5),
                 fontWeight: FontWeight.w500,
-                color: errorColor,
-                height: 1.4,
+              ),
+              suffixIcon: isPassword
+                  ? IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        color: textSecondaryColor,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    )
+                  : (controller.text.isNotEmpty && errorText == null
+                      ? Icon(Icons.check, color: Colors.green, size: 24)
+                      : null),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: errorText != null ? errorColor : Colors.grey[300]!,
+                  width: 1.5,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: errorText != null ? errorColor : Colors.grey[300]!,
+                  width: 1.5,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: errorText != null ? errorColor : Colors.grey.shade400,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
               ),
             ),
           ),
-          // Dismiss button
-          GestureDetector(
-            onTap: () {
-              if (error == _emailError) {
-                _emailErrorTimer?.cancel();
-                setState(() => _emailError = null);
-              } else if (error == _passwordError) {
-                _passwordErrorTimer?.cancel();
-                setState(() => _passwordError = null);
-              } else if (error == _verificationError) {
-                _verificationErrorTimer?.cancel();
-                setState(() => _verificationError = null);
-              }
-            },
-            child: Icon(
-              Icons.close,
-              color: errorColor.withOpacity(0.7),
-              size: 16,
+          if (errorText != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: errorColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: errorColor.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, color: errorColor, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      errorText,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: errorColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    // Desktop/Tablet layout
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: textPrimaryColor,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          obscureText: isPassword ? _obscurePassword : obscureText,
+          keyboardType: keyboardType,
+          onChanged: (_) => setState(() {}),
+          onFieldSubmitted: onSubmitted,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: textPrimaryColor,
+          ),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(
+              color: textSecondaryColor.withOpacity(0.5),
+              fontWeight: FontWeight.w500,
+            ),
+            suffixIcon: isPassword
+                ? IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: textSecondaryColor,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                  )
+                : (controller.text.isNotEmpty && errorText == null
+                    ? Icon(Icons.check, color: Colors.green, size: 24)
+                    : null),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: errorText != null ? errorColor : Colors.grey[300]!,
+                width: 1.5,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: errorText != null ? errorColor : Colors.grey[300]!,
+                width: 1.5,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: errorText != null ? errorColor : Colors.grey.shade400,
+                width: 2,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+          ),
+        ),
+        if (errorText != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: errorColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: errorColor.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: errorColor, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    errorText,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: errorColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 
-  // Build general error widget with animation
-  Widget _buildGeneralError(double fontSizeMultiplier) {
-    if (_generalError == null) return const SizedBox.shrink();
+  Widget _buildGeneralError() {
+    if (_generalError == null && _verificationError == null) {
+      return const SizedBox.shrink();
+    }
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+    final errorMessage = _generalError ?? _verificationError;
+
+    return Container(
       padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: errorColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
@@ -447,21 +500,25 @@ class _LoginPageState extends State<LoginPage> {
           const SizedBox(width: 14),
           Expanded(
             child: Text(
-              _generalError!,
+              errorMessage!,
               style: TextStyle(
-                fontFamily: primaryFontFamily,
-                fontSize: baseErrorFontSize * fontSizeMultiplier + 1,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: errorColor,
                 height: 1.4,
               ),
             ),
           ),
-          // Dismiss button
           GestureDetector(
             onTap: () {
-              _generalErrorTimer?.cancel();
-              setState(() => _generalError = null);
+              if (_generalError != null) {
+                _generalErrorTimer?.cancel();
+                setState(() => _generalError = null);
+              }
+              if (_verificationError != null) {
+                _verificationErrorTimer?.cancel();
+                setState(() => _verificationError = null);
+              }
             },
             child: Icon(
               Icons.close,
@@ -474,245 +531,164 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  @override
-  void dispose() {
-    // Cancel all timers
-    _emailErrorTimer?.cancel();
-    _passwordErrorTimer?.cancel();
-    _generalErrorTimer?.cancel();
-    _verificationErrorTimer?.cancel();
-
-    emailController.dispose();
-    passwordController.dispose();
-    super.dispose();
-  }
-
-  Widget _buildLoginForm({
-    double maxWidth = double.infinity,
-    double horizontalPadding = 16.0,
-    double iconSize = 100,
-    double fontSizeMultiplier = 1.0,
-    double buttonPadding = 16,
-    required double availableHeight,
+  Widget _buildContent({
+    required double maxWidth,
+    required double horizontalPadding,
+    required double iconSize,
+    required double titleFontSize,
+    required double descriptionFontSize,
+    required double cardPadding,
   }) {
-    final baseSpacing = availableHeight * 0.02;
-    final sectionSpacing = availableHeight * 0.025;
-    final largeSpacing = availableHeight * 0.04;
-
-    return Container(
-      constraints: BoxConstraints(maxWidth: maxWidth),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 40),
+      child: Container(
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SizedBox(height: largeSpacing),
-
             SizedBox(
-              width: 120,
-              height: 120,
+              width: iconSize,
+              height: iconSize,
               child: Image.asset(
                 'lib/images/oasp.png',
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Icon(
                     Icons.smart_toy_outlined,
-                    color: Color(0xFF2E7D32),
-                    size: 100,
+                    color: primaryColor,
+                    size: iconSize * 0.8,
                   );
                 },
               ),
             ),
-            SizedBox(height: sectionSpacing),
-
+            const SizedBox(height: 24),
             Text(
               "Welcome to OASP Assist",
               style: TextStyle(
                 fontFamily: primaryFontFamily,
-                fontSize: baseTitleFontSize * fontSizeMultiplier,
-                fontWeight: titleFontWeight,
+                fontSize: titleFontSize,
+                fontWeight: FontWeight.w800,
                 color: textPrimaryColor,
                 letterSpacing: -0.3,
-                height: 1.2,
               ),
+              textAlign: TextAlign.center,
             ),
-
-            SizedBox(height: baseSpacing * 0.5),
-
+            const SizedBox(height: 12),
             Text(
               "Sign in to continue",
               style: TextStyle(
                 fontFamily: primaryFontFamily,
-                fontSize: baseSubtitleFontSize * fontSizeMultiplier,
-                fontWeight: subtitleFontWeight,
+                fontSize: descriptionFontSize,
+                fontWeight: FontWeight.w400,
                 color: textSecondaryColor,
                 letterSpacing: 0.1,
-                height: 1.3,
               ),
+              textAlign: TextAlign.center,
             ),
-
-            SizedBox(height: sectionSpacing),
-
-            // General error message (keep this for general/verification errors)
-            _buildGeneralError(fontSizeMultiplier),
-
-            // Verification error message
-            if (_verificationError != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
+            const SizedBox(height: 32),
+            _buildGeneralError(),
+            _buildModernTextField(
+              controller: emailController,
+              label: 'Email',
+              hint: 'Enter your email',
+              keyboardType: TextInputType.emailAddress,
+              errorText: _emailError,
+              cardPadding: cardPadding,
+              onSubmitted: (_) => signUserIn(),
+            ),
+            const SizedBox(height: 16),
+            _buildModernTextField(
+              controller: passwordController,
+              label: 'Password',
+              hint: 'Enter your password',
+              isPassword: true,
+              errorText: _passwordError,
+              cardPadding: cardPadding,
+              onSubmitted: (_) => signUserIn(),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ForgotPasswordPage(),
+                    ),
+                  );
+                },
                 child: Text(
-                  _verificationError!,
+                  "Forgot Password?",
                   style: TextStyle(
                     fontFamily: primaryFontFamily,
-                    fontSize: baseErrorFontSize * fontSizeMultiplier,
-                    color: Colors.red,
-                    fontWeight: FontWeight.w400,
-                    height: 1.4,
+                    color: linkColor,
+                    fontWeight: FontWeight.w500,
+                    fontSize: descriptionFontSize * 0.9,
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ),
-
-            // Email field with error text passed directly
-            Textfield(
-              controller: emailController,
-              hintText: "Email",
-              obscureText: false,
-              keyboardType: TextInputType.emailAddress,
-              onSubmitted: (_) => signUserIn(),
-              errorText: _emailError, // Pass error directly
             ),
-
-            SizedBox(height: baseSpacing * 0.5),
-
-            // Password field with error text passed directly
-            Textfield(
-              controller: passwordController,
-              hintText: "Password",
-              obscureText: true,
-              isPasswordField: true,
-              onSubmitted: (_) => signUserIn(),
-              errorText: _passwordError, // Pass error directly
-            ),
-
-            SizedBox(height: baseSpacing),
-
-            // Forgot Password
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ForgotPasswordPage(),
-                        ),
-                      );
-                    },
-                    child: Text(
-                      "Forgot Password?",
-                      style: TextStyle(
-                        fontFamily: primaryFontFamily,
-                        color: linkColor,
-                        fontWeight: linkFontWeight,
-                        fontSize: baseLinkFontSize * fontSizeMultiplier,
-                        letterSpacing: 0.1,
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: sectionSpacing),
-
-            // Sign In Button
+            const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: buttonPadding),
-                    textStyle: TextStyle(
-                      fontFamily: primaryFontFamily,
-                      fontSize: baseButtonFontSize * fontSizeMultiplier,
-                      fontWeight: buttonFontWeight,
-                      letterSpacing: 0.3,
-                      height: 1.2,
-                    ),
-                    elevation: 2,
-                    shadowColor: primaryColor.withOpacity(0.3),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  disabledBackgroundColor: Colors.grey[300],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  onPressed: _isLoading ? null : signUserIn,
-                  child:
-                      _isLoading
-                          ? SizedBox(
-                            width: 20 * fontSizeMultiplier,
-                            height: 20 * fontSizeMultiplier,
-                            child: const CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2.0,
-                            ),
-                          )
-                          : const Text("Sign In"),
+                  elevation: 0,
                 ),
+                onPressed: _isLoading ? null : signUserIn,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.0,
+                        ),
+                      )
+                    : Text(
+                        "Sign In",
+                        style: TextStyle(
+                          fontFamily: primaryFontFamily,
+                          fontSize: descriptionFontSize,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
               ),
             ),
-
-            SizedBox(height: sectionSpacing),
-
-            // Divider
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Divider(thickness: 1, color: Colors.grey[350]),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      "OR",
-                      style: TextStyle(
-                        fontFamily: primaryFontFamily,
-                        color: textSecondaryColor,
-                        fontSize: baseLabelFontSize * fontSizeMultiplier,
-                        fontWeight: labelFontWeight,
-                        letterSpacing: 1.5,
-                        height: 1.2,
-                      ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(child: Divider(thickness: 1, color: Colors.grey[350])),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    "OR",
+                    style: TextStyle(
+                      fontFamily: primaryFontFamily,
+                      color: textSecondaryColor,
+                      fontSize: descriptionFontSize * 0.85,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 1.5,
                     ),
                   ),
-                  Expanded(
-                    child: Divider(thickness: 1, color: Colors.grey[350]),
-                  ),
-                ],
-              ),
+                ),
+                Expanded(child: Divider(thickness: 1, color: Colors.grey[350])),
+              ],
             ),
-
-            SizedBox(height: baseSpacing),
+            const SizedBox(height: 24),
             if (!(!kIsWeb &&
-                (Platform.isWindows ||
-                    Platform.isLinux ||
-                    Platform.isMacOS))) ...[
+                (Platform.isWindows || Platform.isLinux || Platform.isMacOS))) ...[
               const SquareTile(imagePath: 'lib/images/google.png'),
-              SizedBox(height: sectionSpacing),
+              const SizedBox(height: 24),
             ],
-
-            // Sign Up Link
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -721,10 +697,8 @@ class _LoginPageState extends State<LoginPage> {
                   style: TextStyle(
                     fontFamily: primaryFontFamily,
                     color: textSecondaryColor,
-                    fontSize: baseLinkFontSize * fontSizeMultiplier,
-                    fontWeight: subtitleFontWeight,
-                    height: 1.3,
-                    letterSpacing: 0.1,
+                    fontSize: descriptionFontSize * 0.9,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
                 GestureDetector(
@@ -741,151 +715,99 @@ class _LoginPageState extends State<LoginPage> {
                     style: TextStyle(
                       fontFamily: primaryFontFamily,
                       color: linkColor,
-                      fontWeight: buttonFontWeight,
-                      fontSize: baseLinkFontSize * fontSizeMultiplier,
-                      letterSpacing: 0.2,
-                      height: 1.3,
+                      fontWeight: FontWeight.w600,
+                      fontSize: descriptionFontSize * 0.9,
                     ),
                   ),
                 ),
               ],
             ),
-
-            SizedBox(height: largeSpacing),
           ],
         ),
       ),
     );
   }
 
-  // Mobile Screen
-  Widget _buildMobileLayout() {
-    return SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: IntrinsicHeight(
-                child: _buildLoginForm(
-                  availableHeight: constraints.maxHeight,
-                  iconSize: constraints.maxHeight * 0.08,
-                  fontSizeMultiplier: 0.95,
-                  buttonPadding: 18,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // Tablet Screen
-  Widget _buildTabletLayout() {
-    return SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return Center(
-            child: SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight * 0.9,
-                ),
-                child: Center(
-                  child: Container(
-                    margin: const EdgeInsets.all(32.0),
-                    padding: const EdgeInsets.all(32.0),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300, width: 1),
-                      borderRadius: BorderRadius.circular(16),
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.08),
-                          spreadRadius: 2,
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: _buildLoginForm(
-                      maxWidth: 480,
-                      horizontalPadding: 0,
-                      availableHeight: constraints.maxHeight * 0.8,
-                      iconSize: constraints.maxHeight * 0.1,
-                      fontSizeMultiplier: 1.0,
-                      buttonPadding: 20,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // Desktop Screen
-  Widget _buildDesktopBody() {
-    return SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return Center(
-            child: SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight * 0.9,
-                ),
-                child: Center(
-                  child: Container(
-                    margin: const EdgeInsets.all(40.0),
-                    padding: const EdgeInsets.only(
-                      left: 50.0,
-                      right: 50.0,
-                      bottom: 40,
-                      top: 20,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300, width: 1),
-                      borderRadius: BorderRadius.circular(16),
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          spreadRadius: 3,
-                          blurRadius: 20,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: _buildLoginForm(
-                      maxWidth: 420,
-                      horizontalPadding: 0,
-                      availableHeight: constraints.maxHeight * 0.8,
-                      iconSize: constraints.maxHeight * 0.12,
-                      fontSizeMultiplier: 1.0,
-                      buttonPadding: 22,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
+  @override
+  void dispose() {
+    _emailErrorTimer?.cancel();
+    _passwordErrorTimer?.cancel();
+    _generalErrorTimer?.cancel();
+    _verificationErrorTimer?.cancel();
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: ResponsiveLayout(
-        mobileBody: _buildMobileLayout(),
-        tabletBody: _buildTabletLayout(),
-        desktopBody: _buildDesktopBody(),
+      body: SafeArea(
+        child: ResponsiveLayout(
+          mobileBody: _buildContent(
+            maxWidth: double.infinity,
+            horizontalPadding: 20,
+            iconSize: 100,
+            titleFontSize: 24,
+            descriptionFontSize: 14,
+            cardPadding: 20,
+          ),
+          tabletBody: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 500),
+              margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 24,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: _buildContent(
+                maxWidth: 500,
+                horizontalPadding: 0,
+                iconSize: 110,
+                titleFontSize: 28,
+                descriptionFontSize: 15,
+                cardPadding: 32,
+              ),
+            ),
+          ),
+          desktopBody: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 480),
+              margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 40),
+              padding: const EdgeInsets.all(40),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 24,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: _buildContent(
+                maxWidth: 480,
+                horizontalPadding: 0,
+                iconSize: 120,
+                titleFontSize: 32,
+                descriptionFontSize: 16,
+                cardPadding: 40,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

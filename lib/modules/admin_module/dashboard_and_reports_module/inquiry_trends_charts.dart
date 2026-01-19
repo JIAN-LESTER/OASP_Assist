@@ -1,4 +1,5 @@
-import 'package:capstone_project/icon_and_color.dart';
+// import 'package:capstone_project/icon_and_color.dart';
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/escalation_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_dialog.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/reports.dart';
 
@@ -1227,26 +1228,1157 @@ String _formatBottomTitle(String date, String timeFrame, [DateTime? startDate, D
   }
 }
 
-String _getTimeFrameDescription(String timeFrame, [DateTime? startDate, DateTime? endDate]) {
-  if (timeFrame == 'Custom' && startDate != null && endDate != null) {
-    final daysDiff = endDate.difference(startDate).inDays;
+// String _getTimeFrameDescription(String timeFrame, [DateTime? startDate, DateTime? endDate]) {
+//   if (timeFrame == 'Custom' && startDate != null && endDate != null) {
+//     final daysDiff = endDate.difference(startDate).inDays;
     
-    if (daysDiff == 0) return 'by hour';
-    if (daysDiff <= 7) return 'by day';
-    if (daysDiff <= 31) return 'by week';
-    return 'by month';
+//     if (daysDiff == 0) return 'by hour';
+//     if (daysDiff <= 7) return 'by day';
+//     if (daysDiff <= 31) return 'by week';
+//     return 'by month';
+//   }
+
+//   switch (timeFrame) {
+//     case 'Today':
+//       return 'by hour';
+//     case 'This Week':
+//       return 'by day';
+//     case 'This Month':
+//       return 'by week';
+//     case 'This Year':
+//       return 'by month';
+//     default:
+//       return 'over time';
+//   }
+// }
+
+Widget buildEscalatedMessagesList(
+  List<EscalatedMessage> data,
+  String timeFrame,
+  BuildContext context,
+) {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isMobile = screenWidth < 600;
+      final padding = isMobile ? 16.0 : 20.0;
+      final iconSize = isMobile ? 18.0 : 20.0;
+      final titleFontSize = isMobile ? 16.0 : 18.0;
+
+      return Container(
+        padding: EdgeInsets.all(padding),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(isMobile ? 8 : 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffef4444).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.priority_high_rounded,
+                    color: const Color(0xffef4444),
+                    size: iconSize,
+                  ),
+                ),
+                SizedBox(width: isMobile ? 8 : 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Escalated Messages',
+                        style: TextStyle(
+                          fontSize: titleFontSize,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xff1a1a1a),
+                        ),
+                      ),
+                      Text(
+                        '${data.length} messages requiring attention',
+                        style: TextStyle(
+                          fontSize: isMobile ? 11 : 13,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // "See more" button added to match System Logs pattern
+                // TextButton.icon(
+                //   onPressed: () => _showEscalatedMessagesDialog(context, timeFrame),
+                //   icon: Icon(
+                //     Icons.arrow_forward,
+                //     size: isMobile ? 14 : 16,
+                //     color: Colors.orange[800],
+                //   ),
+                //   label: Text(
+                //     'See more',
+                //     style: TextStyle(
+                //       fontSize: isMobile ? 11 : 12,
+                //       color: Colors.orange[800],
+                //       fontWeight: FontWeight.w600,
+                //     ),
+                //   ),
+                // ),
+              ],
+            ),
+            SizedBox(height: isMobile ? 12 : 16),
+            Expanded(
+              child: data.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            size: 48,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No escalated messages',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      // Limit preview to top 5 items like System Logs
+                      itemCount: data.length > 5 ? 5 : data.length,
+                      separatorBuilder: (context, index) => Divider(
+                        height: isMobile ? 16 : 20,
+                        color: Colors.grey[200],
+                      ),
+                      itemBuilder: (context, index) {
+                        final message = data[index];
+                        final categoryColor = _getColorForCategory(message.category);
+
+                        return Container(
+                          padding: EdgeInsets.all(isMobile ? 10 : 12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: message.status == 'pending'
+                                  ? const Color(0xffef4444).withOpacity(0.3)
+                                  : Colors.grey[300]!,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: categoryColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      message.category,
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 10 : 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: categoryColor,
+                                      ),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  _buildStatusBadge(message.status, isMobile),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                message.userMessage,
+                                style: TextStyle(
+                                  fontSize: isMobile ? 12 : 13,
+                                  color: Colors.grey[800],
+                                  height: 1.4,
+                                ),
+                                maxLines: 1, // Preview mode: single line
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+// Helper for status badge to keep code clean
+Widget _buildStatusBadge(String status, bool isMobile) {
+  final isPending = status.toLowerCase() == 'pending';
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: (isPending ? Colors.red : Colors.green).withOpacity(0.1),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      status.toUpperCase(),
+      style: TextStyle(
+        fontSize: isMobile ? 9 : 10,
+        fontWeight: FontWeight.w700,
+        color: isPending ? Colors.red : Colors.green,
+      ),
+    ),
+  );
+}
+
+
+// Widget buildEscalatedMessagesList(
+//   List<EscalatedMessage> data, // Accept dynamic list (can be List<EscalatedMessage> or List<MessageLogs>)
+//   String timeFrame,
+//   BuildContext context,
+// ) {
+//   // Convert data to List<EscalatedMessage> if needed
+//   final List<EscalatedMessage> escalatedMessages = [];
+  
+//   // If data is already List<EscalatedMessage>, use it directly
+//   if (data.isNotEmpty) {
+//     escalatedMessages.addAll(data.cast<EscalatedMessage>());
+//   }
+
+//   return LayoutBuilder(
+//     builder: (context, constraints) {
+//       final screenWidth = MediaQuery.of(context).size.width;
+//       final isMobile = screenWidth < 600;
+//       final padding = isMobile ? 16.0 : 20.0;
+//       final iconSize = isMobile ? 18.0 : 20.0;
+//       final titleFontSize = isMobile ? 16.0 : 18.0;
+
+//       return Container(
+//         padding: EdgeInsets.all(padding),
+//         decoration: BoxDecoration(
+//           color: Colors.white,
+//           borderRadius: BorderRadius.circular(16),
+//           boxShadow: [
+//             BoxShadow(
+//               color: Colors.black.withOpacity(0.08),
+//               blurRadius: 12,
+//               offset: const Offset(0, 4),
+//             ),
+//           ],
+//         ),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Row(
+//               children: [
+//                 Container(
+//                   padding: EdgeInsets.all(isMobile ? 8 : 10),
+//                   decoration: BoxDecoration(
+//                     color: const Color(0xffef4444).withOpacity(0.1),
+//                     borderRadius: BorderRadius.circular(10),
+//                   ),
+//                   child: Icon(
+//                     Icons.priority_high_rounded,
+//                     color: const Color(0xffef4444),
+//                     size: iconSize,
+//                   ),
+//                 ),
+//                 SizedBox(width: isMobile ? 8 : 12),
+//                 Expanded(
+//                   child: Column(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     children: [
+//                       Text(
+//                         'Escalated Messages',
+//                         style: TextStyle(
+//                           fontSize: titleFontSize,
+//                           fontWeight: FontWeight.bold,
+//                           color: const Color(0xff1a1a1a),
+//                         ),
+//                       ),
+//                       const SizedBox(height: 2),
+//                       Text(
+//                         'Recent escalations requiring attention',
+//                         style: TextStyle(
+//                           fontSize: isMobile ? 11 : 13,
+//                           color: Colors.grey[600],
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             SizedBox(height: isMobile ? 12 : 16),
+//             Expanded(
+//               child: escalatedMessages.isEmpty
+//                   ? Center(
+//                       child: Column(
+//                         mainAxisAlignment: MainAxisAlignment.center,
+//                         children: [
+//                           Icon(
+//                             Icons.check_circle_outline,
+//                             size: 48,
+//                             color: Colors.grey[300],
+//                           ),
+//                           const SizedBox(height: 12),
+//                           Text(
+//                             'No escalated messages',
+//                             style: TextStyle(
+//                               fontSize: 14,
+//                               color: Colors.grey[400],
+//                             ),
+//                           ),
+//                         ],
+//                       ),
+//                     )
+//                   : ListView.separated(
+//                       itemCount: 
+//                         escalatedMessages.length, // Limit to top 5
+//                       separatorBuilder: (context, index) => Divider(
+//                         height: isMobile ? 16 : 20,
+//                         color: Colors.grey[200],
+//                       ),
+//                       itemBuilder: (context, index) {
+//                         final message = escalatedMessages[index];
+//                         final categoryColor = _getColorForCategory(message.category);
+
+//                         return Container(
+//                           padding: EdgeInsets.all(isMobile ? 10 : 12),
+//                           decoration: BoxDecoration(
+//                             color: Colors.grey[50],
+//                             borderRadius: BorderRadius.circular(8),
+//                             border: Border.all(
+//                               color: message.status == 'pending'
+//                                   ? const Color(0xffef4444).withOpacity(0.3)
+//                                   : Colors.grey[300]!,
+//                               width: 1.5,
+//                             ),
+//                           ),
+//                           child: Column(
+//                             crossAxisAlignment: CrossAxisAlignment.start,
+//                             children: [
+//                               Row(
+//                                 children: [
+//                                   Container(
+//                                     padding: const EdgeInsets.symmetric(
+//                                       horizontal: 8,
+//                                       vertical: 4,
+//                                     ),
+//                                     decoration: BoxDecoration(
+//                                       color: categoryColor.withOpacity(0.1),
+//                                       borderRadius: BorderRadius.circular(6),
+//                                     ),
+//                                     child: Text(
+//                                       message.category,
+//                                       style: TextStyle(
+//                                         fontSize: isMobile ? 10 : 11,
+//                                         fontWeight: FontWeight.w600,
+//                                         color: categoryColor,
+//                                       ),
+//                                     ),
+//                                   ),
+//                                   const Spacer(),
+//                                   Container(
+//                                     padding: const EdgeInsets.symmetric(
+//                                       horizontal: 8,
+//                                       vertical: 4,
+//                                     ),
+//                                     decoration: BoxDecoration(
+//                                       color: message.status == 'pending'
+//                                           ? const Color(0xffef4444).withOpacity(0.1)
+//                                           : const Color(0xff10b981).withOpacity(0.1),
+//                                       borderRadius: BorderRadius.circular(6),
+//                                     ),
+//                                     child: Text(
+//                                       message.status.toUpperCase(),
+//                                       style: TextStyle(
+//                                         fontSize: isMobile ? 9 : 10,
+//                                         fontWeight: FontWeight.w700,
+//                                         color: message.status == 'pending'
+//                                             ? const Color(0xffef4444)
+//                                             : const Color(0xff10b981),
+//                                       ),
+//                                     ),
+//                                   ),
+//                                 ],
+//                               ),
+//                               const SizedBox(height: 8),
+//                               Text(
+//                                 message.userMessage,
+//                                 style: TextStyle(
+//                                   fontSize: isMobile ? 12 : 13,
+//                                   color: Colors.grey[800],
+//                                   height: 1.4,
+//                                 ),
+//                                 maxLines: 2,
+//                                 overflow: TextOverflow.ellipsis,
+//                               ),
+//                               const SizedBox(height: 6),
+//                               Row(
+//                                 children: [
+//                                   Icon(
+//                                     Icons.access_time,
+//                                     size: 12,
+//                                     color: Colors.grey[500],
+//                                   ),
+//                                   const SizedBox(width: 4),
+//                                   Text(
+//                                     _formatDateTime(message.escalatedAt),
+//                                     style: TextStyle(
+//                                       fontSize: isMobile ? 10 : 11,
+//                                       color: Colors.grey[600],
+//                                     ),
+//                                   ),
+//                                   if (message.resolvedBy != null) ...[
+//                                     const SizedBox(width: 12),
+//                                     Icon(
+//                                       Icons.person,
+//                                       size: 12,
+//                                       color: Colors.grey[500],
+//                                     ),
+//                                     const SizedBox(width: 4),
+//                                     Flexible(
+//                                       child: Text(
+//                                         'By ${message.resolvedBy}',
+//                                         style: TextStyle(
+//                                           fontSize: isMobile ? 10 : 11,
+//                                           color: Colors.grey[600],
+//                                         ),
+//                                         overflow: TextOverflow.ellipsis,
+//                                       ),
+//                                     ),
+//                                   ],
+//                                 ],
+//                               ),
+//                             ],
+//                           ),
+//                         );
+//                       },
+//                     ),
+//             ),
+//           ],
+//         ),
+//       );
+//     },
+//   );
+// }
+
+// ============================================================================
+// ESCALATIONS OVER TIME (WITH CATEGORY BREAKDOWN)
+// ============================================================================
+Widget buildEscalationsOverTimeCard(
+  List<ChartData> escalationsData,
+  String timeFrame,
+  BuildContext context, {
+  DateTime? startDate,
+  DateTime? endDate,
+}) {
+  Set<String> allCategories = {};
+  for (var data in escalationsData) {
+    allCategories.addAll(data.categoryBreakdown.keys);
   }
 
-  switch (timeFrame) {
-    case 'Today':
-      return 'by hour';
-    case 'This Week':
-      return 'by day';
-    case 'This Month':
-      return 'by week';
-    case 'This Year':
-      return 'by month';
-    default:
-      return 'over time';
+  double maxY = 0;
+  for (var data in escalationsData) {
+    for (var count in data.categoryBreakdown.values) {
+      if (count > maxY) maxY = count.toDouble();
+    }
+  }
+  maxY = maxY * 1.2;
+
+  // Calculate bottom title interval
+  final bottomInterval = _getBottomTitleInterval(
+    escalationsData.length,
+    timeFrame,
+    startDate,
+    endDate,
+  );
+
+  return Container(
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Colors.white, Colors.grey[50]!],
+      ),
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.06),
+          blurRadius: 20,
+          offset: const Offset(0, 4),
+        ),
+      ],
+      border: Border.all(color: Colors.grey[200]!, width: 1),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xffef4444),
+                    const Color(0xffdc2626),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xffef4444).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.warning_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Escalations Over Time',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff0f172a),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Escalation trends by category',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (allCategories.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            children: allCategories.map((category) {
+              final color = _getColorForCategory(category);
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: color.withOpacity(0.2), width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withOpacity(0.4),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      category,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+        const SizedBox(height: 24),
+        Expanded(
+          child: escalationsData.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, size: 48, color: Colors.grey[400]),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No escalations in this period',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                )
+              : Container(
+                  padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!, width: 1),
+                  ),
+                  child: LineChart(
+                    LineChartData(
+                      minY: 0,
+                      maxY: maxY,
+                      lineBarsData: _generateEscalationLineChartBars(
+                        escalationsData,
+                        allCategories.toList(),
+                      ),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        getDrawingHorizontalLine: (value) => FlLine(
+                          color: Colors.grey[200]!,
+                          strokeWidth: 1,
+                          dashArray: [5, 5],
+                        ),
+                      ),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
+                            getTitlesWidget: (value, meta) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Text(
+                                value.toInt().toString(),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 32,
+                            interval: bottomInterval,
+                            getTitlesWidget: (value, meta) {
+                              if (value < 0 || value >= escalationsData.length) {
+                                return const SizedBox.shrink();
+                              }
+                              final formattedDate = _formatBottomTitle(
+                                escalationsData[value.toInt()].date,
+                                timeFrame,
+                                startDate,
+                                endDate,
+                              );
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  formattedDate,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      borderData: FlBorderData(
+                        show: true,
+                        border: Border(
+                          left: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                          bottom: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                        ),
+                      ),
+                      lineTouchData: LineTouchData(
+                        enabled: true,
+                        touchTooltipData: LineTouchTooltipData(
+                          tooltipRoundedRadius: 8,
+                          tooltipPadding: const EdgeInsets.all(12),
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.map((spot) {
+                              final category = allCategories.elementAt(spot.barIndex);
+                              final color = _getColorForCategory(category);
+                              return LineTooltipItem(
+                                '$category\n${spot.y.toInt()}',
+                                TextStyle(
+                                  color: color,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ============================================================================
+// STAFF PERFORMANCE (RESOLUTION RATE)
+// ============================================================================
+Widget buildStaffPerformanceCard(
+  Map<String, double> staffPerformance,
+  String timeFrame,
+  BuildContext context,
+) {
+  final sortedStaff = staffPerformance.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xff8b5cf6).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.people_rounded,
+                color: Color(0xff8b5cf6),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Staff Performance',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff1a1a1a),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Average resolution rate by staff ($timeFrame)',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: sortedStaff.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.person_off, size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No staff data available for $timeFrame',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.separated(
+                  itemCount: sortedStaff.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final entry = sortedStaff[index];
+                    final maxRate = sortedStaff.first.value;
+                    final percentage = (entry.value / maxRate * 100).clamp(0, 100);
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey[200]!),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: const Color(0xff8b5cf6).withOpacity(0.1),
+                                child: Text(
+                                  entry.key.substring(0, 1).toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Color(0xff8b5cf6),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  entry.key,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xff1a1a1a),
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '${entry.value.toStringAsFixed(1)}%',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: percentage / 100,
+                              minHeight: 8,
+                              backgroundColor: Colors.grey[200],
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Color(0xff8b5cf6),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ============================================================================
+// BOT VS HUMAN ANSWERS
+// ============================================================================
+Widget buildBotVsHumanCard(Map<String, int> botVsHumanAnswers, String timeFrame) {
+  final botCount = botVsHumanAnswers['bot'] ?? 0;
+  final humanCount = botVsHumanAnswers['human'] ?? 0;
+  final total = botCount + humanCount;
+
+  final botPercentage = total > 0 ? (botCount / total * 100) : 0.0;
+  final humanPercentage = total > 0 ? (humanCount / total * 100) : 0.0;
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xff3b82f6).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.psychology_rounded,
+                color: Color(0xff3b82f6),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Bot vs Human Answers',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff1a1a1a),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Answer distribution ($timeFrame)',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: total == 0
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No answer data available for $timeFrame',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                      ),
+                    ],
+                  ),
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: PieChart(
+                        PieChartData(
+                          sectionsSpace: 2,
+                          centerSpaceRadius: 50,
+                          sections: [
+                            PieChartSectionData(
+                              color: const Color(0xff3b82f6),
+                              value: botCount.toDouble(),
+                              title: '${botPercentage.toStringAsFixed(1)}%',
+                              radius: 50,
+                              titleStyle: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            PieChartSectionData(
+                              color: const Color(0xff10b981),
+                              value: humanCount.toDouble(),
+                              title: '${humanPercentage.toStringAsFixed(1)}%',
+                              radius: 50,
+                              titleStyle: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildLegendItem(
+                            'Bot Answers',
+                            botCount,
+                            botPercentage,
+                            const Color(0xff3b82f6),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLegendItem(
+                            'Human Answers',
+                            humanCount,
+                            humanPercentage,
+                            const Color(0xff10b981),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ============================================================================
+// HELPER METHODS
+// ============================================================================
+
+List<LineChartBarData> _generateEscalationLineChartBars(
+  List<ChartData> trendData,
+  List<String> categories,
+) {
+  List<LineChartBarData> lineBars = [];
+
+  for (int categoryIndex = 0; categoryIndex < categories.length; categoryIndex++) {
+    final category = categories[categoryIndex];
+    final color = _getColorForCategory(category);
+
+    List<FlSpot> spots = [];
+    for (int i = 0; i < trendData.length; i++) {
+      final count = trendData[i].categoryBreakdown[category] ?? 0;
+      spots.add(FlSpot(i.toDouble(), count.toDouble()));
+    }
+
+    lineBars.add(
+      LineChartBarData(
+        spots: spots,
+        isCurved: true,
+        curveSmoothness: 0.4,
+        color: color,
+        barWidth: 3.5,
+        isStrokeCapRound: true,
+        dotData: FlDotData(
+          show: true,
+          getDotPainter: (spot, percent, barData, index) {
+            return FlDotCirclePainter(
+              radius: 5,
+              color: color,
+              strokeWidth: 2.5,
+              strokeColor: Colors.white,
+            );
+          },
+        ),
+        belowBarData: BarAreaData(
+          show: true,
+          gradient: LinearGradient(
+            colors: [
+              color.withOpacity(0.2),
+              color.withOpacity(0.05),
+              color.withOpacity(0.0),
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+      ),
+    );
+  }
+
+  return lineBars;
+}
+
+Widget _buildLegendItem(String label, int count, double percentage, Color color) {
+  return Row(
+    children: [
+      Container(
+        width: 12,
+        height: 12,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(3),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              '$count (${percentage.toStringAsFixed(1)}%)',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+
+
+String _formatDateTime(DateTime dateTime) {
+  final now = DateTime.now();
+  final difference = now.difference(dateTime);
+
+  if (difference.inMinutes < 1) {
+    return 'Just now';
+  } else if (difference.inMinutes < 60) {
+    return '${difference.inMinutes}m ago';
+  } else if (difference.inHours < 24) {
+    return '${difference.inHours}h ago';
+  } else if (difference.inDays < 7) {
+    return '${difference.inDays}d ago';
+  } else {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
   }
 }

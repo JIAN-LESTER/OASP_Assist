@@ -1,5 +1,6 @@
 
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/charts.dart';
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/reports.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -1079,3 +1080,547 @@ Color _getAffiliationColor(String affiliation) {
   }
 }
 
+// ============================================================================
+// SCHOLARSHIP DISTRIBUTION (WITH VS WITHOUT)
+// ============================================================================
+Widget buildScholarshipDistributionCard(
+  int? usersWithScholarship,
+  int? usersWithoutScholarship,
+) {
+  final withScholarship = usersWithScholarship ?? 0;
+  final withoutScholarship = usersWithoutScholarship ?? 0;
+  final total = withScholarship + withoutScholarship;
+  
+  final withPercentage = total > 0 ? (withScholarship / total * 100) : 0.0;
+  final withoutPercentage = total > 0 ? (withoutScholarship / total * 100) : 0.0;
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xfff59e0b).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.school_rounded,
+                color: Color(0xfff59e0b),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Scholarship Distribution',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff1a1a1a),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Students with and without scholarships',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: total == 0
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.people_outline, size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No scholarship data available',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                      ),
+                    ],
+                  ),
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      child: PieChart(
+                        PieChartData(
+                          sectionsSpace: 2,
+                          centerSpaceRadius: 50,
+                          sections: [
+                            PieChartSectionData(
+                              color: const Color(0xff10b981),
+                              value: withScholarship.toDouble(),
+                              title: '${withPercentage.toStringAsFixed(1)}%',
+                              radius: 50,
+                              titleStyle: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            PieChartSectionData(
+                              color: const Color(0xff6b7280),
+                              value: withoutScholarship.toDouble(),
+                              title: '${withoutPercentage.toStringAsFixed(1)}%',
+                              radius: 50,
+                              titleStyle: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildScholarshipLegend(
+                          'With Scholarship',
+                          withScholarship,
+                          withPercentage,
+                          const Color(0xff10b981),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildScholarshipLegend(
+                          'Without Scholarship',
+                          withoutScholarship,
+                          withoutPercentage,
+                          const Color(0xff6b7280),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildScholarshipLegend(
+  String label,
+  int count,
+  double percentage,
+  Color color,
+) {
+  return Row(
+    children: [
+      Container(
+        width: 12,
+        height: 12,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+        ),
+      ),
+      const SizedBox(width: 8),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Color(0xff64748b),
+            ),
+          ),
+          Text(
+            '$count (${percentage.toStringAsFixed(1)}%)',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xff1a1a1a),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+
+// ============================================================================
+// USER GROWTH OVER TIME
+// ============================================================================
+double _getBottomTitleInterval(int dataLength, String timeFrame, [DateTime? startDate, DateTime? endDate]) {
+  // Handle custom date ranges
+  if (timeFrame == 'Custom' && startDate != null && endDate != null) {
+    final daysDiff = endDate.difference(startDate).inDays;
+    
+    if (daysDiff == 0) {
+      // Hourly: show every 3-4 hours
+      return dataLength <= 24 ? 3.0 : 4.0;
+    } else if (daysDiff <= 7) {
+      // Daily: show all days if 7 or fewer
+      return 1.0;
+    } else if (daysDiff <= 31) {
+      // Weekly: show all weeks
+      return 1.0;
+    } else {
+      // Monthly: show every other month if more than 6 months
+      return dataLength <= 6 ? 1.0 : 2.0;
+    }
+  }
+
+  // Handle predefined time frames
+  switch (timeFrame) {
+    case 'Today':
+      // Hourly data: show every 3-4 hours
+      return dataLength <= 12 ? 2.0 : (dataLength <= 18 ? 3.0 : 4.0);
+    
+    case 'This Week':
+      // Daily data: show all 7 days
+      return 1.0;
+    
+    case 'This Month':
+      // Daily data: show every 3-4 days
+      return dataLength <= 15 ? 2.0 : (dataLength <= 20 ? 3.0 : 4.0);
+    
+    case 'This Year':
+      // Monthly data: show all 12 months or every other month
+      return dataLength <= 12 ? 1.0 : 2.0;
+    
+    case 'All Time':
+      // Variable data: adjust based on data length
+      if (dataLength <= 12) {
+        return 1.0;
+      } else if (dataLength <= 24) {
+        return 2.0;
+      } else if (dataLength <= 36) {
+        return 3.0;
+      } else {
+        return 4.0;
+      }
+    
+    default:
+      // Default fallback
+      return dataLength <= 10 ? 1.0 : (dataLength / 8).ceilToDouble();
+  }
+}
+
+Widget buildUserGrowthCard(
+  List<ChartData> userGrowthData,
+  String timeFrame,
+  BuildContext context, {
+  DateTime? startDate,
+  DateTime? endDate,
+}) {
+  double maxY = 0;
+  for (var data in userGrowthData) {
+    if (data.count > maxY) maxY = data.count.toDouble();
+  }
+  maxY = maxY * 1.1;
+
+  // Calculate interval for bottom titles
+  final bottomTitleInterval = _getBottomTitleInterval(
+    userGrowthData.length,
+    timeFrame,
+    startDate,
+    endDate,
+  );
+
+  return Container(
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Colors.white, Colors.grey[50]!],
+      ),
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.06),
+          blurRadius: 20,
+          offset: const Offset(0, 4),
+        ),
+      ],
+      border: Border.all(color: Colors.grey[200]!, width: 1),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xff3b82f6),
+                    const Color(0xff2563eb),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xff3b82f6).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.trending_up_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'User Growth Over Time',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff0f172a),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Cumulative user registration trend',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Expanded(
+          child: userGrowthData.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.people_outline, size: 48, color: Colors.grey[400]),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No user growth data available',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                )
+              : Container(
+                  padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!, width: 1),
+                  ),
+                  child: LineChart(
+                    LineChartData(
+                      minY: 0,
+                      maxY: maxY,
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: userGrowthData
+                              .asMap()
+                              .entries
+                              .map((entry) => FlSpot(
+                                    entry.key.toDouble(),
+                                    entry.value.count.toDouble(),
+                                  ))
+                              .toList(),
+                          isCurved: true,
+                          curveSmoothness: 0.4,
+                          color: const Color(0xff3b82f6),
+                          barWidth: 4,
+                          isStrokeCapRound: true,
+                          dotData: FlDotData(
+                            show: true,
+                            getDotPainter: (spot, percent, barData, index) {
+                              return FlDotCirclePainter(
+                                radius: 6,
+                                color: const Color(0xff3b82f6),
+                                strokeWidth: 3,
+                                strokeColor: Colors.white,
+                              );
+                            },
+                          ),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xff3b82f6).withOpacity(0.3),
+                                const Color(0xff3b82f6).withOpacity(0.1),
+                                const Color(0xff3b82f6).withOpacity(0.0),
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                        ),
+                      ],
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        getDrawingHorizontalLine: (value) => FlLine(
+                          color: Colors.grey[200]!,
+                          strokeWidth: 1,
+                          dashArray: [5, 5],
+                        ),
+                      ),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 50,
+                            getTitlesWidget: (value, meta) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Text(
+                                _formatUserCount(value.toInt()),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 32,
+                            interval: bottomTitleInterval,
+                            getTitlesWidget: (value, meta) {
+                              if (value < 0 || value >= userGrowthData.length) {
+                                return const SizedBox.shrink();
+                              }
+                              
+                              // Only show labels at interval positions
+                              if (value % bottomTitleInterval != 0) {
+                                return const SizedBox.shrink();
+                              }
+                              
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  userGrowthData[value.toInt()].date,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      borderData: FlBorderData(
+                        show: true,
+                        border: Border(
+                          left: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                          bottom: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                        ),
+                      ),
+                      lineTouchData: LineTouchData(
+                        enabled: true,
+                        touchTooltipData: LineTouchTooltipData(
+                          tooltipRoundedRadius: 8,
+                          tooltipPadding: const EdgeInsets.all(12),
+                          tooltipBorder: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.map((spot) {
+                              return LineTooltipItem(
+                                '${userGrowthData[spot.x.toInt()].date}\n${spot.y.toInt()} users',
+                                const TextStyle(
+                                  color: Color(0xff3b82f6),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              );
+                            }).toList();
+                          },
+                        ),
+                        getTouchedSpotIndicator: (barData, spotIndexes) {
+                          return spotIndexes.map((index) {
+                            return TouchedSpotIndicatorData(
+                              FlLine(
+                                color: const Color(0xff3b82f6),
+                                strokeWidth: 2,
+                                dashArray: [5, 5],
+                              ),
+                              FlDotData(
+                                show: true,
+                                getDotPainter: (spot, percent, bar, index) {
+                                  return FlDotCirclePainter(
+                                    radius: 8,
+                                    color: const Color(0xff3b82f6),
+                                    strokeWidth: 4,
+                                    strokeColor: Colors.white,
+                                  );
+                                },
+                              ),
+                            );
+                          }).toList();
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ============================================================================
+// HELPER METHODS
+// ============================================================================
+
+
+
+String _formatUserCount(int count) {
+  if (count >= 1000000) {
+    return '${(count / 1000000).toStringAsFixed(1)}M';
+  } else if (count >= 1000) {
+    return '${(count / 1000).toStringAsFixed(1)}K';
+  }
+  return count.toString();
+}

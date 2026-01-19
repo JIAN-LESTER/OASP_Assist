@@ -2,6 +2,7 @@
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_data.dart';
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/paginated_list.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/reports.dart';
 import 'package:capstone_project/modules/admin_module/widgets/custom_dropdown_button.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -598,25 +599,49 @@ List<Widget> buildInquiryTrendsReport(
   bool isMobile = false,
   required BuildContext context,
 }) {
+  // Provide default values for all required fields
+  final userMessages = data?.userMessages ?? 0;
+  final botMessages = data?.botMessages ?? 0;
+  final escalatedMessages = data?.escalatedMessages ?? 0;
+  final resolvedMessages = data?.resolvedMessages ?? 0;
+  final escalationRate = data?.escalationRate ?? 0.0;
+  final resolutionRate = data?.resolutionRate ?? 0.0;
+
   if (isMobile) {
     return [
       Row(
         children: [
           Expanded(
-            child: buildStatCard(
-              'Total Messages',
-              '${data?.totalMessages ?? 0}',
-              Colors.blue,
-              Icons.message,
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'User Messages',
+                    '$userMessages',
+                    Colors.blue,
+                    Icons.message,
+                    onTap:
+                        () => _showMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: buildStatCard(
-              'Answered Messages',
-              '${data?.answeredMessages ?? 0}',
-              Colors.green,
-              Icons.check_circle,
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Bot Messages',
+                    '$botMessages',
+                    Colors.green,
+                    Icons.check_circle,
+                    onTap:
+                        () => _showAnsweredMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
         ],
@@ -625,20 +650,40 @@ List<Widget> buildInquiryTrendsReport(
       Row(
         children: [
           Expanded(
-            child: buildStatCard(
-              'Escalated Messages',
-              '${data?.escalatedMessages ?? 0}',
-              Colors.red,
-              Icons.people,
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Escalated Messages',
+                    '$escalatedMessages',
+                    Colors.red,
+                    Icons.warning_amber_rounded,
+                    onTap:
+                        () => _showEscalatedMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                    rateLabel: 'Rate',
+                    rateValue: escalationRate,
+                  ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: buildStatCard(
-              'Resolved Escalated Messages',
-              data?.resolvedEscalatedMessages.toString() ?? '0',
-              Colors.orange,
-              Icons.help,
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Resolved Messages',
+                    '$resolvedMessages',
+                    Colors.orange,
+                    Icons.check_circle_outline,
+                    onTap:
+                        () => _showResolvedMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                    rateLabel: 'Rate',
+                    rateValue: resolutionRate,
+                  ),
             ),
           ),
         ],
@@ -648,62 +693,121 @@ List<Widget> buildInquiryTrendsReport(
         height: 400,
         child: buildInquiryTrendCard(
           data?.inquiryTrend ?? [],
-          selectedTimeFrame.toString(),
-          context
+          selectedTimeFrame ?? 'This Month',
+          context,
         ),
       ),
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
-        child: buildCategoryDistributionCard(data?.categoryDistribution ?? {}, selectedTimeFrame.toString(), context),
+        child: buildCategoryDistributionCard(
+          data?.categoryDistribution ?? {},
+          selectedTimeFrame ?? 'This Month',
+          context,
+        ),
       ),
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
-        child: buildHighestFAQCard(data?.highestFAQs ?? {}),
+        child: buildHighestFAQCard(data?.topQuestions ?? {}),
       ),
-
+      const SizedBox(height: 16),
+      SizedBox(
+        height: 400,
+        child: buildEscalationsOverTimeCard(
+          data?.escalationsOverTime ?? [],
+          selectedTimeFrame ?? 'This Month',
+          context,
+        ),
+      ),
+      const SizedBox(height: 16),
+      SizedBox(
+        height: 400,
+        child: buildStaffPerformanceCard(
+          data?.staffPerformance ?? {},
+          selectedTimeFrame ?? 'This Month',
+          context,
+        ),
+      ),
+      const SizedBox(height: 16),
+      SizedBox(
+        height: 400,
+        child: buildBotVsHumanCard(data?.botVsHumanAnswers ?? {}, selectedTimeFrame ?? 'This Month'),
+      ),
     ];
   }
 
+  // Desktop layout
   return [
     SizedBox(
       height: 120,
       child: Row(
         children: [
           Expanded(
-            child: buildStatCard(
-              'Total Messages',
-              '${data?.totalMessages ?? 0}',
-              Colors.blue,
-              Icons.message,
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'User Messages',
+                    '$userMessages',
+                    Colors.blue,
+                    Icons.message,
+                    onTap:
+                        () => _showMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
           const SizedBox(width: 20),
           Expanded(
-            child: buildStatCard(
-              'Answered Messages',
-              '${data?.answeredMessages ?? 0}',
-              Colors.green,
-              Icons.check_circle,
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Bot Messages',
+                    '$botMessages',
+                    Colors.green,
+                    Icons.check_circle,
+                    onTap:
+                        () => _showAnsweredMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
           const SizedBox(width: 20),
           Expanded(
-            child: buildStatCard(
-              'Escalated Messages',
-              '${data?.escalatedMessages ?? 0}',
-              Colors.red,
-              Icons.people,
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Escalated (${escalationRate.toStringAsFixed(1)}%)',
+                    '$escalatedMessages',
+                    Colors.red,
+                    Icons.warning_amber_rounded,
+                    onTap:
+                        () => _showEscalatedMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
           const SizedBox(width: 20),
           Expanded(
-            child: buildStatCard(
-               'Resolved Messages',
-              data?.resolvedEscalatedMessages.toString() ?? '0',
-              Colors.orange,
-              Icons.help,
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Resolved (${resolutionRate.toStringAsFixed(1)}%)',
+                    '$resolvedMessages',
+                    Colors.orange,
+                    Icons.check_circle_outline,
+                    onTap:
+                        () => _showResolvedMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
         ],
@@ -717,8 +821,8 @@ List<Widget> buildInquiryTrendsReport(
           Expanded(
             child: buildInquiryTrendCard(
               data?.inquiryTrend ?? [],
-              selectedTimeFrame.toString(),
-              context
+              selectedTimeFrame ?? 'This Month',
+              context,
             ),
           ),
         ],
@@ -731,18 +835,48 @@ List<Widget> buildInquiryTrendsReport(
         children: [
           Expanded(
             child: buildCategoryDistributionCard(
-              data?.categoryDistribution ?? {}, 
-              selectedTimeFrame.toString(),
+              data?.categoryDistribution ?? {},
+              selectedTimeFrame ?? 'This Month',
               context,
             ),
           ),
           const SizedBox(width: 20),
-          Expanded(child: buildHighestFAQCard(data?.highestFAQs ?? {})),
+          Expanded(child: buildHighestFAQCard(data?.topQuestions ?? {})),
         ],
       ),
     ),
     const SizedBox(height: 16),
-
+    SizedBox(
+      height: 400,
+      child: Row(
+        children: [
+          Expanded(
+            child: buildEscalationsOverTimeCard(
+              data?.escalationsOverTime ?? [],
+              selectedTimeFrame ?? 'This Month',
+              context,
+            ),
+          ),
+        ],
+      ),
+    ),
+    const SizedBox(height: 16),
+    SizedBox(
+      height: 350,
+      child: Row(
+        children: [
+          Expanded(
+            child: buildStaffPerformanceCard(
+              data?.staffPerformance ?? {},
+              selectedTimeFrame ?? 'This Month',
+              context,
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(child: buildBotVsHumanCard(data?.botVsHumanAnswers ?? {}, selectedTimeFrame ?? 'This Month')),
+        ],
+      ),
+    ),
   ];
 }
 
@@ -822,5 +956,194 @@ Widget buildHeader(
         ],
       );
     },
+  );
+}
+String _formatTimestamp(Timestamp timestamp) {
+  final date = timestamp.toDate();
+  return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+}
+
+DateTime _getStartDateForDialog(
+  String timeFrame, [
+  DateTimeRange? customRange,
+]) {
+  if (timeFrame == 'Custom' && customRange != null) {
+    return DateTime(
+      customRange.start.year,
+      customRange.start.month,
+      customRange.start.day,
+      0,
+      0,
+      0,
+    );
+  }
+
+  final now = DateTime.now();
+  return switch (timeFrame) {
+    'All' => DateTime(2000, 1, 1),
+    'Today' => DateTime(now.year, now.month, now.day),
+    'This Week' => now.subtract(Duration(days: now.weekday - 1)),
+    'This Month' => DateTime(now.year, now.month, 1),
+    'This Year' => DateTime(now.year, 1, 1),
+    _ => DateTime(now.year, now.month, 1),
+  };
+}
+
+DateTime? _getEndDateForDialog(String timeFrame, [DateTimeRange? customRange]) {
+  if (timeFrame == 'Custom' && customRange != null) {
+    return DateTime(
+      customRange.end.year,
+      customRange.end.month,
+      customRange.end.day,
+      23,
+      59,
+      59,
+      999,
+    );
+  }
+  return null;
+}
+
+
+void _showMessagesDialog(
+  BuildContext context,
+  String timeFrame, [
+  DateTimeRange? customRange,
+]) {
+  showDialog(
+    context: context,
+    builder:
+        (context) => PaginatedListDialog(
+          title: 'Total Messages',
+          headerColor: Colors.blue,
+          dataFetcher: (page, pageSize) async {
+            final startDate = _getStartDateForDialog(timeFrame, customRange);
+            final endDate = _getEndDateForDialog(timeFrame, customRange);
+
+            Query query = FirebaseFirestore.instance
+                .collectionGroup('messages')
+                .where('sender', isEqualTo: 'user')
+                .where('sent_at', isGreaterThanOrEqualTo: startDate);
+
+            if (endDate != null) {
+              query = query.where('sent_at', isLessThanOrEqualTo: endDate);
+            }
+
+            final snapshot =
+                await query
+                    .orderBy('sent_at', descending: true)
+                    .limit(pageSize)
+                    .get();
+
+            return snapshot.docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>?;
+              final timestamp = data?['sent_at'] as Timestamp?;
+              return {
+                'Message': data?['text'] ?? 'N/A',
+                'Category': data?['category'] ?? 'General',
+                'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
+              };
+            }).toList();
+          },
+        ),
+  );
+}
+
+
+void _showEscalatedMessagesDialog(BuildContext context, String timeFrame) {
+  showDialog(
+    context: context,
+    builder:
+        (context) => PaginatedListDialog(
+          title: 'Escalated Messages',
+          headerColor: Colors.red,
+          dataFetcher: (page, pageSize) async {
+            final snapshot =
+                await FirebaseFirestore.instance
+                    .collection('escalations')
+                    .orderBy('createdAt', descending: true)
+                    .limit(pageSize)
+                    // .offset(page * pageSize)
+                    .get();
+
+            return snapshot.docs.map((doc) {
+              final data = doc.data();
+              final timestamp = data['createdAt'] as Timestamp?;
+              return {
+                'Message': data['content'] ?? 'N/A',
+                'User': data['name'] ?? 'N/A',
+                'Status': data['status'] ?? 'N/A',
+                'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
+              };
+            }).toList();
+          },
+        ),
+  );
+}
+
+
+void _showResolvedMessagesDialog(BuildContext context, String timeFrame) {
+  showDialog(
+    context: context,
+    builder:
+        (context) => PaginatedListDialog(
+          title: 'Resolved Escalated Messages',
+          headerColor: Colors.orange,
+          dataFetcher: (page, pageSize) async {
+            final snapshot =
+                await FirebaseFirestore.instance
+                    .collection('escalations')
+                    .where('status', isEqualTo: 'resolved')
+                    .orderBy('resolvedAt', descending: true)
+                    .limit(pageSize)
+                    // .offset(page * pageSize)
+                    .get();
+
+            return snapshot.docs.map((doc) {
+              final data = doc.data();
+              final timestamp = data['resolvedAt'] as Timestamp?;
+              return {
+                'Message': data['question'] ?? 'N/A',
+                'User': data['userId']['name'] ?? 'N/A',
+                'Resolved By': data['resolvedBy'] ?? 'N/A',
+                'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
+              };
+            }).toList();
+          },
+        ),
+  );
+}
+
+void _showAnsweredMessagesDialog(BuildContext context, String timeFrame) {
+  showDialog(
+    context: context,
+    builder:
+        (context) => PaginatedListDialog(
+          title: 'Answered Messages',
+          headerColor: Colors.green,
+          dataFetcher: (page, pageSize) async {
+            final startDate = _getStartDateForDialog(timeFrame);
+            final snapshot =
+                await FirebaseFirestore.instance
+                    .collectionGroup('messages')
+                    .where('sender', isEqualTo: 'user')
+                    .where('isAnswered', isEqualTo: true)
+                    .where('sent_at', isGreaterThanOrEqualTo: startDate)
+                    .orderBy('sent_at', descending: true)
+                    .limit(pageSize)
+                    // .offset(page * pageSize)
+                    .get();
+
+            return snapshot.docs.map((doc) {
+              final data = doc.data();
+              final timestamp = data['sent_at'] as Timestamp?;
+              return {
+                'Message': data['content'] ?? 'N/A',
+                'Category': data['category'] ?? 'General',
+                'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
+              };
+            }).toList();
+          },
+        ),
   );
 }

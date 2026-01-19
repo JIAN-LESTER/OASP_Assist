@@ -12,6 +12,8 @@ Widget buildStatCard(
   Color color,
   IconData icon, {
   VoidCallback? onTap,
+  String? rateLabel,
+  double? rateValue,
 }) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -24,6 +26,7 @@ Widget buildStatCard(
       final iconSize = isMobile ? 16.0 : (isTablet ? 18.0 : 20.0);
       final valueFontSize = isMobile ? 16.0 : (isTablet ? 18.0 : 20.0);
       final titleFontSize = isMobile ? 10.0 : (isTablet ? 11.0 : 12.0);
+      final rateFontSize = isMobile ? 10.0 : (isTablet ? 11.0 : 12.0);
       final spacing = isMobile ? 8.0 : (isTablet ? 10.0 : 12.0);
       final borderRadius = isMobile ? 10.0 : 12.0;
       final borderWidth = isMobile ? 3.0 : 4.0;
@@ -52,32 +55,66 @@ Widget buildStatCard(
                 ),
               ],
             ),
-               child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.start,
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: EdgeInsets.all(iconPadding),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: color, size: iconSize),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(iconPadding),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(icon, color: color, size: iconSize),
+                    ),
+                    SizedBox(width: isMobile ? 6 : 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Flexible(
+                                child: _buildAdaptiveValueText(
+                                  value,
+                                  valueFontSize,
+                                  color,
+                                ),
+                              ),
+                              if (rateLabel != null && rateValue != null) ...[
+                                SizedBox(width: isMobile ? 4 : 6),
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: isMobile ? 4 : 6,
+                                    vertical: isMobile ? 2 : 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: color.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '${rateValue.toStringAsFixed(1)}%',
+                                    style: TextStyle(
+                                      fontSize: rateFontSize,
+                                      fontWeight: FontWeight.w600,
+                                      color: color,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(width: isMobile ? 6 : 8),
-                Expanded(
-                  child: _buildAdaptiveValueText(
-                    value,
-                    valueFontSize,
-                    color,
-                  ),
-                ),
-              ],
-            ),
                 SizedBox(height: spacing),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -110,7 +147,6 @@ Widget buildStatCard(
     },
   );
 }
-
 
 Widget _buildAdaptiveValueText(String value, double baseFontSize, Color color) {
   return LayoutBuilder(
@@ -163,7 +199,6 @@ Widget _buildAdaptiveValueText(String value, double baseFontSize, Color color) {
     },
   );
 }
-
 class DashboardWidgets {
   // Simplified color scheme
   static const _categoryColors = {
