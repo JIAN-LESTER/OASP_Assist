@@ -1,5 +1,3 @@
-
-
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -476,8 +474,8 @@ class _SquareTileState extends State<SquareTile> {
           'isFirstLogin': true,
           'profileCompleted': false,
           'linkedProviders': ['google.com'],
-                   'dailyMessageCount': 0,                       
-    'lastMessageResetDate': FieldValue.serverTimestamp(), 
+          'dailyMessageCount': 0,
+          'lastMessageResetDate': FieldValue.serverTimestamp(),
         });
         print('🎉 Created new user: ${user.email}');
       } else {
@@ -513,13 +511,13 @@ class _SquareTileState extends State<SquareTile> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
       child: GestureDetector(
         onTap: _isLoading ? null : signInWithGoogleAccountSelection,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 12.0),
+          padding: const EdgeInsets.symmetric(vertical: 10.0),
           decoration: BoxDecoration(
             border: Border.all(
               color: _isLoading ? Colors.grey.shade300 : Colors.grey.shade400,

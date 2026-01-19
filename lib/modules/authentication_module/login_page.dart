@@ -294,38 +294,39 @@ class _LoginPageState extends State<LoginPage> {
                 color: textSecondaryColor.withOpacity(0.5),
                 fontWeight: FontWeight.w500,
               ),
-              suffixIcon: isPassword
-                  ? IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        color: textSecondaryColor,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    )
-                  : (controller.text.isNotEmpty && errorText == null
-                      ? Icon(Icons.check, color: Colors.green, size: 24)
-                      : null),
+              suffixIcon:
+                  isPassword
+                      ? IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: textSecondaryColor,
+                        ),
+                        onPressed:
+                            () => setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
+                      )
+                      : null,
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
                   color: errorText != null ? errorColor : Colors.grey[300]!,
                   width: 1.5,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
                   color: errorText != null ? errorColor : Colors.grey[300]!,
                   width: 1.5,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
                   color: errorText != null ? errorColor : Colors.grey.shade400,
                   width: 2,
@@ -339,28 +340,12 @@ class _LoginPageState extends State<LoginPage> {
           ),
           if (errorText != null) ...[
             const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: errorColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: errorColor.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.error_outline, color: errorColor, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      errorText,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: errorColor,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
+            Text(
+              errorText,
+              style: TextStyle(
+                fontSize: 12,
+                color: errorColor,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -398,38 +383,39 @@ class _LoginPageState extends State<LoginPage> {
               color: textSecondaryColor.withOpacity(0.5),
               fontWeight: FontWeight.w500,
             ),
-            suffixIcon: isPassword
-                ? IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                      color: textSecondaryColor,
-                    ),
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
-                  )
-                : (controller.text.isNotEmpty && errorText == null
-                    ? Icon(Icons.check, color: Colors.green, size: 24)
-                    : null),
+            suffixIcon:
+                isPassword
+                    ? IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        color: textSecondaryColor,
+                      ),
+                      onPressed:
+                          () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
+                    )
+                    : null,
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
                 color: errorText != null ? errorColor : Colors.grey[300]!,
                 width: 1.5,
               ),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
                 color: errorText != null ? errorColor : Colors.grey[300]!,
                 width: 1.5,
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
                 color: errorText != null ? errorColor : Colors.grey.shade400,
                 width: 2,
@@ -443,28 +429,12 @@ class _LoginPageState extends State<LoginPage> {
         ),
         if (errorText != null) ...[
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: errorColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: errorColor.withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.error_outline, color: errorColor, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    errorText,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: errorColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
+          Text(
+            errorText,
+            style: TextStyle(
+              fontSize: 12,
+              color: errorColor,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -484,7 +454,7 @@ class _LoginPageState extends State<LoginPage> {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: errorColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: errorColor.withOpacity(0.3)),
       ),
       child: Row(
@@ -540,7 +510,10 @@ class _LoginPageState extends State<LoginPage> {
     required double cardPadding,
   }) {
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 40),
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: 40,
+      ),
       child: Container(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Column(
@@ -637,30 +610,31 @@ class _LoginPageState extends State<LoginPage> {
                   backgroundColor: primaryColor,
                   disabledBackgroundColor: Colors.grey[300],
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 18),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   elevation: 0,
                 ),
                 onPressed: _isLoading ? null : signUserIn,
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.0,
+                child:
+                    _isLoading
+                        ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.0,
+                          ),
+                        )
+                        : Text(
+                          "Sign In",
+                          style: TextStyle(
+                            fontFamily: primaryFontFamily,
+                            fontSize: descriptionFontSize,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      )
-                    : Text(
-                        "Sign In",
-                        style: TextStyle(
-                          fontFamily: primaryFontFamily,
-                          fontSize: descriptionFontSize,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
               ),
             ),
             const SizedBox(height: 24),
@@ -685,7 +659,9 @@ class _LoginPageState extends State<LoginPage> {
             ),
             const SizedBox(height: 24),
             if (!(!kIsWeb &&
-                (Platform.isWindows || Platform.isLinux || Platform.isMacOS))) ...[
+                (Platform.isWindows ||
+                    Platform.isLinux ||
+                    Platform.isMacOS))) ...[
               const SquareTile(imagePath: 'lib/images/google.png'),
               const SizedBox(height: 24),
             ],

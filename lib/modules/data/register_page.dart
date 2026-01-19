@@ -101,7 +101,9 @@ class _RegisterPageState extends State<RegisterPage> {
               .timeout(const Duration(seconds: 5));
           signInMethods = List<String>.from(result as List);
         } on NoSuchMethodError {
-          print('⚠️ fetchSignInMethodsForEmail not available in firebase_auth SDK');
+          print(
+            '⚠️ fetchSignInMethodsForEmail not available in firebase_auth SDK',
+          );
         }
 
         if (signInMethods.isNotEmpty) {
@@ -390,203 +392,204 @@ class _RegisterPageState extends State<RegisterPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false,
-        child: Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 440),
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(40),
-                  ),
-                  child: Icon(
-                    Icons.mark_email_read_rounded,
-                    color: primaryColor,
-                    size: 40,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Verify Your Email',
-                  style: TextStyle(
-                    fontFamily: primaryFontFamily,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    color: textPrimaryColor,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'A verification email has been sent to:',
-                  style: TextStyle(
-                    fontFamily: primaryFontFamily,
-                    fontSize: 14,
-                    color: textSecondaryColor,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.email_outlined,
+      builder:
+          (context) => WillPopScope(
+            onWillPop: () async => false,
+            child: Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 440),
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(40),
+                      ),
+                      child: Icon(
+                        Icons.mark_email_read_rounded,
                         color: primaryColor,
-                        size: 18,
+                        size: 40,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          userEmail,
-                          style: TextStyle(
-                            fontFamily: primaryFontFamily,
-                            fontSize: 14,
-                            color: textPrimaryColor,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: primaryColor.withOpacity(0.1),
                     ),
-                  ),
-                  child: Text(
-                    'Please check your inbox or spam folder and click the verification link before signing in.',
-                    style: TextStyle(
-                      fontFamily: primaryFontFamily,
-                      fontSize: 13,
-                      color: textSecondaryColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    onPressed: () async {
-                      print('🔵 Continue to Sign In pressed');
-
-                      try {
-                        await FirebaseAuth.instance.signOut();
-                        print('✅ User signed out');
-
-                        emailController.clear();
-                        passwordController.clear();
-                        confirmPasswordController.clear();
-
-                        if (!mounted) return;
-                        Navigator.pop(context);
-
-                        await Future.delayed(
-                          const Duration(milliseconds: 100),
-                        );
-
-                        if (!mounted) return;
-                        Navigator.pop(context);
-
-                        await Future.delayed(
-                          const Duration(milliseconds: 150),
-                        );
-
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: const [
-                                Icon(
-                                  Icons.check_circle,
-                                  color: Colors.white,
-                                ),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'Account created! Please verify your email.',
-                                  ),
-                                ),
-                              ],
-                            ),
-                            backgroundColor: Colors.green,
-                            duration: const Duration(seconds: 5),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        );
-                      } catch (e) {
-                        print('❌ Navigation error: $e');
-                        if (mounted) {
-                          try {
-                            Navigator.of(context).pop();
-                          } catch (_) {}
-
-                          await Future.delayed(
-                            const Duration(milliseconds: 50),
-                          );
-
-                          if (mounted) {
-                            try {
-                              Navigator.of(context).pop();
-                            } catch (_) {}
-                          }
-                        }
-                      }
-                    },
-                    child: Text(
-                      'Continue to Sign In',
+                    const SizedBox(height: 24),
+                    Text(
+                      'Verify Your Email',
                       style: TextStyle(
                         fontFamily: primaryFontFamily,
-                        fontSize: 15,
+                        fontSize: 22,
                         fontWeight: FontWeight.w600,
+                        color: textPrimaryColor,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'A verification email has been sent to:',
+                      style: TextStyle(
+                        fontFamily: primaryFontFamily,
+                        fontSize: 14,
+                        color: textSecondaryColor,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.email_outlined,
+                            color: primaryColor,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              userEmail,
+                              style: TextStyle(
+                                fontFamily: primaryFontFamily,
+                                fontSize: 14,
+                                color: textPrimaryColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: primaryColor.withOpacity(0.1),
+                        ),
+                      ),
+                      child: Text(
+                        'Please check your inbox or spam folder and click the verification link before signing in.',
+                        style: TextStyle(
+                          fontFamily: primaryFontFamily,
+                          fontSize: 13,
+                          color: textSecondaryColor,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: () async {
+                          print('🔵 Continue to Sign In pressed');
+
+                          try {
+                            await FirebaseAuth.instance.signOut();
+                            print('✅ User signed out');
+
+                            emailController.clear();
+                            passwordController.clear();
+                            confirmPasswordController.clear();
+
+                            if (!mounted) return;
+                            Navigator.pop(context);
+
+                            await Future.delayed(
+                              const Duration(milliseconds: 100),
+                            );
+
+                            if (!mounted) return;
+                            Navigator.pop(context);
+
+                            await Future.delayed(
+                              const Duration(milliseconds: 150),
+                            );
+
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: const [
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: Colors.white,
+                                    ),
+                                    SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Account created! Please verify your email.',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                backgroundColor: Colors.green,
+                                duration: const Duration(seconds: 5),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            );
+                          } catch (e) {
+                            print('❌ Navigation error: $e');
+                            if (mounted) {
+                              try {
+                                Navigator.of(context).pop();
+                              } catch (_) {}
+
+                              await Future.delayed(
+                                const Duration(milliseconds: 50),
+                              );
+
+                              if (mounted) {
+                                try {
+                                  Navigator.of(context).pop();
+                                } catch (_) {}
+                              }
+                            }
+                          }
+                        },
+                        child: Text(
+                          'Continue to Sign In',
+                          style: TextStyle(
+                            fontFamily: primaryFontFamily,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
     );
   }
 
@@ -621,9 +624,12 @@ class _RegisterPageState extends State<RegisterPage> {
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
-          obscureText: isPassword
-              ? (isConfirmPassword ? _obscureConfirmPassword : _obscurePassword)
-              : obscureText,
+          obscureText:
+              isPassword
+                  ? (isConfirmPassword
+                      ? _obscureConfirmPassword
+                      : _obscurePassword)
+                  : obscureText,
           keyboardType: keyboardType,
           onChanged: (_) => setState(() {}),
           onFieldSubmitted: onSubmitted,
@@ -638,49 +644,48 @@ class _RegisterPageState extends State<RegisterPage> {
               color: textSecondaryColor.withOpacity(0.5),
               fontWeight: FontWeight.w500,
             ),
-            suffixIcon: isPassword
-                ? IconButton(
-                    icon: Icon(
-                      isConfirmPassword
-                          ? (_obscureConfirmPassword
-                              ? Icons.visibility_off
-                              : Icons.visibility)
-                          : (_obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility),
-                      color: textSecondaryColor,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        if (isConfirmPassword) {
-                          _obscureConfirmPassword = !_obscureConfirmPassword;
-                        } else {
-                          _obscurePassword = !_obscurePassword;
-                        }
-                      });
-                    },
-                  )
-                : (controller.text.isNotEmpty && errorText == null
-                    ? Icon(Icons.check, color: Colors.green, size: 24)
-                    : null),
+            suffixIcon:
+                isPassword
+                    ? IconButton(
+                      icon: Icon(
+                        isConfirmPassword
+                            ? (_obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility)
+                            : (_obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility),
+                        color: textSecondaryColor,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          if (isConfirmPassword) {
+                            _obscureConfirmPassword = !_obscureConfirmPassword;
+                          } else {
+                            _obscurePassword = !_obscurePassword;
+                          }
+                        });
+                      },
+                    )
+                    : null,
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
                 color: errorText != null ? errorColor : Colors.grey[300]!,
                 width: 1.5,
               ),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
                 color: errorText != null ? errorColor : Colors.grey[300]!,
                 width: 1.5,
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
                 color: errorText != null ? errorColor : Colors.grey.shade400,
                 width: 2,
@@ -694,28 +699,12 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         if (errorText != null) ...[
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: errorColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: errorColor.withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.error_outline, color: errorColor, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    errorText,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: errorColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
+          Text(
+            errorText,
+            style: TextStyle(
+              fontSize: 12,
+              color: errorColor,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -731,7 +720,7 @@ class _RegisterPageState extends State<RegisterPage> {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: errorColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: errorColor.withOpacity(0.3)),
       ),
       child: Row(
@@ -781,7 +770,10 @@ class _RegisterPageState extends State<RegisterPage> {
     required double cardPadding,
   }) {
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 40),
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: 40,
+      ),
       child: Container(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Column(
@@ -865,30 +857,31 @@ class _RegisterPageState extends State<RegisterPage> {
                   backgroundColor: primaryColor,
                   disabledBackgroundColor: Colors.grey[300],
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 18),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   elevation: 0,
                 ),
                 onPressed: _isLoading ? null : registerUser,
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.0,
+                child:
+                    _isLoading
+                        ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.0,
+                          ),
+                        )
+                        : Text(
+                          "Sign Up",
+                          style: TextStyle(
+                            fontFamily: primaryFontFamily,
+                            fontSize: descriptionFontSize,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      )
-                    : Text(
-                        "Sign Up",
-                        style: TextStyle(
-                          fontFamily: primaryFontFamily,
-                          fontSize: descriptionFontSize,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
               ),
             ),
             const SizedBox(height: 24),
@@ -913,7 +906,9 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
             const SizedBox(height: 24),
             if (!(!kIsWeb &&
-                (Platform.isWindows || Platform.isLinux || Platform.isMacOS))) ...[
+                (Platform.isWindows ||
+                    Platform.isLinux ||
+                    Platform.isMacOS))) ...[
               const SquareTile(imagePath: 'lib/images/google.png'),
               const SizedBox(height: 24),
             ],
