@@ -402,222 +402,163 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
   // Replace the content section in _buildMessageBubble with this updated version
 
-  Widget _buildMessageBubble(Message message, bool isUser) {
-    return FutureBuilder<String?>(
-      future: isUser ? _getUserAvatarUrl() : null,
-      builder: (context, snapshot) {
-        final chatProvider = Provider.of<ChatProvider>(context, listen: true);
-        final streamingContent = chatProvider.getStreamingContent(message.id);
-        final isStreaming = streamingContent != null;
+Widget _buildMessageBubble(Message message, bool isUser) {
+  return FutureBuilder<String?>(
+    future: isUser ? _getUserAvatarUrl() : null,
+    builder: (context, snapshot) {
+      final chatProvider = Provider.of<ChatProvider>(context, listen: true);
+      final streamingContent = chatProvider.getStreamingContent(message.id);
+      final isStreaming = streamingContent != null;
 
-        // Use streaming content if streaming, otherwise use message content
-        final displayContent = isStreaming ? streamingContent : message.content;
+      final displayContent = isStreaming ? streamingContent : message.content;
+      final isEmptyStreaming =
+          !isUser && isStreaming && displayContent.trim().isEmpty;
 
-        // Check if this is an empty bot message that's actively streaming
-        final isEmptyStreaming =
-            !isUser && isStreaming && displayContent.trim().isEmpty;
+      final isEscalatedMessage =
+          message.sender == 'bot' && message.rating == 'dislike';
 
-        final isEscalatedMessage =
-            message.sender == 'bot' && message.rating == 'dislike';
+      return FutureBuilder<Map<String, dynamic>?>(
+        future:
+            isEscalatedMessage
+                ? _getEscalationStatus(message.id)
+                : Future.value(null),
+        builder: (context, escalationSnapshot) {
+          final escalationData = escalationSnapshot.data;
+          final isEscalated = escalationData != null;
+          final isResolved = escalationData?['status'] == 'resolved';
 
-        return FutureBuilder<Map<String, dynamic>?>(
-          future:
-              isEscalatedMessage
-                  ? _getEscalationStatus(message.id)
-                  : Future.value(null),
-          builder: (context, escalationSnapshot) {
-            final escalationData = escalationSnapshot.data;
-            final isEscalated = escalationData != null;
-            final isResolved = escalationData?['status'] == 'resolved';
-
-            return GestureDetector(
-              onLongPress: () => _showMessageOptions(context, message),
-              child: Container(
-                margin: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                child: Column(
-                  crossAxisAlignment:
-                      isUser
-                          ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
-                  children: [
-                    // Escalation badge (unchanged)
-                    if (isEscalated)
-                      Container(
-                        margin: EdgeInsets.only(
-                          bottom: 4,
-                          left: isUser ? 0 : 44,
-                        ),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              isResolved
-                                  ? Colors.green.shade100
-                                  : Colors.orange.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
+          return GestureDetector(
+            onLongPress: () => _showMessageOptions(context, message),
+            child: Container(
+              margin: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+              child: Column(
+                crossAxisAlignment:
+                    isUser
+                        ? CrossAxisAlignment.end
+                        : CrossAxisAlignment.start,
+                children: [
+                  // ✅ REMOVED: Escalation badge completely removed
+                  
+                  Row(
+                    mainAxisAlignment:
+                        isUser
+                            ? MainAxisAlignment.end
+                            : MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Bot avatar
+                      if (!isUser)
+                        Container(
+                          width: 32,
+                          height: 32,
+                          margin: EdgeInsets.only(right: 8, bottom: 4),
+                          decoration: BoxDecoration(
                             color:
-                                isResolved
-                                    ? Colors.green.shade300
-                                    : Colors.orange.shade300,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isResolved
-                                  ? Icons.check_circle
-                                  : Icons.support_agent,
-                              size: 14,
-                              color:
-                                  isResolved
-                                      ? Colors.green.shade700
-                                      : Colors.orange.shade700,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              isResolved
-                                  ? 'Resolved by staff'
-                                  : 'Escalated to staff',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color:
-                                    isResolved
-                                        ? Colors.green.shade700
-                                        : Colors.orange.shade700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    Row(
-                      mainAxisAlignment:
-                          isUser
-                              ? MainAxisAlignment.end
-                              : MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        // Bot avatar
-                        if (!isUser)
-                          Container(
-                            width: 32,
-                            height: 32,
-                            margin: EdgeInsets.only(right: 8, bottom: 4),
-                            decoration: BoxDecoration(
+                                message.sender == 'staff'
+                                    ? Colors.green.shade100
+                                    : Colors.green.shade100,
+                            shape: BoxShape.circle,
+                            border: Border.all(
                               color:
                                   message.sender == 'staff'
-                                      ? Colors.green.shade100
-                                      : Colors.green.shade100,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color:
-                                    message.sender == 'staff'
-                                        ? Colors.green.shade300
-                                        : Color(0xFF2E7D32).withOpacity(0.3),
-                                width: 1,
-                              ),
-                            ),
-                            child: ClipOval(
-                              child:
-                                  message.sender == 'staff'
-                                      ? Icon(
-                                        Icons.support_agent,
-                                        color: Colors.green.shade700,
-                                        size: 18,
-                                      )
-                                      : Image.asset(
-                                        'lib/images/oasp.png',
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (
-                                          context,
-                                          error,
-                                          stackTrace,
-                                        ) {
-                                          return Icon(
-                                            Icons.smart_toy_outlined,
-                                            color: Color(0xFF2E7D32),
-                                            size: 18,
-                                          );
-                                        },
-                                      ),
+                                      ? Colors.green.shade300
+                                      : Color(0xFF2E7D32).withOpacity(0.3),
+                              width: 1,
                             ),
                           ),
+                          child: ClipOval(
+                            child:
+                                message.sender == 'staff'
+                                    ? Icon(
+                                      Icons.support_agent,
+                                      color: Colors.green.shade700,
+                                      size: 18,
+                                    )
+                                    : Image.asset(
+                                      'lib/images/oasp.png',
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (
+                                        context,
+                                        error,
+                                        stackTrace,
+                                      ) {
+                                        return Icon(
+                                          Icons.smart_toy_outlined,
+                                          color: Color(0xFF2E7D32),
+                                          size: 18,
+                                        );
+                                      },
+                                    ),
+                          ),
+                        ),
 
-                        // Message bubble
-                        Flexible(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient:
-                                  isUser
-                                      ? LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Color(0xFF2E7D32),
-                                          Color(0xFF388E3C),
-                                        ],
-                                      )
-                                      : message.sender == 'staff'
-                                      ? LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Colors.white,
-                                          Colors.grey.shade50,
-                                        ],
-                                      )
-                                      : LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Colors.white,
-                                          Colors.grey.shade50,
-                                        ],
-                                      ),
-                              border:
-                                  message.sender == 'staff'
-                                      ? Border.all(
-                                        color: Color(0xFF2E7D32),
-                                        width: 2,
-                                      )
-                                      : null,
-                              borderRadius: BorderRadius.only(
-                                topLeft: Radius.circular(20),
-                                topRight: Radius.circular(20),
-                                bottomLeft: Radius.circular(isUser ? 20 : 4),
-                                bottomRight: Radius.circular(isUser ? 4 : 20),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color:
-                                      isUser
-                                          ? Color(0xFF2E7D32).withOpacity(0.3)
-                                          : message.sender == 'staff'
-                                          ? Color(0xFF2E7D32).withOpacity(0.2)
-                                          : Colors.black.withOpacity(0.1),
-                                  blurRadius: 15,
-                                  offset: Offset(0, 5),
-                                ),
-                              ],
+                      // Message bubble
+                      Flexible(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient:
+                                isUser
+                                    ? LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Color(0xFF2E7D32),
+                                        Color(0xFF388E3C),
+                                      ],
+                                    )
+                                    : message.sender == 'staff'
+                                    ? LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Colors.white,
+                                        Colors.grey.shade50,
+                                      ],
+                                    )
+                                    : LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Colors.white,
+                                        Colors.grey.shade50,
+                                      ],
+                                    ),
+                            border:
+                                message.sender == 'staff'
+                                    ? Border.all(
+                                      color: Color(0xFF2E7D32),
+                                      width: 2,
+                                    )
+                                    : null,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(20),
+                              topRight: Radius.circular(20),
+                              bottomLeft: Radius.circular(isUser ? 20 : 4),
+                              bottomRight: Radius.circular(isUser ? 4 : 20),
                             ),
-                            padding: EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment:
-                                  isUser
-                                      ? CrossAxisAlignment.end
-                                      : CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-
-                              // Replace the content section in _buildMessageBubble method
-                              // (the section that handles streaming content display)
-                              children: [
-                                // ✅ CONTENT SECTION - Show content if available
-                                if (displayContent.trim().isNotEmpty)
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    isUser
+                                        ? Color(0xFF2E7D32).withOpacity(0.3)
+                                        : message.sender == 'staff'
+                                        ? Color(0xFF2E7D32).withOpacity(0.2)
+                                        : Colors.black.withOpacity(0.1),
+                                blurRadius: 15,
+                                offset: Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          padding: EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment:
+                                isUser
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Content section (unchanged)
+                              if (displayContent.trim().isNotEmpty)
                                   // ✅ Has content - show text (with cursor if streaming)
                                   if (isStreaming)
                                     // Streaming with content
@@ -870,6 +811,351 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildMessageContent(Message message, bool isUser, String displayContent, bool isStreaming) {
+  // Check if this is a staff response
+  final isStaffResponse = message.sender == 'staff' || 
+                          (message.content.contains('**Staff Response from') && 
+                           message.content.contains(':**'));
+
+  if (isStaffResponse && !isUser) {
+    // Parse staff response
+    String staffName = 'Staff';
+    String responseContent = displayContent;
+
+    // Extract staff name and content
+    final staffResponseMatch = RegExp(r'\*\*Staff Response from (.+?):\*\*\n\n(.+)', dotAll: true)
+        .firstMatch(displayContent);
+    
+    if (staffResponseMatch != null) {
+      staffName = staffResponseMatch.group(1) ?? 'Staff';
+      responseContent = staffResponseMatch.group(2) ?? displayContent;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ✅ PROFESSIONAL HEADER
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF2E7D32),
+                Color(0xFF388E3C),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.verified_user,
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Official Staff Response',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  Text(
+                    'from $staffName',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withOpacity(0.9),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        
+        SizedBox(height: 12),
+        
+        // ✅ EMPHASIZED CONTENT AREA
+        Container(
+          padding: EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Color(0xFF2E7D32).withOpacity(0.05),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: Color(0xFF2E7D32).withOpacity(0.2),
+              width: 1.5,
+            ),
+          ),
+          child: isStreaming
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Flexible(
+                      child: MarkdownBody(
+                        data: _convertMarkdownLinksToPlainUrls(responseContent),
+                        selectable: true,
+                        onTapLink: (text, href, title) {
+                          if (href != null) {
+                            _onLinkTap(LinkableElement(href, text));
+                          }
+                        },
+                        styleSheet: MarkdownStyleSheet(
+                          p: TextStyle(
+                            color: Color(0xFF1B5E20),
+                            fontSize: 15.5,
+                            height: 1.6,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          strong: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1B5E20),
+                          ),
+                          em: TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFF2E7D32),
+                          ),
+                          a: TextStyle(
+                            color: Color(0xFF1565C0),
+                            decoration: TextDecoration.underline,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          listBullet: TextStyle(
+                            color: Color(0xFF2E7D32),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        extensionSet: md.ExtensionSet(
+                          md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+                          [
+                            md.EmojiSyntax(),
+                            ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: BlinkingCursor(color: Color(0xFF2E7D32)),
+                    ),
+                  ],
+                )
+              : MarkdownBody(
+                  data: _convertMarkdownLinksToPlainUrls(responseContent),
+                  selectable: true,
+                  onTapLink: (text, href, title) {
+                    if (href != null) {
+                      _onLinkTap(LinkableElement(href, text));
+                    }
+                  },
+                  styleSheet: MarkdownStyleSheet(
+                    p: TextStyle(
+                      color: Color(0xFF1B5E20),
+                      fontSize: 15.5,
+                      height: 1.6,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    strong: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1B5E20),
+                    ),
+                    em: TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF2E7D32),
+                    ),
+                    a: TextStyle(
+                      color: Color(0xFF1565C0),
+                      decoration: TextDecoration.underline,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    listBullet: TextStyle(
+                      color: Color(0xFF2E7D32),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    h1: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1B5E20),
+                    ),
+                    h2: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1B5E20),
+                    ),
+                    h3: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF2E7D32),
+                    ),
+                  ),
+                  extensionSet: md.ExtensionSet(
+                    md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+                    [
+                      md.EmojiSyntax(),
+                      ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+                    ],
+                  ),
+                ),
+        ),
+        
+        SizedBox(height: 10),
+        
+        // ✅ VERIFICATION FOOTER
+        Row(
+          children: [
+            Icon(
+              Icons.shield_outlined,
+              size: 14,
+              color: Color(0xFF2E7D32).withOpacity(0.7),
+            ),
+            SizedBox(width: 6),
+            Text(
+              'Verified Staff Member',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF2E7D32).withOpacity(0.8),
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ✅ REGULAR MESSAGE (User or Bot)
+  if (isStreaming) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Flexible(
+          child: isUser
+              ? SelectableLinkify(
+                  onOpen: _onLinkTap,
+                  text: _convertMarkdownLinksToPlainUrls(displayContent),
+                  textAlign: TextAlign.justify,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    height: 1.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  linkStyle: TextStyle(
+                    decoration: TextDecoration.underline,
+                    color: Colors.yellow[100],
+                    fontWeight: FontWeight.w600,
+                  ),
+                  options: LinkifyOptions(
+                    humanize: false,
+                    looseUrl: true,
+                    defaultToHttps: true,
+                  ),
+                )
+              : MarkdownBody(
+                  data: _convertMarkdownLinksToPlainUrls(displayContent),
+                  selectable: true,
+                  onTapLink: (text, href, title) {
+                    if (href != null) {
+                      _onLinkTap(LinkableElement(href, text));
+                    }
+                  },
+                  styleSheet: MarkdownStyleSheet(
+                    p: TextStyle(
+                      color: Colors.grey.shade800,
+                      fontSize: 15,
+                      height: 1.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  extensionSet: md.ExtensionSet(
+                    md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+                    [
+                      md.EmojiSyntax(),
+                      ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+                    ],
+                  ),
+                ),
+        ),
+        SizedBox(width: 4),
+        Padding(
+          padding: EdgeInsets.only(top: 2),
+          child: BlinkingCursor(
+            color: isUser ? Colors.white70 : Color(0xFF2E7D32),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Final content (not streaming)
+  return isUser
+      ? SelectableLinkify(
+          onOpen: _onLinkTap,
+          text: _convertMarkdownLinksToPlainUrls(displayContent),
+          textAlign: TextAlign.justify,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            height: 1.5,
+            fontWeight: FontWeight.w500,
+          ),
+          linkStyle: TextStyle(
+            decoration: TextDecoration.underline,
+            color: Colors.yellow[100],
+            fontWeight: FontWeight.w600,
+          ),
+          options: LinkifyOptions(
+            humanize: false,
+            looseUrl: true,
+            defaultToHttps: true,
+          ),
+        )
+      : MarkdownBody(
+          data: _convertMarkdownLinksToPlainUrls(displayContent),
+          selectable: true,
+          onTapLink: (text, href, title) {
+            if (href != null) {
+              _onLinkTap(LinkableElement(href, text));
+            }
+          },
+          styleSheet: MarkdownStyleSheet(
+            p: TextStyle(
+              color: Colors.grey.shade800,
+              fontSize: 15,
+              height: 1.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          extensionSet: md.ExtensionSet(
+            md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+            [
+              md.EmojiSyntax(),
+              ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+            ],
+          ),
+        );
+}
+
   String _convertMarkdownLinksToPlainUrls(String text) {
     return text.replaceAllMapped(RegExp(r'\[([^\]]+)\]\(([^\)]+)\)'), (match) {
       final linkText = match.group(1) ?? '';
@@ -978,11 +1264,6 @@ Widget _buildEscalateButton(Message message) {
       final escalationData = escalationSnapshot.data;
       final isResolved = escalationData?['status'] == 'resolved';
 
-      // ✅ FIX: Hide button completely if escalation is resolved
-      if (hasEscalated && isResolved) {
-        return SizedBox.shrink(); // Don't show button at all
-      }
-
       return Container(
         margin: EdgeInsets.only(top: 8),
         child: InkWell(
@@ -995,13 +1276,17 @@ Widget _buildEscalateButton(Message message) {
             padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               color:
-                  hasEscalated
+                  isResolved
+                      ? Colors.green.withOpacity(0.1)
+                      : hasEscalated
                       ? Colors.orange.withOpacity(0.1)
                       : Colors.transparent,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color:
-                    hasEscalated
+                    isResolved
+                        ? Colors.green.shade600
+                        : hasEscalated
                         ? Colors.orange
                         : isLoadingEscalation
                         ? Colors.grey.shade200
@@ -1023,13 +1308,24 @@ Widget _buildEscalateButton(Message message) {
                   )
                 else
                   Icon(
-                    hasEscalated ? Icons.check_circle : Icons.support_agent,
+                    isResolved
+                        ? Icons.check_circle
+                        : hasEscalated
+                        ? Icons.support_agent
+                        : Icons.support_agent,
                     size: 18,
-                    color: hasEscalated ? Colors.orange : Colors.grey.shade700,
+                    color:
+                        isResolved
+                            ? Colors.green.shade700
+                            : hasEscalated
+                            ? Colors.orange
+                            : Colors.grey.shade700,
                   ),
                 SizedBox(width: 6),
                 Text(
-                  hasEscalated
+                  isResolved
+                      ? 'Resolved by Staff'
+                      : hasEscalated
                       ? 'Escalated to Staff'
                       : canEscalate
                       ? 'Escalate to Staff ($remainingEscalations left)'
@@ -1037,7 +1333,9 @@ Widget _buildEscalateButton(Message message) {
                   style: TextStyle(
                     fontSize: 13,
                     color:
-                        hasEscalated
+                        isResolved
+                            ? Colors.green.shade700
+                            : hasEscalated
                             ? Colors.orange
                             : isLoadingEscalation
                             ? Colors.grey.shade400
@@ -1055,6 +1353,7 @@ Widget _buildEscalateButton(Message message) {
     },
   );
 }
+
   Future<void> _handleEscalation(
     Message message,
     ChatProvider chatProvider,

@@ -23,6 +23,8 @@ Color _getFAQBarColor(int index, int total) {
   return colors[index % colors.length];
 }
 
+
+
 // Helper function to calculate Y-axis interval
 
 

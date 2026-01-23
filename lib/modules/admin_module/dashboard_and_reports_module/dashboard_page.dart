@@ -1,5 +1,6 @@
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/admin_dashboard_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/chatbot_usage_data.dart';
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/export_button.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/paginated_list.dart';
@@ -266,10 +267,10 @@ class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
   @override
-  State<DashboardPage> createState() => _Dashboardmodulestate();
+  State<DashboardPage> createState() => _DashboardModulestate();
 }
 
-class _Dashboardmodulestate extends State<DashboardPage> {
+class _DashboardModulestate extends State<DashboardPage> {
   String selectedTimeFrame = 'This Month';
   final currentUser = FirebaseAuth.instance.currentUser;
   final FirebaseService _firebaseService = FirebaseService();
@@ -371,7 +372,7 @@ Future<void> _loadFullData() async {
   // Fetch fresh data
   await _fetchAndCacheData();
 }
- Future<void> _fetchAndCacheData() async {
+Future<void> _fetchAndCacheData() async {
   try {
     final results = await Future.wait([
       _firebaseService.getAdminDashboardData(
@@ -382,53 +383,61 @@ Future<void> _loadFullData() async {
         selectedTimeFrame,
         customDateRange,
       ),
+      // ✅ ADD: Fetch inquiry data separately
+      _firebaseService.getInquiryReportsData(
+        selectedTimeFrame,
+        customDateRange,
+      ),
     ]);
 
     if (!mounted) return;
 
     final adminData = results[0] as AdminDashboardData;
     final userDemoData = results[1] as UserDemographicsReportsData;
+    final inquiryReportData = results[2] as InquiryReportsData;
 
-    // Create inquiry data from admin data
+    // ✅ FIX: Use inquiryReportData directly instead of creating from adminData
     final inquiryData = InquiryReportsData(
-      totalMessages: adminData.totalMessages,
-      userMessages: 0,
-      botMessages: 0,
-      escalatedMessages: adminData.pendingEscalations,
-      escalationRate: adminData.escalationRate,
-      resolvedMessages: adminData.resolvedEscalations,
-      resolutionRate: adminData.resolutionRate,
-      inquiryTrend: adminData.inquiryTrend,
-      categoryDistribution: {},
-      topQuestions: {},
-      escalationsOverTime: adminData.escalationsOverTime,
-      staffPerformance: {},
-      botVsHumanAnswers: {'bot': 0, 'human': 0},
-      recentLogs: adminData.systemLogs,
-      msgLogs: adminData.messageLogs,
+      totalMessages: inquiryReportData.totalMessages,
+      userMessages: inquiryReportData.userMessages,
+      botMessages: inquiryReportData.botMessages,
+      escalatedMessages: inquiryReportData.escalatedMessages,
+      escalationRate: inquiryReportData.escalationRate,
+      resolvedMessages: inquiryReportData.resolvedMessages,
+      resolutionRate: inquiryReportData.resolutionRate,
+      inquiryTrend: inquiryReportData.inquiryTrend,
+      categoryDistribution: inquiryReportData.categoryDistribution,
+      topQuestions: inquiryReportData.topQuestions,
+      escalationsOverTime: inquiryReportData.escalationsOverTime,
+      staffPerformance: inquiryReportData.staffPerformance,
+      botVsHumanAnswers: inquiryReportData.botVsHumanAnswers,
+      allEscalations: inquiryReportData.allEscalations, // ✅ This now has the correct value
+      recentLogs: inquiryReportData.recentLogs,
+      msgLogs: inquiryReportData.msgLogs,
     );
 
     // ✅ UPDATE CACHE
     _cache[selectedTimeFrame] = DashboardCache(
       inq: inquiryData,
       ud: userDemoData,
-      ad: adminData,  // ✅ STORE IT IN CACHE
+      ad: adminData,
       timestamp: DateTime.now(),
     );
 
     setState(() {
-  inq = inquiryData;
-  ud = userDemoData;
-  ad = adminData;
-  
-  // ✅ DEBUG PRINTS
-  print('📊 Admin Data Updated:');
-  print('   Pending Escalations: ${adminData.pendingEscalations}');
-  print('   Top Escalated Messages: ${adminData.topEscalatedMessages.length}');
-  print('   First Message: ${adminData.topEscalatedMessages.isNotEmpty ? adminData.topEscalatedMessages.first.userMessage : "none"}');
-});
+      inq = inquiryData;
+      ud = userDemoData;
+      ad = adminData;
+      
+      // ✅ DEBUG PRINTS
+      print('📊 Inquiry Data Updated:');
+      print('   All Escalations: ${inquiryData.allEscalations}');
+      print('   Escalated Messages: ${inquiryData.escalatedMessages}');
+      print('   Admin Pending Escalations: ${adminData.pendingEscalations}');
+      print('   Top Escalated Messages: ${adminData.topEscalatedMessages.length}');
+    });
   } catch (e) {
-    print('Error fetching data: $e');
+    print('❌ Error fetching data: $e');
     rethrow;
   }
 }
@@ -1080,7 +1089,7 @@ Widget dashboardContents(
                 ),
                 const SizedBox(height: 12),
               
-                const SizedBox(height: 12),
+
                 Row(
                   children: [
                     Expanded(
@@ -1130,8 +1139,8 @@ Widget dashboardContents(
                 const SizedBox(width: 20),
                 Expanded(
                   child: buildStatCard(
-                    'Escalated and Resolved Messages Ratio',
-                    '$escalated : $resolved',
+                    'Escalated Messages',
+                    '${inq?.allEscalations}',
                     Colors.orange,
                     Icons.warning_amber_rounded,
                     onTap:
@@ -1145,7 +1154,7 @@ Widget dashboardContents(
                 Expanded(
                   child: buildStatCard(
                     'Escalation and Resolution Rate Ratio ',
-                    '${escalationRate.toStringAsFixed(0)}% : ${resolutionRate.toStringAsFixed(0)}%',
+                    '${escalationRate.toStringAsFixed(2)}% : ${resolutionRate.toStringAsFixed(2)}%',
                   
                     Colors.red,
                     Icons.analytics,
@@ -1358,6 +1367,9 @@ Widget dashboardContents(
                 userName,
                 customDateRange,
                 onDateRangeChanged,
+                inq, 
+                ud, 
+                ad,
               ),
               const SizedBox(height: 32),
               statCards(),
@@ -1505,6 +1517,10 @@ Widget _buildHeader(
   String userName,
   DateTimeRange? customDateRange,
   ValueChanged<DateTimeRange?> onDateRangeChanged,
+  // ✅ ADD THESE PARAMETERS
+  InquiryReportsData? inq,
+  UserDemographicsReportsData? ud,
+  AdminDashboardData? ad,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -1550,6 +1566,16 @@ Widget _buildHeader(
                           onDateRangeChanged: onDateRangeChanged,
                         ),
                       ],
+                      // ✅ ADD EXPORT BUTTON
+                      const SizedBox(width: 8),
+                      ExportButton(
+                        pageType: 'dashboard',
+                        timeFrame: selectedTimeFrame,
+                        userName: userName,
+                        inq: inq,
+                        ud: ud,
+                        ad: ad,
+                      ),
                     ],
                   ),
                 ],
@@ -1586,6 +1612,16 @@ Widget _buildHeader(
                           onDateRangeChanged: onDateRangeChanged,
                         ),
                       ],
+                      // ✅ ADD EXPORT BUTTON
+                      const SizedBox(width: 12),
+                      ExportButton(
+                        pageType: 'dashboard',
+                        timeFrame: selectedTimeFrame,
+                        userName: userName,
+                        inq: inq,
+                        ud: ud,
+                        ad: ad,
+                      ),
                     ],
                   ),
                 ],

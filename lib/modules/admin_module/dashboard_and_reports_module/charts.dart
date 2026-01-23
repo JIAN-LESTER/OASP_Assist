@@ -26,7 +26,7 @@ Widget buildStatCard(
       final iconSize = isMobile ? 16.0 : (isTablet ? 18.0 : 20.0);
       final valueFontSize = isMobile ? 16.0 : (isTablet ? 18.0 : 20.0);
       final titleFontSize = isMobile ? 10.0 : (isTablet ? 11.0 : 12.0);
-      final rateFontSize = isMobile ? 10.0 : (isTablet ? 11.0 : 12.0);
+      final rateFontSize = isMobile ? 9.0 : (isTablet ? 10.0 : 11.0);
       final spacing = isMobile ? 8.0 : (isTablet ? 10.0 : 12.0);
       final borderRadius = isMobile ? 10.0 : 12.0;
       final borderWidth = isMobile ? 3.0 : 4.0;
@@ -60,59 +60,58 @@ Widget buildStatCard(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: EdgeInsets.all(iconPadding),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(icon, color: color, size: iconSize),
-                    ),
-                    SizedBox(width: isMobile ? 6 : 8),
+                    // Left side: Icon and Value
                     Expanded(
-                      child: Column(
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Flexible(
-                                child: _buildAdaptiveValueText(
-                                  value,
-                                  valueFontSize,
-                                  color,
-                                ),
-                              ),
-                              if (rateLabel != null && rateValue != null) ...[
-                                SizedBox(width: isMobile ? 4 : 6),
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: isMobile ? 4 : 6,
-                                    vertical: isMobile ? 2 : 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: color.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    '${rateValue.toStringAsFixed(1)}%',
-                                    style: TextStyle(
-                                      fontSize: rateFontSize,
-                                      fontWeight: FontWeight.w600,
-                                      color: color,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
+                          Container(
+                            padding: EdgeInsets.all(iconPadding),
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(icon, color: color, size: iconSize),
+                          ),
+                          SizedBox(width: isMobile ? 6 : 8),
+                          Expanded(
+                            child: _buildAdaptiveValueText(
+                              value,
+                              valueFontSize,
+                              color,
+                            ),
                           ),
                         ],
                       ),
                     ),
+                    // Right side: Rate badge (if provided)
+                    if (rateLabel != null && rateValue != null)
+                      Container(
+                        margin: EdgeInsets.only(left: isMobile ? 4 : 6),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isMobile ? 6 : 8,
+                          vertical: isMobile ? 3 : 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: color.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          '${rateValue.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: rateFontSize,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
                 SizedBox(height: spacing),
@@ -151,7 +150,6 @@ Widget buildStatCard(
 Widget _buildAdaptiveValueText(String value, double baseFontSize, Color color) {
   return LayoutBuilder(
     builder: (context, constraints) {
-      // Calculate if text needs 2 lines
       final textPainter = TextPainter(
         text: TextSpan(
           text: value,
@@ -166,18 +164,10 @@ Widget _buildAdaptiveValueText(String value, double baseFontSize, Color color) {
       )..layout(maxWidth: constraints.maxWidth);
 
       final needsTwoLines = textPainter.didExceedMaxLines;
-      
-      // Calculate adjusted font size for 2-line text
-      // Reduce by 15-20% to fit better
-      final adjustedFontSize = needsTwoLines 
-          ? baseFontSize * 0.85 
-          : baseFontSize;
-      
-      // Calculate the height for consistent sizing
-      // Base height for 1 line + line height
+      final adjustedFontSize = needsTwoLines ? baseFontSize * 0.85 : baseFontSize;
       final lineHeight = 1.2;
       final singleLineHeight = baseFontSize * lineHeight;
-      final containerHeight = singleLineHeight * 2; // Always reserve space for 2 lines
+      final containerHeight = singleLineHeight * 2;
       
       return SizedBox(
         height: containerHeight,
@@ -199,6 +189,8 @@ Widget _buildAdaptiveValueText(String value, double baseFontSize, Color color) {
     },
   );
 }
+
+
 class DashboardWidgets {
   // Simplified color scheme
   static const _categoryColors = {

@@ -19,6 +19,7 @@ class InquiryReportsData {
   final Map<String, double>
   staffPerformance; // Staff name -> avg resolution rate
   final Map<String, int> botVsHumanAnswers; // {'bot': count, 'human': count}
+  final int allEscalations;
 
   // Logs
   final List<SystemLog> recentLogs;
@@ -38,6 +39,7 @@ class InquiryReportsData {
     required this.escalationsOverTime,
     required this.staffPerformance,
     required this.botVsHumanAnswers,
+    required this.allEscalations,
     required this.recentLogs,
     required this.msgLogs,
   });
@@ -58,6 +60,7 @@ InquiryReportsData getEmptyInquiryReportsData() {
     escalationsOverTime: [],
     staffPerformance: {},
     botVsHumanAnswers: {'bot': 0, 'human': 0},
+    allEscalations: 0,
     recentLogs: [],
     msgLogs: [],
   );

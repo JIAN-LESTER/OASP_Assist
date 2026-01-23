@@ -1,3 +1,5 @@
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/admin_dashboard_data.dart';
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/export_button.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/paginated_list.dart';
 import 'package:capstone_project/modules/admin_module/widgets/custom_dropdown_button.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/charts.dart';
@@ -33,6 +35,7 @@ class _ReportsPageState extends State<ReportsPage> {
   InquiryReportsData? inq;
   ChatbotUsageReportsData? cb;
   UserDemographicsReportsData? ud;
+  AdminDashboardData? ad;
   String? userName;
 
   DateTimeRange? customDateRange;
@@ -87,9 +90,15 @@ class _ReportsPageState extends State<ReportsPage> {
               selectedTimeFrame,
               customDateRange, // Pass custom date range
             );
+
+            final escalatedData = await _firebaseService.getAdminDashboardData(
+              selectedTimeFrame,
+              customDateRange,
+            );
             if (!mounted) return;
             setState(() {
               inq = data;
+              ad = escalatedData;
               isLoadingInquiry = false;
               inquiryDataLoaded = true;
             });
@@ -395,6 +404,7 @@ class _ReportsPageState extends State<ReportsPage> {
         inq: inq,
         cb: cb,
         ud: ud,
+        ad: ad,
         userName: userName!,
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
@@ -413,6 +423,7 @@ class _ReportsPageState extends State<ReportsPage> {
         inq: inq,
         cb: cb,
         ud: ud,
+        ad: ad,
         userName: userName!,
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
@@ -431,6 +442,7 @@ class _ReportsPageState extends State<ReportsPage> {
         inq: inq,
         cb: cb,
         ud: ud,
+        ad: ad,
         userName: userName!,
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
@@ -594,6 +606,7 @@ class DesktopDashboard extends StatelessWidget {
   final InquiryReportsData? inq;
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
+  final AdminDashboardData? ad;
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -613,6 +626,7 @@ class DesktopDashboard extends StatelessWidget {
     this.inq,
     this.cb,
     this.ud,
+    this.ad,
     required this.userName,
     required this.startDate,
     required this.timeCategoryCounts,
@@ -640,6 +654,10 @@ class DesktopDashboard extends StatelessWidget {
               userName,
               customDateRange,
               onDateRangeChanged,
+                    inq,
+              cb,
+              ud,
+              ad,
             ),
             const SizedBox(height: 32),
 
@@ -649,12 +667,14 @@ class DesktopDashboard extends StatelessWidget {
               ...ReportsHelper.buildReportContent(
                 selectedReportType,
                 inq,
+                ad,
                 cb,
                 selectedTimeFrame,
                 ud,
                 startDate,
                 timeFrame,
                 timeCategoryCounts,
+                customDateRange,
                 isMobile: false,
                 context: context,
               ),
@@ -676,6 +696,7 @@ class TabletDashboard extends StatelessWidget {
   final InquiryReportsData? inq;
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
+  final AdminDashboardData? ad;
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -695,6 +716,7 @@ class TabletDashboard extends StatelessWidget {
     this.inq,
     this.cb,
     this.ud,
+    this.ad,
     required this.startDate,
     required this.timeCategoryCounts,
     required this.timeFrame,
@@ -722,6 +744,10 @@ class TabletDashboard extends StatelessWidget {
               userName,
               customDateRange,
               onDateRangeChanged,
+              inq,
+              cb,
+              ud,
+              ad,
             ),
             const SizedBox(height: 32),
 
@@ -731,12 +757,14 @@ class TabletDashboard extends StatelessWidget {
               ...ReportsHelper.buildReportContent(
                 selectedReportType,
                 inq,
+                ad,
                 cb,
                 selectedTimeFrame,
                 ud,
                 startDate,
                 timeFrame,
                 timeCategoryCounts,
+                customDateRange,
                 isMobile: false,
                 context: context,
               ),
@@ -758,6 +786,7 @@ class MobileDashboard extends StatelessWidget {
   final InquiryReportsData? inq;
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
+  final AdminDashboardData? ad;
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -777,6 +806,7 @@ class MobileDashboard extends StatelessWidget {
     this.inq,
     this.cb,
     this.ud,
+    this.ad,
     required this.userName,
     required this.startDate,
     required this.timeCategoryCounts,
@@ -804,6 +834,10 @@ class MobileDashboard extends StatelessWidget {
               userName,
               customDateRange,
               onDateRangeChanged,
+                    inq,
+              cb,
+              ud,
+              ad,
             ),
             const SizedBox(height: 24),
 
@@ -813,12 +847,14 @@ class MobileDashboard extends StatelessWidget {
               ...ReportsHelper.buildReportContent(
                 selectedReportType,
                 inq,
+                ad,
                 cb,
                 selectedTimeFrame,
                 ud,
                 startDate,
                 timeFrame,
                 timeCategoryCounts,
+                customDateRange,
                 isMobile: true,
                 context: context,
               ),
@@ -887,12 +923,15 @@ class ReportsHelper {
   static List<Widget> buildReportContent(
     String reportType,
     InquiryReportsData? inq,
+    AdminDashboardData? ad,
     ChatbotUsageReportsData? cb,
     String selectedTimeFrame,
     UserDemographicsReportsData? ud,
     DateTime startDate,
     String timeFrame,
-    Map<String, Map<String, int>> timeCategoryCounts, {
+    Map<String, Map<String, int>> timeCategoryCounts,
+    DateTimeRange? customDateRange, // ADD THIS PARAMETER
+    {
     bool isMobile = false,
     required BuildContext context,
   }) {
@@ -900,6 +939,7 @@ class ReportsHelper {
       case 'Inquiry Trends':
         return buildInquiryTrendsReport(
           inq,
+          ad,
           selectedTimeFrame: selectedTimeFrame,
           isMobile: isMobile,
           context: context,
@@ -908,15 +948,23 @@ class ReportsHelper {
         return buildChatbotUsageReport(
           cb,
           startDate,
+          selectedTimeFrame,
+          customDateRange, // PASS IT HERE
           timeCategoryCounts,
           timeFrame,
           isMobile: isMobile,
         );
       case 'User Demographics':
-        return buildUserDemographicsReport(ud, selectedTimeFrame: selectedTimeFrame, context: context, isMobile: isMobile);
+        return buildUserDemographicsReport(
+          ud,
+          selectedTimeFrame: selectedTimeFrame,
+          context: context,
+          isMobile: isMobile,
+        );
       default:
         return buildInquiryTrendsReport(
           inq,
+          ad,
           isMobile: isMobile,
           context: context,
         );
@@ -925,7 +973,8 @@ class ReportsHelper {
 }
 
 List<Widget> buildInquiryTrendsReport(
-  InquiryReportsData? data, {
+  InquiryReportsData? data,
+  AdminDashboardData? ad, {
   String? selectedTimeFrame,
   bool isMobile = false,
   required BuildContext context,
@@ -984,7 +1033,7 @@ List<Widget> buildInquiryTrendsReport(
             child: Builder(
               builder:
                   (context) => buildStatCard(
-                    'Escalated Messages',
+                    'Pending Escalated Messages',
                     '$escalatedMessages',
                     Colors.red,
                     Icons.warning_amber_rounded,
@@ -1013,7 +1062,7 @@ List<Widget> buildInquiryTrendsReport(
                           selectedTimeFrame ?? 'This Month',
                         ),
                     rateLabel: 'Rate',
-                    rateValue: resolutionRate,
+                    rateValue: resolutionRate.remainder(1),
                   ),
             ),
           ),
@@ -1063,87 +1112,87 @@ List<Widget> buildInquiryTrendsReport(
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
-        child: buildBotVsHumanCard(data?.botVsHumanAnswers ?? {}, selectedTimeFrame ?? 'This Month'),
+        child: buildEscalatedMessagesList(
+          ad?.topEscalatedMessages ?? [],
+          selectedTimeFrame ?? 'This Month',
+          context,
+        ),
       ),
     ];
   }
 
   // Desktop layout
-  return [
-    SizedBox(
-      height: 120,
-      child: Row(
-        children: [
-          Expanded(
-            child: Builder(
-              builder:
-                  (context) => buildStatCard(
-                    'User Messages',
-                    '$userMessages',
-                    Colors.blue,
-                    Icons.message,
-                    onTap:
-                        () => _showMessagesDialog(
-                          context,
-                          selectedTimeFrame ?? 'This Month',
-                        ),
-                  ),
+return [
+  SizedBox(
+    height: 120,
+    child: Row(
+      children: [
+        Expanded(
+          child: Builder(
+            builder: (context) => buildStatCard(
+              'User Messages',  // Clean title
+              '$userMessages',
+              Colors.blue,
+              Icons.message,
+              onTap: () => _showMessagesDialog(
+                context,
+                selectedTimeFrame ?? 'This Month',
+              ),
             ),
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Builder(
-              builder:
-                  (context) => buildStatCard(
-                    'Bot Messages',
-                    '$botMessages',
-                    Colors.green,
-                    Icons.check_circle,
-                    onTap:
-                        () => _showAnsweredMessagesDialog(
-                          context,
-                          selectedTimeFrame ?? 'This Month',
-                        ),
-                  ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: Builder(
+            builder: (context) => buildStatCard(
+              'Bot Messages',  // Clean title
+              '$botMessages',
+              Colors.green,
+              Icons.check_circle,
+              onTap: () => _showAnsweredMessagesDialog(
+                context,
+                selectedTimeFrame ?? 'This Month',
+              ),
             ),
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Builder(
-              builder:
-                  (context) => buildStatCard(
-                    'Escalated (${escalationRate.toStringAsFixed(1)}%)',
-                    '$escalatedMessages',
-                    Colors.red,
-                    Icons.warning_amber_rounded,
-                    onTap:
-                        () => _showEscalatedMessagesDialog(
-                          context,
-                          selectedTimeFrame ?? 'This Month',
-                        ),
-                  ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: Builder(
+            builder: (context) => buildStatCard(
+              'Pending Escalated Messages',  // ✅ FIXED: Clean title, rate shown separately
+              '$escalatedMessages',
+              Colors.red,
+              Icons.warning_amber_rounded,
+              onTap: () => _showEscalatedMessagesDialog(
+                context,
+                selectedTimeFrame ?? 'This Month',
+              ),
+              rateLabel: 'Rate',     // ✅ FIXED: Pass rate as parameter
+              rateValue: escalationRate,
             ),
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Builder(
-              builder:
-                  (context) => buildStatCard(
-                    'Resolved (${resolutionRate.toStringAsFixed(1)}%)',
-                    '$resolvedMessages',
-                    Colors.orange,
-                    Icons.check_circle_outline,
-                    onTap:
-                        () => _showResolvedMessagesDialog(
-                          context,
-                          selectedTimeFrame ?? 'This Month',
-                        ),
-                  ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: Builder(
+            builder: (context) => buildStatCard(
+              'Resolved Messages',  // ✅ FIXED: Clean title, rate shown separately
+              '$resolvedMessages',
+              Colors.orange,
+              Icons.check_circle_outline,
+              onTap: () => _showResolvedMessagesDialog(
+                context,
+                selectedTimeFrame ?? 'This Month',
+              ),
+              rateLabel: 'Rate',     
+              rateValue: resolutionRate,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     ),
+  ),
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
@@ -1165,6 +1214,7 @@ List<Widget> buildInquiryTrendsReport(
       child: Row(
         children: [
           Expanded(
+            flex: 1,
             child: buildCategoryDistributionCard(
               data?.categoryDistribution ?? {},
               selectedTimeFrame ?? 'This Month',
@@ -1172,7 +1222,10 @@ List<Widget> buildInquiryTrendsReport(
             ),
           ),
           const SizedBox(width: 20),
-          Expanded(child: buildHighestFAQCard(data?.topQuestions ?? {})),
+          Expanded(
+            flex: 2,
+            child: buildHighestFAQCard(data?.topQuestions ?? {}),
+          ),
         ],
       ),
     ),
@@ -1197,6 +1250,7 @@ List<Widget> buildInquiryTrendsReport(
       child: Row(
         children: [
           Expanded(
+            flex: 2,
             child: buildStaffPerformanceCard(
               data?.staffPerformance ?? {},
               selectedTimeFrame ?? 'This Month',
@@ -1204,7 +1258,14 @@ List<Widget> buildInquiryTrendsReport(
             ),
           ),
           const SizedBox(width: 20),
-          Expanded(child: buildBotVsHumanCard(data?.botVsHumanAnswers ?? {}, selectedTimeFrame ?? 'This Month')),
+          Expanded(
+            flex: 1,
+            child: buildEscalatedMessagesList(
+              ad?.topEscalatedMessages ?? [],
+              selectedTimeFrame ?? 'This Month',
+              context,
+            ),
+          ),
         ],
       ),
     ),
@@ -1213,8 +1274,9 @@ List<Widget> buildInquiryTrendsReport(
 
 List<Widget> buildChatbotUsageReport(
   ChatbotUsageReportsData? data,
-  DateTime start,
-  
+  DateTime startDate,
+  String selectedTimeFrame, // Changed parameter name for clarity
+  DateTimeRange? customDateRange, // ADD THIS PARAMETER
   Map<String, Map<String, int>> timeCategoryCounts,
   String timeFrame, {
   bool isMobile = false,
@@ -1239,6 +1301,9 @@ List<Widget> buildChatbotUsageReport(
     return '${hours}h ${remainingMinutes}m';
   }
 
+  // Calculate endDate from customDateRange or use null
+  final endDate = customDateRange?.end;
+
   /// =======================
   /// 📱 MOBILE LAYOUT
   /// =======================
@@ -1255,7 +1320,7 @@ List<Widget> buildChatbotUsageReport(
                 Icons.timer,
                 onTap: () => _showResponseTimeDetailsDialog(
                   context,
-                  timeFrame,
+                  selectedTimeFrame,
                   data,
                 ),
               ),
@@ -1269,45 +1334,52 @@ List<Widget> buildChatbotUsageReport(
                 '${data?.totalConversations ?? 0}',
                 Colors.green,
                 Icons.chat,
-                onTap: () => _showConversationsDialog(context, timeFrame),
+                onTap: () => _showConversationsDialog(context, selectedTimeFrame),
               ),
             ),
           ),
         ],
       ),
       const SizedBox(height: 24),
+
+      // FIXED: Pass all required parameters
       SizedBox(
         height: 400,
-        child: buildConversationsOverTimeCard(
-          data?.conversationsOverTime ?? [],
-          timeFrame,
+        child: buildPeakUsageCard(
+          data!,
+          selectedTimeFrame,
+          startDate,
+          endDate, // Now properly passed
         ),
       ),
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
-        child: buildPeakUsageCard(
-          data?.peakUsageByHour ?? {},
-          data?.peakUsageByDay,
-          data?.peakUsageByMonth,
-          timeFrame,
+        child: buildConversationsOverTimeCard(
+          data?.conversationsOverTime ?? [],
+          selectedTimeFrame,
         ),
+      ),
+      const SizedBox(height: 16),
+      SizedBox(
+        height: 400,
+        child: buildChatLimitReachTrendCard(data?.chatLimitReachTrend ?? []),
       ),
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
         child: buildResponseTimeTrendCard(
-  data?.responseTimeTrend ?? [],
-  timeFrame: timeFrame,
-  startDate: start,  // Add this
-       endDate: timeFrame == 'Custom' ? null : null,     // Add this
-),
+          data?.responseTimeTrend ?? [],
+          timeFrame: selectedTimeFrame,
+          startDate: startDate,
+          endDate: endDate,
+        ),
       ),
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
-        child: buildUnansweredReasonsCard(
-          data?.unansweredReasonsDistribution ?? {},
+        child: buildEscalationLimitReachTrendCard(
+          data?.escalationLimitReachTrend ?? [],
         ),
       ),
     ];
@@ -1330,7 +1402,7 @@ List<Widget> buildChatbotUsageReport(
                 Icons.timer,
                 onTap: () => _showResponseTimeDetailsDialog(
                   context,
-                  timeFrame,
+                  selectedTimeFrame,
                   data,
                 ),
               ),
@@ -1344,7 +1416,7 @@ List<Widget> buildChatbotUsageReport(
                 '${data?.totalConversations ?? 0}',
                 Colors.green,
                 Icons.chat,
-                onTap: () => _showConversationsDialog(context, timeFrame),
+                onTap: () => _showConversationsDialog(context, selectedTimeFrame),
               ),
             ),
           ),
@@ -1372,9 +1444,11 @@ List<Widget> buildChatbotUsageReport(
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
-      child: buildConversationsOverTimeCard(
-        data?.conversationsOverTime ?? [],
-        timeFrame,
+      child: buildPeakUsageCard(
+        data!,
+        selectedTimeFrame,
+        startDate,
+        endDate,
       ),
     ),
     const SizedBox(height: 16),
@@ -1383,15 +1457,17 @@ List<Widget> buildChatbotUsageReport(
       child: Row(
         children: [
           Expanded(
-            child: buildUnansweredReasonsCard(
-              data?.unansweredReasonsDistribution ?? {},
+            flex: 1,
+            child: buildChatLimitReachTrendCard(
+              data?.chatLimitReachTrend ?? [],
             ),
           ),
           const SizedBox(width: 20),
           Expanded(
-            child: buildResponseTimeTrendCard(
-              data?.responseTimeTrend ?? [],
-              timeFrame: timeFrame,
+            flex: 2,
+            child: buildConversationsOverTimeCard(
+              data?.conversationsOverTime ?? [],
+              selectedTimeFrame,
             ),
           ),
         ],
@@ -1400,21 +1476,34 @@ List<Widget> buildChatbotUsageReport(
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
-      child: buildPeakUsageCard(
-        data?.peakUsageByHour ?? {},
-        data?.peakUsageByDay,
-        data?.peakUsageByMonth,
-        timeFrame,
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: buildResponseTimeTrendCard(
+              data?.responseTimeTrend ?? [],
+              timeFrame: selectedTimeFrame,
+              startDate: startDate,
+              endDate: endDate,
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            flex: 1,
+            child: buildEscalationLimitReachTrendCard(
+              data?.escalationLimitReachTrend ?? [],
+            ),
+          ),
+        ],
       ),
     ),
   ];
 }
 
+
 List<Widget> buildUserDemographicsReport(
-  UserDemographicsReportsData? data,
- 
-   {
-     String? selectedTimeFrame,
+  UserDemographicsReportsData? data, {
+  String? selectedTimeFrame,
   required BuildContext context,
   bool isMobile = false,
 }) {
@@ -1485,7 +1574,9 @@ List<Widget> buildUserDemographicsReport(
       const SizedBox(height: 24),
       SizedBox(
         height: 400,
-        child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
+        child: buildUserGrowthCard( data?.userGrowthOverTime ?? [],
+        selectedTimeFrame ?? 'This Month',
+        context,),
       ),
       const SizedBox(height: 16),
       SizedBox(
@@ -1498,6 +1589,11 @@ List<Widget> buildUserDemographicsReport(
         child: buildUsersByYearLevelCard(data?.usersByYear ?? {}),
       ),
       const SizedBox(height: 16),
+            SizedBox(
+        height: 400,
+        child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
+      ),
+      SizedBox(width: 16,),
       SizedBox(
         height: 400,
         child: buildScholarshipDistributionCard(
@@ -1578,7 +1674,12 @@ List<Widget> buildUserDemographicsReport(
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
-      child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
+
+      child: buildUserGrowthCard(
+        data?.userGrowthOverTime ?? [],
+        selectedTimeFrame ?? 'This Month',
+        context,
+      ),
     ),
     const SizedBox(height: 16),
     SizedBox(
@@ -1587,30 +1688,31 @@ List<Widget> buildUserDemographicsReport(
         children: [
           Expanded(child: buildUsersByProgramCard(data?.usersByProgram ?? {})),
           const SizedBox(width: 20),
-          Expanded(
-            child: buildUsersByYearLevelCard(data?.usersByYear ?? {}),
-          ),
+          Expanded(child: buildUsersByYearLevelCard(data?.usersByYear ?? {})),
         ],
       ),
     ),
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
-      child: buildUserGrowthCard(data?.userGrowthOverTime ?? [],selectedTimeFrame ?? 'This Month', context),
+          child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
     ),
+   const SizedBox(height: 16),
+
     SizedBox(
       height: 400,
       child: Row(
         children: [
           Expanded(
+            flex: 1,
             child: buildScholarshipDistributionCard(
               data?.usersWithScholarship,
               data?.usersWithoutScholarship,
-
             ),
           ),
           const SizedBox(width: 20),
           Expanded(
+            flex: 2,
             child: buildScholarshipTypesCard(
               data?.scholarshipDistribution ?? {},
             ),
@@ -1619,6 +1721,69 @@ List<Widget> buildUserDemographicsReport(
       ),
     ),
   ];
+}
+
+Widget buildPeakUsageCard(
+  ChatbotUsageReportsData data,
+  String timeFrame,
+  DateTime startDate,
+  DateTime? endDate,
+) {
+  // Show the most relevant peak usage based on timeframe
+  switch (timeFrame) {
+    case 'Today':
+      // Show hourly breakdown
+      return buildPeakUsageHoursCard(
+        data.peakUsageByHour,
+        timeFrame,
+        startDate,
+        endDate,
+      );
+
+    case 'This Week':
+      // Show daily breakdown (Mon-Sun)
+      return buildPeakUsageByDayCard(
+        data.peakUsageByDay,
+        timeFrame,
+        startDate,
+        endDate,
+      );
+
+    case 'This Month':
+      // Show weekly breakdown or daily
+      return buildPeakUsageByMonthCard(
+        data.peakUsageByMonth,
+        timeFrame,
+        startDate,
+        endDate,
+      );
+
+    case 'This Year':
+      // Show monthly breakdown
+      return buildPeakUsageByYearCard(
+        data.peakUsageByYear,
+        timeFrame,
+        startDate,
+        endDate,
+      );
+
+    case 'All':
+      // Show monthly or yearly breakdown
+      return buildPeakUsageByAllYearsCard(
+        data.peakUsageByAllYears,
+        timeFrame,
+        startDate,
+        endDate,
+      );
+
+    default:
+      return buildPeakUsageByMonthCard(
+        data.peakUsageByMonth,
+        timeFrame,
+        startDate,
+        endDate,
+      );
+  }
 }
 
 void _showMessagesDialog(
@@ -2105,6 +2270,7 @@ String _formatTimestamp(Timestamp timestamp) {
   return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
 }
 
+// ✅ UPDATED buildHeader function for Reports page
 Widget buildHeader(
   String selectedTimeFrame,
   String selectedReportType,
@@ -2115,11 +2281,23 @@ Widget buildHeader(
   String userName,
   DateTimeRange? customDateRange,
   ValueChanged<DateTimeRange?> onDateRangeChanged,
+  // ✅ ADD THESE PARAMETERS FOR EXPORT
+  InquiryReportsData? inq,
+  ChatbotUsageReportsData? cb,
+  UserDemographicsReportsData? ud,
+  AdminDashboardData? ad,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
       double screenWidth = MediaQuery.of(context).size.width;
       bool isMobile = screenWidth < 600;
+
+      // ✅ Determine page type based on selected report
+      String pageType = selectedReportType == 'Inquiry Trends'
+          ? 'inquiry'
+          : selectedReportType == 'Chatbot Usage'
+              ? 'chatbot'
+              : 'demographics';
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2172,6 +2350,17 @@ Widget buildHeader(
                           onDateRangeChanged: onDateRangeChanged,
                         ),
                       ],
+                      // ✅ ADD EXPORT BUTTON
+                      const SizedBox(width: 8),
+                      ExportButton(
+                        pageType: pageType,
+                        timeFrame: selectedTimeFrame,
+                        userName: userName,
+                        inq: inq,
+                        cb: cb,
+                        ud: ud,
+                        ad: ad,
+                      ),
                     ],
                   ),
                 ],
@@ -2215,6 +2404,17 @@ Widget buildHeader(
                           onDateRangeChanged: onDateRangeChanged,
                         ),
                       ],
+                      // ✅ ADD EXPORT BUTTON
+                      const SizedBox(width: 12),
+                      ExportButton(
+                        pageType: pageType,
+                        timeFrame: selectedTimeFrame,
+                        userName: userName,
+                        inq: inq,
+                        cb: cb,
+                        ud: ud,
+                        ad: ad,
+                      ),
                     ],
                   ),
                 ],
@@ -2233,6 +2433,7 @@ Widget buildHeader(
     },
   );
 }
+
 
 // Update _getReportDescription to handle custom date range:
 String _getReportDescription(
@@ -2282,43 +2483,46 @@ String _formatDate(DateTime date) {
 void _showConversationsDialog(BuildContext context, String timeFrame) {
   showDialog(
     context: context,
-    builder: (context) => PaginatedListDialog(
-      title: 'Conversations',
-      headerColor: Colors.green,
-      dataFetcher: (page, pageSize) async {
-        final startDate = _getStartDateForDialog(timeFrame);
-        Query query = FirebaseFirestore.instance
-            .collection('conversations')
-            .where(
-              'createdAt',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
-            );
+    builder:
+        (context) => PaginatedListDialog(
+          title: 'Conversations',
+          headerColor: Colors.green,
+          dataFetcher: (page, pageSize) async {
+            final startDate = _getStartDateForDialog(timeFrame);
+            Query query = FirebaseFirestore.instance
+                .collection('conversations')
+                .where(
+                  'createdAt',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+                );
 
-        final snapshot = await query
-            .orderBy('createdAt', descending: true)
-            .limit(pageSize)
-            .get();
+            final snapshot =
+                await query
+                    .orderBy('createdAt', descending: true)
+                    .limit(pageSize)
+                    .get();
 
-        return snapshot.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          final createdAt = data['createdAt'] as Timestamp?;
-          final endedAt = data['endedAt'] as Timestamp?;
-          final status = data['status'] ?? 'active';
+            return snapshot.docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final createdAt = data['createdAt'] as Timestamp?;
+              final endedAt = data['endedAt'] as Timestamp?;
+              final status = data['status'] ?? 'active';
 
-          String duration = 'N/A';
-          if (createdAt != null && endedAt != null) {
-            final diff = endedAt.toDate().difference(createdAt.toDate());
-            duration = '${diff.inMinutes}m ${diff.inSeconds % 60}s';
-          }
+              String duration = 'N/A';
+              if (createdAt != null && endedAt != null) {
+                final diff = endedAt.toDate().difference(createdAt.toDate());
+                duration = '${diff.inMinutes}m ${diff.inSeconds % 60}s';
+              }
 
-          return {
-            'User ID': data['userId'] ?? 'N/A',
-            'Status': status,
-            'Duration': duration,
-            'Started': createdAt != null ? _formatTimestamp(createdAt) : 'N/A',
-          };
-        }).toList();
-      },
-    ),
+              return {
+                'User ID': data['userId'] ?? 'N/A',
+                'Status': status,
+                'Duration': duration,
+                'Started':
+                    createdAt != null ? _formatTimestamp(createdAt) : 'N/A',
+              };
+            }).toList();
+          },
+        ),
   );
 }

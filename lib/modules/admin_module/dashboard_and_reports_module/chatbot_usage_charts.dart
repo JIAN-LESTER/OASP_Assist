@@ -1,8 +1,10 @@
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/reports.dart';
+import 'package:capstone_project/modules/admin_module/widgets/empty_state.dart';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 
 
@@ -353,46 +355,6 @@ Widget buildResponseTimeTrendCard(
 }
 
 
-
-// Helper functions
-Widget _buildMiniStat(String label, String value, Color color) {
-  return Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
 Widget _buildEmptyState({
   required IconData icon,
   required String message,
@@ -436,6 +398,7 @@ Widget _buildEmptyState({
     ),
   );
 }
+
 
 Widget buildConversationsOverTimeCard(
   List<ChartData> conversationTrend,
@@ -795,273 +758,273 @@ double _getConversationBottomInterval(int dataLength, String timeFrame) {
 
 
 // ============================================
-Widget buildPeakUsageHoursCard(Map<int, int> hourlyData) {
-  int totalMessages = hourlyData.values.fold(0, (sum, count) => sum + count);
-  int peakHour = 0;
-  int peakCount = 0;
+// Widget buildPeakUsageHoursCard(Map<int, int> hourlyData) {
+//   int totalMessages = hourlyData.values.fold(0, (sum, count) => sum + count);
+//   int peakHour = 0;
+//   int peakCount = 0;
   
-  hourlyData.forEach((hour, count) {
-    if (count > peakCount) {
-      peakCount = count;
-      peakHour = hour;
-    }
-  }); 
+//   hourlyData.forEach((hour, count) {
+//     if (count > peakCount) {
+//       peakCount = count;
+//       peakHour = hour;
+//     }
+//   }); 
   
-  String getPeakTimeLabel() {
-    if (peakHour == 0) return '12 AM';
-    if (peakHour < 12) return '$peakHour AM';
-    if (peakHour == 12) return '12 PM';
-    return '${peakHour - 12} PM';
-  }
+//   String getPeakTimeLabel() {
+//     if (peakHour == 0) return '12 AM';
+//     if (peakHour < 12) return '$peakHour AM';
+//     if (peakHour == 12) return '12 PM';
+//     return '${peakHour - 12} PM';
+//   }
 
-  return Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-          border: Border(
+//   return Container(
+//     padding: const EdgeInsets.all(20),
+//     decoration: BoxDecoration(
+//       color: Colors.white,
+//       borderRadius: BorderRadius.circular(16),
+//           border: Border(
         
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.06),
-          blurRadius: 12,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Peak Usage Hours',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Messages sent by hour of day',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (hourlyData.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.orange[200]!, width: 1),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.schedule, size: 14, color: Colors.orange[700]),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Peak: ${getPeakTimeLabel()}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.orange[700],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
+//       ),
+//       boxShadow: [
+//         BoxShadow(
+//           color: Colors.black.withOpacity(0.06),
+//           blurRadius: 12,
+//           offset: const Offset(0, 4),
+//         ),
+//       ],
+//     ),
+//     child: Column(
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         Row(
+//           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//           children: [
+//             Expanded(
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   const Text(
+//                     'Peak Usage Hours',
+//                     style: TextStyle(
+//                       fontSize: 18,
+//                       fontWeight: FontWeight.bold,
+//                       color: Color(0xFF1A1A1A),
+//                     ),
+//                   ),
+//                   const SizedBox(height: 4),
+//                   Text(
+//                     'Messages sent by hour of day',
+//                     style: TextStyle(
+//                       fontSize: 12,
+//                       color: Colors.grey[600],
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//             if (hourlyData.isNotEmpty)
+//               Container(
+//                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+//                 decoration: BoxDecoration(
+//                   color: Colors.orange[50],
+//                   borderRadius: BorderRadius.circular(20),
+//                   border: Border.all(color: Colors.orange[200]!, width: 1),
+//                 ),
+//                 child: Row(
+//                   mainAxisSize: MainAxisSize.min,
+//                   children: [
+//                     Icon(Icons.schedule, size: 14, color: Colors.orange[700]),
+//                     const SizedBox(width: 6),
+//                     Text(
+//                       'Peak: ${getPeakTimeLabel()}',
+//                       style: TextStyle(
+//                         fontSize: 12,
+//                         color: Colors.orange[700],
+//                         fontWeight: FontWeight.w600,
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//           ],
+//         ),
         
-        if (hourlyData.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildMiniStat('Total', '$totalMessages', Colors.blue),
-              const SizedBox(width: 16),
-              _buildMiniStat('Peak Count', '$peakCount', Colors.orange),
-              const SizedBox(width: 16),
-              _buildMiniStat('Active Hours', '${hourlyData.length}', Colors.green),
-            ],
-          ),
-        ],
+//         if (hourlyData.isNotEmpty) ...[
+//           const SizedBox(height: 16),
+//           Row(
+//             children: [
+//               _buildMiniStat('Total', '$totalMessages', Colors.blue),
+//               const SizedBox(width: 16),
+//               _buildMiniStat('Peak Count', '$peakCount', Colors.orange),
+//               const SizedBox(width: 16),
+//               _buildMiniStat('Active Hours', '${hourlyData.length}', Colors.green),
+//             ],
+//           ),
+//         ],
         
-        const SizedBox(height: 20),
+//         const SizedBox(height: 20),
         
-        Expanded(
-          child: hourlyData.isEmpty
-              ? _buildEmptyState(
-                  icon: Icons.access_time,
-                  message: 'No hourly data available',
-                  subtitle: 'Usage patterns will appear here over time',
-                )
-              : BarChart(
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: hourlyData.values.isNotEmpty
-                        ? hourlyData.values.reduce((a, b) => a > b ? a : b).toDouble() * 1.2
-                        : 10,
-                    barTouchData: BarTouchData(
-                      touchTooltipData: BarTouchTooltipData(
-                            getTooltipColor: (group) => const Color(0xff1a1a1a),
-                        tooltipRoundedRadius: 8,
-                        tooltipPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                          int hour = group.x.toInt();
-                          String timeLabel = hour == 0
-                              ? '12 AM'
-                              : hour < 12
-                                  ? '$hour AM'
-                                  : hour == 12
-                                      ? '12 PM'
-                                      : '${hour - 12} PM';
-                          return BarTooltipItem(
-                            '$timeLabel\n',
-                            const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 11,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: '${rod.toY.round()} messages',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                    titlesData: FlTitlesData(
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 35,
-                          getTitlesWidget: (value, meta) => Container(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Text(
-                              value.toInt().toString(),
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey[700],
-                              ),
-                              textAlign: TextAlign.right,
-                            ),
-                          ),
-                        ),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          interval: 4,
-                          getTitlesWidget: (value, meta) {
-                            int hour = value.toInt();
-                            if (hour % 4 == 0) {
-                              String label = hour == 0
-                                  ? '12A'
-                                  : hour < 12
-                                      ? '${hour}A'
-                                      : hour == 12
-                                          ? '12P'
-                                          : '${hour - 12}P';
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  label,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
-                        ),
-                      ),
-                      rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                    ),
-                    borderData: FlBorderData(
-                      show: true,
-                      border: Border(
-                        left: BorderSide(color: Colors.grey[300]!, width: 1),
-                        bottom: BorderSide(color: Colors.grey[300]!, width: 1),
-                      ),
-                    ),
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: false,
-                      horizontalInterval: hourlyData.values.isNotEmpty
-                          ? (hourlyData.values.reduce((a, b) => a > b ? a : b) / 5).ceilToDouble()
-                          : 5,
-                      getDrawingHorizontalLine: (value) => FlLine(
-                        color: Colors.grey.withOpacity(0.15),
-                        strokeWidth: 1,
-                        dashArray: [5, 5],
-                      ),
-                    ),
-                    barGroups: List.generate(24, (hour) {
-                      final count = hourlyData[hour] ?? 0;
-                      final maxCount = hourlyData.values.isNotEmpty
-                          ? hourlyData.values.reduce((a, b) => a > b ? a : b)
-                          : 1;
-                      final intensity = count / maxCount;
+//         Expanded(
+//           child: hourlyData.isEmpty
+//               ? _buildEmptyState(
+//                   icon: Icons.access_time,
+//                   message: 'No hourly data available',
+//                   subtitle: 'Usage patterns will appear here over time',
+//                 )
+//               : BarChart(
+//                   BarChartData(
+//                     alignment: BarChartAlignment.spaceAround,
+//                     maxY: hourlyData.values.isNotEmpty
+//                         ? hourlyData.values.reduce((a, b) => a > b ? a : b).toDouble() * 1.2
+//                         : 10,
+//                     barTouchData: BarTouchData(
+//                       touchTooltipData: BarTouchTooltipData(
+//                             getTooltipColor: (group) => const Color(0xff1a1a1a),
+//                         tooltipRoundedRadius: 8,
+//                         tooltipPadding: const EdgeInsets.symmetric(
+//                           horizontal: 12,
+//                           vertical: 8,
+//                         ),
+//                         getTooltipItem: (group, groupIndex, rod, rodIndex) {
+//                           int hour = group.x.toInt();
+//                           String timeLabel = hour == 0
+//                               ? '12 AM'
+//                               : hour < 12
+//                                   ? '$hour AM'
+//                                   : hour == 12
+//                                       ? '12 PM'
+//                                       : '${hour - 12} PM';
+//                           return BarTooltipItem(
+//                             '$timeLabel\n',
+//                             const TextStyle(
+//                               color: Colors.white70,
+//                               fontSize: 11,
+//                             ),
+//                             children: [
+//                               TextSpan(
+//                                 text: '${rod.toY.round()} messages',
+//                                 style: const TextStyle(
+//                                   color: Colors.white,
+//                                   fontSize: 13,
+//                                   fontWeight: FontWeight.bold,
+//                                 ),
+//                               ),
+//                             ],
+//                           );
+//                         },
+//                       ),
+//                     ),
+//                     titlesData: FlTitlesData(
+//                       leftTitles: AxisTitles(
+//                         sideTitles: SideTitles(
+//                           showTitles: true,
+//                           reservedSize: 35,
+//                           getTitlesWidget: (value, meta) => Container(
+//                             padding: const EdgeInsets.only(right: 8),
+//                             child: Text(
+//                               value.toInt().toString(),
+//                               style: TextStyle(
+//                                 fontSize: 10,
+//                                 fontWeight: FontWeight.w500,
+//                                 color: Colors.grey[700],
+//                               ),
+//                               textAlign: TextAlign.right,
+//                             ),
+//                           ),
+//                         ),
+//                       ),
+//                       bottomTitles: AxisTitles(
+//                         sideTitles: SideTitles(
+//                           showTitles: true,
+//                           interval: 4,
+//                           getTitlesWidget: (value, meta) {
+//                             int hour = value.toInt();
+//                             if (hour % 4 == 0) {
+//                               String label = hour == 0
+//                                   ? '12A'
+//                                   : hour < 12
+//                                       ? '${hour}A'
+//                                       : hour == 12
+//                                           ? '12P'
+//                                           : '${hour - 12}P';
+//                               return Padding(
+//                                 padding: const EdgeInsets.only(top: 8),
+//                                 child: Text(
+//                                   label,
+//                                   style: TextStyle(
+//                                     fontSize: 10,
+//                                     fontWeight: FontWeight.w500,
+//                                     color: Colors.grey[600],
+//                                   ),
+//                                 ),
+//                               );
+//                             }
+//                             return const SizedBox.shrink();
+//                           },
+//                         ),
+//                       ),
+//                       rightTitles: const AxisTitles(
+//                         sideTitles: SideTitles(showTitles: false),
+//                       ),
+//                       topTitles: const AxisTitles(
+//                         sideTitles: SideTitles(showTitles: false),
+//                       ),
+//                     ),
+//                     borderData: FlBorderData(
+//                       show: true,
+//                       border: Border(
+//                         left: BorderSide(color: Colors.grey[300]!, width: 1),
+//                         bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+//                       ),
+//                     ),
+//                     gridData: FlGridData(
+//                       show: true,
+//                       drawVerticalLine: false,
+//                       horizontalInterval: hourlyData.values.isNotEmpty
+//                           ? (hourlyData.values.reduce((a, b) => a > b ? a : b) / 5).ceilToDouble()
+//                           : 5,
+//                       getDrawingHorizontalLine: (value) => FlLine(
+//                         color: Colors.grey.withOpacity(0.15),
+//                         strokeWidth: 1,
+//                         dashArray: [5, 5],
+//                       ),
+//                     ),
+//                     barGroups: List.generate(24, (hour) {
+//                       final count = hourlyData[hour] ?? 0;
+//                       final maxCount = hourlyData.values.isNotEmpty
+//                           ? hourlyData.values.reduce((a, b) => a > b ? a : b)
+//                           : 1;
+//                       final intensity = count / maxCount;
                       
-                      return BarChartGroupData(
-                        x: hour,
-                        barRods: [
-                          BarChartRodData(
-                            toY: count.toDouble(),
-                            color: _getHeatmapColor(intensity),
-                            width: 14,
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(4),
-                            ),
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [
-                                _getHeatmapColor(intensity).withOpacity(0.7),
-                                _getHeatmapColor(intensity),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    }),
-                  ),
-                ),
-        ),
-      ],
-    ),
-  );
-}
+//                       return BarChartGroupData(
+//                         x: hour,
+//                         barRods: [
+//                           BarChartRodData(
+//                             toY: count.toDouble(),
+//                             color: _getHeatmapColor(intensity),
+//                             width: 14,
+//                             borderRadius: const BorderRadius.vertical(
+//                               top: Radius.circular(4),
+//                             ),
+//                             gradient: LinearGradient(
+//                               begin: Alignment.bottomCenter,
+//                               end: Alignment.topCenter,
+//                               colors: [
+//                                 _getHeatmapColor(intensity).withOpacity(0.7),
+//                                 _getHeatmapColor(intensity),
+//                               ],
+//                             ),
+//                           ),
+//                         ],
+//                       );
+//                     }),
+//                   ),
+//                 ),
+//         ),
+//       ],
+//     ),
+//   );
+// }
 
 // ============================================
 // 🎨 IMPROVED USERS BY COURSE CARD
@@ -1600,6 +1563,582 @@ Widget buildUsersByYearLevelCard(
   );
 }
 
+Widget buildChatLimitReachCard(double chatLimitReachRate) {
+  final Color cardColor = chatLimitReachRate > 50 
+      ? Colors.red 
+      : chatLimitReachRate > 25 
+          ? Colors.orange 
+          : Colors.green;
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: cardColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.chat_bubble_outline,
+                color: cardColor,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Chat Limit Reach Rate',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xff666666),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${chatLimitReachRate.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: cardColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Users hitting daily message limit',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Stat Card for Escalation Limit Reach Rate
+Widget buildEscalationLimitReachCard(double escalationLimitReachRate) {
+  final Color cardColor = escalationLimitReachRate > 50 
+      ? Colors.red 
+      : escalationLimitReachRate > 25 
+          ? Colors.orange 
+          : Colors.green;
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: cardColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.priority_high,
+                color: cardColor,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Escalation Limit Reach Rate',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xff666666),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${escalationLimitReachRate.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: cardColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Users hitting daily escalation limit',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Chart for Chat Limit Reach Trend
+Widget buildChatLimitReachTrendCard(List<ChartData> trendData) {
+  if (trendData.isEmpty) {
+    return _buildEmptyState(
+      message: 'Chat Limit Reach Trend',
+      subtitle: 'Users hitting message limit over time',
+      icon: Icons.chat_bubble_outline,
+    );
+  }
+
+  final maxValue = trendData.map((e) => e.count).reduce((a, b) => a > b ? a : b).toDouble();
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.chat_bubble_outline,
+                color: Color(0xFFEF4444),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Chat Limit Reach Trend',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff1a1a1a),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Users hitting message limit over time',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: LineChart(
+            LineChartData(
+              minY: 0,
+              maxY: maxValue * 1.2,
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: _calculateInterval(maxValue),
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: Colors.grey.withOpacity(0.15),
+                  strokeWidth: 1,
+                ),
+              ),
+              titlesData: FlTitlesData(
+                show: true,
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 30,
+                    interval: getBottomTitleInterval(trendData.length),
+                    getTitlesWidget: (value, meta) {
+                      if (value.toInt() >= 0 && value.toInt() < trendData.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            trendData[value.toInt()].date,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 40,
+                    interval: _calculateInterval(maxValue),
+                    getTitlesWidget: (value, meta) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text(
+                          value.toInt().toString(),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border(
+                  left: BorderSide(color: Colors.grey[300]!, width: 1),
+                  bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                ),
+              ),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: trendData.asMap().entries.map((entry) {
+                    return FlSpot(entry.key.toDouble(), entry.value.count.toDouble());
+                  }).toList(),
+                  isCurved: true,
+                  color: const Color(0xFFEF4444),
+                  barWidth: 3,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (spot, percent, barData, index) {
+                      return FlDotCirclePainter(
+                        radius: 4,
+                        color: Colors.white,
+                        strokeWidth: 2,
+                        strokeColor: const Color(0xFFEF4444),
+                      );
+                    },
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFEF4444).withOpacity(0.3),
+                        const Color(0xFFEF4444).withOpacity(0.0),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+              ],
+              lineTouchData: LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipColor: (touchedSpot) => const Color(0xff1a1a1a),
+                  tooltipRoundedRadius: 8,
+                  getTooltipItems: (touchedSpots) {
+                    return touchedSpots.map((spot) {
+                      final index = spot.x.toInt();
+                      if (index >= 0 && index < trendData.length) {
+                        return LineTooltipItem(
+                          '${trendData[index].date}\n',
+                          const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: '${spot.y.toInt()} users',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      return null;
+                    }).toList();
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Chart for Escalation Limit Reach Trend
+Widget buildEscalationLimitReachTrendCard(List<ChartData> trendData) {
+  if (trendData.isEmpty) {
+    return _buildEmptyState(
+      message: 'Escalation Limit Reach Trend',
+      subtitle: 'Users hitting escalation limit over time',
+      icon: Icons.priority_high,
+    );
+  }
+
+  final maxValue = trendData.map((e) => e.count).reduce((a, b) => a > b ? a : b).toDouble();
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF97316).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.priority_high,
+                color: Color(0xFFF97316),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Escalation Limit Reach Trend',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff1a1a1a),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Users hitting escalation limit over time',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: LineChart(
+            LineChartData(
+              minY: 0,
+              maxY: maxValue * 1.2,
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: _calculateInterval(maxValue),
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: Colors.grey.withOpacity(0.15),
+                  strokeWidth: 1,
+                ),
+              ),
+              titlesData: FlTitlesData(
+                show: true,
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 30,
+                    interval: _calculateBottomInterval(trendData.length),
+                    getTitlesWidget: (value, meta) {
+                      if (value.toInt() >= 0 && value.toInt() < trendData.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            trendData[value.toInt()].date,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 40,
+                    interval: _calculateInterval(maxValue),
+                    getTitlesWidget: (value, meta) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text(
+                          value.toInt().toString(),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border(
+                  left: BorderSide(color: Colors.grey[300]!, width: 1),
+                  bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                ),
+              ),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: trendData.asMap().entries.map((entry) {
+                    return FlSpot(entry.key.toDouble(), entry.value.count.toDouble());
+                  }).toList(),
+                  isCurved: true,
+                  color: const Color(0xFFF97316),
+                  barWidth: 3,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (spot, percent, barData, index) {
+                      return FlDotCirclePainter(
+                        radius: 4,
+                        color: Colors.white,
+                        strokeWidth: 2,
+                        strokeColor: const Color(0xFFF97316),
+                      );
+                    },
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFF97316).withOpacity(0.3),
+                        const Color(0xFFF97316).withOpacity(0.0),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+              ],
+              lineTouchData: LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipColor: (touchedSpot) => const Color(0xff1a1a1a),
+                  tooltipRoundedRadius: 8,
+                  getTooltipItems: (touchedSpots) {
+                    return touchedSpots.map((spot) {
+                      final index = spot.x.toInt();
+                      if (index >= 0 && index < trendData.length) {
+                        return LineTooltipItem(
+                          '${trendData[index].date}\n',
+                          const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: '${spot.y.toInt()} users',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      return null;
+                    }).toList();
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+double _calculateInterval(double maxValue) {
+  if (maxValue <= 5) return 1;
+  if (maxValue <= 20) return 5;
+  if (maxValue <= 50) return 10;
+  return (maxValue / 5).ceil().toDouble();
+}
+
 
 
 double _getMaxResponseTime(List<ChartData> data) {
@@ -1659,6 +2198,26 @@ Color _getYearLevelColor(int index) {
     Colors.red[600]!,
   ];
   return colors[index % colors.length];
+}
+
+double _calculateBottomInterval(int dataLength) {
+  if (dataLength <= 7) return 1;
+  if (dataLength <= 14) return 2;
+  return (dataLength / 6).ceil().toDouble();
+}
+
+
+// Helper function
+DateTime _getStartOfWeek(DateTime date) {
+  final daysFromMonday = date.weekday - 1;
+  return DateTime(
+    date.year,
+    date.month,
+    date.day,
+    0,
+    0,
+    0,
+  ).subtract(Duration(days: daysFromMonday));
 }
 
 
@@ -1776,267 +2335,6 @@ String _getTimeFrameDescription(String timeFrame, [DateTime? startDate, DateTime
   }
 }
 
-
-// ============================================================================
-// PEAK USAGE (DYNAMIC BY TIMEFRAME)
-// ============================================================================
-Widget buildPeakUsageCard(
-  Map<int, int>? peakByHour,
-  Map<String, int>? peakByDay,
-  Map<String, int>? peakByMonth,
-  String timeFrame,
-) {
-  // Determine which data to show based on timeframe
-  final bool showHourly = timeFrame == 'Today' || (peakByHour != null && peakByDay == null && peakByMonth == null);
-  final bool showDaily = timeFrame == 'This Week' || timeFrame == 'Custom' && peakByDay != null;
-  final bool showMonthly = timeFrame == 'This Year' || timeFrame == 'All' || peakByMonth != null;
-
-  String title;
-  String subtitle;
-  Map<String, int> dataToShow = {};
-
-  if (showHourly && peakByHour != null) {
-    title = 'Peak Usage Hours';
-    subtitle = 'Busiest hours of the day';
-    peakByHour.forEach((hour, count) {
-      final hourStr = hour == 0
-          ? '12AM'
-          : hour < 12
-              ? '${hour}AM'
-              : hour == 12
-                  ? '12PM'
-                  : '${hour - 12}PM';
-      dataToShow[hourStr] = count;
-    });
-  } else if (showDaily && peakByDay != null) {
-    title = 'Peak Usage Days';
-    subtitle = 'Busiest days of the week';
-    dataToShow = peakByDay;
-  } else if (showMonthly && peakByMonth != null) {
-    title = 'Peak Usage Months';
-    subtitle = 'Busiest months';
-    dataToShow = peakByMonth;
-  } else {
-    title = 'Peak Usage';
-    subtitle = 'No data available';
-  }
-
-  final sortedData = dataToShow.entries.toList()
-    ..sort((a, b) => b.value.compareTo(a.value));
-  final topData = sortedData.take(10).toList();
-
-  return Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.08),
-          blurRadius: 12,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xfff59e0b).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.timeline_rounded,
-                color: Color(0xfff59e0b),
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xff1a1a1a),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        Expanded(
-          child: topData.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.show_chart, size: 48, color: Colors.grey[300]),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No usage data available',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
-                      ),
-                    ],
-                  ),
-                )
-              : BarChart(
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: topData.first.value.toDouble() * 1.15,
-                    minY: 0,
-                    groupsSpace: 12,
-                    barTouchData: BarTouchData(
-                      enabled: true,
-                      touchTooltipData: BarTouchTooltipData(
-                        getTooltipColor: (group) => const Color(0xff1a1a1a),
-                        tooltipPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        tooltipRoundedRadius: 8,
-                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                          if (groupIndex < topData.length) {
-                            final entry = topData[groupIndex];
-                            return BarTooltipItem(
-                              '${entry.key}\n',
-                              const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              children: [
-                                TextSpan(
-                                  text: '${entry.value} sessions',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    titlesData: FlTitlesData(
-                      show: true,
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 40,
-                          getTitlesWidget: (value, meta) {
-                            if (value.toInt() < topData.length) {
-                              final entry = topData[value.toInt()];
-                              return Transform.rotate(
-                                angle: -0.3,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Text(
-                                    entry.key,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey[700],
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
-                        ),
-                      ),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 40,
-                          getTitlesWidget: (value, meta) {
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: Text(
-                                value.toInt().toString(),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey[600],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    ),
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: false,
-                      getDrawingHorizontalLine: (value) => FlLine(
-                        color: Colors.grey.withOpacity(0.15),
-                        strokeWidth: 1,
-                      ),
-                    ),
-                    borderData: FlBorderData(
-                      show: true,
-                      border: Border(
-                        left: BorderSide(color: Colors.grey[300]!, width: 1),
-                        bottom: BorderSide(color: Colors.grey[300]!, width: 1),
-                      ),
-                    ),
-                    barGroups: topData.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final data = entry.value;
-                      final Color barColor = _getPeakBarColor(index, topData.length);
-
-                      return BarChartGroupData(
-                        x: index,
-                        barRods: [
-                          BarChartRodData(
-                            toY: data.value.toDouble(),
-                            width: 32,
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(8),
-                              topRight: Radius.circular(8),
-                            ),
-                            gradient: LinearGradient(
-                              colors: [
-                                barColor,
-                                barColor.withOpacity(0.7),
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                  swapAnimationDuration: const Duration(milliseconds: 600),
-                  swapAnimationCurve: Curves.easeInOutCubic,
-                ),
-        ),
-      ],
-    ),
-  );
-}
 
 // ============================================================================
 // UNANSWERED REASONS DISTRIBUTION
@@ -2235,4 +2533,1338 @@ Color _getReasonColor(int index) {
     const Color(0xff06b6d4), // Cyan
   ];
   return colors[index % colors.length];
+}
+
+
+Widget buildPeakUsageHoursCard(
+  Map<int, int> hourlyData,
+  String timeFrame,
+  DateTime startDate,
+  DateTime? endDate,
+) {
+  // Calculate stats
+  int totalMessages = hourlyData.values.fold(0, (sum, count) => sum + count);
+  int peakHour = 0;
+  int peakCount = 0;
+  
+  hourlyData.forEach((hour, count) {
+    if (count > peakCount) {
+      peakCount = count;
+      peakHour = hour;
+    }
+  });
+
+  // Count non-zero hours
+  int activeHours = hourlyData.values.where((count) => count > 0).length;
+  
+  String getPeakTimeLabel() {
+    if (peakHour == 0) return '12 AM';
+    if (peakHour < 12) return '$peakHour AM';
+    if (peakHour == 12) return '12 PM';
+    return '${peakHour - 12} PM';
+  }
+
+  String getTimeRangeText() {
+    final actualEndDate = endDate ?? DateTime.now();
+    final dateFormat = DateFormat('MMM d');
+    
+    switch (timeFrame) {
+      case 'Today':
+        return 'Today';
+      case 'This Week':
+        final startOfWeek = _getStartOfWeek(DateTime.now());
+        final endOfWeek = startOfWeek.add(const Duration(days: 6));
+        return '${dateFormat.format(startOfWeek)} - ${dateFormat.format(endOfWeek)}';
+      case 'This Month':
+        return DateFormat('MMMM y').format(DateTime.now());
+      case 'This Year':
+        return 'Year ${DateTime.now().year}';
+      case 'Custom':
+        return '${dateFormat.format(startDate)} - ${dateFormat.format(actualEndDate)}';
+      case 'All':
+        return 'All time';
+      default:
+        return 'Messages sent by hour of day';
+    }
+  }
+
+  // Check if we have any data
+  final hasData = totalMessages > 0;
+  
+  // Calculate max value safely
+  final maxValue = hasData && hourlyData.values.isNotEmpty
+      ? hourlyData.values.reduce((a, b) => a > b ? a : b).toDouble()
+      : 10.0;
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.06),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Peak Usage Hours',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    getTimeRangeText(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (hasData)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.orange[200]!, width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.schedule, size: 14, color: Colors.orange[700]),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Peak: ${getPeakTimeLabel()}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        
+        if (hasData) ...[
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildMiniStat('Total', '$totalMessages', Colors.blue),
+              const SizedBox(width: 16),
+              _buildMiniStat('Peak Count', '$peakCount', Colors.orange),
+              const SizedBox(width: 16),
+              _buildMiniStat('Active Hours', '$activeHours', Colors.green),
+            ],
+          ),
+        ],
+        
+        const SizedBox(height: 20),
+        
+        Expanded(
+          child: !hasData
+              ? _buildEmptyState(
+                  icon: Icons.access_time,
+                  message: 'No hourly data available',
+                  subtitle: 'for ${getTimeRangeText()}',
+                )
+              : BarChart(
+                  BarChartData(
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: maxValue * 1.2,
+                    barTouchData: BarTouchData(
+                      touchTooltipData: BarTouchTooltipData(
+                        getTooltipColor: (group) => const Color(0xff1a1a1a),
+                        tooltipRoundedRadius: 8,
+                        tooltipPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                          int hour = group.x.toInt();
+                          String timeLabel = hour == 0
+                              ? '12 AM'
+                              : hour < 12
+                                  ? '$hour AM'
+                                  : hour == 12
+                                      ? '12 PM'
+                                      : '${hour - 12} PM';
+                          return BarTooltipItem(
+                            '$timeLabel\n',
+                            const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: '${rod.toY.round()} messages',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    titlesData: FlTitlesData(
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 35,
+                          getTitlesWidget: (value, meta) => Container(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Text(
+                              value.toInt().toString(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[700],
+                              ),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                        ),
+                      ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          interval: 4,
+                          getTitlesWidget: (value, meta) {
+                            int hour = value.toInt();
+                            if (hour % 4 == 0) {
+                              String label = hour == 0
+                                  ? '12A'
+                                  : hour < 12
+                                      ? '${hour}A'
+                                      : hour == 12
+                                          ? '12P'
+                                          : '${hour - 12}P';
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ),
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                    ),
+                    borderData: FlBorderData(
+                      show: true,
+                      border: Border(
+                        left: BorderSide(color: Colors.grey[300]!, width: 1),
+                        bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                      ),
+                    ),
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      // Fix: Ensure interval is never zero
+                      horizontalInterval: maxValue > 0 
+                          ? (maxValue / 5).ceilToDouble().clamp(1.0, double.infinity)
+                          : 2.0,
+                      getDrawingHorizontalLine: (value) => FlLine(
+                        color: Colors.grey.withOpacity(0.15),
+                        strokeWidth: 1,
+                        dashArray: [5, 5],
+                      ),
+                    ),
+                    barGroups: List.generate(24, (hour) {
+                      final count = hourlyData[hour] ?? 0;
+                      final intensity = maxValue > 0 ? count / maxValue : 0.0;
+                      
+                      return BarChartGroupData(
+                        x: hour,
+                        barRods: [
+                          BarChartRodData(
+                            toY: count.toDouble(),
+                            color: _getHeatmapColor(intensity),
+                            width: 14,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(4),
+                            ),
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [
+                                _getHeatmapColor(intensity).withOpacity(0.7),
+                                _getHeatmapColor(intensity),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
+                  ),
+                ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Card 2: Peak Days (Mon-Sun view)
+Widget buildPeakUsageByDayCard(
+  Map<String, int>? dailyData,
+  String timeFrame,
+  DateTime startDate,
+  DateTime? endDate,
+) {
+  if (dailyData == null || dailyData.isEmpty) {
+    return _buildEmptyCard('Peak Usage by Day', 'No daily data available');
+  }
+
+  final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  int maxCount = dailyData.values.reduce((a, b) => a > b ? a : b);
+  int totalMessages = dailyData.values.fold(0, (sum, count) => sum + count);
+  
+  // Find peak day
+  String peakDay = '';
+  int peakCount = 0;
+  dailyData.forEach((day, count) {
+    if (count > peakCount) {
+      peakCount = count;
+      peakDay = day;
+    }
+  });
+
+  String getTimeRangeText() {
+    final actualEndDate = endDate ?? DateTime.now();
+    final dateFormat = DateFormat('MMM d');
+    
+    switch (timeFrame) {
+      case 'This Week':
+        final startOfWeek = _getStartOfWeek(DateTime.now());
+        final endOfWeek = startOfWeek.add(const Duration(days: 6));
+        return '${dateFormat.format(startOfWeek)} - ${dateFormat.format(endOfWeek)}';
+      case 'This Month':
+        return DateFormat('MMMM y').format(DateTime.now());
+      case 'Custom':
+        return '${dateFormat.format(startDate)} - ${dateFormat.format(actualEndDate)}';
+      default:
+        return 'Weekly breakdown';
+    }
+  }
+  
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.06),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Peak Usage by Day',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    getTimeRangeText(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.orange[200]!, width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_today, size: 14, color: Colors.orange[700]),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Peak: $peakDay',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            _buildMiniStat('Total', '$totalMessages', Colors.blue),
+            const SizedBox(width: 16),
+            _buildMiniStat('Peak Count', '$peakCount', Colors.orange),
+            const SizedBox(width: 16),
+            _buildMiniStat('Active Days', '${dailyData.length}', Colors.green),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxCount.toDouble() * 1.2,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (group) => const Color(0xff1a1a1a),
+                  tooltipRoundedRadius: 8,
+                  tooltipPadding: const EdgeInsets.all(8),
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final day = dayNames[group.x.toInt()];
+                    return BarTooltipItem(
+                      '$day\n',
+                      const TextStyle(color: Colors.white70, fontSize: 11),
+                      children: [
+                        TextSpan(
+                          text: '${rod.toY.round()} messages',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 35,
+                    getTitlesWidget: (value, meta) => Container(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Text(
+                        value.toInt().toString(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[700],
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      if (value.toInt() < dayNames.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            dayNames[value.toInt()],
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border(
+                  left: BorderSide(color: Colors.grey[300]!, width: 1),
+                  bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: (maxCount / 5).ceilToDouble(),
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: Colors.grey.withOpacity(0.15),
+                  strokeWidth: 1,
+                  dashArray: [5, 5],
+                ),
+              ),
+              barGroups: dayNames.asMap().entries.map((entry) {
+                final index = entry.key;
+                final day = entry.value;
+                final count = dailyData[day] ?? 0;
+                final intensity = maxCount > 0 ? count / maxCount : 0.0;
+                
+                return BarChartGroupData(
+                  x: index,
+                  barRods: [
+                    BarChartRodData(
+                      toY: count.toDouble(),
+                      color: _getHeatmapColor(intensity),
+                      width: 24,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          _getHeatmapColor(intensity).withOpacity(0.7),
+                          _getHeatmapColor(intensity),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Card 3: Peak Weeks (for Monthly filter) & Peak Months (for Year/All filter)
+Widget buildPeakUsageByMonthCard(
+  Map<String, int>? monthlyData,
+  String timeFrame,
+  DateTime startDate,
+  DateTime? endDate,
+) {
+  if (monthlyData == null || monthlyData.isEmpty) {
+    return _buildEmptyCard('Peak Usage by Week', 'No weekly data available');
+  }
+
+  // This function should ONLY handle weeks (for "This Month")
+  // Other timeframes should use their specific functions
+  String title = 'Peak Usage by Week';
+  List<String> labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'];
+  IconData icon = Icons.date_range;
+
+  int maxCount = monthlyData.values.reduce((a, b) => a > b ? a : b);
+  int totalMessages = monthlyData.values.fold(0, (sum, count) => sum + count);
+  
+  String peakPeriod = '';
+  int peakCount = 0;
+  monthlyData.forEach((period, count) {
+    if (count > peakCount) {
+      peakCount = count;
+      peakPeriod = period;
+    }
+  });
+
+  String getTimeRangeText() {
+    return DateFormat('MMMM y').format(startDate);
+  }
+  
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.06),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    getTimeRangeText(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.orange[200]!, width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 14, color: Colors.orange[700]),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Peak: $peakPeriod',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            _buildMiniStat('Total', '$totalMessages', Colors.blue),
+            const SizedBox(width: 16),
+            _buildMiniStat('Peak Count', '$peakCount', Colors.orange),
+            const SizedBox(width: 16),
+            _buildMiniStat(
+              'Active Periods',
+              '${monthlyData.entries.where((entry) => entry.value > 0).length}',
+              Colors.green,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxCount > 0 ? maxCount.toDouble() * 1.2 : 10,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (group) => const Color(0xff1a1a1a),
+                  tooltipRoundedRadius: 8,
+                  tooltipPadding: const EdgeInsets.all(8),
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    if (group.x.toInt() < labels.length) {
+                      final label = labels[group.x.toInt()];
+                      return BarTooltipItem(
+                        '$label\n',
+                        const TextStyle(color: Colors.white70, fontSize: 11),
+                        children: [
+                          TextSpan(
+                            text: '${rod.toY.round()} messages',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 35,
+                    getTitlesWidget: (value, meta) => Container(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Text(
+                        value.toInt().toString(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[700],
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      final index = value.toInt();
+                      if (index < labels.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            labels[index],
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border(
+                  left: BorderSide(color: Colors.grey[300]!, width: 1),
+                  bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: maxCount > 0 ? (maxCount / 5).ceilToDouble() : 2,
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: Colors.grey.withOpacity(0.15),
+                  strokeWidth: 1,
+                  dashArray: [5, 5],
+                ),
+              ),
+              barGroups: labels.asMap().entries.map((entry) {
+                final index = entry.key;
+                final label = entry.value;
+                final count = monthlyData[label] ?? 0;
+                final intensity = maxCount > 0 ? count / maxCount : 0.0;
+                
+                return BarChartGroupData(
+                  x: index,
+                  barRods: [
+                    BarChartRodData(
+                      toY: count.toDouble(),
+                      color: _getHeatmapColor(intensity),
+                      width: 20,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          _getHeatmapColor(intensity).withOpacity(0.7),
+                          _getHeatmapColor(intensity),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+
+Widget buildPeakUsageByYearCard(
+  Map<String, int>? yearlyData,
+  String timeFrame,
+  DateTime startDate,
+  DateTime? endDate,
+) {
+  if (yearlyData == null || yearlyData.isEmpty) {
+    return _buildEmptyCard('Peak Usage by Month', 'No monthly data available');
+  }
+
+  final monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+
+  int maxCount = yearlyData.values.reduce((a, b) => a > b ? a : b);
+  int totalMessages = yearlyData.values.fold(0, (sum, count) => sum + count);
+  
+  // Find peak month
+  String peakMonth = '';
+  int peakCount = 0;
+  yearlyData.forEach((month, count) {
+    if (count > peakCount) {
+      peakCount = count;
+      peakMonth = month;
+    }
+  });
+
+  String getTimeRangeText() {
+    return 'Year ${startDate.year}';
+  }
+  
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.06),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Peak Usage by Month',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    getTimeRangeText(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.orange[200]!, width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_month, size: 14, color: Colors.orange[700]),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Peak: $peakMonth',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            _buildMiniStat('Total', '$totalMessages', Colors.blue),
+            const SizedBox(width: 16),
+            _buildMiniStat('Peak Count', '$peakCount', Colors.orange),
+            const SizedBox(width: 16),
+            _buildMiniStat('Avg/Month', '${(totalMessages / 12).round()}', Colors.green),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxCount.toDouble() * 1.2,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (group) => const Color(0xff1a1a1a),
+                  tooltipRoundedRadius: 8,
+                  tooltipPadding: const EdgeInsets.all(8),
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final month = monthNames[group.x.toInt()];
+                    return BarTooltipItem(
+                      '$month ${startDate.year}\n',
+                      const TextStyle(color: Colors.white70, fontSize: 11),
+                      children: [
+                        TextSpan(
+                          text: '${rod.toY.round()} messages',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 35,
+                    getTitlesWidget: (value, meta) => Container(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Text(
+                        value.toInt().toString(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[700],
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      if (value.toInt() < monthNames.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            monthNames[value.toInt()],
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border(
+                  left: BorderSide(color: Colors.grey[300]!, width: 1),
+                  bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: (maxCount / 5).ceilToDouble(),
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: Colors.grey.withOpacity(0.15),
+                  strokeWidth: 1,
+                  dashArray: [5, 5],
+                ),
+              ),
+              barGroups: monthNames.asMap().entries.map((entry) {
+                final index = entry.key;
+                final month = entry.value;
+                final count = yearlyData[month] ?? 0;
+                final intensity = maxCount > 0 ? count / maxCount : 0.0;
+                
+                return BarChartGroupData(
+                  x: index,
+                  barRods: [
+                    BarChartRodData(
+                      toY: count.toDouble(),
+                      color: _getHeatmapColor(intensity),
+                      width: 20,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          _getHeatmapColor(intensity).withOpacity(0.7),
+                          _getHeatmapColor(intensity),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ALL-TIME VIEW: Shows all years
+Widget buildPeakUsageByAllYearsCard(
+  Map<String, int>? allYearsData,
+  String timeFrame,
+  DateTime startDate,
+  DateTime? endDate,
+) {
+  if (allYearsData == null || allYearsData.isEmpty) {
+    return _buildEmptyCard('Peak Usage by Year', 'No yearly data available');
+  }
+
+  final years = allYearsData.keys.toList()..sort();
+  int maxCount = allYearsData.values.reduce((a, b) => a > b ? a : b);
+  int totalMessages = allYearsData.values.fold(0, (sum, count) => sum + count);
+  
+  // Find peak year
+  String peakYear = '';
+  int peakCount = 0;
+  allYearsData.forEach((year, count) {
+    if (count > peakCount) {
+      peakCount = count;
+      peakYear = year;
+    }
+  });
+
+  String getTimeRangeText() {
+    final actualEndDate = endDate ?? DateTime.now();
+    return '${startDate.year} - ${actualEndDate.year}';
+  }
+  
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.06),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Peak Usage by Year',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    getTimeRangeText(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.orange[200]!, width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_today, size: 14, color: Colors.orange[700]),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Peak: $peakYear',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            _buildMiniStat('Total', '$totalMessages', Colors.blue),
+            const SizedBox(width: 16),
+            _buildMiniStat('Peak Count', '$peakCount', Colors.orange),
+            const SizedBox(width: 16),
+            _buildMiniStat('Years', '${years.length}', Colors.green),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxCount.toDouble() * 1.2,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (group) => const Color(0xff1a1a1a),
+                  tooltipRoundedRadius: 8,
+                  tooltipPadding: const EdgeInsets.all(8),
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final year = years[group.x.toInt()];
+                    return BarTooltipItem(
+                      '$year\n',
+                      const TextStyle(color: Colors.white70, fontSize: 11),
+                      children: [
+                        TextSpan(
+                          text: '${rod.toY.round()} messages',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 35,
+                    getTitlesWidget: (value, meta) => Container(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Text(
+                        value.toInt().toString(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[700],
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    interval: years.length > 10 ? 2 : 1, // Show every 2 years if > 10 years
+                    getTitlesWidget: (value, meta) {
+                      if (value.toInt() < years.length) {
+                        final shouldShow = years.length <= 10 || value.toInt() % 2 == 0;
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            shouldShow ? years[value.toInt()] : '',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border(
+                  left: BorderSide(color: Colors.grey[300]!, width: 1),
+                  bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: (maxCount / 5).ceilToDouble(),
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: Colors.grey.withOpacity(0.15),
+                  strokeWidth: 1,
+                  dashArray: [5, 5],
+                ),
+              ),
+              barGroups: years.asMap().entries.map((entry) {
+                final index = entry.key;
+                final year = entry.value;
+                final count = allYearsData[year] ?? 0;
+                final intensity = maxCount > 0 ? count / maxCount : 0.0;
+                
+                return BarChartGroupData(
+                  x: index,
+                  barRods: [
+                    BarChartRodData(
+                      toY: count.toDouble(),
+                      color: _getHeatmapColor(intensity),
+                      width: years.length > 10 ? 16 : 24,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          _getHeatmapColor(intensity).withOpacity(0.7),
+                          _getHeatmapColor(intensity),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Helper widgets
+Widget _buildMiniStat(String label, String value, Color color) {
+  return Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.2), width: 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildEmptyCard(String title, String message) {
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.06),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1A1A1A),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: Center(
+            child: Text(
+              message,
+              style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }

@@ -57,6 +57,8 @@ dependencies:
   markdown: ^7.3.0
   flutter_markdown_plus: ^1.0.5
   timeago: ^3.7.1
+  open_file: ^3.5.11
+  csv: ^6.0.0
 
 
 

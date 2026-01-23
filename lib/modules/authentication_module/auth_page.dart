@@ -184,85 +184,102 @@ class RoleBasedRouter extends StatelessWidget {
   }
 
   Future<UserData> _getUserDataAndLogEvent() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception('No authenticated user found');
-      }
-
-      print('🔍 Fetching user data for: ${user.uid}');
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      String role = 'user';
-      String name = user.displayName ?? user.email?.split('@')[0] ?? 'User';
-      bool profileCompleted = false;
-      bool onboardingCompleted = false;
-
-      if (doc.exists) {
-        final data = doc.data()!;
-        role = data['role'] ?? 'user';
-        name = data['name'] ?? name;
-        profileCompleted = data['profileCompleted'] ?? false;
-        onboardingCompleted = data['onboardingCompleted'] ?? false;
-
-        print('📊 User data found:');
-        print('   - Role: $role');
-        print('   - Name: $name');
-        print('   - Profile Completed: $profileCompleted');
-        print('   - Onboarding Completed: $onboardingCompleted');
-
-        try {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .update({'lastLoginAt': FieldValue.serverTimestamp()});
-        } catch (e) {
-          print('⚠️ Failed to update last login: $e');
-        }
-      } else {
-        print('⚠️ User document not found, creating new one');
-
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'uid': user.uid,
-          'email': user.email ?? '',
-          'name': name,
-          'photoURL': user.photoURL ?? '',
-          'role': 'user',
-          'createdAt': FieldValue.serverTimestamp(),
-          'firstLogin': true,
-          'isActive': true,
-          'profileCompleted': false,
-          'onboardingCompleted': false,
-          'hasSeenOnboardingGuide': false,
-          'isVerified': user.emailVerified,
-          'linkedProviders': ['password'],
-          'dailyMessageCount': 0,
-          'lastMessageResetDate': FieldValue.serverTimestamp(),
-        });
-
-        print('✅ New user document created');
-      }
-
-      try {
-        await _logLogin(user.uid, name);
-      } catch (e) {
-        print('⚠️ Failed to log login: $e');
-      }
-
-      return UserData(
-        role: role,
-        name: name,
-        isProfileCompleted: profileCompleted,
-        isOnboardingCompleted: onboardingCompleted,
-      );
-    } catch (e) {
-      print('❌ Error getting user data: $e');
-      rethrow;
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('No authenticated user found');
     }
+
+    print('🔍 Fetching user data for: ${user.uid}');
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    String role = 'user';
+    String name = user.displayName ?? user.email?.split('@')[0] ?? 'User';
+    bool profileCompleted = false;
+    bool onboardingCompleted = false;
+
+    if (doc.exists) {
+      final data = doc.data()!;
+      
+      // ✅ READ ALL FIELDS
+      role = data['role'] ?? 'user';
+      name = data['name'] ?? name;
+      profileCompleted = data['profileCompleted'] ?? false;
+      onboardingCompleted = data['onboardingCompleted'] ?? false;
+
+      // ✅ DETAILED DEBUG OUTPUT
+      print('📊 User document EXISTS:');
+      print('   - Document ID: ${doc.id}');
+      print('   - Role: $role');
+      print('   - Name: $name');
+      print('   - profileCompleted (read): $profileCompleted');
+      print('   - onboardingCompleted (read): $onboardingCompleted');
+      print('   - RAW profileCompleted: ${data['profileCompleted']}');
+      print('   - RAW onboardingCompleted: ${data['onboardingCompleted']}');
+      print('   - Document has fields: ${data.keys.toList()}');
+
+      // ✅ UPDATE LAST LOGIN (with error handling)
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({'lastLoginAt': FieldValue.serverTimestamp()});
+      } catch (e) {
+        print('⚠️ Failed to update last login: $e');
+      }
+    } else {
+      print('⚠️ User document DOES NOT EXIST - creating new one');
+
+      // ✅ CREATE NEW DOCUMENT (only if it doesn't exist)
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'email': user.email ?? '',
+        'name': name,
+        'photoURL': user.photoURL ?? '',
+        'role': 'user',
+        'createdAt': FieldValue.serverTimestamp(),
+        'firstLogin': true,
+        'isActive': true,
+        'profileCompleted': false,
+        'onboardingCompleted': false,
+        'hasSeenOnboardingGuide': false,
+        'isVerified': user.emailVerified,
+        'linkedProviders': ['password'],
+        'dailyMessageCount': 0,
+        'lastMessageResetDate': FieldValue.serverTimestamp(),
+      });
+
+      print('✅ New user document created');
+    }
+
+    // ✅ LOG LOGIN EVENT
+    try {
+      await _logLogin(user.uid, name);
+    } catch (e) {
+      print('⚠️ Failed to log login: $e');
+    }
+
+    // ✅ RETURN USER DATA
+    print('🎯 Returning UserData:');
+    print('   - role: $role');
+    print('   - name: $name');
+    print('   - isProfileCompleted: $profileCompleted');
+    print('   - isOnboardingCompleted: $onboardingCompleted');
+
+    return UserData(
+      role: role,
+      name: name,
+      isProfileCompleted: profileCompleted,
+      isOnboardingCompleted: onboardingCompleted,
+    );
+  } catch (e) {
+    print('❌ Error getting user data: $e');
+    rethrow;
   }
+}
 
   Future<void> _logLogin(String userId, String userName) async {
     try {

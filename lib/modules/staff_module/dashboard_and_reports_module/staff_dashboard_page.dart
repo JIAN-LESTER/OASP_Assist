@@ -235,11 +235,11 @@ class _LazyLoadWidgetState extends State<LazyLoadWidget> {
 class DashboardCache {
   final InquiryReportsData? inq;
   final UserDemographicsReportsData? ud;
+  final AdminDashboardData? ad;
   final DateTime timestamp;
   final Map<String, dynamic>? quickStats;
 
-  DashboardCache({this.inq, this.ud, required this.timestamp, this.quickStats});
-
+  DashboardCache({this.inq, this.ud, this.ad, required this.timestamp, this.quickStats});
   bool get isValid {
     final now = DateTime.now();
     return now.difference(timestamp).inMinutes < 5;
@@ -275,6 +275,7 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
   InquiryReportsData? inq;
   ChatbotUsageReportsData? cb;
   UserDemographicsReportsData? ud;
+  AdminDashboardData? ad;
   String? userName;
   Map<String, int>? quickStats;
 
@@ -364,59 +365,74 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
   }
 
   Future<void> _fetchAndCacheData() async {
-    try {
-      // For dashboard, we use getAdminDashboardData
-      final results = await Future.wait([
-        _firebaseService.getAdminDashboardData(
-          selectedTimeFrame,
-          customDateRange,
-        ),
-        _firebaseService.getUserDemographicsReportsData(
-          selectedTimeFrame,
-          customDateRange,
-        ),
-      ]);
+  try {
+    final results = await Future.wait([
+      _firebaseService.getAdminDashboardData(
+        selectedTimeFrame,
+        customDateRange,
+      ),
+      _firebaseService.getUserDemographicsReportsData(
+        selectedTimeFrame,
+        customDateRange,
+      ),
+      // ✅ ADD: Fetch inquiry data separately
+      _firebaseService.getInquiryReportsData(
+        selectedTimeFrame,
+        customDateRange,
+      ),
+    ]);
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      final adminData = results[0] as AdminDashboardData;
-      final userDemoData = results[1] as UserDemographicsReportsData;
+    final adminData = results[0] as AdminDashboardData;
+    final userDemoData = results[1] as UserDemographicsReportsData;
+    final inquiryReportData = results[2] as InquiryReportsData;
 
-      // Convert AdminDashboardData to InquiryReportsData for compatibility
-      final inquiryData = InquiryReportsData(
-        totalMessages: adminData.totalMessages,
-        userMessages: 0, // Not available in AdminDashboardData
-        botMessages: 0, // Not available in AdminDashboardData
-        escalatedMessages: adminData.pendingEscalations,
-        escalationRate: adminData.escalationRate,
-        resolvedMessages: adminData.resolvedEscalations,
-        resolutionRate: adminData.resolutionRate,
-        inquiryTrend: adminData.inquiryTrend,
-        categoryDistribution: {}, // Not available in AdminDashboardData
-        topQuestions: {}, // Not available in AdminDashboardData
-        escalationsOverTime: adminData.escalationsOverTime,
-        staffPerformance: {}, // Not available in AdminDashboardData
-        botVsHumanAnswers: {'bot': 0, 'human': 0}, // Not available
-        recentLogs: [], // Not available
-        msgLogs: adminData.messageLogs,
-      );
+    // ✅ FIX: Use inquiryReportData directly instead of creating from adminData
+    final inquiryData = InquiryReportsData(
+      totalMessages: inquiryReportData.totalMessages,
+      userMessages: inquiryReportData.userMessages,
+      botMessages: inquiryReportData.botMessages,
+      escalatedMessages: inquiryReportData.escalatedMessages,
+      escalationRate: inquiryReportData.escalationRate,
+      resolvedMessages: inquiryReportData.resolvedMessages,
+      resolutionRate: inquiryReportData.resolutionRate,
+      inquiryTrend: inquiryReportData.inquiryTrend,
+      categoryDistribution: inquiryReportData.categoryDistribution,
+      topQuestions: inquiryReportData.topQuestions,
+      escalationsOverTime: inquiryReportData.escalationsOverTime,
+      staffPerformance: inquiryReportData.staffPerformance,
+      botVsHumanAnswers: inquiryReportData.botVsHumanAnswers,
+      allEscalations: inquiryReportData.allEscalations, // ✅ This now has the correct value
+      recentLogs: inquiryReportData.recentLogs,
+      msgLogs: inquiryReportData.msgLogs,
+    );
 
-      _cache[selectedTimeFrame] = DashboardCache(
-        inq: inquiryData,
-        ud: userDemoData,
-        timestamp: DateTime.now(),
-        quickStats: quickStats,
-      );
+    // ✅ UPDATE CACHE
+    _cache[selectedTimeFrame] = DashboardCache(
+      inq: inquiryData,
+      ud: userDemoData,
+      ad: adminData,
+      timestamp: DateTime.now(),
+    );
 
-      setState(() {
-        inq = inquiryData;
-        ud = userDemoData;
-      });
-    } catch (e) {
-      print('Error fetching data: $e');
-      rethrow;
-    }
+    setState(() {
+      inq = inquiryData;
+      ud = userDemoData;
+      ad = adminData;
+      
+      // ✅ DEBUG PRINTS
+      print('📊 Inquiry Data Updated:');
+      print('   All Escalations: ${inquiryData.allEscalations}');
+      print('   Escalated Messages: ${inquiryData.escalatedMessages}');
+      print('   Admin Pending Escalations: ${adminData.pendingEscalations}');
+      print('   Top Escalated Messages: ${adminData.topEscalatedMessages.length}');
+    });
+  } catch (e) {
+    print('❌ Error fetching data: $e');
+    rethrow;
   }
+}
 
   Future<void> _refreshInBackground() async {
     try {
@@ -650,6 +666,7 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
             isRefreshing: isRefreshing,
             inq: inq,
             ud: ud,
+            ad: ad,
             userName: userName!,
             quickStats: quickStats,
             customDateRange: customDateRange,
@@ -662,6 +679,7 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
             isRefreshing: isRefreshing,
             inq: inq,
             ud: ud,
+            ad: ad,
             userName: userName!,
             quickStats: quickStats,
             customDateRange: customDateRange,
@@ -674,6 +692,7 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
             isRefreshing: isRefreshing,
             inq: inq,
             ud: ud,
+            ad: ad,
             userName: userName!,
             quickStats: quickStats,
             customDateRange: customDateRange,
@@ -1082,7 +1101,7 @@ Widget dashboardContents(
                     Expanded(
                       child: buildStatCard(
                         'Escalation Rate',
-                        '${escalationRate.toStringAsFixed(1)}%',
+                        '${escalationRate.toStringAsFixed(2)}%',
                         Colors.red,
                         Icons.trending_up,
                       ),
@@ -1091,7 +1110,7 @@ Widget dashboardContents(
                     Expanded(
                       child: buildStatCard(
                         'Resolution Rate',
-                        '${resolutionRate.toStringAsFixed(1)}%',
+                        '${resolutionRate.toStringAsFixed(2)}%',
                         Colors.purple,
                         Icons.check_circle,
                       ),
@@ -1101,7 +1120,7 @@ Widget dashboardContents(
               ],
             );
           } else {
-            return Row(
+                return Row(
               children: [
                 Expanded(
                   child: buildStatCard(
@@ -1126,8 +1145,8 @@ Widget dashboardContents(
                 const SizedBox(width: 20),
                 Expanded(
                   child: buildStatCard(
-                    'Escalated: $escalated | Resolved: $resolved',
-                    '',
+                    'Escalated Messages',
+                    '${inq?.allEscalations}',
                     Colors.orange,
                     Icons.warning_amber_rounded,
                     onTap:
@@ -1140,8 +1159,9 @@ Widget dashboardContents(
                 const SizedBox(width: 20),
                 Expanded(
                   child: buildStatCard(
-                    'Escalation Rate: ${escalationRate.toStringAsFixed(1)}% | Resolution Rate: ${resolutionRate.toStringAsFixed(1)}%',
-                    '',
+                    'Escalation and Resolution Rate Ratio ',
+                    '${escalationRate.toStringAsFixed(2)}% : ${resolutionRate.toStringAsFixed(2)}%',
+                  
                     Colors.red,
                     Icons.analytics,
                   ),
@@ -1155,17 +1175,7 @@ Widget dashboardContents(
           if (isMobile) {
             return Column(
               children: [
-                // SizedBox(
-                //   height: 400,
-                //   child: LazyLoadWidget(
-                //     delay: const Duration(milliseconds: 100),
-                //     builder: (context) => buildCategoryDistributionCard(
-                //       inq?.categoryDistribution ?? {},
-                //       selectedTimeFrame,
-                //       context, // Add context parameter
-                //     ),
-                //   ),
-                // ),
+       
                 const SizedBox(height: 20),
                 SizedBox(
                   height: 400,
@@ -1183,19 +1193,7 @@ Widget dashboardContents(
                   ),
                 ),
                 const SizedBox(height: 20),
-                SizedBox(
-                  height: 350,
-                  child: LazyLoadWidget(
-                    delay: const Duration(milliseconds: 300),
-                    builder:
-                        (context) => buildSystemLogsCard(
-                          inq?.recentLogs ?? [],
-                          selectedTimeFrame,
-                          context, // Add context parameter
-                        ),
-                  ),
-                ),
-                const SizedBox(height: 20),
+                
                 SizedBox(
                   height: 350,
                   child: LazyLoadWidget(
@@ -1273,19 +1271,7 @@ Widget dashboardContents(
                   height: 350,
                   child: Row(
                     children: [
-                      Expanded(
-                        flex: 1,
-                        child: LazyLoadWidget(
-                          delay: const Duration(milliseconds: 300),
-                          builder:
-                              (context) => buildSystemLogsCard(
-                                inq?.recentLogs ?? [],
-                                selectedTimeFrame,
-                                context,
-                              ),
-                        ),
-                      ),
-                      const SizedBox(width: 20),
+                    
                       Expanded(
                         flex: 2,
                         child: LazyLoadWidget(
@@ -1334,39 +1320,7 @@ Widget dashboardContents(
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 350,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 1,
-                        child: LazyLoadWidget(
-                          delay: const Duration(milliseconds: 300),
-                          builder:
-                              (context) => buildSystemLogsCard(
-                                inq?.recentLogs ?? [],
-                                selectedTimeFrame,
-                                context,
-                              ),
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        flex: 2,
-                        child: LazyLoadWidget(
-                          delay: const Duration(milliseconds: 400),
-                          builder:
-                              (context) => buildMessageLogsCard(
-                                inq?.msgLogs ?? [],
-                                selectedTimeFrame,
-                                context,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                
               ],
             );
           }

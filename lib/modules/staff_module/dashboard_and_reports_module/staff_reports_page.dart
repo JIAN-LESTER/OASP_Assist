@@ -1,4 +1,5 @@
 
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/admin_dashboard_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_data.dart';
@@ -24,6 +25,7 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
   final FirebaseService _firebaseService = FirebaseService();
 
   InquiryReportsData? inq;
+  AdminDashboardData? ad;
   String? userName;
 
   bool isLoadingUser = true;
@@ -58,16 +60,27 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
 
     setState(() => isLoadingInquiry = true);
     try {
-      final data = await _firebaseService.getInquiryReportsData(
-        selectedTimeFrame,
-      );
+      // ✅ Fetch both in parallel
+      final results = await Future.wait([
+        _firebaseService.getInquiryReportsData(selectedTimeFrame),
+        _firebaseService.getAdminDashboardData(selectedTimeFrame),
+      ]);
+
       if (!mounted) return;
+      
       setState(() {
-        inq = data;
+        inq = results[0] as InquiryReportsData;
+        ad = results[1] as AdminDashboardData;  // ✅ NOW LOADED
         isLoadingInquiry = false;
       });
+
+      // ✅ DEBUG
+      print('📊 Staff Reports Data Loaded:');
+      print('   Inquiry Data: ${inq?.totalMessages ?? 0} messages');
+      print('   Admin Data: ${ad?.topEscalatedMessages.length ?? 0} escalations');
+      
     } catch (e) {
-      print('Error loading inquiry data: $e');
+      print('❌ Error loading inquiry data: $e');
       if (!mounted) return;
       setState(() => isLoadingInquiry = false);
     }
@@ -191,6 +204,7 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
         isRefreshing: isRefreshing,
         isLoading: isLoadingInquiry,
         inq: inq,
+        ad: ad,
         userName: userName!,
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
@@ -203,6 +217,7 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
         isRefreshing: isRefreshing,
         isLoading: isLoadingInquiry,
         inq: inq,
+        ad: ad,
         userName: userName!,
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
@@ -215,6 +230,7 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
         isRefreshing: isRefreshing,
         isLoading: isLoadingInquiry,
         inq: inq,
+        ad: ad,
         userName: userName!,
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
@@ -371,6 +387,7 @@ class DesktopDashboard extends StatelessWidget {
   final bool isRefreshing;
   final bool isLoading;
   final InquiryReportsData? inq;
+  final AdminDashboardData? ad;
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -384,6 +401,7 @@ class DesktopDashboard extends StatelessWidget {
     required this.isRefreshing,
     required this.isLoading,
     this.inq,
+    this.ad,
     required this.userName,
     required this.startDate,
     required this.timeCategoryCounts,
@@ -413,6 +431,7 @@ class DesktopDashboard extends StatelessWidget {
             else
               ...buildInquiryTrendsReport(
                 inq,
+                ad,
                 selectedTimeFrame: selectedTimeFrame,
                 isMobile: false,
                 context: context,
@@ -431,6 +450,7 @@ class TabletDashboard extends StatelessWidget {
   final bool isRefreshing;
   final bool isLoading;
   final InquiryReportsData? inq;
+  final AdminDashboardData? ad;
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -444,6 +464,7 @@ class TabletDashboard extends StatelessWidget {
     required this.isRefreshing,
     required this.isLoading,
     this.inq,
+    this.ad,
     required this.startDate,
     required this.timeCategoryCounts,
     required this.timeFrame,
@@ -473,6 +494,7 @@ class TabletDashboard extends StatelessWidget {
             else
               ...buildInquiryTrendsReport(
                 inq,
+                ad,
                 selectedTimeFrame: selectedTimeFrame,
                 isMobile: false,
                 context: context,
@@ -491,6 +513,7 @@ class MobileDashboard extends StatelessWidget {
   final bool isRefreshing;
   final bool isLoading;
   final InquiryReportsData? inq;
+  final AdminDashboardData? ad;
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -504,6 +527,7 @@ class MobileDashboard extends StatelessWidget {
     required this.isRefreshing,
     required this.isLoading,
     this.inq,
+    this.ad,
     required this.userName,
     required this.startDate,
     required this.timeCategoryCounts,
@@ -533,6 +557,7 @@ class MobileDashboard extends StatelessWidget {
             else
               ...buildInquiryTrendsReport(
                 inq,
+                ad,
                 selectedTimeFrame: selectedTimeFrame,
                 isMobile: true,
                 context: context,
@@ -594,7 +619,8 @@ List<Widget> buildSkeletonReport({bool isMobile = false}) {
 }
 
 List<Widget> buildInquiryTrendsReport(
-  InquiryReportsData? data, {
+  InquiryReportsData? data,
+  AdminDashboardData? ad, {
   String? selectedTimeFrame,
   bool isMobile = false,
   required BuildContext context,
@@ -653,7 +679,7 @@ List<Widget> buildInquiryTrendsReport(
             child: Builder(
               builder:
                   (context) => buildStatCard(
-                    'Escalated Messages',
+                    'Pending Escalated Messages',
                     '$escalatedMessages',
                     Colors.red,
                     Icons.warning_amber_rounded,
@@ -682,7 +708,7 @@ List<Widget> buildInquiryTrendsReport(
                           selectedTimeFrame ?? 'This Month',
                         ),
                     rateLabel: 'Rate',
-                    rateValue: resolutionRate,
+                    rateValue: resolutionRate.remainder(1),
                   ),
             ),
           ),
@@ -732,87 +758,87 @@ List<Widget> buildInquiryTrendsReport(
       const SizedBox(height: 16),
       SizedBox(
         height: 400,
-        child: buildBotVsHumanCard(data?.botVsHumanAnswers ?? {}, selectedTimeFrame ?? 'This Month'),
+        child: buildEscalatedMessagesList(
+          ad?.topEscalatedMessages ?? [],
+          selectedTimeFrame ?? 'This Month',
+          context,
+        ),
       ),
     ];
   }
 
   // Desktop layout
-  return [
-    SizedBox(
-      height: 120,
-      child: Row(
-        children: [
-          Expanded(
-            child: Builder(
-              builder:
-                  (context) => buildStatCard(
-                    'User Messages',
-                    '$userMessages',
-                    Colors.blue,
-                    Icons.message,
-                    onTap:
-                        () => _showMessagesDialog(
-                          context,
-                          selectedTimeFrame ?? 'This Month',
-                        ),
-                  ),
+return [
+  SizedBox(
+    height: 120,
+    child: Row(
+      children: [
+        Expanded(
+          child: Builder(
+            builder: (context) => buildStatCard(
+              'User Messages',  // Clean title
+              '$userMessages',
+              Colors.blue,
+              Icons.message,
+              onTap: () => _showMessagesDialog(
+                context,
+                selectedTimeFrame ?? 'This Month',
+              ),
             ),
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Builder(
-              builder:
-                  (context) => buildStatCard(
-                    'Bot Messages',
-                    '$botMessages',
-                    Colors.green,
-                    Icons.check_circle,
-                    onTap:
-                        () => _showAnsweredMessagesDialog(
-                          context,
-                          selectedTimeFrame ?? 'This Month',
-                        ),
-                  ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: Builder(
+            builder: (context) => buildStatCard(
+              'Bot Messages',  // Clean title
+              '$botMessages',
+              Colors.green,
+              Icons.check_circle,
+              onTap: () => _showAnsweredMessagesDialog(
+                context,
+                selectedTimeFrame ?? 'This Month',
+              ),
             ),
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Builder(
-              builder:
-                  (context) => buildStatCard(
-                    'Escalated (${escalationRate.toStringAsFixed(1)}%)',
-                    '$escalatedMessages',
-                    Colors.red,
-                    Icons.warning_amber_rounded,
-                    onTap:
-                        () => _showEscalatedMessagesDialog(
-                          context,
-                          selectedTimeFrame ?? 'This Month',
-                        ),
-                  ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: Builder(
+            builder: (context) => buildStatCard(
+              'Pending Escalated Messages',  // ✅ FIXED: Clean title, rate shown separately
+              '$escalatedMessages',
+              Colors.red,
+              Icons.warning_amber_rounded,
+              onTap: () => _showEscalatedMessagesDialog(
+                context,
+                selectedTimeFrame ?? 'This Month',
+              ),
+              rateLabel: 'Rate',     // ✅ FIXED: Pass rate as parameter
+              rateValue: escalationRate,
             ),
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Builder(
-              builder:
-                  (context) => buildStatCard(
-                    'Resolved (${resolutionRate.toStringAsFixed(1)}%)',
-                    '$resolvedMessages',
-                    Colors.orange,
-                    Icons.check_circle_outline,
-                    onTap:
-                        () => _showResolvedMessagesDialog(
-                          context,
-                          selectedTimeFrame ?? 'This Month',
-                        ),
-                  ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: Builder(
+            builder: (context) => buildStatCard(
+              'Resolved Messages',  // ✅ FIXED: Clean title, rate shown separately
+              '$resolvedMessages',
+              Colors.orange,
+              Icons.check_circle_outline,
+              onTap: () => _showResolvedMessagesDialog(
+                context,
+                selectedTimeFrame ?? 'This Month',
+              ),
+              rateLabel: 'Rate',     
+              rateValue: resolutionRate,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     ),
+  ),
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
@@ -834,6 +860,7 @@ List<Widget> buildInquiryTrendsReport(
       child: Row(
         children: [
           Expanded(
+            flex: 1,
             child: buildCategoryDistributionCard(
               data?.categoryDistribution ?? {},
               selectedTimeFrame ?? 'This Month',
@@ -841,7 +868,10 @@ List<Widget> buildInquiryTrendsReport(
             ),
           ),
           const SizedBox(width: 20),
-          Expanded(child: buildHighestFAQCard(data?.topQuestions ?? {})),
+          Expanded(
+            flex: 2,
+            child: buildHighestFAQCard(data?.topQuestions ?? {}),
+          ),
         ],
       ),
     ),
@@ -866,6 +896,7 @@ List<Widget> buildInquiryTrendsReport(
       child: Row(
         children: [
           Expanded(
+            flex: 2,
             child: buildStaffPerformanceCard(
               data?.staffPerformance ?? {},
               selectedTimeFrame ?? 'This Month',
@@ -873,7 +904,14 @@ List<Widget> buildInquiryTrendsReport(
             ),
           ),
           const SizedBox(width: 20),
-          Expanded(child: buildBotVsHumanCard(data?.botVsHumanAnswers ?? {}, selectedTimeFrame ?? 'This Month')),
+          Expanded(
+            flex: 1,
+            child: buildEscalatedMessagesList(
+              ad?.topEscalatedMessages ?? [],
+              selectedTimeFrame ?? 'This Month',
+              context,
+            ),
+          ),
         ],
       ),
     ),
