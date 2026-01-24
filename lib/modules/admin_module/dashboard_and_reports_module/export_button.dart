@@ -1,10 +1,10 @@
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/export.dart';
 import 'package:flutter/material.dart';
-
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/admin_dashboard_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/chatbot_usage_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/user_demographics_data.dart';
+import 'package:capstone_project/utils/snackbar_util.dart'; // Add this import
 
 class ExportButton extends StatelessWidget {
   final String pageType; // 'dashboard', 'inquiry', 'chatbot', 'demographics'
@@ -43,7 +43,7 @@ class ExportButton extends StatelessWidget {
           ),
         ],
       ),
-      child: PopupMenuButton<String>(
+      child: PopupMenuButton(
         offset: const Offset(0, 48),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
@@ -119,7 +119,7 @@ class ExportButton extends StatelessWidget {
     );
   }
 
-  Future<void> _handleExport(BuildContext context, String format) async {
+  Future _handleExport(BuildContext context, String format) async {
     // Show loading dialog
     showDialog(
       context: context,
@@ -165,164 +165,30 @@ class ExportButton extends StatelessWidget {
       // Close loading dialog
       if (context.mounted) Navigator.pop(context);
 
-      // Show success message with file path
+      // Show success message with custom toast
       if (context.mounted) {
-        _showSuccessSnackBar(context, format, filePath);
+        final fileName = filePath.split('/').last;
+        SnackbarUtil.showSuccess(
+          context,
+          'Export Successful',
+          subtitle: 'File saved: $fileName',
+          duration: const Duration(seconds: 6),
+        );
       }
     } catch (e) {
       // Close loading dialog
       if (context.mounted) Navigator.pop(context);
 
-      // Show error message
+      // Show error message with custom toast
       if (context.mounted) {
-        _showErrorSnackBar(context, e.toString());
+        SnackbarUtil.showError(
+          context,
+          'Export Failed',
+          subtitle: e.toString(),
+          duration: const Duration(seconds: 5),
+        );
       }
     }
-  }
-
-  void _showSuccessSnackBar(BuildContext context, String format, String filePath) {
-    final fileName = filePath.split('/').last;
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.check_circle,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Export Successful',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Saved as ${format.toUpperCase()}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      format == 'pdf' ? Icons.picture_as_pdf : Icons.table_chart,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        fileName,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontFamily: 'monospace',
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Location: $filePath',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white.withOpacity(0.8),
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-        backgroundColor: Colors.green.shade600,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 6),
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-    );
-  }
-
-  void _showErrorSnackBar(BuildContext context, String error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.error_outline, color: Colors.white, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Export Failed',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    error,
-                    style: const TextStyle(fontSize: 12),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: Colors.red.shade600,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 5),
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-    );
   }
 
   Future<String> _exportToPDF() async {
@@ -369,6 +235,7 @@ class ExportButton extends StatelessWidget {
         return await ExportService.exportInquiryTrendsToCSV(
           timeFrame: timeFrame,
           data: inq,
+          ad: ad,
         );
       case 'chatbot':
         return await ExportService.exportChatbotUsageToCSV(

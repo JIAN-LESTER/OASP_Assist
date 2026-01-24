@@ -1,5 +1,6 @@
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/admin_dashboard_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/chatbot_usage_data.dart';
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/export_button.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/paginated_list.dart';
@@ -1339,6 +1340,9 @@ Widget dashboardContents(
                 userName,
                 customDateRange,
                 onDateRangeChanged,
+                inq,
+                ud,
+                ad,
               ),
               const SizedBox(height: 32),
               statCards(),
@@ -1486,6 +1490,10 @@ Widget _buildHeader(
   String userName,
   DateTimeRange? customDateRange,
   ValueChanged<DateTimeRange?> onDateRangeChanged,
+  // ✅ ADD THESE PARAMETERS
+  InquiryReportsData? inq,
+  UserDemographicsReportsData? ud,
+  AdminDashboardData? ad,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -1531,6 +1539,16 @@ Widget _buildHeader(
                           onDateRangeChanged: onDateRangeChanged,
                         ),
                       ],
+                      // ✅ ADD EXPORT BUTTON
+                      const SizedBox(width: 8),
+                      ExportButton(
+                        pageType: 'dashboard',
+                        timeFrame: selectedTimeFrame,
+                        userName: userName,
+                        inq: inq,
+                        ud: ud,
+                        ad: ad,
+                      ),
                     ],
                   ),
                 ],
@@ -1567,6 +1585,16 @@ Widget _buildHeader(
                           onDateRangeChanged: onDateRangeChanged,
                         ),
                       ],
+                      // ✅ ADD EXPORT BUTTON
+                      const SizedBox(width: 12),
+                      ExportButton(
+                        pageType: 'dashboard',
+                        timeFrame: selectedTimeFrame,
+                        userName: userName,
+                        inq: inq,
+                        ud: ud,
+                        ad: ad,
+                      ),
                     ],
                   ),
                 ],
@@ -1583,6 +1611,7 @@ Widget _buildHeader(
     },
   );
 }
+
 
 void _showEscalatedMessagesDialog(BuildContext context, String timeFrame) {
   showDialog(

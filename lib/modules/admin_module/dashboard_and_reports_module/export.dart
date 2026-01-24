@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert' show utf8;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
@@ -10,6 +11,8 @@ import 'package:capstone_project/modules/admin_module/dashboard_and_reports_modu
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/chatbot_usage_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/user_demographics_data.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:universal_html/html.dart' as html;
 
 class ExportService {
   // ============================================================================
@@ -18,127 +21,201 @@ class ExportService {
 
   /// Export Dashboard to PDF
   static Future<String> exportDashboardToPDF({
-    required String userName,
-    required String timeFrame,
-    required InquiryReportsData? inq,
-    required UserDemographicsReportsData? ud,
-    required AdminDashboardData? ad,
-  }) async {
-    final pdf = pw.Document();
-    final now = DateTime.now();
-    final dateFormat = DateFormat('MMMM dd, yyyy - hh:mm a');
+  required String userName,
+  required String timeFrame,
+  required InquiryReportsData? inq,
+  required UserDemographicsReportsData? ud,
+  required AdminDashboardData? ad,
+}) async {
+  final pdf = pw.Document();
+  final now = DateTime.now();
+  final dateFormat = DateFormat('MMMM dd, yyyy - hh:mm a');
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (context) => [
-          // Header
-          _buildPDFHeader('Dashboard Report', userName, timeFrame, dateFormat.format(now)),
+  pdf.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      build: (context) => [
+        _buildPDFHeader('Dashboard Report', userName, timeFrame, dateFormat.format(now)),
+        pw.SizedBox(height: 20),
+
+        // Overview Stats
+        _buildPDFSection('Overview Statistics'),
+        _buildStatsTable([
+          ['Total Messages', '${inq?.totalMessages ?? 0}'],
+          ['Total Users', '${ud?.totalUsers ?? 0}'],
+          ['All Escalations', '${inq?.allEscalations ?? 0}'],
+          ['Pending Escalations', '${ad?.pendingEscalations ?? 0}'],
+          ['Resolved Escalations', '${ad?.resolvedEscalations ?? 0}'],
+          ['Escalation Rate', '${inq?.escalationRate.toStringAsFixed(1) ?? 0}%'],
+          ['Resolution Rate', '${inq?.resolutionRate.toStringAsFixed(1) ?? 0}%'],
+        ]),
+        pw.SizedBox(height: 20),
+
+        // Inquiry Trends Over Time
+        if (inq?.inquiryTrend.isNotEmpty ?? false) ...[
+          _buildPDFSection('Inquiry Trends Over Time'),
+          _buildKeyValueTable(
+            Map.fromEntries(inq!.inquiryTrend.map((e) => MapEntry(e.date, e.count))),
+          ),
           pw.SizedBox(height: 20),
-
-          // Overview Stats
-          _buildPDFSection('Overview Statistics'),
-          _buildStatsTable([
-            ['Total Messages', '${inq?.totalMessages ?? 0}'],
-            ['Total Users', '${ud?.totalUsers ?? 0}'],
-            ['Pending Escalations', '${ad?.pendingEscalations ?? 0}'],
-            ['Resolved Escalations', '${ad?.resolvedEscalations ?? 0}'],
-            ['Escalation Rate', '${inq?.escalationRate.toStringAsFixed(1) ?? 0}%'],
-            ['Resolution Rate', '${inq?.resolutionRate.toStringAsFixed(1) ?? 0}%'],
-          ]),
-          pw.SizedBox(height: 20),
-
-          // Category Distribution
-          if (inq?.categoryDistribution.isNotEmpty ?? false) ...[
-            _buildPDFSection('Category Distribution'),
-            _buildKeyValueTable(inq!.categoryDistribution),
-            pw.SizedBox(height: 20),
-          ],
-
-          // Top Questions
-          if (inq?.topQuestions.isNotEmpty ?? false) ...[
-            _buildPDFSection('Top Questions'),
-            _buildKeyValueTable(inq!.topQuestions),
-            pw.SizedBox(height: 20),
-          ],
-
-          // Staff Performance
-          if (inq?.staffPerformance.isNotEmpty ?? false) ...[
-            _buildPDFSection('Staff Performance'),
-            _buildKeyValueTable(
-              inq!.staffPerformance.map((k, v) => MapEntry(k, v.toStringAsFixed(1) + '%')),
-            ),
-          ],
         ],
-      ),
-    );
 
-   return await _savePDF(pdf, 'Dashboard_Report_$timeFrame');
-  }
-
-  /// Export Inquiry Trends Report to PDF
-  static Future<String> exportInquiryTrendsToPDF({
-    required String timeFrame,
-    required InquiryReportsData? data,
-    required AdminDashboardData? ad,
-  }) async {
-    final pdf = pw.Document();
-    final now = DateTime.now();
-    final dateFormat = DateFormat('MMMM dd, yyyy - hh:mm a');
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (context) => [
-          _buildPDFHeader('Inquiry Trends Report', 'Admin', timeFrame, dateFormat.format(now)),
-          pw.SizedBox(height: 20),
-
-          // Key Metrics
-          _buildPDFSection('Key Metrics'),
-          _buildStatsTable([
-            ['User Messages', '${data?.userMessages ?? 0}'],
-            ['Bot Messages', '${data?.botMessages ?? 0}'],
-            ['Pending Escalations', '${data?.escalatedMessages ?? 0}'],
-            ['Resolved Messages', '${data?.resolvedMessages ?? 0}'],
-            ['Escalation Rate', '${data?.escalationRate.toStringAsFixed(1) ?? 0}%'],
-            ['Resolution Rate', '${data?.resolutionRate.toStringAsFixed(1) ?? 0}%'],
-          ]),
-          pw.SizedBox(height: 20),
-
-          // Category Distribution
-          if (data?.categoryDistribution.isNotEmpty ?? false) ...[
-            _buildPDFSection('Category Distribution'),
-            _buildKeyValueTable(data!.categoryDistribution),
-            pw.SizedBox(height: 20),
-          ],
-
-          // Top FAQs
-          if (data?.topQuestions.isNotEmpty ?? false) ...[
-            _buildPDFSection('Top Questions'),
-            ...data!.topQuestions.entries.map((e) => 
-              pw.Padding(
-                padding: const pw.EdgeInsets.symmetric(vertical: 4),
-                child: pw.Text('• ${e.key} (${e.value} times)', style: pw.TextStyle(fontSize: 10)),
+        // System Logs
+        if (inq?.recentLogs.isNotEmpty ?? false) ...[
+          _buildPDFSection('Recent System Logs'),
+          ...inq!.recentLogs.take(10).map((log) => 
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 4),
+              child: pw.Text(
+                '${log.time}: ${log.action}',
+                style: pw.TextStyle(fontSize: 9),
               ),
             ),
-            pw.SizedBox(height: 20),
-          ],
-
-          // Staff Performance
-          if (data?.staffPerformance.isNotEmpty ?? false) ...[
-            _buildPDFSection('Staff Performance'),
-            _buildKeyValueTable(
-              data!.staffPerformance.map((k, v) => MapEntry(k, v.toStringAsFixed(1) + '%')),
-            ),
-          ],
+          ),
+          pw.SizedBox(height: 20),
         ],
-      ),
-    );
 
-    return await _savePDF(pdf, 'Inquiry_Trends_$timeFrame');
-  }
+        // Message Logs
+        if (inq?.msgLogs.isNotEmpty ?? false) ...[
+          _buildPDFSection('Recent Message Logs'),
+          ...inq!.msgLogs.take(10).map((log) => 
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 4),
+              child: pw.Text(
+                '${log.time}: ${log.user} - ${log.message}',
+                style: pw.TextStyle(fontSize: 9),
+              ),
+            ),
+          ),
+          pw.SizedBox(height: 20),
+        ],
+
+        // Escalations Over Time
+        if (inq?.escalationsOverTime.isNotEmpty ?? false) ...[
+          _buildPDFSection('Escalations Over Time'),
+          _buildKeyValueTable(
+            Map.fromEntries(inq!.escalationsOverTime.map((e) => MapEntry(e.date, e.count))),
+          ),
+          pw.SizedBox(height: 20),
+        ],
+
+        // Escalated Messages List
+        if (ad?.topEscalatedMessages.isNotEmpty ?? false) ...[
+          _buildPDFSection('Top Escalated Messages'),
+          ...ad!.topEscalatedMessages.take(10).map((msg) => 
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 4),
+              child: pw.Text(
+                '• ${msg.userMessage} (${msg.status})',
+                style: pw.TextStyle(fontSize: 9),
+              ),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+
+  return await _savePDF(pdf, 'Dashboard_Report_$timeFrame');
+}
+
+  /// Export Inquiry Trends Report to PDF
+ static Future<String> exportInquiryTrendsToPDF({
+  required String timeFrame,
+  required InquiryReportsData? data,
+  required AdminDashboardData? ad,
+}) async {
+  final pdf = pw.Document();
+  final now = DateTime.now();
+  final dateFormat = DateFormat('MMMM dd, yyyy - hh:mm a');
+
+  pdf.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      build: (context) => [
+        _buildPDFHeader('Inquiry Trends Report', 'Admin', timeFrame, dateFormat.format(now)),
+        pw.SizedBox(height: 20),
+
+        // Key Metrics
+        _buildPDFSection('Key Metrics'),
+        _buildStatsTable([
+          ['User Messages', '${data?.userMessages ?? 0}'],
+          ['Bot Messages', '${data?.botMessages ?? 0}'],
+          ['Pending Escalations', '${data?.escalatedMessages ?? 0}'],
+          ['Resolved Messages', '${data?.resolvedMessages ?? 0}'],
+          ['Escalation Rate', '${data?.escalationRate.toStringAsFixed(1) ?? 0}%'],
+          ['Resolution Rate', '${data?.resolutionRate.toStringAsFixed(1) ?? 0}%'],
+        ]),
+        pw.SizedBox(height: 20),
+
+        // Inquiry Trends Over Time
+        if (data?.inquiryTrend.isNotEmpty ?? false) ...[
+          _buildPDFSection('Inquiry Trends Over Time'),
+          _buildKeyValueTable(
+            Map.fromEntries(data!.inquiryTrend.map((e) => MapEntry(e.date, e.count))),
+          ),
+          pw.SizedBox(height: 20),
+        ],
+
+        // Category Distribution
+        if (data?.categoryDistribution.isNotEmpty ?? false) ...[
+          _buildPDFSection('Category Distribution'),
+          _buildKeyValueTable(data!.categoryDistribution),
+          pw.SizedBox(height: 20),
+        ],
+
+        // Top FAQs
+        if (data?.topQuestions.isNotEmpty ?? false) ...[
+          _buildPDFSection('Top Questions'),
+          ...data!.topQuestions.entries.map((e) => 
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 4),
+              child: pw.Text('• ${e.key} (${e.value} times)', style: pw.TextStyle(fontSize: 10)),
+            ),
+          ),
+          pw.SizedBox(height: 20),
+        ],
+
+        // Escalations Over Time
+        if (data?.escalationsOverTime.isNotEmpty ?? false) ...[
+          _buildPDFSection('Escalations Over Time'),
+          _buildKeyValueTable(
+            Map.fromEntries(data!.escalationsOverTime.map((e) => MapEntry(e.date, e.count))),
+          ),
+          pw.SizedBox(height: 20),
+        ],
+
+        // Staff Performance
+        if (data?.staffPerformance.isNotEmpty ?? false) ...[
+          _buildPDFSection('Staff Performance'),
+          _buildKeyValueTable(
+            data!.staffPerformance.map((k, v) => MapEntry(k, v.toStringAsFixed(1) + '%')),
+          ),
+          pw.SizedBox(height: 20),
+        ],
+
+        // Escalated Messages List
+        if (ad?.topEscalatedMessages.isNotEmpty ?? false) ...[
+          _buildPDFSection('Top Escalated Messages'),
+          ...ad!.topEscalatedMessages.take(10).map((msg) => 
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 4),
+              child: pw.Text(
+                '• ${msg.userMessage} (${msg.status})',
+                style: pw.TextStyle(fontSize: 9),
+              ),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+
+  return await _savePDF(pdf, 'Inquiry_Trends_$timeFrame');
+}
+
 
   /// Export Chatbot Usage Report to PDF
   static Future<String> exportChatbotUsageToPDF({
@@ -173,10 +250,48 @@ class ExportService {
           ]),
           pw.SizedBox(height: 20),
 
-          // Unanswered Reasons
-          if (data?.unansweredReasonsDistribution.isNotEmpty ?? false) ...[
-            _buildPDFSection('Unanswered Reasons Distribution'),
-            _buildKeyValueTable(data!.unansweredReasonsDistribution),
+          // Peak Usage by Hour
+          if (data?.peakUsageByHour.isNotEmpty ?? false) ...[
+            _buildPDFSection('Peak Usage by Hour'),
+            _buildKeyValueTable(
+              data!.peakUsageByHour.map((k, v) => MapEntry('${k}:00', v)),
+            ),
+            pw.SizedBox(height: 20),
+          ],
+
+          // Conversations Over Time
+          if (data?.conversationsOverTime.isNotEmpty ?? false) ...[
+            _buildPDFSection('Conversations Over Time'),
+            _buildKeyValueTable(
+              Map.fromEntries(data!.conversationsOverTime.map((e) => MapEntry(e.date, e.count))),
+            ),
+            pw.SizedBox(height: 20),
+          ],
+
+          // Chat Limit Reach Trend
+          if (data?.chatLimitReachTrend.isNotEmpty ?? false) ...[
+            _buildPDFSection('Chat Limit Reach Trend'),
+            _buildKeyValueTable(
+              Map.fromEntries(data!.chatLimitReachTrend.map((e) => MapEntry(e.date, e.count))),
+            ),
+            pw.SizedBox(height: 20),
+          ],
+
+          // Response Time Trend
+          if (data?.responseTimeTrend.isNotEmpty ?? false) ...[
+            _buildPDFSection('Response Time Trend'),
+            _buildKeyValueTable(
+              Map.fromEntries(data!.responseTimeTrend.map((e) => MapEntry(e.date, e.count))),
+            ),
+            pw.SizedBox(height: 20),
+          ],
+
+          // Escalation Limit Reach Trend
+          if (data?.escalationLimitReachTrend.isNotEmpty ?? false) ...[
+            _buildPDFSection('Escalation Limit Reach Trend'),
+            _buildKeyValueTable(
+              Map.fromEntries(data!.escalationLimitReachTrend.map((e) => MapEntry(e.date, e.count))),
+            ),
           ],
         ],
       ),
@@ -208,12 +323,23 @@ class ExportService {
             ['New Users', '${data?.newUsers ?? 0}'],
             ['Active Users', '${data?.activeUsers ?? 0}'],
             ['Inactive Users', '${data?.inactiveUsers ?? 0}'],
+            ['Active/Inactive Ratio', data?.activeUserRatio ?? 'N/A'],
             ['Enrolled Students', '${data?.enrolledStudents ?? 0}'],
             ['Incoming Freshmen', '${data?.incomingFreshmen ?? 0}'],
+            ['Enrolled/Freshman Ratio', data?.enrolledRatio ?? 'N/A'],
             ['With Scholarship', '${data?.usersWithScholarship ?? 0}'],
             ['Without Scholarship', '${data?.usersWithoutScholarship ?? 0}'],
           ]),
           pw.SizedBox(height: 20),
+
+          // User Growth Over Time
+          if (data?.userGrowthOverTime.isNotEmpty ?? false) ...[
+            _buildPDFSection('User Growth Over Time'),
+            _buildKeyValueTable(
+              Map.fromEntries(data!.userGrowthOverTime.map((e) => MapEntry(e.date, e.count))),
+            ),
+            pw.SizedBox(height: 20),
+          ],
 
           // Users by Program
           if (data?.usersByProgram.isNotEmpty ?? false) ...[
@@ -229,7 +355,7 @@ class ExportService {
             pw.SizedBox(height: 20),
           ],
 
-          // Affiliations
+          // User Affiliations
           if (data?.userAffiliations.isNotEmpty ?? false) ...[
             _buildPDFSection('User Affiliations'),
             _buildKeyValueTable(data!.userAffiliations),
@@ -238,7 +364,7 @@ class ExportService {
 
           // Scholarship Distribution
           if (data?.scholarshipDistribution.isNotEmpty ?? false) ...[
-            _buildPDFSection('Scholarship Distribution'),
+            _buildPDFSection('Scholarship Types Distribution'),
             _buildKeyValueTable(data!.scholarshipDistribution),
           ],
         ],
@@ -254,74 +380,170 @@ class ExportService {
 
   /// Export Dashboard to CSV
   static Future<String> exportDashboardToCSV({
-    required String timeFrame,
-    required InquiryReportsData? inq,
-    required UserDemographicsReportsData? ud,
-    required AdminDashboardData? ad,
-  }) async {
-    List<List<dynamic>> rows = [
-      ['Dashboard Report - $timeFrame'],
-      ['Generated:', DateFormat('MMMM dd, yyyy - hh:mm a').format(DateTime.now())],
-      [],
-      ['Metric', 'Value'],
-      ['Total Messages', inq?.totalMessages ?? 0],
-      ['Total Users', ud?.totalUsers ?? 0],
-      ['Pending Escalations', ad?.pendingEscalations ?? 0],
-      ['Resolved Escalations', ad?.resolvedEscalations ?? 0],
-      ['Escalation Rate', '${inq?.escalationRate.toStringAsFixed(1) ?? 0}%'],
-      ['Resolution Rate', '${inq?.resolutionRate.toStringAsFixed(1) ?? 0}%'],
-      [],
-      ['Category Distribution'],
-      ['Category', 'Count'],
-    ];
+  required String timeFrame,
+  required InquiryReportsData? inq,
+  required UserDemographicsReportsData? ud,
+  required AdminDashboardData? ad,
+}) async {
+  List<List<dynamic>> rows = [
+    ['Dashboard Report - $timeFrame'],
+    ['Generated:', DateFormat('MMMM dd, yyyy - hh:mm a').format(DateTime.now())],
+    [],
+    ['Overview Statistics'],
+    ['Metric', 'Value'],
+    ['Total Messages', inq?.totalMessages ?? 0],
+    ['Total Users', ud?.totalUsers ?? 0],
+    ['All Escalations', inq?.allEscalations ?? 0],
+    ['Pending Escalations', ad?.pendingEscalations ?? 0],
+    ['Resolved Escalations', ad?.resolvedEscalations ?? 0],
+    ['Escalation Rate', '${inq?.escalationRate.toStringAsFixed(1) ?? 0}%'],
+    ['Resolution Rate', '${inq?.resolutionRate.toStringAsFixed(1) ?? 0}%'],
+    [],
+    ['Inquiry Trends Over Time'],
+    ['Date', 'Count'],
+  ];
 
-    // Add category data
-    if (inq?.categoryDistribution.isNotEmpty ?? false) {
-      rows.addAll(inq!.categoryDistribution.entries.map((e) => [e.key, e.value]));
-    }
-
-   return  await _saveCSV(rows, 'Dashboard_Report_$timeFrame');
+  if (inq?.inquiryTrend.isNotEmpty ?? false) {
+    rows.addAll(inq!.inquiryTrend.map((d) => [d.date, d.count]));
   }
+
+  rows.addAll([
+    [],
+    ['Recent System Logs'],
+    ['Timestamp', 'Action', 'Details'],
+  ]);
+
+  if (inq?.recentLogs.isNotEmpty ?? false) {
+    rows.addAll(inq!.recentLogs.take(10).map((log) => [
+      log.time,
+      log.action,
+ 
+    ]));
+  }
+
+  rows.addAll([
+    [],
+    ['Recent Message Logs'],
+    ['Timestamp', 'Sender', 'Message'],
+  ]);
+
+  if (inq?.msgLogs.isNotEmpty ?? false) {
+    rows.addAll(inq!.msgLogs.take(10).map((log) => [
+      log.time,
+      log.user,
+      log.message,
+    ]));
+  }
+
+  rows.addAll([
+    [],
+    ['Escalations Over Time'],
+    ['Date', 'Count'],
+  ]);
+
+  if (inq?.escalationsOverTime.isNotEmpty ?? false) {
+    rows.addAll(inq!.escalationsOverTime.map((d) => [d.date, d.count]));
+  }
+
+  rows.addAll([
+    [],
+    ['Top Escalated Messages'],
+    ['Question', 'Status'],
+  ]);
+
+  if (ad?.topEscalatedMessages.isNotEmpty ?? false) {
+    rows.addAll(ad!.topEscalatedMessages.take(10).map((msg) => [
+      msg.userMessage,
+      msg.status,
+    ]));
+  }
+
+  return await _saveCSV(rows, 'Dashboard_Report_$timeFrame');
+}
+
 
   /// Export Inquiry Trends to CSV
-  static Future<String> exportInquiryTrendsToCSV({
-    required String timeFrame,
-    required InquiryReportsData? data,
-  }) async {
-    List<List<dynamic>> rows = [
-      ['Inquiry Trends Report - $timeFrame'],
-      ['Generated:', DateFormat('MMMM dd, yyyy - hh:mm a').format(DateTime.now())],
-      [],
-      ['Metric', 'Value'],
-      ['User Messages', data?.userMessages ?? 0],
-      ['Bot Messages', data?.botMessages ?? 0],
-      ['Pending Escalations', data?.escalatedMessages ?? 0],
-      ['Resolved Messages', data?.resolvedMessages ?? 0],
-      ['Escalation Rate', '${data?.escalationRate.toStringAsFixed(1) ?? 0}%'],
-      ['Resolution Rate', '${data?.resolutionRate.toStringAsFixed(1) ?? 0}%'],
-      [],
-      ['Inquiry Trend Data'],
-      ['Date', 'Count'],
-    ];
+static Future<String> exportInquiryTrendsToCSV({
+  required String timeFrame,
+  required InquiryReportsData? data,
+  required AdminDashboardData? ad,
+}) async {
+  List<List<dynamic>> rows = [
+    ['Inquiry Trends Report - $timeFrame'],
+    ['Generated:', DateFormat('MMMM dd, yyyy - hh:mm a').format(DateTime.now())],
+    [],
+    ['Key Metrics'],
+    ['Metric', 'Value'],
+    ['User Messages', data?.userMessages ?? 0],
+    ['Bot Messages', data?.botMessages ?? 0],
+    ['Pending Escalations', data?.escalatedMessages ?? 0],
+    ['Resolved Messages', data?.resolvedMessages ?? 0],
+    ['Escalation Rate', '${data?.escalationRate.toStringAsFixed(1) ?? 0}%'],
+    ['Resolution Rate', '${data?.resolutionRate.toStringAsFixed(1) ?? 0}%'],
+    [],
+    ['Inquiry Trends Over Time'],
+    ['Date', 'Count'],
+  ];
 
-    // Add trend data
-    if (data?.inquiryTrend.isNotEmpty ?? false) {
-      rows.addAll(data!.inquiryTrend.map((d) => [d.date, d.count]));
-    }
-
-    rows.addAll([
-      [],
-      ['Category Distribution'],
-      ['Category', 'Count'],
-    ]);
-
-    if (data?.categoryDistribution.isNotEmpty ?? false) {
-      rows.addAll(data!.categoryDistribution.entries.map((e) => [e.key, e.value]));
-    }
-
-    return await _saveCSV(rows, 'Inquiry_Trends_$timeFrame');
+  if (data?.inquiryTrend.isNotEmpty ?? false) {
+    rows.addAll(data!.inquiryTrend.map((d) => [d.date, d.count]));
   }
 
+  rows.addAll([
+    [],
+    ['Category Distribution'],
+    ['Category', 'Count'],
+  ]);
+
+  if (data?.categoryDistribution.isNotEmpty ?? false) {
+    rows.addAll(data!.categoryDistribution.entries.map((e) => [e.key, e.value]));
+  }
+
+  rows.addAll([
+    [],
+    ['Top Questions'],
+    ['Question', 'Count'],
+  ]);
+
+  if (data?.topQuestions.isNotEmpty ?? false) {
+    rows.addAll(data!.topQuestions.entries.map((e) => [e.key, e.value]));
+  }
+
+  rows.addAll([
+    [],
+    ['Escalations Over Time'],
+    ['Date', 'Count'],
+  ]);
+
+  if (data?.escalationsOverTime.isNotEmpty ?? false) {
+    rows.addAll(data!.escalationsOverTime.map((d) => [d.date, d.count]));
+  }
+
+  rows.addAll([
+    [],
+    ['Staff Performance'],
+    ['Staff', 'Resolution Rate %'],
+  ]);
+
+  if (data?.staffPerformance.isNotEmpty ?? false) {
+    rows.addAll(data!.staffPerformance.entries.map((e) => [e.key, e.value.toStringAsFixed(1)]));
+  }
+
+  rows.addAll([
+    [],
+    ['Top Escalated Messages'],
+    ['Question', 'Status'],
+  ]);
+
+  if (ad?.topEscalatedMessages.isNotEmpty ?? false) {
+    rows.addAll(ad!.topEscalatedMessages.take(10).map((msg) => [
+      msg.userMessage,
+      msg.status,
+    ]));
+  }
+
+  return await _saveCSV(rows, 'Inquiry_Trends_$timeFrame');
+}
   /// Export Chatbot Usage to CSV
   static Future<String> exportChatbotUsageToCSV({
     required String timeFrame,
@@ -338,15 +560,55 @@ class ExportService {
       ['Chat Limit Reach Rate', '${data?.chatLimitReachRate.toStringAsFixed(1) ?? 0}%'],
       ['Escalation Limit Rate', '${data?.escalationLimitReachRate.toStringAsFixed(1) ?? 0}%'],
       [],
+      ['Peak Usage by Hour'],
+      ['Hour', 'Count'],
+    ];
+
+    if (data?.peakUsageByHour.isNotEmpty ?? false) {
+      rows.addAll(data!.peakUsageByHour.entries.map((e) => ['${e.key}:00', e.value]));
+    }
+
+    rows.addAll([
+      [],
       ['Conversations Over Time'],
       ['Date', 'Count'],
-    ];
+    ]);
 
     if (data?.conversationsOverTime.isNotEmpty ?? false) {
       rows.addAll(data!.conversationsOverTime.map((d) => [d.date, d.count]));
     }
 
-  return await _saveCSV(rows, 'Chatbot_Usage_$timeFrame');
+    rows.addAll([
+      [],
+      ['Chat Limit Reach Trend'],
+      ['Date', 'Count'],
+    ]);
+
+    if (data?.chatLimitReachTrend.isNotEmpty ?? false) {
+      rows.addAll(data!.chatLimitReachTrend.map((d) => [d.date, d.count]));
+    }
+
+    rows.addAll([
+      [],
+      ['Response Time Trend'],
+      ['Date', 'Response Time (ms)'],
+    ]);
+
+    if (data?.responseTimeTrend.isNotEmpty ?? false) {
+      rows.addAll(data!.responseTimeTrend.map((d) => [d.date, d.count]));
+    }
+
+    rows.addAll([
+      [],
+      ['Escalation Limit Reach Trend'],
+      ['Date', 'Count'],
+    ]);
+
+    if (data?.escalationLimitReachTrend.isNotEmpty ?? false) {
+      rows.addAll(data!.escalationLimitReachTrend.map((d) => [d.date, d.count]));
+    }
+
+    return await _saveCSV(rows, 'Chatbot_Usage_$timeFrame');
   }
 
   /// Export User Demographics to CSV
@@ -363,12 +625,24 @@ class ExportService {
       ['New Users', data?.newUsers ?? 0],
       ['Active Users', data?.activeUsers ?? 0],
       ['Inactive Users', data?.inactiveUsers ?? 0],
+      ['Active/Inactive Ratio', data?.activeUserRatio ?? 'N/A'],
       ['Enrolled Students', data?.enrolledStudents ?? 0],
       ['Incoming Freshmen', data?.incomingFreshmen ?? 0],
+      ['Enrolled/Freshman Ratio', data?.enrolledRatio ?? 'N/A'],
+      [],
+      ['User Growth Over Time'],
+      ['Date', 'Count'],
+    ];
+
+    if (data?.userGrowthOverTime.isNotEmpty ?? false) {
+      rows.addAll(data!.userGrowthOverTime.map((d) => [d.date, d.count]));
+    }
+
+    rows.addAll([
       [],
       ['Users by Program'],
       ['Program', 'Count'],
-    ];
+    ]);
 
     if (data?.usersByProgram.isNotEmpty ?? false) {
       rows.addAll(data!.usersByProgram.entries.map((e) => [e.key, e.value]));
@@ -384,7 +658,31 @@ class ExportService {
       rows.addAll(data!.usersByYear.entries.map((e) => [e.key, e.value]));
     }
 
-   return await _saveCSV(rows, 'User_Demographics_$timeFrame');
+    rows.addAll([
+      [],
+      ['User Affiliations'],
+      ['Affiliation', 'Count'],
+    ]);
+
+    if (data?.userAffiliations.isNotEmpty ?? false) {
+      rows.addAll(data!.userAffiliations.entries.map((e) => [e.key, e.value]));
+    }
+
+    rows.addAll([
+      [],
+      ['Scholarship Distribution'],
+      ['With Scholarship', data?.usersWithScholarship ?? 0],
+      ['Without Scholarship', data?.usersWithoutScholarship ?? 0],
+      [],
+      ['Scholarship Types'],
+      ['Type', 'Count'],
+    ]);
+
+    if (data?.scholarshipDistribution.isNotEmpty ?? false) {
+      rows.addAll(data!.scholarshipDistribution.entries.map((e) => [e.key, e.value]));
+    }
+
+    return await _saveCSV(rows, 'User_Demographics_$timeFrame');
   }
 
   // ============================================================================
@@ -460,21 +758,56 @@ class ExportService {
   static Future<String> _savePDF(pw.Document pdf, String filename) async {
     try {
       final bytes = await pdf.save();
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/$filename.pdf');
-      await file.writeAsBytes(bytes);
       
-      // Try to open file, but don't throw if it fails
-      try {
-        await OpenFile.open(file.path);
-      } catch (openError) {
-        print('Could not auto-open file: $openError');
-        // File is still saved, just not auto-opened
+      if (kIsWeb) {
+        final blob = html.Blob([bytes], 'application/pdf');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute('download', '$filename.pdf')
+          ..click();
+        html.Url.revokeObjectUrl(url);
+        return 'Downloaded: $filename.pdf';
+      } else {
+        Directory? dir;
+        
+        if (Platform.isAndroid) {
+          dir = Directory('/storage/emulated/0/Download');
+          if (!await dir.exists()) {
+            dir = await getExternalStorageDirectory();
+          }
+        } else if (Platform.isIOS) {
+          dir = await getApplicationDocumentsDirectory();
+        } else {
+          if (Platform.isWindows) {
+            final home = Platform.environment['USERPROFILE'];
+            dir = Directory('$home\\Downloads');
+          } else if (Platform.isMacOS || Platform.isLinux) {
+            final home = Platform.environment['HOME'];
+            dir = Directory('$home/Downloads');
+          } else {
+            dir = await getApplicationDocumentsDirectory();
+          }
+        }
+        
+        if (dir == null || !await dir.exists()) {
+          throw Exception('Could not access storage directory');
+        }
+        
+        final file = File('${dir.path}/$filename.pdf');
+        await file.writeAsBytes(bytes);
+        
+        print('✅ PDF saved to: ${file.path}');
+        
+        try {
+          await OpenFile.open(file.path);
+        } catch (openError) {
+          print('Could not auto-open file: $openError');
+        }
+        
+        return file.path;
       }
-      
-      return file.path;
     } catch (e) {
-      print('Error saving PDF: $e');
+      print('❌ Error saving PDF: $e');
       rethrow;
     }
   }
@@ -482,21 +815,57 @@ class ExportService {
   static Future<String> _saveCSV(List<List<dynamic>> rows, String filename) async {
     try {
       final csv = const ListToCsvConverter().convert(rows);
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/$filename.csv');
-      await file.writeAsString(csv);
       
-      // Try to open file, but don't throw if it fails
-      try {
-        await OpenFile.open(file.path);
-      } catch (openError) {
-        print('Could not auto-open file: $openError');
-        // File is still saved, just not auto-opened
+      if (kIsWeb) {
+        final bytes = utf8.encode(csv);
+        final blob = html.Blob([bytes], 'text/csv');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute('download', '$filename.csv')
+          ..click();
+        html.Url.revokeObjectUrl(url);
+        return 'Downloaded: $filename.csv';
+      } else {
+        Directory? dir;
+        
+        if (Platform.isAndroid) {
+          dir = Directory('/storage/emulated/0/Download');
+          if (!await dir.exists()) {
+            dir = await getExternalStorageDirectory();
+          }
+        } else if (Platform.isIOS) {
+          dir = await getApplicationDocumentsDirectory();
+        } else {
+          if (Platform.isWindows) {
+            final home = Platform.environment['USERPROFILE'];
+            dir = Directory('$home\\Downloads');
+          } else if (Platform.isMacOS || Platform.isLinux) {
+            final home = Platform.environment['HOME'];
+            dir = Directory('$home/Downloads');
+          } else {
+            dir = await getApplicationDocumentsDirectory();
+          }
+        }
+        
+        if (dir == null || !await dir.exists()) {
+          throw Exception('Could not access storage directory');
+        }
+        
+        final file = File('${dir.path}/$filename.csv');
+        await file.writeAsString(csv);
+        
+        print('✅ CSV saved to: ${file.path}');
+        
+        try {
+          await OpenFile.open(file.path);
+        } catch (openError) {
+          print('Could not auto-open file: $openError');
+        }
+        
+        return file.path;
       }
-      
-      return file.path;
     } catch (e) {
-      print('Error saving CSV: $e');
+      print('❌ Error saving CSV: $e');
       rethrow;
     }
   }

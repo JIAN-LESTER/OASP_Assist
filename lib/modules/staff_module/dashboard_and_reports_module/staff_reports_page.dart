@@ -1,11 +1,13 @@
 
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/admin_dashboard_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/charts.dart';
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/export_button.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/paginated_list.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/reports.dart';
 import 'package:capstone_project/modules/admin_module/widgets/custom_dropdown_button.dart';
+import 'package:capstone_project/modules/admin_module/widgets/date_range_filter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -27,6 +29,9 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
   InquiryReportsData? inq;
   AdminDashboardData? ad;
   String? userName;
+
+  // ✅ ADD THESE MISSING VARIABLES
+  DateTimeRange? customDateRange;
 
   bool isLoadingUser = true;
   bool isLoadingInquiry = false;
@@ -56,42 +61,80 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
   }
 
   Future<void> _loadInquiryData() async {
+  if (!mounted) return;
+
+  setState(() => isLoadingInquiry = true);
+  try {
+    // ✅ Pass customDateRange to both fetchers
+    final results = await Future.wait([
+      _firebaseService.getInquiryReportsData(
+        selectedTimeFrame,
+        customDateRange, // ✅ ADD THIS
+      ),
+      _firebaseService.getAdminDashboardData(
+        selectedTimeFrame,
+        customDateRange, // ✅ ADD THIS
+      ),
+    ]);
+
     if (!mounted) return;
-
-    setState(() => isLoadingInquiry = true);
-    try {
-      // ✅ Fetch both in parallel
-      final results = await Future.wait([
-        _firebaseService.getInquiryReportsData(selectedTimeFrame),
-        _firebaseService.getAdminDashboardData(selectedTimeFrame),
-      ]);
-
-      if (!mounted) return;
-      
-      setState(() {
-        inq = results[0] as InquiryReportsData;
-        ad = results[1] as AdminDashboardData;  // ✅ NOW LOADED
-        isLoadingInquiry = false;
-      });
-
-      // ✅ DEBUG
-      print('📊 Staff Reports Data Loaded:');
-      print('   Inquiry Data: ${inq?.totalMessages ?? 0} messages');
-      print('   Admin Data: ${ad?.topEscalatedMessages.length ?? 0} escalations');
-      
-    } catch (e) {
-      print('❌ Error loading inquiry data: $e');
-      if (!mounted) return;
-      setState(() => isLoadingInquiry = false);
-    }
-  }
-
-  void _onTimeFrameChanged(String newValue) {
+    
     setState(() {
-      selectedTimeFrame = newValue;
+      inq = results[0] as InquiryReportsData;
+      ad = results[1] as AdminDashboardData;
+      isLoadingInquiry = false;
     });
-    _loadInquiryData();
+
+    print('📊 Staff Reports Data Loaded:');
+    print('   Inquiry Data: ${inq?.totalMessages ?? 0} messages');
+    print('   Admin Data: ${ad?.topEscalatedMessages.length ?? 0} escalations');
+    
+  } catch (e) {
+    print('❌ Error loading inquiry data: $e');
+    if (!mounted) return;
+    setState(() => isLoadingInquiry = false);
   }
+}
+
+void _onTimeFrameChanged(String newValue) {
+  // If Custom is selected, just update the UI to show the DateRangeFilter
+  if (newValue == 'Custom') {
+    if (mounted) {
+      setState(() {
+        selectedTimeFrame = 'Custom';
+        // Keep existing customDateRange if any
+      });
+    }
+    // Don't load data yet - wait for user to select a date range
+    return;
+  }
+
+  // Normal timeframe selection
+  setState(() {
+    selectedTimeFrame = newValue;
+    customDateRange = null; // Clear custom range when selecting preset
+  });
+  
+  _loadInquiryData();
+}
+
+void _onDateRangeChanged(DateTimeRange? range) {
+  if (range == null) {
+    // User cleared the date range, revert to "This Month"
+    setState(() {
+      customDateRange = null;
+      selectedTimeFrame = 'This Month';
+    });
+  } else {
+    // User selected a custom date range
+    setState(() {
+      customDateRange = range;
+      selectedTimeFrame = 'Custom';
+    });
+  }
+
+  _loadInquiryData();
+}
 
   Future<void> _refreshData() async {
     if (!mounted || isRefreshing) return;
@@ -209,6 +252,8 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
+                customDateRange: customDateRange,
+        onDateRangeChanged: _onDateRangeChanged,
       ),
       tabletBody: TabletDashboard(
         selectedTimeFrame: selectedTimeFrame,
@@ -222,6 +267,8 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
+                customDateRange: customDateRange,
+        onDateRangeChanged: _onDateRangeChanged,
       ),
       desktopBody: DesktopDashboard(
         selectedTimeFrame: selectedTimeFrame,
@@ -235,6 +282,8 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
+                customDateRange: customDateRange,
+        onDateRangeChanged: _onDateRangeChanged,
       ),
     );
   }
@@ -392,6 +441,8 @@ class DesktopDashboard extends StatelessWidget {
   final DateTime startDate;
   final String timeFrame;
   final Map<String, Map<String, int>> timeCategoryCounts;
+    final DateTimeRange? customDateRange;
+  final ValueChanged<DateTimeRange?> onDateRangeChanged;
 
   const DesktopDashboard({
     super.key,
@@ -406,6 +457,8 @@ class DesktopDashboard extends StatelessWidget {
     required this.startDate,
     required this.timeCategoryCounts,
     required this.timeFrame,
+    required this.customDateRange,
+    required this.onDateRangeChanged,
   });
 
   @override
@@ -423,6 +476,10 @@ class DesktopDashboard extends StatelessWidget {
               onRefresh,
               isRefreshing,
               userName,
+              customDateRange,
+              onDateRangeChanged,
+              inq,
+              ad,
             ),
             const SizedBox(height: 32),
 
@@ -455,6 +512,8 @@ class TabletDashboard extends StatelessWidget {
   final DateTime startDate;
   final String timeFrame;
   final Map<String, Map<String, int>> timeCategoryCounts;
+    final DateTimeRange? customDateRange;
+  final ValueChanged<DateTimeRange?> onDateRangeChanged;
 
   const TabletDashboard({
     super.key,
@@ -469,6 +528,8 @@ class TabletDashboard extends StatelessWidget {
     required this.timeCategoryCounts,
     required this.timeFrame,
     required this.userName,
+    required this.customDateRange,
+    required this.onDateRangeChanged,
   });
 
   @override
@@ -486,6 +547,12 @@ class TabletDashboard extends StatelessWidget {
               onRefresh,
               isRefreshing,
               userName,
+                         customDateRange,
+              onDateRangeChanged,
+              inq, 
+              ad, 
+   
+              
             ),
             const SizedBox(height: 32),
 
@@ -515,9 +582,12 @@ class MobileDashboard extends StatelessWidget {
   final InquiryReportsData? inq;
   final AdminDashboardData? ad;
   final String userName;
+
   final DateTime startDate;
   final String timeFrame;
   final Map<String, Map<String, int>> timeCategoryCounts;
+    final DateTimeRange? customDateRange;
+  final ValueChanged<DateTimeRange?> onDateRangeChanged;
 
   const MobileDashboard({
     super.key,
@@ -532,6 +602,8 @@ class MobileDashboard extends StatelessWidget {
     required this.startDate,
     required this.timeCategoryCounts,
     required this.timeFrame,
+    required this.customDateRange,
+    required this.onDateRangeChanged,
   });
 
   @override
@@ -549,6 +621,10 @@ class MobileDashboard extends StatelessWidget {
               onRefresh,
               isRefreshing,
               userName,
+              customDateRange,
+              onDateRangeChanged,
+              inq,
+              ad,
             ),
             const SizedBox(height: 24),
 
@@ -924,6 +1000,10 @@ Widget buildHeader(
   VoidCallback onRefresh,
   bool isRefreshing,
   String userName,
+  DateTimeRange? customDateRange,
+  ValueChanged<DateTimeRange?> onDateRangeChanged,
+  InquiryReportsData? inq,
+  AdminDashboardData? ad,
 ) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -952,10 +1032,26 @@ Widget buildHeader(
                             'This Week',
                             'This Month',
                             'This Year',
+                            'Custom',
                           ],
                           initialValue: selectedTimeFrame,
                           onChanged: onTimeFrameChanged,
                         ),
+                      ),
+                      if (selectedTimeFrame == 'Custom') ...[
+                        const SizedBox(width: 8),
+                        DateRangeFilter(
+                          selectedDateRange: customDateRange,
+                          onDateRangeChanged: onDateRangeChanged,
+                        ),
+                      ],
+                      const SizedBox(width: 8),
+                      ExportButton(
+                        pageType: 'inquiry',
+                        timeFrame: selectedTimeFrame,
+                        userName: userName,
+                        inq: inq,
+                        ad: ad,
                       ),
                     ],
                   ),
@@ -969,7 +1065,6 @@ Widget buildHeader(
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       CustomDropdownButton(
                         items: [
@@ -978,9 +1073,25 @@ Widget buildHeader(
                           'This Week',
                           'This Month',
                           'This Year',
+                          'Custom',
                         ],
                         initialValue: selectedTimeFrame,
                         onChanged: onTimeFrameChanged,
+                      ),
+                      if (selectedTimeFrame == 'Custom') ...[
+                        const SizedBox(width: 12),
+                        DateRangeFilter(
+                          selectedDateRange: customDateRange,
+                          onDateRangeChanged: onDateRangeChanged,
+                        ),
+                      ],
+                      const SizedBox(width: 12),
+                      ExportButton(
+                        pageType: 'inquiry',
+                        timeFrame: selectedTimeFrame,
+                        userName: userName,
+                        inq: inq,
+                        ad: ad,
                       ),
                     ],
                   ),
@@ -988,7 +1099,7 @@ Widget buildHeader(
               ),
           SizedBox(height: isMobile ? 12 : 8),
           Text(
-            "Detailed analysis of inquiry patterns and trends for $selectedTimeFrame.",
+            _getReportDescription(selectedTimeFrame, customDateRange),
             style: TextStyle(fontSize: isMobile ? 13 : 14, color: Colors.grey),
           ),
         ],
@@ -996,6 +1107,38 @@ Widget buildHeader(
     },
   );
 }
+
+String _getReportDescription(
+  String timeFrame,
+  DateTimeRange? customDateRange,
+) {
+  if (timeFrame == 'Custom' && customDateRange != null) {
+    return 'Detailed analysis of inquiry patterns and trends from ${_formatDate(customDateRange.start)} to ${_formatDate(customDateRange.end)}.';
+  }
+
+  return 'Detailed analysis of inquiry patterns and trends for $timeFrame.';
+}
+
+
+String _formatDate(DateTime date) {
+  const months = [
+    '',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${date.day} ${months[date.month]} ${date.year}';
+}
+
 String _formatTimestamp(Timestamp timestamp) {
   final date = timestamp.toDate();
   return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
