@@ -17,7 +17,7 @@ CategoryStyle getCategoryStyle(String category) {
     case 'scholarship':
       return CategoryStyle('Scholarship', Colors.purple, Colors.white);
     case 'placement':
-      return CategoryStyle('Placement', Colors.teal[600]!, Colors.black);
+      return CategoryStyle('Placement', Colors.teal[600]!, Colors.white);
     case 'general':
       return CategoryStyle('General', Colors.green, Colors.white);
     default:
