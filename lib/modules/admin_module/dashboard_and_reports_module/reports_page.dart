@@ -16,7 +16,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide DateRangePickerDialog;
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -165,38 +165,50 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 
   // ✅ When timeframe changes, invalidate and reload current report
-  void _onTimeFrameChanged(String newValue) {
-    // If Custom is selected, just update the UI to show the DateRangeFilter
-    if (newValue == 'Custom') {
-      if (mounted) {
-        setState(() {
-          selectedTimeFrame = 'Custom';
-          // Keep existing customDateRange if any
-        });
-      }
-      // Don't load data yet - wait for user to select a date range
-      return;
+ void _onTimeFrameChanged(String newValue) async {
+  // ✅ CORRECT: Show modal when Custom is selected
+  if (newValue == 'Custom') {
+    final DateTimeRange? selectedRange = await showDialog<DateTimeRange>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return DateRangePickerDialog(
+          initialDateRange: customDateRange,
+          firstDate: DateTime(2020, 1, 1),
+          lastDate: DateTime.now(),
+        );
+      },
+    );
+
+    // If user selected a range, apply it
+    if (selectedRange != null) {
+      _onDateRangeChanged(selectedRange);
     }
-
-    setState(() {
-      selectedTimeFrame = newValue;
-      customDateRange = null; // Clear custom range
-
-      // Invalidate loaded data flags to force reload
-      switch (selectedReportType) {
-        case 'Inquiry Trends':
-          inquiryDataLoaded = false;
-          break;
-        case 'Chatbot Usage':
-          chatbotDataLoaded = false;
-          break;
-        case 'User Demographics':
-          demographicsDataLoaded = false;
-          break;
-      }
-    });
-    _loadDataForSelectedReport();
+    // If user cancelled, don't change anything
+    return;
   }
+
+  // Normal timeframe selection
+  setState(() {
+    selectedTimeFrame = newValue;
+    customDateRange = null;
+
+    // Invalidate loaded data flags to force reload
+    switch (selectedReportType) {
+      case 'Inquiry Trends':
+        inquiryDataLoaded = false;
+        break;
+      case 'Chatbot Usage':
+        chatbotDataLoaded = false;
+        break;
+      case 'User Demographics':
+        demographicsDataLoaded = false;
+        break;
+    }
+  });
+  _loadDataForSelectedReport();
+}
 
   // Add this new method to handle date range changes:
   void _onDateRangeChanged(DateTimeRange? range) {

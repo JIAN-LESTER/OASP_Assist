@@ -137,31 +137,41 @@ String formatTime(Timestamp? timestamp) {
 }
 
 IconData getNotificationIcon(String? type) {
-  switch (type?.toLowerCase()) {
+  switch (type) {
+    case 'new_escalation':
+      return Icons.help_rounded;
+    case 'escalation_reply':
+      return Icons.message_rounded;
     case 'announcement':
       return Icons.campaign_rounded;
     case 'deadline_reminder':
-      return Icons.alarm_on_rounded;
-    case 'escalation_reply':
-      return Icons.reply_rounded;
-    case 'new_escalation':
-      return Icons.help_rounded;
+      return Icons.access_time_rounded;
+    case 'fb_token_expiration': // ✅ NEW
+      return Icons.key_rounded;
     default:
       return Icons.notifications_rounded;
   }
 }
 
 Color getNotificationColor(String? type) {
-  switch (type?.toLowerCase()) {
-    case 'announcement':
-      return const Color(0xFF2E7D32);
-    case 'deadline_reminder':
-      return const Color(0xFFFF6F00);
-    case 'escalation_reply':
-      return const Color(0xFF1976D2);
+  switch (type) {
     case 'new_escalation':
-      return const Color(0xFFF57C00);
+      return const Color(0xFFEF4444); // Red
+    case 'escalation_reply':
+      return const Color(0xFF2E7D32); // Green
+    case 'announcement':
+      return const Color(0xFF3B82F6); // Blue
+    case 'deadline_reminder':
+      return const Color(0xFFF59E0B); // Orange
+    case 'fb_token_expiration': // ✅ NEW
+      final status = type;
+      if (status == 'expired') {
+        return const Color(0xFFDC2626); // Dark red
+      } else {
+        return const Color(0xFFF59E0B); // Orange
+      }
     default:
-      return const Color(0xFF2E7D32);
+      return const Color(0xFF6B7280); // Gray
   }
 }
+

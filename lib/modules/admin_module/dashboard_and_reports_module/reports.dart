@@ -2964,26 +2964,26 @@ List<ChartData> _generateTrendData(
       break;
 
     case 'weekly':
-    case 'This Month':
-      // Generate 5 weeks
-      for (int week = 1; week <= 5; week++) {
-        final weekKey = "Week $week";
-        final categoryBreakdown =
-            timeCategoryCounts[weekKey] ?? <String, int>{};
-        final totalCount = categoryBreakdown.values.fold(
-          0,
-          (sum, count) => sum + count,
-        );
+case 'This Month':
+  // Generate 5 weeks
+  for (int week = 1; week <= 5; week++) {
+    final weekKey = "Week $week";  // ✅ Correct format
+    final categoryBreakdown =
+        timeCategoryCounts[weekKey] ?? <String, int>{};
+    final totalCount = categoryBreakdown.values.fold(
+      0,
+      (sum, count) => sum + count,
+    );
 
-        trendData.add(
-          ChartData(
-            date: weekKey,
-            count: totalCount,
-            categoryBreakdown: categoryBreakdown,
-          ),
-        );
-      }
-      break;
+    trendData.add(
+      ChartData(
+        date: weekKey,  // ✅ Use the full "Week 1" format
+        count: totalCount,
+        categoryBreakdown: categoryBreakdown,
+      ),
+    );
+  }
+  break;
 
     case 'monthly':
     case 'This Year':
@@ -3213,13 +3213,13 @@ String _getTimeKeyForInterval(
 
     case 'daily':
     case 'This Week':
-      // Return full date key for aggregation
+      // Return full date key
       return "${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}";
 
     case 'weekly':
     case 'This Month':
       final weekOfMonth = ((dateTime.day - 1) ~/ 7) + 1;
-      return "Week $weekOfMonth";
+      return "Week $weekOfMonth";  // ✅ This is correct
 
     case 'monthly':
     case 'This Year':
@@ -3232,6 +3232,7 @@ String _getTimeKeyForInterval(
       return "${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}";
   }
 }
+
 
 List<String> _generateAllTimeKeys(
   DateTime startDate,
@@ -3689,12 +3690,6 @@ double getBottomTitleInterval(int dataLength) {
   return (dataLength / 6).ceil().toDouble();
 }
 
-String formatBottomTitle(String date) {
-  if (date.length > 6) {
-    return date.substring(0, 6);
-  }
-  return date;
-}
 
 extension DateTimeExtension on DateTime {
   int get dayOfYear {

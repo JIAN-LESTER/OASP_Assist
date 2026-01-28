@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 class DateRangeFilter extends StatefulWidget {
   final DateTimeRange? selectedDateRange;
   final ValueChanged<DateTimeRange?> onDateRangeChanged;
+  final DateTime? firstDate;
+  final DateTime? lastDate;
 
   const DateRangeFilter({
     Key? key,
     required this.selectedDateRange,
     required this.onDateRangeChanged,
+    this.firstDate,
+    this.lastDate,
   }) : super(key: key);
 
   @override
@@ -79,8 +83,10 @@ class _DateRangeFilterState extends State<DateRangeFilter>
       barrierDismissible: true,
       barrierColor: Colors.black.withOpacity(0.5),
       builder: (BuildContext context) {
-        return _DateRangePickerDialog(
+        return DateRangePickerDialog(  // ✅ PUBLIC - No underscore
           initialDateRange: widget.selectedDateRange,
+          firstDate: widget.firstDate ?? DateTime(2020, 1, 1),
+          lastDate: widget.lastDate ?? DateTime.now(),
         );
       },
     );
@@ -205,19 +211,28 @@ class _DateRangeFilterState extends State<DateRangeFilter>
   }
 }
 
-class _DateRangePickerDialog extends StatefulWidget {
+// ✅✅✅ CHANGED: Removed underscore to make it PUBLIC ✅✅✅
+class DateRangePickerDialog extends StatefulWidget {
   final DateTimeRange? initialDateRange;
+  final DateTime firstDate;
+  final DateTime lastDate;
 
-  const _DateRangePickerDialog({this.initialDateRange});
+  const DateRangePickerDialog({
+    Key? key,  // ✅ Added key parameter
+    this.initialDateRange,
+    required this.firstDate,
+    required this.lastDate,
+  }) : super(key: key);
 
   @override
-  State<_DateRangePickerDialog> createState() => _DateRangePickerDialogState();
+  State<DateRangePickerDialog> createState() => DateRangePickerDialogState();  // ✅ Updated state class name
 }
 
-class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
+// ✅✅✅ CHANGED: Updated to match new class name ✅✅✅
+class DateRangePickerDialogState extends State<DateRangePickerDialog> {
   DateTime? _startDate;
   DateTime? _endDate;
-  DateTime _displayedMonth = DateTime.now();
+  late DateTime _displayedMonth;
 
   @override
   void initState() {
@@ -226,6 +241,8 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
       _startDate = widget.initialDateRange!.start;
       _endDate = widget.initialDateRange!.end;
       _displayedMonth = _startDate!;
+    } else {
+      _displayedMonth = DateTime(widget.lastDate.year, widget.lastDate.month);
     }
   }
 
@@ -255,9 +272,7 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
         _startDate = _endDate;
         _endDate = temp;
       }
-      Navigator.of(
-        context,
-      ).pop(DateTimeRange(start: _startDate!, end: _endDate!));
+      Navigator.of(context).pop(DateTimeRange(start: _startDate!, end: _endDate!));
     }
   }
 
@@ -268,11 +283,7 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
   bool _isDateInRange(DateTime date) {
     if (_startDate == null || _endDate == null) return false;
 
-    final start = DateTime(
-      _startDate!.year,
-      _startDate!.month,
-      _startDate!.day,
-    );
+    final start = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
     final end = DateTime(_endDate!.year, _endDate!.month, _endDate!.day);
     final current = DateTime(date.year, date.month, date.day);
 
@@ -295,6 +306,8 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
   }
 
   Widget _buildQuickSelectList() {
+    final now = widget.lastDate;
+    
     final quickSelects = [
       {'label': 'Today', 'days': 0},
       {'label': 'Yesterday', 'days': 1},
@@ -304,27 +317,29 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
     ];
 
     return Column(
-      children:
-          quickSelects.map((item) {
-            return _buildQuickSelectButton(
-              item['label'] as String,
-              item['days'] as int,
-            );
-          }).toList(),
+      children: quickSelects.map((item) {
+        return _buildQuickSelectButton(
+          item['label'] as String,
+          item['days'] as int,
+        );
+      }).toList(),
     );
   }
 
   Widget _buildQuickSelectButton(String label, int days) {
     final isToday = days == 0;
-    final endDate = DateTime.now();
-    final startDate =
-        isToday ? endDate : endDate.subtract(Duration(days: days));
+    final endDate = widget.lastDate;
+    final startDate = isToday ? endDate : endDate.subtract(Duration(days: days));
+
+    final effectiveStartDate = startDate.isBefore(widget.firstDate) 
+        ? widget.firstDate 
+        : startDate;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
-          final range = DateTimeRange(start: startDate, end: endDate);
+          final range = DateTimeRange(start: effectiveStartDate, end: endDate);
           Navigator.of(context).pop(range);
         },
         child: Container(
@@ -344,16 +359,8 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
   }
 
   Widget _buildCustomCalendar() {
-    final firstDayOfMonth = DateTime(
-      _displayedMonth.year,
-      _displayedMonth.month,
-      1,
-    );
-    final lastDayOfMonth = DateTime(
-      _displayedMonth.year,
-      _displayedMonth.month + 1,
-      0,
-    );
+    final firstDayOfMonth = DateTime(_displayedMonth.year, _displayedMonth.month, 1);
+    final lastDayOfMonth = DateTime(_displayedMonth.year, _displayedMonth.month + 1, 0);
     final firstWeekday = firstDayOfMonth.weekday % 7;
     final daysInMonth = lastDayOfMonth.day;
 
@@ -365,10 +372,11 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
 
     for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(_displayedMonth.year, _displayedMonth.month, day);
-      final isToday =
-          DateTime.now().year == date.year &&
-          DateTime.now().month == date.month &&
-          DateTime.now().day == date.day;
+      
+      final isToday = widget.lastDate.year == date.year &&
+          widget.lastDate.month == date.month &&
+          widget.lastDate.day == date.day;
+      
       final isStart = _isStartDate(date);
       final isEnd = _isEndDate(date);
       final isInRange = _isDateInRange(date);
@@ -388,20 +396,13 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
                 child: InkWell(
                   onTap: () {
                     setState(() {
-                      _displayedMonth = DateTime(
-                        _displayedMonth.year,
-                        _displayedMonth.month - 1,
-                      );
+                      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month - 1);
                     });
                   },
                   borderRadius: BorderRadius.circular(6),
                   child: Container(
                     padding: const EdgeInsets.all(6),
-                    child: const Icon(
-                      Icons.chevron_left,
-                      color: Color(0xFF1E293B),
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.chevron_left, color: Color(0xFF1E293B), size: 20),
                   ),
                 ),
               ),
@@ -412,8 +413,8 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
                     final selectedDate = await showDatePicker(
                       context: context,
                       initialDate: _displayedMonth,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime.now(),
+                      firstDate: widget.firstDate,
+                      lastDate: widget.lastDate,
                       builder: (context, child) {
                         return Theme(
                           data: Theme.of(context).copyWith(
@@ -436,10 +437,7 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
                   },
                   borderRadius: BorderRadius.circular(6),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     child: Text(
                       '${_getMonthName(_displayedMonth.month)} ${_displayedMonth.year}',
                       style: const TextStyle(
@@ -456,20 +454,13 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
                 child: InkWell(
                   onTap: () {
                     setState(() {
-                      _displayedMonth = DateTime(
-                        _displayedMonth.year,
-                        _displayedMonth.month + 1,
-                      );
+                      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month + 1);
                     });
                   },
                   borderRadius: BorderRadius.circular(6),
                   child: Container(
                     padding: const EdgeInsets.all(6),
-                    child: const Icon(
-                      Icons.chevron_right,
-                      color: Color(0xFF1E293B),
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.chevron_right, color: Color(0xFF1E293B), size: 20),
                   ),
                 ),
               ),
@@ -479,21 +470,20 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Row(
-            children:
-                ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((day) {
-                  return Expanded(
-                    child: Center(
-                      child: Text(
-                        day,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF94A3B8),
-                        ),
-                      ),
+            children: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((day) {
+              return Expanded(
+                child: Center(
+                  child: Text(
+                    day,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF94A3B8),
                     ),
-                  );
-                }).toList(),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ),
         const SizedBox(height: 8),
@@ -515,19 +505,8 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
 
   String _getMonthName(int month) {
     const months = [
-      '',
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
     ];
     return months[month];
   }
@@ -539,59 +518,45 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
     bool isEnd,
     bool isInRange,
   ) {
-    final isDisabled = date.isAfter(DateTime.now());
+    final isDisabled = date.isAfter(widget.lastDate) || date.isBefore(widget.firstDate);
 
     return GestureDetector(
-      onTap:
-          isDisabled
-              ? null
-              : () {
-                setState(() {
-                  if (_startDate == null ||
-                      (_startDate != null && _endDate != null)) {
-                    _startDate = date;
-                    _endDate = null;
-                  } else {
-                    _endDate = date;
-                  }
-                });
-              },
+      onTap: isDisabled ? null : () {
+        setState(() {
+          if (_startDate == null || (_startDate != null && _endDate != null)) {
+            _startDate = date;
+            _endDate = null;
+          } else {
+            _endDate = date;
+          }
+        });
+      },
       child: Stack(
         children: [
-          if (isInRange ||
-              (isStart && _endDate != null) ||
-              (isEnd && _startDate != null))
+          if (isInRange || (isStart && _endDate != null) || (isEnd && _startDate != null))
             Positioned.fill(
-              child: Container(
-                color: const Color(0xFF1E293B).withOpacity(0.08),
-              ),
+              child: Container(color: const Color(0xFF1E293B).withOpacity(0.08)),
             ),
           Center(
             child: Container(
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color:
-                    (isStart || isEnd)
-                        ? const Color(0xFF1E293B)
-                        : Colors.transparent,
+                color: (isStart || isEnd) ? const Color(0xFF1E293B) : Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
-                border:
-                    isToday && !isStart && !isEnd
-                        ? Border.all(color: const Color(0xFF1E293B), width: 1)
-                        : null,
+                border: isToday && !isStart && !isEnd
+                    ? Border.all(color: const Color(0xFF1E293B), width: 1)
+                    : null,
               ),
               child: Center(
                 child: Text(
                   '${date.day}',
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight:
-                        isStart || isEnd ? FontWeight.w500 : FontWeight.w400,
-                    color:
-                        isDisabled
-                            ? const Color(0xFFCBD5E1)
-                            : (isStart || isEnd)
+                    fontWeight: isStart || isEnd ? FontWeight.w500 : FontWeight.w400,
+                    color: isDisabled
+                        ? const Color(0xFFCBD5E1)
+                        : (isStart || isEnd)
                             ? Colors.white
                             : const Color(0xFF1E293B),
                   ),
@@ -610,12 +575,10 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
     final isMobile = screenWidth < 600;
     final isTablet = screenWidth >= 600 && screenWidth < 1100;
 
-    final dialogMaxWidth =
-        isMobile ? screenWidth - 32 : (isTablet ? 480.0 : 540.0);
-    final dialogMaxHeight =
-        isMobile
-            ? MediaQuery.of(context).size.height - 100
-            : (isTablet ? 540.0 : 560.0);
+    final dialogMaxWidth = isMobile ? screenWidth - 32 : (isTablet ? 480.0 : 540.0);
+    final dialogMaxHeight = isMobile
+        ? MediaQuery.of(context).size.height - 100
+        : (isTablet ? 540.0 : 560.0);
     final sidebarWidth = isMobile ? 0.0 : (isTablet ? 130.0 : 140.0);
     final horizontalPadding = isMobile ? 16.0 : (isTablet ? 20.0 : 24.0);
 
@@ -675,10 +638,7 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
                           },
                           child: Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 10,
-                              horizontal: 12,
-                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                             child: const Text(
                               'Reset',
                               style: TextStyle(
@@ -716,48 +676,31 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFB),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: const Color(0xFFE2E8F0),
-                                width: 1,
-                              ),
+                              border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
                             ),
-                            child:
-                                isMobile
-                                    ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildDateColumn('Start', _startDate),
-                                        const SizedBox(height: 10),
-                                        _buildDateColumn('End', _endDate),
-                                      ],
-                                    )
-                                    : Row(
-                                      children: [
-                                        Expanded(
-                                          child: _buildDateColumn(
-                                            'Start',
-                                            _startDate,
-                                          ),
+                            child: isMobile
+                                ? Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildDateColumn('Start', _startDate),
+                                      const SizedBox(height: 10),
+                                      _buildDateColumn('End', _endDate),
+                                    ],
+                                  )
+                                : Row(
+                                    children: [
+                                      Expanded(child: _buildDateColumn('Start', _startDate)),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        child: Icon(
+                                          Icons.arrow_forward,
+                                          color: const Color(0xFF94A3B8),
+                                          size: 16,
                                         ),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                          ),
-                                          child: Icon(
-                                            Icons.arrow_forward,
-                                            color: const Color(0xFF94A3B8),
-                                            size: 16,
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: _buildDateColumn(
-                                            'End',
-                                            _endDate,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                      ),
+                                      Expanded(child: _buildDateColumn('End', _endDate)),
+                                    ],
+                                  ),
                           ),
                           SizedBox(height: isMobile ? 16 : 20),
                           _buildCustomCalendar(),
@@ -778,10 +721,7 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
                                 },
                                 child: Container(
                                   width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 10,
-                                    horizontal: 12,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                                   child: const Text(
                                     'Reset',
                                     style: TextStyle(
@@ -809,10 +749,7 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       border: Border(
-                        top: BorderSide(
-                          color: const Color(0xFFE2E8F0),
-                          width: 1,
-                        ),
+                        top: BorderSide(color: const Color(0xFFE2E8F0), width: 1),
                       ),
                     ),
                     child: Row(
@@ -824,20 +761,14 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
                               onPressed: _cancel,
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: const Color(0xFF64748B),
-                                side: const BorderSide(
-                                  color: Color(0xFFE2E8F0),
-                                  width: 1,
-                                ),
+                                side: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
                               child: const Text(
                                 'Cancel',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                               ),
                             ),
                           ),
@@ -847,19 +778,12 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
                           child: SizedBox(
                             height: 40,
                             child: ElevatedButton(
-                              onPressed:
-                                  _startDate != null && _endDate != null
-                                      ? _applyDateRange
-                                      : null,
+                              onPressed: _startDate != null && _endDate != null ? _applyDateRange : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF1E293B),
                                 foregroundColor: Colors.white,
-                                disabledBackgroundColor: const Color(
-                                  0xFFE2E8F0,
-                                ),
-                                disabledForegroundColor: const Color(
-                                  0xFF94A3B8,
-                                ),
+                                disabledBackgroundColor: const Color(0xFFE2E8F0),
+                                disabledForegroundColor: const Color(0xFF94A3B8),
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
@@ -867,10 +791,7 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
                               ),
                               child: const Text(
                                 'Apply',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                               ),
                             ),
                           ),
@@ -904,10 +825,7 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
           date != null ? _formatDate(date) : 'Not selected',
           style: TextStyle(
             fontSize: 13,
-            color:
-                date != null
-                    ? const Color(0xFF1E293B)
-                    : const Color(0xFFCBD5E1),
+            color: date != null ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
             fontWeight: FontWeight.w500,
           ),
         ),

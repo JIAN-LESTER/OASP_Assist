@@ -118,29 +118,257 @@ class NotificationNavigationHandler {
   }
 
   void _handleNavigation(String type, Map<String, dynamic> data) {
-    final context = navigatorKey.currentContext;
-    if (context == null) {
-      print('⚠️ No navigator context available');
-      return;
-    }
-
-    print('📍 Navigating to: $type with data: $data');
-
-    switch (type) {
-      case 'escalation_detail':
-        _navigateToEscalationDetail(context, data);
-        break;
-      case 'escalation_response':
-        _showEscalationResponse(context, data);
-        break;
-      case 'announcement':
-        _navigateToAnnouncement(context, data);
-        break;
-      case 'announcements_list':
-        _navigateToAnnouncementsList(context);
-        break;
-    }
+  final context = navigatorKey.currentContext;
+  if (context == null) {
+    print('⚠️ No navigator context available');
+    return;
   }
+
+  print('📍 Navigating to: $type with data: $data');
+
+  switch (type) {
+    case 'escalation_detail':
+      _navigateToEscalationDetail(context, data);
+      break;
+    case 'escalation_response':
+      _showEscalationResponse(context, data);
+      break;
+    case 'announcement':
+      _navigateToAnnouncement(context, data);
+      break;
+    case 'announcements_list':
+      _navigateToAnnouncementsList(context);
+      break;
+    // ✅ NEW: Handle Facebook token expiration notifications
+    case 'fb_token_expiration':
+      _handleFacebookTokenExpiration(context, data);
+      break;
+  }
+}
+
+void _handleFacebookTokenExpiration(BuildContext context, Map<String, dynamic> data) {
+  final status = data['status'] as String?;
+  final daysLeft = int.tryParse(data['daysLeft'] ?? '0') ?? 0;
+  
+  print('⚠️ Facebook token notification:');
+  print('   Status: $status');
+  print('   Days left: $daysLeft');
+  
+  // Show dialog with token renewal instructions
+  _showTokenExpirationDialog(context, status, daysLeft);
+}
+
+void _showTokenExpirationDialog(
+  BuildContext context,
+  String? status,
+  int daysLeft,
+) {
+  final isExpired = status == 'expired' || daysLeft <= 0;
+  
+  showDialog(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.5),
+    builder: (context) => Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 500),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isExpired
+                        ? const Color(0xFFDC2626).withOpacity(0.1)
+                        : const Color(0xFFF59E0B).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    isExpired ? Icons.error_rounded : Icons.warning_rounded,
+                    color: isExpired 
+                        ? const Color(0xFFDC2626) 
+                        : const Color(0xFFF59E0B),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isExpired 
+                            ? 'Facebook Token Expired' 
+                            : 'Facebook Token Expiring Soon',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isExpired 
+                            ? 'Action required immediately'
+                            : '$daysLeft day${daysLeft != 1 ? "s" : ""} remaining',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Message
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Text(
+                isExpired
+                    ? 'Your Facebook API token has expired. You cannot sync new posts until you renew the token.'
+                    : 'Your Facebook API token will expire in $daysLeft day${daysLeft != 1 ? "s" : ""}. Please renew it soon to continue syncing posts without interruption.',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black87,
+                  height: 1.5,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Quick instructions
+            const Text(
+              'To renew your token:',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildQuickStep('1', 'Go to Announcements page'),
+            const SizedBox(height: 8),
+            _buildQuickStep('2', 'Click the key (🔑) button'),
+            const SizedBox(height: 8),
+            _buildQuickStep('3', 'Follow the token renewal process'),
+            const SizedBox(height: 24),
+
+            // Action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.grey[700],
+                      side: BorderSide(color: Colors.grey[300]!),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      // Navigate to announcements page
+                      Navigator.of(context).pushReplacementNamed(
+                        '/admin/home',
+                        arguments: {'initialTab': 4}, // Announcements tab
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E7D32),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Go to Announcements',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+Widget _buildQuickStep(String number, String text) {
+  return Row(
+    children: [
+      Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: const Color(0xFF2E7D32),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Center(
+          child: Text(
+            number,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[700],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
 
   // ✅ Listen to both role and service unit changes
   void _listenToRoleChanges() {

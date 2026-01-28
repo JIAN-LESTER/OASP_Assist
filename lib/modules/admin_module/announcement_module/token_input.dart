@@ -2,6 +2,7 @@
 // FILE 1: lib/modules/admin_module/announcement_module/fb_integration_helpers.dart
 // ============================================================================
 
+import 'package:capstone_project/modules/admin_module/announcement_module/fb_expiry_test.dart';
 import 'package:capstone_project/modules/admin_module/announcement_module/fb_sync.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -930,185 +931,70 @@ Future<void> showTokenInputModal(
     pageIdController.text = helper.tokenStatus!.pageId!;
   }
 
+  // ✅ FIX: Create a ValueNotifier to manage isExchanging state properly
+  final ValueNotifier<bool> isExchangingNotifier = ValueNotifier(false);
+
   showDialog(
     context: context,
     barrierDismissible: false,
-    builder:
-        (context) => StatefulBuilder(
-          builder: (context, setDialogState) {
-            bool isExchanging = false;
-
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              insetPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 24,
-              ),
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 650),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 40,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildTokenInputHeader(context, helper),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: _buildTokenInputContent(
-                          context,
-                          tokenController,
-                          pageIdController,
-                          appIdController,
-                          helper,
-                          setDialogState,
-                          onRefreshNeeded,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-  );
-}
-
-// ============================================================================
-// TOKEN INPUT MODAL - CONTINUED (add to fb_integration_helpers.dart)
-// ============================================================================
-
-// This continues from the _buildTokenInputHeader function...
-
-Widget _buildTokenInputHeader(
-  BuildContext context,
-  FacebookIntegrationHelper helper,
-) {
-  return Container(
-    padding: const EdgeInsets.all(24),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      border: Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.facebook, color: Colors.grey[700], size: 24),
+    builder: (context) {
+      return ValueListenableBuilder<bool>(
+        valueListenable: isExchangingNotifier,
+        builder: (context, isExchanging, child) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 24,
             ),
-            SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Facebook Integration',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.grey[900],
-                      letterSpacing: -0.3,
-                    ),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 650),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 40,
+                    offset: const Offset(0, 12),
                   ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Connect your Facebook Page',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w400,
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildTokenInputHeader(context, helper),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: _buildTokenInputContent(
+                        context,
+                        tokenController,
+                        pageIdController,
+                        appIdController,
+                        helper,
+                        isExchanging,
+                        isExchangingNotifier,
+                        onRefreshNeeded,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: Icon(
-                Icons.close_rounded,
-                color: Colors.grey[600],
-                size: 22,
-              ),
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.grey[100],
-                padding: EdgeInsets.all(6),
-              ),
-            ),
-          ],
-        ),
-        if (helper.tokenStatus != null && helper.tokenStatus!.configured) ...[
-          SizedBox(height: 12),
-          Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey[300]!, width: 1),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  helper.tokenStatus!.expired
-                      ? Icons.error_outline
-                      : helper.tokenStatus!.needsRenewal
-                      ? Icons.warning_amber_outlined
-                      : Icons.check_circle_outline,
-                  color: Colors.grey[600],
-                  size: 20,
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        helper.tokenStatus!.expired
-                            ? 'Token Expired'
-                            : helper.tokenStatus!.needsRenewal
-                            ? 'Token Expiring Soon'
-                            : 'Token Active',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[800],
-                        ),
-                      ),
-                      SizedBox(height: 1),
-                      Text(
-                        helper.tokenStatus!.expired
-                            ? 'Renew your token to continue syncing'
-                            : 'Expires in ${helper.tokenStatus!.daysLeft} days',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    ),
-  );
+          );
+        },
+      );
+    },
+  ).then((_) {
+    // Clean up when dialog is dismissed
+    isExchangingNotifier.dispose();
+  });
 }
+
+// ============================================================================
+// TOKEN INPUT CONTENT - UPDATED
+// ============================================================================
 
 Widget _buildTokenInputContent(
   BuildContext context,
@@ -1116,11 +1002,10 @@ Widget _buildTokenInputContent(
   TextEditingController pageIdController,
   TextEditingController appIdController,
   FacebookIntegrationHelper helper,
-  StateSetter setDialogState,
+  bool isExchanging,
+  ValueNotifier<bool> isExchangingNotifier,
   VoidCallback onRefreshNeeded,
 ) {
-  bool isExchanging = false;
-
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
@@ -1327,7 +1212,7 @@ Widget _buildTokenInputContent(
                         pageIdController,
                         appIdController,
                         helper,
-                        setDialogState,
+                        isExchangingNotifier,
                         onRefreshNeeded,
                       ),
               icon:
@@ -1365,6 +1250,228 @@ Widget _buildTokenInputContent(
         ],
       ),
     ],
+  );
+}
+
+// ============================================================================
+// HANDLE TOKEN EXCHANGE - UPDATED
+// ============================================================================
+
+Future<void> _handleTokenExchange(
+  BuildContext context,
+  TextEditingController tokenController,
+  TextEditingController pageIdController,
+  TextEditingController appIdController,
+  FacebookIntegrationHelper helper,
+  ValueNotifier<bool> isExchangingNotifier,
+  VoidCallback onRefreshNeeded,
+) async {
+  final token = tokenController.text.trim();
+  final pageId = pageIdController.text.trim();
+  final appId = appIdController.text.trim();
+
+  if (pageId.isEmpty) {
+    SnackbarUtil.showError(context, 'Please enter your Facebook Page ID');
+    return;
+  }
+
+  if (!RegExp(r'^\d+$').hasMatch(pageId)) {
+    SnackbarUtil.showError(context, 'Page ID should only contain numbers');
+    return;
+  }
+
+  if (appId.isNotEmpty && !RegExp(r'^\d+$').hasMatch(appId)) {
+    SnackbarUtil.showError(context, 'App ID should only contain numbers');
+    return;
+  }
+
+  if (token.isEmpty) {
+    SnackbarUtil.showError(context, 'Please enter a token');
+    return;
+  }
+
+  if (token.length < 50) {
+    SnackbarUtil.showError(context, 'Token seems too short');
+    return;
+  }
+
+  // ✅ FIX: Update the notifier to trigger UI rebuild
+  isExchangingNotifier.value = true;
+
+  try {
+    print('🔄 Exchanging token with Page ID: $pageId');
+    if (appId.isNotEmpty) {
+      print('📱 Using App ID: $appId');
+    }
+
+    final result = await FacebookSyncService.exchangeToken(
+      token,
+      pageId: pageId,
+      appId: appId.isNotEmpty ? appId : null,
+    );
+
+    if (!context.mounted) return;
+
+    if (result['success'] == true || result['ok'] == true) {
+      final expiresIn = result['expires_in'] ?? 0;
+      final daysValid = (expiresIn / 86400).round();
+      final appUsed = result['appId'] ?? appId;
+
+      // ✅ Close dialog first
+      Navigator.pop(context);
+
+      String successMessage =
+          'Token and Page ID saved! Valid for ~$daysValid days.';
+      if (appUsed != null && appUsed.isNotEmpty) {
+        successMessage += '\nUsing App ID: $appUsed';
+      }
+
+      SnackbarUtil.showSuccess(context, successMessage);
+
+      // ✅ Then update status and refresh
+      await helper.checkTokenStatus();
+      onRefreshNeeded();
+
+      FacebookTokenTestingPanel();
+
+      return;
+    }
+
+    throw Exception(result['message'] ?? result['error']);
+  } catch (e) {
+    print('❌ Error: $e');
+    if (!context.mounted) return;
+    final errorMessage = FacebookSyncService.parseErrorMessage(e);
+    SnackbarUtil.showError(context, 'Failed to save: $errorMessage');
+  } finally {
+    // ✅ FIX: Reset the notifier
+    if (isExchangingNotifier.value) {
+      isExchangingNotifier.value = false;
+    }
+  }
+}
+
+// ============================================================================
+// HELPER WIDGETS (keep all the existing helper widgets)
+// ============================================================================
+
+Widget _buildTokenInputHeader(
+  BuildContext context,
+  FacebookIntegrationHelper helper,
+) {
+  return Container(
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      border: Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.facebook, color: Colors.grey[700], size: 24),
+            ),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Facebook Integration',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey[900],
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Connect your Facebook Page',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: Icon(
+                Icons.close_rounded,
+                color: Colors.grey[600],
+                size: 22,
+              ),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.grey[100],
+                padding: EdgeInsets.all(6),
+              ),
+            ),
+          ],
+        ),
+        if (helper.tokenStatus != null && helper.tokenStatus!.configured) ...[
+          SizedBox(height: 12),
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey[300]!, width: 1),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  helper.tokenStatus!.expired
+                      ? Icons.error_outline
+                      : helper.tokenStatus!.needsRenewal
+                      ? Icons.warning_amber_outlined
+                      : Icons.check_circle_outline,
+                  color: Colors.grey[600],
+                  size: 20,
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        helper.tokenStatus!.expired
+                            ? 'Token Expired'
+                            : helper.tokenStatus!.needsRenewal
+                            ? 'Token Expiring Soon'
+                            : 'Token Active',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                      SizedBox(height: 1),
+                      Text(
+                        helper.tokenStatus!.expired
+                            ? 'Renew your token to continue syncing'
+                            : 'Expires in ${helper.tokenStatus!.daysLeft} days',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    ),
   );
 }
 
@@ -1498,86 +1605,4 @@ Widget _buildTokenTextField({
       ),
     ),
   );
-}
-
-Future<void> _handleTokenExchange(
-  BuildContext context,
-  TextEditingController tokenController,
-  TextEditingController pageIdController,
-  TextEditingController appIdController,
-  FacebookIntegrationHelper helper,
-  StateSetter setDialogState,
-  VoidCallback onRefreshNeeded,
-) async {
-  final token = tokenController.text.trim();
-  final pageId = pageIdController.text.trim();
-  final appId = appIdController.text.trim();
-
-  if (pageId.isEmpty) {
-    SnackbarUtil.showError(context, 'Please enter your Facebook Page ID');
-    return;
-  }
-
-  if (!RegExp(r'^\d+$').hasMatch(pageId)) {
-    SnackbarUtil.showError(context, 'Page ID should only contain numbers');
-    return;
-  }
-
-  if (appId.isNotEmpty && !RegExp(r'^\d+$').hasMatch(appId)) {
-    SnackbarUtil.showError(context, 'App ID should only contain numbers');
-    return;
-  }
-
-  if (token.isEmpty) {
-    SnackbarUtil.showError(context, 'Please enter a token');
-    return;
-  }
-
-  if (token.length < 50) {
-    SnackbarUtil.showError(context, 'Token seems too short');
-    return;
-  }
-
-  setDialogState(() {});
-
-  try {
-    print('🔄 Exchanging token with Page ID: $pageId');
-    if (appId.isNotEmpty) {
-      print('📱 Using App ID: $appId');
-    }
-
-    final result = await FacebookSyncService.exchangeToken(
-      token,
-      pageId: pageId,
-      appId: appId.isNotEmpty ? appId : null,
-    );
-
-    if (!context.mounted) return;
-
-    if (result['success'] == true || result['ok'] == true) {
-      final expiresIn = result['expires_in'] ?? 0;
-      final daysValid = (expiresIn / 86400).round();
-      final appUsed = result['appId'] ?? appId;
-
-      Navigator.pop(context);
-
-      String successMessage =
-          'Token and Page ID saved! Valid for ~$daysValid days.';
-      if (appUsed != null && appUsed.isNotEmpty) {
-        successMessage += '\nUsing App ID: $appUsed';
-      }
-
-      SnackbarUtil.showSuccess(context, successMessage);
-      await helper.checkTokenStatus();
-      onRefreshNeeded();
-      return;
-    }
-
-    throw Exception(result['message'] ?? result['error']);
-  } catch (e) {
-    print('❌ Error: $e');
-    if (!context.mounted) return;
-    final errorMessage = FacebookSyncService.parseErrorMessage(e);
-    SnackbarUtil.showError(context, 'Failed to save: $errorMessage');
-  }
 }

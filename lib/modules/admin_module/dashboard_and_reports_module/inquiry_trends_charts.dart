@@ -576,8 +576,8 @@ Widget buildInquiryTrendCard(
   List<ChartData> trendData,
   String timeFrame,
   BuildContext context, {
-  DateTime? startDate,  // Add these
-  DateTime? endDate,    // Add these
+  DateTime? startDate,
+  DateTime? endDate,
 }) {
   Set<String> allCategories = {};
   for (var data in trendData) {
@@ -590,7 +590,7 @@ Widget buildInquiryTrendCard(
       if (count > maxY) maxY = count.toDouble();
     }
   }
-  maxY = maxY * 1.2; // Increased padding
+  maxY = maxY * 1.2;
 
   Map<String, int> categoryTotals = {};
   for (var data in trendData) {
@@ -635,7 +635,6 @@ Widget buildInquiryTrendCard(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Enhanced Header
         Row(
           children: [
             Container(
@@ -690,7 +689,6 @@ Widget buildInquiryTrendCard(
                 ],
               ),
             ),
-            // Enhanced See More Button
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
@@ -741,90 +739,84 @@ Widget buildInquiryTrendCard(
           ],
         ),
 
-        // Enhanced Category Legend with Stats
         if (allCategories.isNotEmpty) ...[
-   
           const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 10,
-                  children: sortedCategories.map((entry) {
-                    final category = entry.key;
-                    final count = entry.value;
-                    final color = getColorForCategory(category);
-                    
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            children: sortedCategories.map((entry) {
+              final category = entry.key;
+              final count = entry.value;
+              final color = getColorForCategory(category);
+              
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: color.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: color.withOpacity(0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: color.withOpacity(0.4),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            category,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[800],
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              count.toString(),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: color,
-                              ),
-                            ),
+                        color: color,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withOpacity(0.4),
+                            blurRadius: 4,
+                            spreadRadius: 1,
                           ),
                         ],
                       ),
-                    );
-                  }).toList(),
-                ),
-              
-            
-
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      category,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        count.toString(),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ),
                   ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
 
         const SizedBox(height: 24),
 
-        // Chart Area
         Expanded(
           child: trendData.isEmpty
               ? Center(
@@ -936,28 +928,42 @@ Widget buildInquiryTrendCard(
                             },
                           ),
                         ),
-          bottomTitles: AxisTitles(
+                      bottomTitles: AxisTitles(
   sideTitles: SideTitles(
     showTitles: true,
-    reservedSize: 32,
-    interval: _getBottomTitleInterval(
+    reservedSize: 40,
+    interval: getBottomTitleInterval(
       trendData.length,
       timeFrame,
-      startDate,  // Pass these if available
-      endDate,    // Pass these if available
+      startDate,
+      endDate,
     ),
     getTitlesWidget: (value, meta) {
       if (value < 0 || value >= trendData.length) {
         return const SizedBox.shrink();
       }
+      
+      // ✅ IMPORTANT: Only show labels at interval positions
+      final interval = getBottomTitleInterval(
+        trendData.length,
+        timeFrame,
+        startDate,
+        endDate,
+      );
+      
+      // Skip labels that aren't at interval positions
+      if (value % interval != 0 && value != 0) {
+        return const SizedBox.shrink();
+      }
+      
       return Padding(
         padding: const EdgeInsets.only(top: 8),
         child: Text(
-          _formatBottomTitle(
+          formatBottomTitle(
             trendData[value.toInt()].date,
             timeFrame,
-            startDate,  // Pass these if available
-            endDate,    // Pass these if available
+            startDate,
+            endDate,
           ),
           style: TextStyle(
             fontSize: 11,
@@ -1140,7 +1146,9 @@ double _getGridInterval(List<ChartData> trendData) {
   return (maxCount / 5).ceil().toDouble();
 }
 
-double _getBottomTitleInterval(int dataLength, String timeFrame, [DateTime? startDate, DateTime? endDate]) {
+
+
+double getBottomTitleInterval(int dataLength, String timeFrame, [DateTime? startDate, DateTime? endDate]) {
   // Handle custom date ranges
   if (timeFrame == 'Custom' && startDate != null && endDate != null) {
     final daysDiff = endDate.difference(startDate).inDays;
@@ -1179,7 +1187,7 @@ double _getBottomTitleInterval(int dataLength, String timeFrame, [DateTime? star
   }
 }
 
-String _formatBottomTitle(String date, String timeFrame, [DateTime? startDate, DateTime? endDate]) {
+String formatBottomTitle(String date, String timeFrame, [DateTime? startDate, DateTime? endDate]) {
   // Handle custom date ranges
   if (timeFrame == 'Custom' && startDate != null && endDate != null) {
     final daysDiff = endDate.difference(startDate).inDays;
@@ -1197,9 +1205,10 @@ String _formatBottomTitle(String date, String timeFrame, [DateTime? startDate, D
     } else if (daysDiff <= 7) {
       // Daily format: already formatted as "Mon", "Tue", etc.
       return date;
-    } else if (daysDiff <= 31) {
+    }  else if (daysDiff <= 31) {
       // Weekly format: "W1", "W2", etc.
-      return date.replaceAll("Week ", "W");
+
+      return date;
     } else {
       // Monthly format: "Jan", "Feb", etc.
       return date;
@@ -1222,11 +1231,12 @@ String _formatBottomTitle(String date, String timeFrame, [DateTime? startDate, D
     case 'This Week':
       return date;
     case 'This Month':
-      return date.replaceAll("Week ", "W");
+
+    return date;
     case 'This Year':
       return date;
     default:
-      return date.length <= 3 ? date : date.substring(0, 3);
+      return date.length <= 3 ? date : date.substring(0, 6);
   }
 }
 
@@ -1754,7 +1764,7 @@ Widget buildEscalationsOverTimeCard(
   maxY = maxY * 1.2;
 
   // Calculate bottom title interval
-  final bottomInterval = _getBottomTitleInterval(
+  final bottomInterval = getBottomTitleInterval(
     escalationsData.length,
     timeFrame,
     startDate,
@@ -1946,35 +1956,53 @@ Widget buildEscalationsOverTimeCard(
                             ),
                           ),
                         ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 32,
-                            interval: bottomInterval,
-                            getTitlesWidget: (value, meta) {
-                              if (value < 0 || value >= escalationsData.length) {
-                                return const SizedBox.shrink();
-                              }
-                              final formattedDate = _formatBottomTitle(
-                                escalationsData[value.toInt()].date,
-                                timeFrame,
-                                startDate,
-                                endDate,
-                              );
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  formattedDate,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                     bottomTitles: AxisTitles(
+  sideTitles: SideTitles(
+    showTitles: true,
+    reservedSize: 40,
+    interval: getBottomTitleInterval(
+      escalationsData.length,
+      timeFrame,
+      startDate,
+      endDate,
+    ),
+    getTitlesWidget: (value, meta) {
+      if (value < 0 || value >= escalationsData.length) {
+        return const SizedBox.shrink();
+      }
+      
+      // ✅ IMPORTANT: Only show labels at interval positions
+      final interval = getBottomTitleInterval(
+        escalationsData.length,
+        timeFrame,
+        startDate,
+        endDate,
+      );
+      
+      // Skip labels that aren't at interval positions
+      if (value % interval != 0 && value != 0) {
+        return const SizedBox.shrink();
+      }
+      
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          formatBottomTitle(
+            escalationsData[value.toInt()].date,
+            timeFrame,
+            startDate,
+            endDate,
+          ),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[600],
+          ),
+        ),
+      );
+    },
+  ),
+),
                       ),
                       borderData: FlBorderData(
                         show: true,

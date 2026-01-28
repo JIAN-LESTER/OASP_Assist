@@ -992,56 +992,85 @@ class _NotificationModalState extends State<NotificationModal>
     return readBy?.contains(currentUserId) ?? false;
   }
 
-  Future<void> _handleNotificationTap(Map<String, dynamic> data) async {
-    final type = data['type'] as String?;
-    final escalationId =
-        data['escalationId'] as String? ??
-        data['data']?['escalationId'] as String?;
-    final conversationId =
-        data['conversationId'] as String? ??
-        data['data']?['conversationId'] as String?;
-    final announcementId =
-        data['announcementId'] as String? ??
-        data['data']?['announcementId'] as String?;
+Future<void> _handleNotificationTap(Map<String, dynamic> data) async {
+  final type = data['type'] as String?;
+  final escalationId =
+      data['escalationId'] as String? ??
+      data['data']?['escalationId'] as String?;
+  final conversationId =
+      data['conversationId'] as String? ??
+      data['data']?['conversationId'] as String?;
+  final announcementId =
+      data['announcementId'] as String? ??
+      data['data']?['announcementId'] as String?;
 
-    if (type == null) return;
+  if (type == null) return;
 
-    // Mark notification as read
-    final notificationId = data['notificationId'];
-    if (notificationId != null) {
-      await _markAsRead(notificationId);
-    }
-
-    switch (type) {
-      case 'escalation_reply':
-        if (widget.role == 'user') {
-          if (escalationId == null || escalationId.isEmpty) {
-            _showError('Cannot open escalation: Missing escalation ID');
-            return;
-          }
-          await _showEscalationResponseInline(escalationId, conversationId);
-        }
-        break;
-
-      case 'new_escalation':
-        if (widget.role == 'staff' || widget.role == 'admin') {
-          if (escalationId == null || escalationId.isEmpty) {
-            _showError('Cannot open escalation: Missing escalation ID');
-            return;
-          }
-          await _showEscalationDetailInline(escalationId, conversationId);
-        }
-        break;
-
-      case 'announcement':
-      case 'deadline_reminder':
-        _navigateToAnnouncements(announcementId);
-        break;
-
-      default:
-        print('⚠️ Unhandled notification type: $type');
-    }
+  // Mark notification as read
+  final notificationId = data['notificationId'];
+  if (notificationId != null) {
+    await _markAsRead(notificationId);
   }
+
+  switch (type) {
+    case 'escalation_reply':
+      if (widget.role == 'user') {
+        if (escalationId == null || escalationId.isEmpty) {
+          _showError('Cannot open escalation: Missing escalation ID');
+          return;
+        }
+        await _showEscalationResponseInline(escalationId, conversationId);
+      }
+      break;
+
+    case 'new_escalation':
+      if (widget.role == 'staff' || widget.role == 'admin') {
+        if (escalationId == null || escalationId.isEmpty) {
+          _showError('Cannot open escalation: Missing escalation ID');
+          return;
+        }
+        await _showEscalationDetailInline(escalationId, conversationId);
+      }
+      break;
+
+    case 'announcement':
+    case 'deadline_reminder':
+      _navigateToAnnouncements(announcementId);
+      break;
+
+    // ✅ NEW: Handle Facebook token expiration
+    case 'fb_token_expiration':
+      _handleFacebookTokenExpiration(data);
+      break;
+
+    default:
+      print('⚠️ Unhandled notification type: $type');
+  }
+}
+
+void _handleFacebookTokenExpiration(Map<String, dynamic> data) {
+  final status = data['status'] as String? ?? data['data']?['status'] as String?;
+  final daysLeft = int.tryParse(
+    (data['daysLeft'] ?? data['data']?['daysLeft'] ?? '0').toString()
+  ) ?? 0;
+  
+  print('⚠️ Facebook token notification tapped');
+  print('   Status: $status');
+  print('   Days left: $daysLeft');
+  
+  // Close notification modal
+  Navigator.of(context).pop();
+  
+  // Navigate to announcements page where the banner will be visible
+  Future.delayed(const Duration(milliseconds: 200), () {
+    if (!mounted) return;
+    
+    Navigator.of(context).pushReplacementNamed(
+      '/admin/home',
+      arguments: {'initialTab': 4}, // Announcements tab
+    );
+  });
+}
 
   void _navigateToAnnouncements(String? announcementId) {
     Future.delayed(const Duration(milliseconds: 200), () {
@@ -2124,155 +2153,170 @@ Widget _buildInfoCard({
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: notifications.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final doc = notifications[index];
-        final data = doc.data() as Map<String, dynamic>;
-        final isRead = _isRead(data);
-        final notificationType = data['type'] as String?;
+    padding: const EdgeInsets.all(16),
+    itemCount: notifications.length,
+    separatorBuilder: (context, index) => const SizedBox(height: 8),
+    itemBuilder: (context, index) {
+      final doc = notifications[index];
+      final data = doc.data() as Map<String, dynamic>;
+      final isRead = _isRead(data);
+      final notificationType = data['type'] as String?;
 
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              if (!isRead) {
-                _markAsRead(doc.id);
-              }
-              _handleNotificationTap(data);
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isRead ? Colors.grey[50] : Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isRead ? Colors.grey[200]! : Colors.grey[300]!,
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Profile Picture Placeholder
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: getNotificationColor(
-                        notificationType,
-                      ).withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      getNotificationIcon(notificationType),
-                      color: getNotificationColor(notificationType),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
+      // ✅ NEW: Special styling for FB token notifications
+      final isFbTokenNotification = notificationType == 'fb_token_expiration';
+      final isExpired = data['status'] == 'expired' || 
+                        (data['data']?['status'] == 'expired');
 
-                  // Content
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                data['title'] ?? 'No title',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight:
-                                      isRead
-                                          ? FontWeight.w500
-                                          : FontWeight.w600,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (data['body'] != null &&
-                            data['body'].isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            data['body'],
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[700],
-                              height: 1.3,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                        const SizedBox(height: 6),
-                        Text(
-                          formatTime(data['createdAt'] as Timestamp?),
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Three-dot menu button
-                  Builder(
-                    builder: (context) {
-                      return IconButton(
-                        icon: Icon(
-                          Icons.more_vert,
-                          color: Colors.grey[600],
-                          size: 20,
-                        ),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () {
-                          // Get button position
-                          final RenderBox renderBox =
-                              context.findRenderObject() as RenderBox;
-                          final buttonPosition = renderBox.localToGlobal(
-                            Offset.zero,
-                          );
-                          final buttonSize = renderBox.size;
-
-                          _showNotificationMenu(
-                            context,
-                            doc.id,
-                            isRead,
-                            buttonPosition,
-                            buttonSize,
-                          );
-                        },
-                      );
-                    },
-                  ),
-
-                  // Unread Indicator (moved next to menu)
-                  if (!isRead)
-                    Container(
-                      width: 8,
-                      height: 8,
-                      margin: const EdgeInsets.only(left: 4, right: 4),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF2E7D32),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                ],
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            if (!isRead) {
+              _markAsRead(doc.id);
+            }
+            _handleNotificationTap(data);
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              // ✅ Special background for FB token notifications
+              color: isFbTokenNotification
+                  ? (isExpired 
+                      ? const Color(0xFFDC2626).withOpacity(0.05)
+                      : const Color(0xFFF59E0B).withOpacity(0.05))
+                  : (isRead ? Colors.grey[50] : Colors.white),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                // ✅ Special border for FB token notifications
+                color: isFbTokenNotification
+                    ? (isExpired
+                        ? const Color(0xFFDC2626).withOpacity(0.3)
+                        : const Color(0xFFF59E0B).withOpacity(0.3))
+                    : (isRead ? Colors.grey[200]! : Colors.grey[300]!),
+                width: isFbTokenNotification ? 2 : 1,
               ),
             ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Profile Picture Placeholder
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: getNotificationColor(
+                      notificationType,
+                    ).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    getNotificationIcon(notificationType),
+                    color: getNotificationColor(notificationType),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              data['title'] ?? 'No title',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight:
+                                    isRead
+                                        ? FontWeight.w500
+                                        : FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (data['body'] != null &&
+                          data['body'].isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          data['body'],
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      Text(
+                        formatTime(data['createdAt'] as Timestamp?),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Three-dot menu button
+                Builder(
+                  builder: (context) {
+                    return IconButton(
+                      icon: Icon(
+                        Icons.more_vert,
+                        color: Colors.grey[600],
+                        size: 20,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () {
+                        final RenderBox renderBox =
+                            context.findRenderObject() as RenderBox;
+                        final buttonPosition = renderBox.localToGlobal(
+                          Offset.zero,
+                        );
+                        final buttonSize = renderBox.size;
+
+                        _showNotificationMenu(
+                          context,
+                          doc.id,
+                          isRead,
+                          buttonPosition,
+                          buttonSize,
+                        );
+                      },
+                    );
+                  },
+                ),
+
+                // Unread Indicator
+                if (!isRead)
+                  Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(left: 4, right: 4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF2E7D32),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+              ],
+            ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {

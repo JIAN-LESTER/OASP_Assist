@@ -12,7 +12,7 @@ import 'package:capstone_project/modules/admin_module/widgets/custom_dropdown_bu
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/reports.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide DateRangePickerDialog;
 
 class SkeletonBox extends StatefulWidget {
   final double? width;
@@ -519,50 +519,63 @@ Future<void> _fetchAndCacheData() async {
     }
   }
 
-  Future<void> _onTimeFrameChanged(String newValue) async {
-    if (newValue == selectedTimeFrame && newValue != 'Custom') return;
+Future<void> _onTimeFrameChanged(String newValue) async {
+  if (newValue == selectedTimeFrame && newValue != 'Custom') return;
 
-    // If Custom is selected, just update the UI to show the DateRangeFilter
-    if (newValue == 'Custom') {
-      if (mounted) {
-        setState(() {
-          selectedTimeFrame = 'Custom';
-          // Keep existing customDateRange if any, otherwise null
-        });
-      }
-      // Don't load data yet - wait for user to select a date range
-      return;
+  // ✅ CORRECT: Show modal when Custom is selected
+  if (newValue == 'Custom') {
+    final DateTimeRange? selectedRange = await showDialog<DateTimeRange>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        // ✅ IMPORTANT: Import statement needed
+        // Make sure _DateRangePickerDialog is accessible
+        return DateRangePickerDialog(
+          initialDateRange: customDateRange,
+          firstDate: DateTime(2020, 1, 1),
+          lastDate: DateTime.now(),
+        );
+      },
+    );
+
+    // If user selected a range, apply it
+    if (selectedRange != null) {
+      _onDateRangeChanged(selectedRange);
     }
+    // If user cancelled (selectedRange is null), don't change anything
+    return;
+  }
 
-    // Normal timeframe selection
-    setState(() {
-      selectedTimeFrame = newValue;
-      customDateRange = null; // Clear custom range when selecting preset
-      isLazyLoading = true;
-    });
+  // Normal timeframe selection
+  setState(() {
+    selectedTimeFrame = newValue;
+    customDateRange = null;
+    isLazyLoading = true;
+  });
 
-    try {
-      await Future.wait([
-        _fetchQuickStats().then((stats) {
-          if (mounted) {
-            setState(() {
-              quickStats = stats;
-            });
-          }
-        }),
-        _loadFullData(),
-      ]);
-    } catch (e) {
-      print('Error changing timeframe: $e');
-      _showSnackBar('Failed to load data for $newValue', isError: true);
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLazyLoading = false;
-        });
-      }
+  try {
+    await Future.wait([
+      _fetchQuickStats().then((stats) {
+        if (mounted) {
+          setState(() {
+            quickStats = stats;
+          });
+        }
+      }),
+      _loadFullData(),
+    ]);
+  } catch (e) {
+    print('Error changing timeframe: $e');
+    _showSnackBar('Failed to load data for $newValue', isError: true);
+  } finally {
+    if (mounted) {
+      setState(() {
+        isLazyLoading = false;
+      });
     }
   }
+}
 
   // Add this new method to handle date range changes:
   Future<void> _onDateRangeChanged(DateTimeRange? range) async {
