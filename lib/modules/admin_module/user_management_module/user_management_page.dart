@@ -1,5 +1,5 @@
-
 import 'package:capstone_project/modules/admin_module/buttons/add_user_button.dart';
+import 'package:capstone_project/modules/admin_module/buttons/bulk.dart';
 import 'package:capstone_project/modules/admin_module/widgets/pagination.dart';
 import 'package:capstone_project/modules/admin_module/widgets/role_dropdown_button.dart';
 import 'package:capstone_project/modules/admin_module/widgets/search_field.dart';
@@ -24,7 +24,7 @@ class UserManagementPage extends StatefulWidget {
   State<UserManagementPage> createState() => _UserManagementPageState();
 }
 
-class _UserManagementPageState extends State<UserManagementPage> {
+class _UserManagementPageState extends State<UserManagementPage> with BulkSelectionMixin {
   String selectedRole = 'All Roles';
   final TextEditingController _searchController = TextEditingController();
   int currentPage = 1;
@@ -44,6 +44,39 @@ class _UserManagementPageState extends State<UserManagementPage> {
     _usersStream = FirebaseFirestore.instance.collection('users').orderBy('createdAt', descending: true).snapshots();
     loadStatData();
   }
+
+void _handleBulkDelete() async {
+  await handleBulkDelete(
+    context: context,
+    selectedIds: selectedIds,
+    collection: 'users',
+    itemType: 'users',
+    onSuccess: () {
+      clearSelection();
+      _loadStatsAsync();
+    },
+  );
+}
+ Future<void> _loadStatsAsync() async {
+    try {
+      final data = await statData.getUserData();
+      if (mounted) {
+        setState(() {
+          user = data;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading user data: $e");
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+ 
 
   @override
   void dispose() {
@@ -69,7 +102,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         isLoading = false;
       });
     } catch (e) {
-      print("Error loading information bank data: $e");
+      print("Error loading user data: $e");
       if (!mounted) return;
       setState(() {
         isLoading = false;
@@ -120,6 +153,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
         onNavigateToPage: widget.onNavigateToPage,
         user: user,
         usersStream: _usersStream,
+
+       selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
       tabletBody: TabletUserManagement(
         selectedRole: selectedRole,
@@ -132,6 +173,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
         onNavigateToPage: widget.onNavigateToPage,
         user: user,
         usersStream: _usersStream,
+selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
       desktopBody: DesktopUserManagement(
         selectedRole: selectedRole,
@@ -144,6 +192,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
         onNavigateToPage: widget.onNavigateToPage,
         user: user,
         usersStream: _usersStream,
+selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
     );
   }
@@ -161,6 +216,15 @@ class DesktopUserManagement extends StatelessWidget {
   final UserData? user;
   final Stream<QuerySnapshot> usersStream;
 
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
+
+
   const DesktopUserManagement({
     super.key,
     required this.selectedRole,
@@ -173,6 +237,13 @@ class DesktopUserManagement extends StatelessWidget {
     this.onNavigateToPage,
     this.user,
     required this.usersStream,
+   required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
@@ -190,6 +261,14 @@ class DesktopUserManagement extends StatelessWidget {
       24.0,
       user,
       usersStream,
+         
+      selectedIds,
+      isSelectionMode,
+      onToggleSelection,
+      onToggleSelectAll,
+      onClearSelection,
+      onBulkDelete,
+      isAllSelected,
     );
   }
 }
@@ -205,6 +284,14 @@ class TabletUserManagement extends StatelessWidget {
   final Function(int)? onNavigateToPage;
   final UserData? user;
   final Stream<QuerySnapshot> usersStream;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
+
 
   const TabletUserManagement({
     super.key,
@@ -218,6 +305,13 @@ class TabletUserManagement extends StatelessWidget {
     this.onNavigateToPage,
     this.user,
     required this.usersStream,
+   required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
@@ -235,6 +329,13 @@ class TabletUserManagement extends StatelessWidget {
       20.0,
       user,
       usersStream,
+      selectedIds,
+      isSelectionMode,
+      onToggleSelection,
+      onToggleSelectAll,
+      onClearSelection,
+      onBulkDelete,
+      isAllSelected,
     );
   }
 }
@@ -250,6 +351,14 @@ class MobileUserManagement extends StatelessWidget {
   final Function(int)? onNavigateToPage;
   final UserData? user;
   final Stream<QuerySnapshot> usersStream;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
+
 
   const MobileUserManagement({
     super.key,
@@ -263,89 +372,121 @@ class MobileUserManagement extends StatelessWidget {
     this.onNavigateToPage,
     this.user,
     required this.usersStream,
+   required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Header section
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: _buildMobileHeader(
-                selectedRole,
-                onRoleChanged,
-                searchController,
-                onNavigateToPage,
-                user,
-              ),
-            ),
-            // Table section with fixed height
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Container(
-                height: MediaQuery.of(context).size.height * 0.8,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          // Show loading only on first load
+          if (!snapshot.hasData && snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final allDocs = snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
+          final filtered = _getFilteredUsers(
+            allDocs,
+            selectedRole,
+            searchController.text,
+          );
+          final filteredIds = filtered.map((d) => d.id).toList();
+
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                // Header section
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _buildMobileHeader(
+                    selectedRole,
+                    onRoleChanged,
+                    searchController,
+                    onNavigateToPage,
+                    user,
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    _buildTableHeader(),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: StreamBuilder<QuerySnapshot>(
-                        stream: usersStream,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-
-                          if (snapshot.hasError) {
-                            return Center(
-                              child: Text('Error: ${snapshot.error}'),
-                            );
-                          }
-
-                          if (!snapshot.hasData ||
-                              snapshot.data!.docs.isEmpty) {
-                            return const Center(child: Text('No users found.'));
-                          }
-
-                          return _buildUserList(
-                            allUsers: snapshot.data!.docs,
-                            selectedRole: selectedRole,
-                            searchQuery: searchController.text,
-                            currentPage: currentPage,
-                            itemsPerPage: itemsPerPage,
-                            onPageChanged: onPageChanged,
-                            onItemsPerPageChanged: onItemsPerPageChanged,
-                            onNavigateToPage: onNavigateToPage,
-                          );
-                        },
-                      ),
+                if (isSelectionMode)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: BulkDeleteBar(
+                      selectedCount: selectedIds.length,
+                      onToggleSelectAll: () => onToggleSelectAll(filteredIds),
+                      onBulkDelete: onBulkDelete,
+                      isAllSelected: isAllSelected(filteredIds),
+                      itemType: 'users',
                     ),
-                  ],
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Container(
+                    height: MediaQuery.of(context).size.height * 0.8,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          spreadRadius: 1,
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        _buildTableHeader(
+                          selectedIds.length == filtered.length &&
+                              filtered.isNotEmpty,
+                          () => onToggleSelectAll(filteredIds),
+                          selectedIds,
+                          filtered,
+                        ),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: allDocs.isEmpty
+                              ? const Center(
+                                  child: Text('No users found.'),
+                                )
+                              : _buildUserList(
+                                  allUsers: allDocs,
+                                  selectedRole: selectedRole,
+                                  searchQuery: searchController.text,
+                                  currentPage: currentPage,
+                                  itemsPerPage: itemsPerPage,
+                                  onPageChanged: onPageChanged,
+                                  onItemsPerPageChanged: onItemsPerPageChanged,
+                                  onNavigateToPage: onNavigateToPage,
+                                  selectedIds: selectedIds,
+                                  isSelectionMode: isSelectionMode,
+                                  onToggleSelection: onToggleSelection,
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -364,84 +505,146 @@ Widget mainContent(
   final double padding,
   final UserData? user,
   final Stream<QuerySnapshot> usersStream,
+
+  final Set<String> selectedIds,
+  final bool isSelectionMode,
+  final Function(String) onToggleSelection,
+  final Function(List<String>) onToggleSelectAll,
+  final VoidCallback onClearSelection,
+  final VoidCallback onBulkDelete,
+  final Function(List<String>) isAllSelected,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
-    body: Padding(
-      padding: EdgeInsets.all(padding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(
-            selectedRole,
-            onRoleChanged,
-            searchController,
-            onNavigateToPage,
-            user,
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Container(
-              padding: EdgeInsets.all(padding),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
+    body: StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        // Show loading only on first load
+        if (!snapshot.hasData && snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        final allDocs = snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
+        final filtered = _getFilteredUsers(
+          allDocs,
+          selectedRole,
+          searchController.text,
+        );
+        final filteredIds = filtered.map((d) => d.id).toList();
+
+        return Padding(
+          padding: EdgeInsets.all(padding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(
+                selectedRole,
+                onRoleChanged,
+                searchController,
+                onNavigateToPage,
+                user,
               ),
-              child: Column(
-                children: [
-                  _buildTableHeader(),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: StreamBuilder<QuerySnapshot>(
-                      stream: usersStream,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-
-                        if (snapshot.hasError) {
-                          return Center(
-                            child: Text('Error: ${snapshot.error}'),
-                          );
-                        }
-
-                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                          return const Center(child: Text('No users found.'));
-                        }
-
-                        return _buildUserList(
-                          allUsers: snapshot.data!.docs,
-                          selectedRole: selectedRole,
-                          searchQuery: searchController.text,
-                          currentPage: currentPage,
-                          itemsPerPage: itemsPerPage,
-                          onPageChanged: onPageChanged,
-                          onItemsPerPageChanged: onItemsPerPageChanged,
-                          onNavigateToPage: onNavigateToPage,
-                        );
-                      },
-                    ),
+              const SizedBox(height: 16),
+              if (isSelectionMode)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: BulkDeleteBar(
+                    selectedCount: selectedIds.length,
+                    onToggleSelectAll: () => onToggleSelectAll(filteredIds),
+                    onBulkDelete: onBulkDelete,
+                    isAllSelected: isAllSelected(filteredIds),
+                    itemType: 'users',
                   ),
-                ],
+                ),
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.all(padding),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 1,
+                        blurRadius: 3,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      _buildTableHeader(
+                        selectedIds.length == filtered.length &&
+                            filtered.isNotEmpty,
+                        () => onToggleSelectAll(filteredIds),
+                        selectedIds,
+                        filtered,
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: allDocs.isEmpty
+                            ? const Center(
+                                child: Text('No users found.'),
+                              )
+                            : _buildUserList(
+                                allUsers: allDocs,
+                                selectedRole: selectedRole,
+                                searchQuery: searchController.text,
+                                currentPage: currentPage,
+                                itemsPerPage: itemsPerPage,
+                                onPageChanged: onPageChanged,
+                                onItemsPerPageChanged: onItemsPerPageChanged,
+                                onNavigateToPage: onNavigateToPage,
+                                selectedIds: selectedIds,
+                                isSelectionMode: isSelectionMode,
+                                onToggleSelection: onToggleSelection,
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     ),
   );
 }
+
+List<DocumentSnapshot> _getFilteredUsers(
+  List<DocumentSnapshot> docs,
+  String selectedRole,
+  String searchQuery,
+) {
+  return docs.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final name = (data['name'] ?? '').toString().toLowerCase();
+    final email = (data['email'] ?? '').toString().toLowerCase();
+    final role = data['role'] ?? '';
+
+    bool matchesRole =
+        selectedRole == 'All Roles' ||
+        (selectedRole == 'User' && role == 'user') ||
+        (selectedRole == 'Staff' && role == 'staff') ||
+        (selectedRole == 'Admin' && role == 'admin');
+
+    bool matchesSearch =
+        searchQuery.isEmpty ||
+        name.contains(searchQuery.toLowerCase()) ||
+        email.contains(searchQuery.toLowerCase());
+
+    return matchesRole && matchesSearch;
+  }).toList();
+}
+
 
 Widget _buildMobileHeader(
   String selectedRole,
@@ -490,6 +693,9 @@ Widget _buildUserList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
   required Function(int)? onNavigateToPage,
+ required Set<String> selectedIds,
+  required bool isSelectionMode,
+  required Function(String) onToggleSelection,
 }) {
   final filtered =
       allUsers.where((doc) {
@@ -538,6 +744,7 @@ Widget _buildUserList({
                   itemBuilder: (context, index) {
                     final doc = currentPageUsers[index];
                     final data = doc.data() as Map<String, dynamic>;
+                     final isSelected = selectedIds.contains(doc.id);
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -572,6 +779,9 @@ Widget _buildUserList({
                         status:
                             data['isActive'] == true ? 'Active' : 'Inactive',
                         onNavigateToPage: onNavigateToPage,
+                         isSelectionMode: isSelectionMode,
+                      isSelected: isSelected,
+                      onToggleSelection: () => onToggleSelection(doc.id),
                       ),
                     );
                   },
@@ -601,33 +811,58 @@ Widget _buildUserRow({
   required String program,
   required String status,
   required Function(int)? onNavigateToPage,
+  required bool isSelectionMode,
+  required bool isSelected,
+  required VoidCallback onToggleSelection,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
   bool isMobile = screenWidth < 600;
   bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
-  return Container(
+ return Container(
     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
     decoration: BoxDecoration(
       color: Colors.white,
-      border: Border.all(color: Colors.grey[200]!),
+      border: Border.all(
+        color: Colors.grey[200]!,
+        width: 1,
+      ),
       borderRadius: BorderRadius.circular(6),
     ),
     child: InkWell(
-      onTap: () => showUserInfoModal(context, doc),
+      onTap: isSelectionMode
+          ? onToggleSelection
+          : () => showUserInfoModal(context, doc),
+      onLongPress: onToggleSelection,
       child: Row(
         children: [
-          // Icon - matches header spacing
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.person_outline,
-              size: 20,
-              color: Colors.grey[700],
+          // Checkbox for selection mode
+          InkWell(
+            onTap: onToggleSelection,
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFFD1D5DB),
+                    width: 2,
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: isSelected
+                    ? const Icon(
+                        Icons.check,
+                        size: 14,
+                        color: Colors.white,
+                      )
+                    : null,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -910,7 +1145,12 @@ Widget _buildHeader(
   );
 }
 
-Widget _buildTableHeader() {
+Widget _buildTableHeader(
+  bool isAllSelected,
+  VoidCallback onSelectAll,
+  Set<String> selectedIds,
+  List<DocumentSnapshot> filteredDocs,
+) {
   return LayoutBuilder(
     builder: (context, constraints) {
       double screenWidth = MediaQuery.of(context).size.width;
@@ -919,15 +1159,14 @@ Widget _buildTableHeader() {
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           decoration: BoxDecoration(
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(6),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              SizedBox(width: 8),
-              Expanded(
+              const Expanded(
                 flex: 3,
                 child: Text(
                   'User',
@@ -938,7 +1177,8 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              Expanded(
+              const SizedBox(width: 20),
+              const Expanded(
                 flex: 3,
                 child: Text(
                   'Role',
@@ -949,7 +1189,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              Expanded(
+              const Expanded(
                 flex: 2,
                 child: Text(
                   'Status',
@@ -960,7 +1200,49 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 40),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: filteredDocs.isEmpty ? null : onSelectAll,
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Select All',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                          border: Border.all(
+                            color: isAllSelected
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFFD1D5DB),
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: isAllSelected
+                            ? const Icon(
+                                Icons.check,
+                                size: 12,
+                                color: Colors.white,
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -969,7 +1251,7 @@ Widget _buildTableHeader() {
       return Container(
         padding: EdgeInsets.symmetric(
           vertical: isTablet ? 14 : 16,
-          horizontal: isTablet ? 12 : 16,
+          horizontal: 12,
         ),
         decoration: BoxDecoration(
           color: Colors.grey[50],
@@ -977,7 +1259,6 @@ Widget _buildTableHeader() {
         ),
         child: Row(
           children: [
-            const SizedBox(width: 40), // Icon space
             Expanded(
               flex: 3,
               child: Text(
@@ -1033,7 +1314,49 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            SizedBox(width: isTablet ? 60 : 80), // Menu button space
+            SizedBox(width: isTablet ? 60 : 80),
+            InkWell(
+              onTap: filteredDocs.isEmpty ? null : onSelectAll,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Select All',
+                      style: TextStyle(
+                        fontSize: isTablet ? 12 : 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                        border: Border.all(
+                          color: isAllSelected
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFD1D5DB),
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: isAllSelected
+                          ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );

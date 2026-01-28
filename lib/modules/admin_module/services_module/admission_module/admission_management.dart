@@ -1,5 +1,5 @@
 import 'package:capstone_project/modules/admin_module/services_module/admission_module/add_edit_admission.dart';
-
+import 'package:capstone_project/modules/admin_module/buttons/bulk.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/statcard_management.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -21,7 +21,8 @@ class AdmissionManagementPage extends StatefulWidget {
       _AdmissionManagementPageState();
 }
 
-class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
+class _AdmissionManagementPageState extends State<AdmissionManagementPage>
+    with BulkSelectionMixin {
   String selectedYear = 'All Year';
   final TextEditingController _searchController = TextEditingController();
   List<DocumentSnapshot> allAdmissions = [];
@@ -104,12 +105,14 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
     setState(() {
       selectedYear = newYear;
       currentPage = 1;
+      clearSelection();
     });
   }
 
   void _onSearchChanged() {
     setState(() {
       currentPage = 1;
+      clearSelection();
     });
   }
 
@@ -126,10 +129,50 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
     });
   }
 
+  Future<void> _loadStatsAsync() async {
+    try {
+      final data = await statData.getAdmissionData();
+      if (mounted) {
+        setState(() {
+          ad = data;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading admission data: $e");
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _handleBulkDelete() async {
+    await handleBulkDelete(
+      context: context,
+      selectedIds: selectedIds,
+      collection: 'admissions',
+      itemType: 'admissions',
+      onSuccess: () {
+        clearSelection();
+        _loadStatsAsync();
+      },
+      customDeleteHandler: handleAdmissionDelete,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF2E7D32),
+          ),
+        ),
+      );
     }
     return ResponsiveLayout(
       mobileBody: MobileAdmissionManagement(
@@ -142,6 +185,13 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         ad: ad,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
       tabletBody: TabletAdmissionManagement(
         allAdmissions: allAdmissions,
@@ -153,6 +203,13 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         ad: ad,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
       desktopBody: DesktopAdmissionManagement(
         allAdmissions: allAdmissions,
@@ -164,6 +221,13 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         ad: ad,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
     );
   }
@@ -198,6 +262,13 @@ class DesktopAdmissionManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final AdmissionData? ad;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const DesktopAdmissionManagement({
     super.key,
@@ -210,6 +281,13 @@ class DesktopAdmissionManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     required this.allAdmissions,
     this.ad,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
@@ -226,6 +304,13 @@ class DesktopAdmissionManagement extends StatelessWidget {
       onItemsPerPageChanged,
       24.0,
       ad,
+      selectedIds,
+      isSelectionMode,
+      onToggleSelection,
+      onToggleSelectAll,
+      onClearSelection,
+      onBulkDelete,
+      isAllSelected,
     );
   }
 }
@@ -240,6 +325,13 @@ class TabletAdmissionManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final AdmissionData? ad;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const TabletAdmissionManagement({
     super.key,
@@ -252,6 +344,13 @@ class TabletAdmissionManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     required this.allAdmissions,
     this.ad,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
@@ -268,6 +367,13 @@ class TabletAdmissionManagement extends StatelessWidget {
       onItemsPerPageChanged,
       20.0,
       ad,
+      selectedIds,
+      isSelectionMode,
+      onToggleSelection,
+      onToggleSelectAll,
+      onClearSelection,
+      onBulkDelete,
+      isAllSelected,
     );
   }
 }
@@ -282,6 +388,13 @@ class MobileAdmissionManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final AdmissionData? ad;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const MobileAdmissionManagement({
     super.key,
@@ -294,10 +407,24 @@ class MobileAdmissionManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     required this.allAdmissions,
     this.ad,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _getFilteredAdmissions(
+      allAdmissions,
+      selectedYear,
+      searchController.text,
+    );
+    final filteredIds = filtered.map((d) => d.id).toList();
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: SingleChildScrollView(
@@ -313,6 +440,17 @@ class MobileAdmissionManagement extends StatelessWidget {
                 ad,
               ),
             ),
+            if (isSelectionMode)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: BulkDeleteBar(
+                  selectedCount: selectedIds.length,
+                  onToggleSelectAll: () => onToggleSelectAll(filteredIds),
+                  onBulkDelete: onBulkDelete,
+                  isAllSelected: isAllSelected(filteredIds),
+                  itemType: 'admissions',
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Container(
@@ -332,7 +470,12 @@ class MobileAdmissionManagement extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    _buildTableHeader(),
+                    _buildTableHeader(
+                      selectedIds.length == filtered.length && filtered.isNotEmpty,
+                      () => onToggleSelectAll(filteredIds),
+                      selectedIds,
+                      filtered,
+                    ),
                     const SizedBox(height: 10),
                     Expanded(
                       child: _buildAdmissionList(
@@ -343,6 +486,8 @@ class MobileAdmissionManagement extends StatelessWidget {
                         itemsPerPage: itemsPerPage,
                         onPageChanged: onPageChanged,
                         onItemsPerPageChanged: onItemsPerPageChanged,
+                        selectedIds: selectedIds,
+                        onToggleSelection: onToggleSelection,
                       ),
                     ),
                   ],
@@ -416,7 +561,21 @@ Widget mainContent(
   final ValueChanged<int> onItemsPerPageChanged,
   final double padding,
   final AdmissionData? ad,
+  final Set<String> selectedIds,
+  final bool isSelectionMode,
+  final Function(String) onToggleSelection,
+  final Function(List<String>) onToggleSelectAll,
+  final VoidCallback onClearSelection,
+  final VoidCallback onBulkDelete,
+  final Function(List<String>) isAllSelected,
 ) {
+  final filtered = _getFilteredAdmissions(
+    allAdmissions,
+    selectedYear,
+    searchController.text,
+  );
+  final filteredIds = filtered.map((d) => d.id).toList();
+
   return Scaffold(
     backgroundColor: Colors.grey[100],
     body: Padding(
@@ -432,6 +591,17 @@ Widget mainContent(
             ad,
           ),
           const SizedBox(height: 16),
+          if (isSelectionMode)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: BulkDeleteBar(
+                selectedCount: selectedIds.length,
+                onToggleSelectAll: () => onToggleSelectAll(filteredIds),
+                onBulkDelete: onBulkDelete,
+                isAllSelected: isAllSelected(filteredIds),
+                itemType: 'admissions',
+              ),
+            ),
           Expanded(
             child: Container(
               padding: EdgeInsets.all(padding),
@@ -449,7 +619,12 @@ Widget mainContent(
               ),
               child: Column(
                 children: [
-                  _buildTableHeader(),
+                  _buildTableHeader(
+                    selectedIds.length == filtered.length && filtered.isNotEmpty,
+                    () => onToggleSelectAll(filteredIds),
+                    selectedIds,
+                    filtered,
+                  ),
                   const SizedBox(height: 10),
                   Expanded(
                     child: _buildAdmissionList(
@@ -460,6 +635,8 @@ Widget mainContent(
                       itemsPerPage: itemsPerPage,
                       onPageChanged: onPageChanged,
                       onItemsPerPageChanged: onItemsPerPageChanged,
+                      selectedIds: selectedIds,
+                      onToggleSelection: onToggleSelection,
                     ),
                   ),
                 ],
@@ -472,6 +649,34 @@ Widget mainContent(
   );
 }
 
+List<DocumentSnapshot> _getFilteredAdmissions(
+  List<DocumentSnapshot> docs,
+  String selectedYear,
+  String searchQuery,
+) {
+  return docs.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final title = (data['title'] ?? '').toString().toLowerCase().trim();
+    final academicYearData = data['academicYear'];
+    final academicYear =
+        _formatAcademicYear(academicYearData).toLowerCase().trim();
+    final query = searchQuery.toLowerCase().trim();
+    final yearFilter = selectedYear.toLowerCase().trim();
+
+    bool matchesYear =
+        yearFilter == 'all year' ||
+        yearFilter == 'all' ||
+        academicYear == yearFilter;
+
+    bool matchesSearch =
+        query.isEmpty ||
+        title.contains(query) ||
+        academicYear.contains(query);
+
+    return matchesYear && matchesSearch;
+  }).toList();
+}
+
 Widget _buildAdmissionList({
   required List<DocumentSnapshot> allAdmissions,
   required String selectedYear,
@@ -480,29 +685,14 @@ Widget _buildAdmissionList({
   required int itemsPerPage,
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
+  required Set<String> selectedIds,
+  required Function(String) onToggleSelection,
 }) {
-  final filtered =
-      allAdmissions.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final title = (data['title'] ?? '').toString().toLowerCase().trim();
-        final academicYearData = data['academicYear'];
-        final academicYear =
-            _formatAcademicYear(academicYearData).toLowerCase().trim();
-        final query = searchQuery.toLowerCase().trim();
-        final yearFilter = selectedYear.toLowerCase().trim();
-
-        bool matchesYear =
-            yearFilter == 'all year' ||
-            yearFilter == 'all' ||
-            academicYear == yearFilter;
-
-        bool matchesSearch =
-            query.isEmpty ||
-            title.contains(query) ||
-            academicYear.contains(query);
-
-        return matchesYear && matchesSearch;
-      }).toList();
+  final filtered = _getFilteredAdmissions(
+    allAdmissions,
+    selectedYear,
+    searchQuery,
+  );
 
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
@@ -518,36 +708,37 @@ Widget _buildAdmissionList({
   return Column(
     children: [
       Expanded(
-        child:
-            currentPageAdmissions.isEmpty
-                ? const Center(
-                  child: Text('No admissions match your criteria.'),
-                )
-                : ListView.separated(
-                  itemCount: currentPageAdmissions.length,
-                  separatorBuilder:
-                      (context, index) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final doc = currentPageAdmissions[index];
-                    final data = doc.data() as Map<String, dynamic>;
+        child: currentPageAdmissions.isEmpty
+            ? const Center(
+                child: Text('No admissions match your criteria.'),
+              )
+            : ListView.separated(
+                itemCount: currentPageAdmissions.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final doc = currentPageAdmissions[index];
+                  final data = doc.data() as Map<String, dynamic>;
 
-                    final List<String> contacts =
-                        (data['contact'] as List<dynamic>?)
-                            ?.map((c) => c.toString())
-                            .toList() ??
-                        [];
+                  final List<String> contacts =
+                      (data['contact'] as List<dynamic>?)
+                          ?.map((c) => c.toString())
+                          .toList() ??
+                      [];
+                  final isSelected = selectedIds.contains(doc.id);
 
-                    return _buildAdmissionRow(
-                      context: context,
-                      doc: doc,
-                      title: data['title'] ?? 'N/A',
-                      source: data['source'] ?? 'N/A',
-                      content: data['content'] ?? '',
-                      contacts: contacts,
-                      academicYear: _formatAcademicYear(data['academicYear']),
-                    );
-                  },
-                ),
+                  return _buildAdmissionRow(
+                    context: context,
+                    doc: doc,
+                    title: data['title'] ?? 'N/A',
+                    source: data['source'] ?? 'N/A',
+                    content: data['content'] ?? '',
+                    contacts: contacts,
+                    academicYear: _formatAcademicYear(data['academicYear']),
+                    isSelected: isSelected,
+                    onToggleSelection: () => onToggleSelection(doc.id),
+                  );
+                },
+              ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -571,6 +762,8 @@ Widget _buildAdmissionRow({
   required String source,
   required String academicYear,
   required List<String>? contacts,
+  required bool isSelected,
+  required VoidCallback onToggleSelection,
 }) {
   return _AdmissionRowWidget(
     context: context,
@@ -580,6 +773,8 @@ Widget _buildAdmissionRow({
     source: source,
     academicYear: academicYear,
     contacts: contacts,
+    isSelected: isSelected,
+    onToggleSelection: onToggleSelection,
   );
 }
 
@@ -628,40 +823,45 @@ Widget _buildHeader(
               UploadDocumentButton(formType: 'admission'),
             ],
           ),
-    const SizedBox(height: 40,),
+          const SizedBox(height: 40),
           isMobile
               ? Column(
-                children: [
-                  buildSearchField('title', searchController),
-                  const SizedBox(height: 12),
-                  AcademicYearDropdown(
-                    allAdmissions: allAdmissions,
-                    initialValue: selectedYear,
-                    onChanged: onYearChanged,
-                  ),
-                ],
-              )
+                  children: [
+                    buildSearchField('title', searchController),
+                    const SizedBox(height: 12),
+                    AcademicYearDropdown(
+                      allAdmissions: allAdmissions,
+                      initialValue: selectedYear,
+                      onChanged: onYearChanged,
+                    ),
+                  ],
+                )
               : Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: buildSearchField('title', searchController),
-                  ),
-                  const SizedBox(width: 16),
-                  AcademicYearDropdown(
-                    allAdmissions: allAdmissions,
-                    initialValue: selectedYear,
-                    onChanged: onYearChanged,
-                  ),
-                ],
-              ),
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: buildSearchField('title', searchController),
+                    ),
+                    const SizedBox(width: 16),
+                    AcademicYearDropdown(
+                      allAdmissions: allAdmissions,
+                      initialValue: selectedYear,
+                      onChanged: onYearChanged,
+                    ),
+                  ],
+                ),
         ],
       );
     },
   );
 }
 
-Widget _buildTableHeader() {
+Widget _buildTableHeader(
+  bool isAllSelected,
+  VoidCallback onSelectAll,
+  Set<String> selectedIds,
+  List<DocumentSnapshot> filteredDocs,
+) {
   return LayoutBuilder(
     builder: (context, constraints) {
       double screenWidth = MediaQuery.of(context).size.width;
@@ -675,9 +875,9 @@ Widget _buildTableHeader() {
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(6),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Expanded(
+              const Expanded(
                 flex: 4,
                 child: Text(
                   'Title',
@@ -688,8 +888,8 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 12),
-              Expanded(
+              const SizedBox(width: 12),
+              const Expanded(
                 flex: 5,
                 child: Text(
                   'Steps',
@@ -700,7 +900,49 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 50),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: filteredDocs.isEmpty ? null : onSelectAll,
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Select All',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                          border: Border.all(
+                            color: isAllSelected
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFFD1D5DB),
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: isAllSelected
+                            ? const Icon(
+                                Icons.check,
+                                size: 12,
+                                color: Colors.white,
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -764,7 +1006,49 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            const SizedBox(width: 60), // space for action buttons
+            SizedBox(width: isTablet ? 40 : 5),
+            InkWell(
+              onTap: filteredDocs.isEmpty ? null : onSelectAll,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Select All',
+                      style: TextStyle(
+                        fontSize: isTablet ? 12 : 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                        border: Border.all(
+                          color: isAllSelected
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFD1D5DB),
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: isAllSelected
+                          ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -876,6 +1160,8 @@ class _AdmissionRowWidget extends StatefulWidget {
   final String source;
   final String academicYear;
   final List<String>? contacts;
+  final bool isSelected;
+  final VoidCallback onToggleSelection;
 
   const _AdmissionRowWidget({
     required this.context,
@@ -885,6 +1171,8 @@ class _AdmissionRowWidget extends StatefulWidget {
     required this.source,
     required this.academicYear,
     required this.contacts,
+    required this.isSelected,
+    required this.onToggleSelection,
   });
 
   @override
@@ -924,190 +1212,115 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
 
     if (isMobile) {
       return Container(
+        key: ValueKey(widget.doc.id),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border.all(color: Colors.grey[200]!),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: InkWell(
-          onTap: () => showADInfoModal(context, widget.doc),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Title Column
-              Expanded(
-                flex: 4,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (widget.academicYear.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          widget.academicYear,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[600],
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Steps Column
-              Expanded(
-                flex: 5,
-                child: _buildExpandableList(
-                  items: steps,
-                  emptyText: 'No steps',
-                  isExpanded: stepsExpanded,
-                  onToggle: (value) => setState(() => stepsExpanded = value),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Actions
-              PopupMenuButton<String>(
-                padding: EdgeInsets.zero,
-                icon: const Icon(Icons.more_vert, size: 20),
-                onSelected: (value) {
-                  if (value == 'edit') {
-                    showDialog(
-                      context: context,
-                      builder:
-                          (context) => AdmissionFormDialog(
-                            doc: widget.doc,
-                            isEdit: true,
-                          ),
-                    );
-                  } else if (value == 'delete') {
-                    showDeleteConfirmation(
-                      context,
-                      widget.doc,
-                      DeleteConfigs.admissions,
-                      'admissions',
-                      customDeleteHandler: handleAdmissionDelete,
-                    );
-                  }
-                },
-                itemBuilder:
-                    (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit, size: 18),
-                            SizedBox(width: 8),
-                            Text('Edit'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, size: 18, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Delete', style: TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                      ),
-                    ],
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // Tablet & Desktop View
-    return Container(
-      padding: EdgeInsets.all(isTablet ? 14 : 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey[200]!),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: InkWell(
-        onTap: () => showADInfoModal(context, widget.doc),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title
-            Expanded(
-              flex: 3,
-              child: Text(
-                widget.title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+            // Custom Checkbox with cursor hand on hover
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: widget.onToggleSelection,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: widget.isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                      border: Border.all(
+                        color: widget.isSelected
+                            ? const Color(0xFF2E7D32)
+                            : const Color(0xFFD1D5DB),
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: widget.isSelected
+                        ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Colors.white,
+                          )
+                        : null,
+                  ),
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 16),
-
-            // Steps
-            Expanded(
-              flex: 3,
-              child: _buildExpandableList(
-                items: steps,
-                emptyText: 'No steps',
-                isExpanded: stepsExpanded,
-                onToggle: (value) => setState(() => stepsExpanded = value),
-              ),
-            ),
-            const SizedBox(width: 16),
-
-            // Requirements
-            Expanded(
-              flex: 3,
-              child: _buildExpandableList(
-                items: requirements,
-                emptyText: 'No requirements',
-                isExpanded: requirementsExpanded,
-                onToggle:
-                    (value) => setState(() => requirementsExpanded = value),
-              ),
-            ),
-            const SizedBox(width: 16),
-
-            // Contacts
-            Expanded(
-              flex: 3,
-              child: _buildExpandableList(
-                items: processedContacts,
-                emptyText: 'No contacts',
-                isExpanded: contactsExpanded,
-                onToggle: (value) => setState(() => contactsExpanded = value),
-              ),
-            ),
-
             const SizedBox(width: 12),
-
+            
+            // Rest of the content - wrapped in Expanded and GestureDetector
+            Expanded(
+              child: GestureDetector(
+                onTap: () => showADInfoModal(context, widget.doc),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title Column
+                    Expanded(
+                      flex: 4,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (widget.academicYear.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                widget.academicYear,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Steps Column
+                    Expanded(
+                      flex: 5,
+                      child: _buildExpandableList(
+                        items: steps,
+                        emptyText: 'No steps',
+                        isExpanded: stepsExpanded,
+                        onToggle: (value) => setState(() => stepsExpanded = value),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
             // Actions
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_horiz),
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.more_vert, size: 20),
               onSelected: (value) {
                 if (value == 'edit') {
                   showDialog(
                     context: context,
-                    builder:
-                        (context) =>
-                            AdmissionFormDialog(doc: widget.doc, isEdit: true),
+                    builder: (context) => AdmissionFormDialog(
+                      doc: widget.doc,
+                      isEdit: true,
+                    ),
                   );
                 } else if (value == 'delete') {
                   showDeleteConfirmation(
@@ -1119,32 +1332,186 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                   );
                 }
               },
-              itemBuilder:
-                  (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 18),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, size: 18, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Delete', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
-                    ),
-                  ],
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
+      );
+    }
+
+    // Tablet & Desktop View
+    return Container(
+      key: ValueKey(widget.doc.id),
+      padding: EdgeInsets.all(isTablet ? 14 : 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Custom Checkbox with cursor hand on hover
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: widget.onToggleSelection,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: widget.isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    border: Border.all(
+                      color: widget.isSelected
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFFD1D5DB),
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: widget.isSelected
+                      ? const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: Colors.white,
+                        )
+                      : null,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Rest of content wrapped in Expanded and GestureDetector
+          Expanded(
+            child: GestureDetector(
+              onTap: () => showADInfoModal(context, widget.doc),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
+                  // Steps
+                  Expanded(
+                    flex: 3,
+                    child: _buildExpandableList(
+                      items: steps,
+                      emptyText: 'No steps',
+                      isExpanded: stepsExpanded,
+                      onToggle: (value) => setState(() => stepsExpanded = value),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
+                  // Requirements
+                  Expanded(
+                    flex: 3,
+                    child: _buildExpandableList(
+                      items: requirements,
+                      emptyText: 'No requirements',
+                      isExpanded: requirementsExpanded,
+                      onToggle: (value) => setState(() => requirementsExpanded = value),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
+                  // Contacts
+                  Expanded(
+                    flex: 3,
+                    child: _buildExpandableList(
+                      items: processedContacts,
+                      emptyText: 'No contacts',
+                      isExpanded: contactsExpanded,
+                      onToggle: (value) => setState(() => contactsExpanded = value),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // Actions
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_horiz),
+            onSelected: (value) {
+              if (value == 'edit') {
+                showDialog(
+                  context: context,
+                  builder: (context) =>
+                      AdmissionFormDialog(doc: widget.doc, isEdit: true),
+                );
+              } else if (value == 'delete') {
+                showDeleteConfirmation(
+                  context,
+                  widget.doc,
+                  DeleteConfigs.admissions,
+                  'admissions',
+                  customDeleteHandler: handleAdmissionDelete,
+                );
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, size: 18),
+                    SizedBox(width: 8),
+                    Text('Edit'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, size: 18, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Delete', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

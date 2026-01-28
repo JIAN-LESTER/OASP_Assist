@@ -1,5 +1,6 @@
 import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/modules/admin_module/services_module/placement_module/add_edit_placement.dart';
+import 'package:capstone_project/modules/admin_module/buttons/bulk.dart';
 import 'package:capstone_project/modules/admin_module/buttons/upload_document_button.dart';
 import 'package:capstone_project/modules/admin_module/widgets/company_dropdown.dart';
 import 'package:capstone_project/modules/admin_module/widgets/pagination.dart';
@@ -10,7 +11,6 @@ import 'package:capstone_project/modules/admin_module/dashboard_and_reports_modu
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:capstone_project/modules/admin_module/services_module/placement_module/pl_info.dart';
-
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
 
@@ -25,7 +25,8 @@ class PlacementManagementPage extends StatefulWidget {
       _PlacementManagementPageState();
 }
 
-class _PlacementManagementPageState extends State<PlacementManagementPage> {
+class _PlacementManagementPageState extends State<PlacementManagementPage>
+    with BulkSelectionMixin {
   String selectedCompany = 'All Company';
   final TextEditingController _searchController = TextEditingController();
   List<DocumentSnapshot> allPlacements = [];
@@ -62,7 +63,7 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
         isLoading = false;
       });
     } catch (e) {
-      print("Error loading information bank data: $e");
+      print("Error loading placement data: $e");
       if (!mounted) return;
       setState(() {
         isLoading = false;
@@ -71,12 +72,16 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
   }
 
   void loadPlacements() {
-    FirebaseFirestore.instance.collection('placements').orderBy('createdAt', descending: true).snapshots().listen((
-      snapshot,
-    ) {
-      setState(() {
-        allPlacements = snapshot.docs;
-      });
+    FirebaseFirestore.instance
+        .collection('placements')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          allPlacements = snapshot.docs;
+        });
+      }
     });
   }
 
@@ -91,12 +96,14 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
     setState(() {
       selectedCompany = newCompany;
       currentPage = 1;
+      clearSelection();
     });
   }
 
   void _onSearchChanged() {
     setState(() {
       currentPage = 1;
+      clearSelection();
     });
   }
 
@@ -113,10 +120,50 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
     });
   }
 
+  Future<void> _loadStatsAsync() async {
+    try {
+      final data = await statData.getPlacementData();
+      if (mounted) {
+        setState(() {
+          pl = data;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading placement data: $e");
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _handleBulkDelete() async {
+    await handleBulkDelete(
+      context: context,
+      selectedIds: selectedIds,
+      collection: 'placements',
+      itemType: 'placements',
+      onSuccess: () {
+        clearSelection();
+        _loadStatsAsync();
+      },
+      customDeleteHandler: handlePlacementDelete,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF2E7D32),
+          ),
+        ),
+      );
     }
     return ResponsiveLayout(
       mobileBody: MobilePlacementManagement(
@@ -129,6 +176,13 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         pl: pl,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
       tabletBody: TabletPlacementManagement(
         allPlacements: allPlacements,
@@ -140,6 +194,13 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         pl: pl,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
       desktopBody: DesktopPlacementManagement(
         allPlacements: allPlacements,
@@ -151,6 +212,13 @@ class _PlacementManagementPageState extends State<PlacementManagementPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         pl: pl,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
     );
   }
@@ -166,6 +234,13 @@ class DesktopPlacementManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final PlacementData? pl;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const DesktopPlacementManagement({
     super.key,
@@ -178,6 +253,13 @@ class DesktopPlacementManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     required this.allPlacements,
     this.pl,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
@@ -194,6 +276,13 @@ class DesktopPlacementManagement extends StatelessWidget {
       onItemsPerPageChanged,
       24.0,
       pl,
+      selectedIds,
+      isSelectionMode,
+      onToggleSelection,
+      onToggleSelectAll,
+      onClearSelection,
+      onBulkDelete,
+      isAllSelected,
     );
   }
 }
@@ -208,6 +297,13 @@ class TabletPlacementManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final PlacementData? pl;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const TabletPlacementManagement({
     super.key,
@@ -220,6 +316,13 @@ class TabletPlacementManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     required this.allPlacements,
     this.pl,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
@@ -236,6 +339,13 @@ class TabletPlacementManagement extends StatelessWidget {
       onItemsPerPageChanged,
       20.0,
       pl,
+      selectedIds,
+      isSelectionMode,
+      onToggleSelection,
+      onToggleSelectAll,
+      onClearSelection,
+      onBulkDelete,
+      isAllSelected,
     );
   }
 }
@@ -250,6 +360,13 @@ class MobilePlacementManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final PlacementData? pl;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const MobilePlacementManagement({
     super.key,
@@ -262,10 +379,24 @@ class MobilePlacementManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     required this.allPlacements,
     this.pl,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _getFilteredPlacements(
+      allPlacements,
+      selectedCompany,
+      searchController.text,
+    );
+    final filteredIds = filtered.map((d) => d.id).toList();
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: SingleChildScrollView(
@@ -281,6 +412,17 @@ class MobilePlacementManagement extends StatelessWidget {
                 pl,
               ),
             ),
+            if (isSelectionMode)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: BulkDeleteBar(
+                  selectedCount: selectedIds.length,
+                  onToggleSelectAll: () => onToggleSelectAll(filteredIds),
+                  onBulkDelete: onBulkDelete,
+                  isAllSelected: isAllSelected(filteredIds),
+                  itemType: 'placements',
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Container(
@@ -300,7 +442,12 @@ class MobilePlacementManagement extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    _buildTableHeader(),
+                    _buildTableHeader(
+                      selectedIds.length == filtered.length && filtered.isNotEmpty,
+                      () => onToggleSelectAll(filteredIds),
+                      selectedIds,
+                      filtered,
+                    ),
                     const SizedBox(height: 10),
                     Expanded(
                       child: _buildPlacementList(
@@ -311,6 +458,8 @@ class MobilePlacementManagement extends StatelessWidget {
                         itemsPerPage: itemsPerPage,
                         onPageChanged: onPageChanged,
                         onItemsPerPageChanged: onItemsPerPageChanged,
+                        selectedIds: selectedIds,
+                        onToggleSelection: onToggleSelection,
                       ),
                     ),
                   ],
@@ -384,7 +533,21 @@ Widget mainContent(
   final ValueChanged<int> onItemsPerPageChanged,
   final double padding,
   final PlacementData? pl,
+  final Set<String> selectedIds,
+  final bool isSelectionMode,
+  final Function(String) onToggleSelection,
+  final Function(List<String>) onToggleSelectAll,
+  final VoidCallback onClearSelection,
+  final VoidCallback onBulkDelete,
+  final Function(List<String>) isAllSelected,
 ) {
+  final filtered = _getFilteredPlacements(
+    allPlacements,
+    selectedCompany,
+    searchController.text,
+  );
+  final filteredIds = filtered.map((d) => d.id).toList();
+
   return Scaffold(
     backgroundColor: Colors.grey[100],
     body: Padding(
@@ -400,6 +563,17 @@ Widget mainContent(
             pl,
           ),
           const SizedBox(height: 16),
+          if (isSelectionMode)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: BulkDeleteBar(
+                selectedCount: selectedIds.length,
+                onToggleSelectAll: () => onToggleSelectAll(filteredIds),
+                onBulkDelete: onBulkDelete,
+                isAllSelected: isAllSelected(filteredIds),
+                itemType: 'placements',
+              ),
+            ),
           Expanded(
             child: Container(
               padding: EdgeInsets.all(padding),
@@ -417,7 +591,12 @@ Widget mainContent(
               ),
               child: Column(
                 children: [
-                  _buildTableHeader(),
+                  _buildTableHeader(
+                    selectedIds.length == filtered.length && filtered.isNotEmpty,
+                    () => onToggleSelectAll(filteredIds),
+                    selectedIds,
+                    filtered,
+                  ),
                   const SizedBox(height: 10),
                   Expanded(
                     child: _buildPlacementList(
@@ -428,6 +607,8 @@ Widget mainContent(
                       itemsPerPage: itemsPerPage,
                       onPageChanged: onPageChanged,
                       onItemsPerPageChanged: onItemsPerPageChanged,
+                      selectedIds: selectedIds,
+                      onToggleSelection: onToggleSelection,
                     ),
                   ),
                 ],
@@ -440,6 +621,36 @@ Widget mainContent(
   );
 }
 
+List<DocumentSnapshot> _getFilteredPlacements(
+  List<DocumentSnapshot> docs,
+  String selectedCompany,
+  String searchQuery,
+) {
+  return docs.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final company = (data['partnerCompany'] ?? '').toString().toLowerCase().trim();
+    final List<String> positionsList =
+        (data['positions'] is List)
+            ? List<String>.from(data['positions'].map((e) => e.toString()))
+            : <String>[];
+    final query = searchQuery.toLowerCase().trim();
+    final companyFilter = selectedCompany.toLowerCase().trim();
+
+    bool matchesCompany =
+        companyFilter == 'all company' ||
+        companyFilter == 'all' ||
+        company == companyFilter;
+
+    bool matchesSearch =
+        query.isEmpty ||
+        company.contains(query) ||
+        positionsList.any((pos) => pos.toLowerCase().contains(query));
+
+    return matchesCompany && matchesSearch;
+  }).toList();
+}
+// Part 2 - Widget builders and components
+
 Widget _buildPlacementList({
   required List<DocumentSnapshot> allPlacements,
   required String selectedCompany,
@@ -448,30 +659,14 @@ Widget _buildPlacementList({
   required int itemsPerPage,
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
+  required Set<String> selectedIds,
+  required Function(String) onToggleSelection,
 }) {
-  final filtered =
-      allPlacements.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final company =
-            (data['partnerCompany'] ?? '').toString().toLowerCase().trim();
-        final List<String> positionsList =
-            (data['positions'] is List)
-                ? List<String>.from(data['positions'].map((e) => e.toString()))
-                : <String>[];
-        final query = searchQuery.toLowerCase().trim();
-        final companyFilter = selectedCompany.toLowerCase().trim();
-
-        bool matchesCompany =
-            companyFilter == 'all company' ||
-            companyFilter == 'all' ||
-            company == companyFilter;
-        bool matchesSearch =
-            query.isEmpty ||
-            company.contains(query) ||
-            positionsList.any((pos) => pos.toLowerCase().contains(query));
-
-        return matchesCompany && matchesSearch;
-      }).toList();
+  final filtered = _getFilteredPlacements(
+    allPlacements,
+    selectedCompany,
+    searchQuery,
+  );
 
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
@@ -487,54 +682,56 @@ Widget _buildPlacementList({
   return Column(
     children: [
       Expanded(
-        child:
-            currentPagePlacements.isEmpty
-                ? const Center(child: Text('No companies match your criteria.'))
-                : ListView.builder(
-                  shrinkWrap: false,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: currentPagePlacements.length,
-                  itemBuilder: (context, index) {
-                    final doc = currentPagePlacements[index];
-                    final data = doc.data() as Map<String, dynamic>;
+        child: currentPagePlacements.isEmpty
+            ? const Center(child: Text('No companies match your criteria.'))
+            : ListView.builder(
+                shrinkWrap: false,
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: currentPagePlacements.length,
+                itemBuilder: (context, index) {
+                  final doc = currentPagePlacements[index];
+                  final data = doc.data() as Map<String, dynamic>;
 
-                    final List<String> contacts =
-                        (data['contacts'] as List<dynamic>?)
-                            ?.map((c) => c.toString())
-                            .toList() ??
-                        [];
+                  final List<String> contacts =
+                      (data['contacts'] as List<dynamic>?)
+                          ?.map((c) => c.toString())
+                          .toList() ??
+                      [];
 
-                    final List<String> positions =
-                        (data['positions'] as List<dynamic>?)
-                            ?.map((c) => c.toString())
-                            .toList() ??
-                        [];
+                  final List<String> positions =
+                      (data['positions'] as List<dynamic>?)
+                          ?.map((c) => c.toString())
+                          .toList() ??
+                      [];
 
-                          String deadline = '-';
-                    if (data['deadline'] != null) {
-                      if (data['deadline'] is Timestamp) {
-                        deadline = DateFormat(
-                          "MMMM d, yyyy",
-                        ).format((data['deadline'] as Timestamp).toDate());
-                      } else {
-                        deadline = data['deadline'].toString();
-                      }
+                  String deadline = '-';
+                  if (data['deadline'] != null) {
+                    if (data['deadline'] is Timestamp) {
+                      deadline = DateFormat("MMMM d, yyyy")
+                          .format((data['deadline'] as Timestamp).toDate());
+                    } else {
+                      deadline = data['deadline'].toString();
                     }
+                  }
 
+                  final isSelected = selectedIds.contains(doc.id);
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _buildPlacementRow(
-                        context: context,
-                        doc: doc,
-                        partnerCompany: data['partnerCompany'] ?? 'N/A',
-                        contacts: contacts,
-                        positions: positions,
-                        deadline: deadline,
-                      ),
-                    );
-                  },
-                ),
+                  return Padding(
+                    key: ValueKey(doc.id),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildPlacementRow(
+                      context: context,
+                      doc: doc,
+                      partnerCompany: data['partnerCompany'] ?? 'N/A',
+                      contacts: contacts,
+                      positions: positions,
+                      deadline: deadline,
+                      isSelected: isSelected,
+                      onToggleSelection: () => onToggleSelection(doc.id),
+                    ),
+                  );
+                },
+              ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -557,6 +754,8 @@ Widget _buildPlacementRow({
   required List<String>? contacts,
   required List<String>? positions,
   required String deadline,
+  required bool isSelected,
+  required VoidCallback onToggleSelection,
 }) {
   return _PlacementRowWidget(
     context: context,
@@ -565,6 +764,8 @@ Widget _buildPlacementRow({
     contacts: contacts,
     positions: positions,
     deadline: deadline,
+    isSelected: isSelected,
+    onToggleSelection: onToggleSelection,
   );
 }
 
@@ -615,96 +816,100 @@ Widget _buildHeader(
           ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child:
-                isMobile
-                    ? Column(
-                      children: [
-                        buildStatCard(
+            child: isMobile
+                ? Column(
+                    children: [
+                      buildStatCard(
+                        'Total Companies',
+                        '${pl?.totalCompanies ?? 0}',
+                        Colors.blue,
+                        Icons.message,
+                      ),
+                      const SizedBox(height: 12),
+                      buildStatCard(
+                        'Companies Looking for Vacancy',
+                        '${pl?.vacantCompanies ?? 0}',
+                        Colors.green,
+                        Icons.check_circle,
+                      ),
+                      const SizedBox(height: 12),
+                      buildStatCard(
+                        'Approaching Deadline',
+                        pl?.approachingDeadline ?? 'Unknown',
+                        Colors.red,
+                        Icons.group,
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: buildStatCard(
                           'Total Companies',
                           '${pl?.totalCompanies ?? 0}',
                           Colors.blue,
                           Icons.message,
                         ),
-                        const SizedBox(height: 12),
-                        buildStatCard(
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
                           'Companies Looking for Vacancy',
                           '${pl?.vacantCompanies ?? 0}',
                           Colors.green,
                           Icons.check_circle,
                         ),
-                        const SizedBox(height: 12),
-                        buildStatCard(
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: buildStatCard(
                           'Approaching Deadline',
                           pl?.approachingDeadline ?? 'Unknown',
                           Colors.red,
                           Icons.group,
                         ),
-                      ],
-                    )
-                    : Row(
-                      children: [
-                        Expanded(
-                          child: buildStatCard(
-                            'Total Companies',
-                            '${pl?.totalCompanies ?? 0}',
-                            Colors.blue,
-                            Icons.message,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Companies Looking for Vacancy',
-                            '${pl?.vacantCompanies ?? 0}',
-                            Colors.green,
-                            Icons.check_circle,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: buildStatCard(
-                            'Approaching Deadline',
-                            pl?.approachingDeadline ?? 'Unknown',
-                            Colors.red,
-                            Icons.group,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
           ),
           isMobile
               ? Column(
-                children: [
-                  buildSearchField('positions', searchController),
-                  const SizedBox(height: 12),
-                  PlacementCompanyDropdown(
-                    allPlacements: allPlacements,
-                    initialValue: selectedCompany,
-                    onChanged: onCompanyChanged,
-                  ),
-                ],
-              )
+                  children: [
+                    buildSearchField('positions', searchController),
+                    const SizedBox(height: 12),
+                    PlacementCompanyDropdown(
+                      allPlacements: allPlacements,
+                      initialValue: selectedCompany,
+                      onChanged: onCompanyChanged,
+                    ),
+                  ],
+                )
               : Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: buildSearchField('positions', searchController),
-                  ),
-                  const SizedBox(width: 16),
-                  PlacementCompanyDropdown(
-                    allPlacements: allPlacements,
-                    initialValue: selectedCompany,
-                    onChanged: onCompanyChanged,
-                  ),
-                ],
-              ),
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: buildSearchField('positions', searchController),
+                    ),
+                    const SizedBox(width: 16),
+                    PlacementCompanyDropdown(
+                      allPlacements: allPlacements,
+                      initialValue: selectedCompany,
+                      onChanged: onCompanyChanged,
+                    ),
+                  ],
+                ),
         ],
       );
     },
   );
 }
 
-Widget _buildTableHeader() {
+Widget _buildTableHeader(
+  bool isAllSelected,
+  VoidCallback onSelectAll,
+  Set<String> selectedIds,
+  List<DocumentSnapshot> filteredDocs,
+) {
   return LayoutBuilder(
     builder: (context, constraints) {
       double screenWidth = MediaQuery.of(context).size.width;
@@ -718,9 +923,9 @@ Widget _buildTableHeader() {
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(6),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Expanded(
+              const Expanded(
                 flex: 4,
                 child: Text(
                   'Company',
@@ -731,8 +936,8 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 12),
-              Expanded(
+              const SizedBox(width: 12),
+              const Expanded(
                 flex: 5,
                 child: Text(
                   'Positions',
@@ -743,7 +948,49 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 50),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: filteredDocs.isEmpty ? null : onSelectAll,
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Select All',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                          border: Border.all(
+                            color: isAllSelected
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFFD1D5DB),
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: isAllSelected
+                            ? const Icon(
+                                Icons.check,
+                                size: 12,
+                                color: Colors.white,
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -807,7 +1054,49 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            SizedBox(width: isTablet ? 70 : 80),
+            SizedBox(width: isTablet ? 40 : 5),
+            InkWell(
+              onTap: filteredDocs.isEmpty ? null : onSelectAll,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Select All',
+                      style: TextStyle(
+                        fontSize: isTablet ? 12 : 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                        border: Border.all(
+                          color: isAllSelected
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFD1D5DB),
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: isAllSelected
+                          ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -832,15 +1121,14 @@ Widget _buildExpandableListYellow({
     );
   }
 
-  final processedItems =
-      items.map((c) {
-        String displayValue = c;
-        if (c.contains(":")) {
-          final parts = c.split(":");
-          displayValue = parts.sublist(1).join(":").trim();
-        }
-        return displayValue;
-      }).toList();
+  final processedItems = items.map((c) {
+    String displayValue = c;
+    if (c.contains(":")) {
+      final parts = c.split(":");
+      displayValue = parts.sublist(1).join(":").trim();
+    }
+    return displayValue;
+  }).toList();
 
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -906,9 +1194,7 @@ Widget _buildExpandableListYellow({
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  isExpanded
-                      ? 'Show less'
-                      : '+${processedItems.length - 1} more',
+                  isExpanded ? 'Show less' : '+${processedItems.length - 1} more',
                   style: TextStyle(
                     fontSize: 11,
                     color: Colors.amber[800],
@@ -930,6 +1216,8 @@ class _PlacementRowWidget extends StatefulWidget {
   final List<String>? contacts;
   final List<String>? positions;
   final String deadline;
+  final bool isSelected;
+  final VoidCallback onToggleSelection;
 
   const _PlacementRowWidget({
     required this.context,
@@ -938,6 +1226,8 @@ class _PlacementRowWidget extends StatefulWidget {
     required this.contacts,
     required this.positions,
     required this.deadline,
+    required this.isSelected,
+    required this.onToggleSelection,
   });
 
   @override
@@ -950,12 +1240,12 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
 
   @override
   Widget build(BuildContext context) {
-    DocumentSnapshot doc = widget.doc;
     double screenWidth = MediaQuery.of(context).size.width;
     bool isMobile = screenWidth < 600;
     bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
     return Container(
+      key: ValueKey(widget.doc.id),
       padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -967,6 +1257,36 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Custom Checkbox
+            InkWell(
+              onTap: widget.onToggleSelection,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: widget.isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    border: Border.all(
+                      color: widget.isSelected
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFFD1D5DB),
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: widget.isSelected
+                      ? const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: Colors.white,
+                        )
+                      : null,
+                ),
+              ),
+            ),
+            SizedBox(width: isMobile ? 12 : 16),
             Expanded(
               flex: isMobile ? 4 : 3,
               child: Text(
@@ -1001,20 +1321,19 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
                 ),
               ),
             ],
-
             if (!isMobile) ...[
-               Expanded(
-              flex: 4,
-              child: Text(
-                widget.deadline,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+              Expanded(
+                flex: 4,
+                child: Text(
+                  widget.deadline,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
             ],
             SizedBox(width: isMobile ? 8 : (isTablet ? 16 : 20)),
             PopupMenuButton<String>(
@@ -1023,43 +1342,41 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
                 if (value == 'edit') {
                   showDialog(
                     context: context,
-                    builder:
-                        (context) =>
-                            PlacementFormDialog(doc: widget.doc, isEdit: true),
+                    builder: (context) =>
+                        PlacementFormDialog(doc: widget.doc, isEdit: true),
                   );
                 } else if (value == 'delete') {
                   showDeleteConfirmation(
                     context,
-                    doc,
+                    widget.doc,
                     DeleteConfigs.placements,
                     'placements',
                     customDeleteHandler: handlePlacementDelete,
                   );
                 }
               },
-              itemBuilder:
-                  (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 18),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, size: 18, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Delete', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
-                    ),
-                  ],
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),

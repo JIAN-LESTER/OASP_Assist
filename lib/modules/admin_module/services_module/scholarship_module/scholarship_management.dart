@@ -1,5 +1,6 @@
 import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/modules/admin_module/services_module/scholarship_module/add_edit_scholarship.dart';
+import 'package:capstone_project/modules/admin_module/buttons/bulk.dart';
 import 'package:capstone_project/modules/admin_module/buttons/upload_document_button.dart';
 import 'package:capstone_project/modules/admin_module/widgets/pagination.dart';
 import 'package:capstone_project/modules/admin_module/widgets/provider_dropdown.dart';
@@ -25,7 +26,8 @@ class ScholarshipManagementPage extends StatefulWidget {
       _ScholarshipManagementPageState();
 }
 
-class _ScholarshipManagementPageState extends State<ScholarshipManagementPage> {
+class _ScholarshipManagementPageState extends State<ScholarshipManagementPage>
+    with BulkSelectionMixin {
   String selectedProvider = 'All Providers';
   final TextEditingController _searchController = TextEditingController();
   List<DocumentSnapshot> allScholarships = [];
@@ -62,7 +64,7 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage> {
         isLoading = false;
       });
     } catch (e) {
-      print("Error loading information bank data: $e");
+      print("Error loading scholarship data: $e");
       if (!mounted) return;
       setState(() {
         isLoading = false;
@@ -71,12 +73,16 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage> {
   }
 
   void _loadScholarships() {
-    FirebaseFirestore.instance.collection('scholarships').orderBy('createdAt', descending: true).snapshots().listen((
-      snapshot,
-    ) {
-      setState(() {
-        allScholarships = snapshot.docs;
-      });
+    FirebaseFirestore.instance
+        .collection('scholarships')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          allScholarships = snapshot.docs;
+        });
+      }
     });
   }
 
@@ -87,16 +93,18 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage> {
     super.dispose();
   }
 
-  void _onYearChanged(String newYear) {
+  void _onProviderChanged(String newProvider) {
     setState(() {
-      selectedProvider = newYear;
+      selectedProvider = newProvider;
       currentPage = 1;
+      clearSelection();
     });
   }
 
   void _onSearchChanged() {
     setState(() {
       currentPage = 1;
+      clearSelection();
     });
   }
 
@@ -113,44 +121,105 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage> {
     });
   }
 
+  Future<void> _loadStatsAsync() async {
+    try {
+      final data = await statData.getScholarshipData();
+      if (mounted) {
+        setState(() {
+          sc = data;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading scholarship data: $e");
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _handleBulkDelete() async {
+    await handleBulkDelete(
+      context: context,
+      selectedIds: selectedIds,
+      collection: 'scholarships',
+      itemType: 'scholarships',
+      onSuccess: () {
+        clearSelection();
+        _loadStatsAsync();
+      },
+      customDeleteHandler: handleScholarshipDelete,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF2E7D32),
+          ),
+        ),
+      );
     }
     return ResponsiveLayout(
       mobileBody: MobileScholarshipManagement(
         allScholarships: allScholarships,
         selectedProvider: selectedProvider,
-        onYearChanged: _onYearChanged,
+        onProviderChanged: _onProviderChanged,
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         sc: sc,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
       tabletBody: TabletScholarshipManagement(
         allScholarships: allScholarships,
         selectedProvider: selectedProvider,
-        onYearChanged: _onYearChanged,
+        onProviderChanged: _onProviderChanged,
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         sc: sc,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
       desktopBody: DesktopScholarshipManagement(
         allScholarships: allScholarships,
         selectedProvider: selectedProvider,
-        onYearChanged: _onYearChanged,
+        onProviderChanged: _onProviderChanged,
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         sc: sc,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
     );
   }
@@ -159,18 +228,25 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage> {
 class DesktopScholarshipManagement extends StatelessWidget {
   final List<DocumentSnapshot> allScholarships;
   final String selectedProvider;
-  final ValueChanged<String> onYearChanged;
+  final ValueChanged<String> onProviderChanged;
   final TextEditingController searchController;
   final int currentPage;
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final ScholarshipData? sc;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const DesktopScholarshipManagement({
     super.key,
     required this.selectedProvider,
-    required this.onYearChanged,
+    required this.onProviderChanged,
     required this.searchController,
     required this.currentPage,
     required this.itemsPerPage,
@@ -178,6 +254,13 @@ class DesktopScholarshipManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     required this.allScholarships,
     this.sc,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
@@ -186,7 +269,7 @@ class DesktopScholarshipManagement extends StatelessWidget {
       allScholarships,
       context,
       selectedProvider,
-      onYearChanged,
+      onProviderChanged,
       searchController,
       currentPage,
       itemsPerPage,
@@ -194,6 +277,13 @@ class DesktopScholarshipManagement extends StatelessWidget {
       onItemsPerPageChanged,
       24.0,
       sc,
+      selectedIds,
+      isSelectionMode,
+      onToggleSelection,
+      onToggleSelectAll,
+      onClearSelection,
+      onBulkDelete,
+      isAllSelected,
     );
   }
 }
@@ -201,18 +291,25 @@ class DesktopScholarshipManagement extends StatelessWidget {
 class TabletScholarshipManagement extends StatelessWidget {
   final List<DocumentSnapshot> allScholarships;
   final String selectedProvider;
-  final ValueChanged<String> onYearChanged;
+  final ValueChanged<String> onProviderChanged;
   final TextEditingController searchController;
   final int currentPage;
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final ScholarshipData? sc;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const TabletScholarshipManagement({
     super.key,
     required this.selectedProvider,
-    required this.onYearChanged,
+    required this.onProviderChanged,
     required this.searchController,
     required this.currentPage,
     required this.itemsPerPage,
@@ -220,6 +317,13 @@ class TabletScholarshipManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     required this.allScholarships,
     this.sc,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
@@ -228,7 +332,7 @@ class TabletScholarshipManagement extends StatelessWidget {
       allScholarships,
       context,
       selectedProvider,
-      onYearChanged,
+      onProviderChanged,
       searchController,
       currentPage,
       itemsPerPage,
@@ -236,6 +340,13 @@ class TabletScholarshipManagement extends StatelessWidget {
       onItemsPerPageChanged,
       20.0,
       sc,
+      selectedIds,
+      isSelectionMode,
+      onToggleSelection,
+      onToggleSelectAll,
+      onClearSelection,
+      onBulkDelete,
+      isAllSelected,
     );
   }
 }
@@ -243,18 +354,25 @@ class TabletScholarshipManagement extends StatelessWidget {
 class MobileScholarshipManagement extends StatelessWidget {
   final List<DocumentSnapshot> allScholarships;
   final String selectedProvider;
-  final ValueChanged<String> onYearChanged;
+  final ValueChanged<String> onProviderChanged;
   final TextEditingController searchController;
   final int currentPage;
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final ScholarshipData? sc;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const MobileScholarshipManagement({
     super.key,
     required this.selectedProvider,
-    required this.onYearChanged,
+    required this.onProviderChanged,
     required this.searchController,
     required this.currentPage,
     required this.itemsPerPage,
@@ -262,10 +380,24 @@ class MobileScholarshipManagement extends StatelessWidget {
     required this.onItemsPerPageChanged,
     required this.allScholarships,
     this.sc,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _getFilteredScholarships(
+      allScholarships,
+      selectedProvider,
+      searchController.text,
+    );
+    final filteredIds = filtered.map((d) => d.id).toList();
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: SingleChildScrollView(
@@ -276,11 +408,22 @@ class MobileScholarshipManagement extends StatelessWidget {
               child: _buildMobileHeader(
                 selectedProvider,
                 allScholarships,
-                onYearChanged,
+                onProviderChanged,
                 searchController,
                 sc,
               ),
             ),
+            if (isSelectionMode)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: BulkDeleteBar(
+                  selectedCount: selectedIds.length,
+                  onToggleSelectAll: () => onToggleSelectAll(filteredIds),
+                  onBulkDelete: onBulkDelete,
+                  isAllSelected: isAllSelected(filteredIds),
+                  itemType: 'scholarships',
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Container(
@@ -300,7 +443,12 @@ class MobileScholarshipManagement extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    _buildTableHeader(),
+                    _buildTableHeader(
+                      selectedIds.length == filtered.length && filtered.isNotEmpty,
+                      () => onToggleSelectAll(filteredIds),
+                      selectedIds,
+                      filtered,
+                    ),
                     const SizedBox(height: 10),
                     Expanded(
                       child: _buildScholarshipList(
@@ -311,6 +459,8 @@ class MobileScholarshipManagement extends StatelessWidget {
                         itemsPerPage: itemsPerPage,
                         onPageChanged: onPageChanged,
                         onItemsPerPageChanged: onItemsPerPageChanged,
+                        selectedIds: selectedIds,
+                        onToggleSelection: onToggleSelection,
                       ),
                     ),
                   ],
@@ -328,7 +478,7 @@ Widget mainContent(
   List<DocumentSnapshot> allScholarships,
   BuildContext context,
   final String selectedProvider,
-  final ValueChanged<String> onYearChanged,
+  final ValueChanged<String> onProviderChanged,
   final TextEditingController searchController,
   final int currentPage,
   final int itemsPerPage,
@@ -336,7 +486,21 @@ Widget mainContent(
   final ValueChanged<int> onItemsPerPageChanged,
   final double padding,
   final ScholarshipData? sc,
+  final Set<String> selectedIds,
+  final bool isSelectionMode,
+  final Function(String) onToggleSelection,
+  final Function(List<String>) onToggleSelectAll,
+  final VoidCallback onClearSelection,
+  final VoidCallback onBulkDelete,
+  final Function(List<String>) isAllSelected,
 ) {
+  final filtered = _getFilteredScholarships(
+    allScholarships,
+    selectedProvider,
+    searchController.text,
+  );
+  final filteredIds = filtered.map((d) => d.id).toList();
+
   return Scaffold(
     backgroundColor: Colors.grey[100],
     body: Padding(
@@ -347,11 +511,22 @@ Widget mainContent(
           _buildHeader(
             selectedProvider,
             allScholarships,
-            onYearChanged,
+            onProviderChanged,
             searchController,
             sc,
           ),
           const SizedBox(height: 16),
+          if (isSelectionMode)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: BulkDeleteBar(
+                selectedCount: selectedIds.length,
+                onToggleSelectAll: () => onToggleSelectAll(filteredIds),
+                onBulkDelete: onBulkDelete,
+                isAllSelected: isAllSelected(filteredIds),
+                itemType: 'scholarships',
+              ),
+            ),
           Expanded(
             child: Container(
               padding: EdgeInsets.all(padding),
@@ -369,7 +544,12 @@ Widget mainContent(
               ),
               child: Column(
                 children: [
-                  _buildTableHeader(),
+                  _buildTableHeader(
+                    selectedIds.length == filtered.length && filtered.isNotEmpty,
+                    () => onToggleSelectAll(filteredIds),
+                    selectedIds,
+                    filtered,
+                  ),
                   const SizedBox(height: 10),
                   Expanded(
                     child: _buildScholarshipList(
@@ -380,6 +560,8 @@ Widget mainContent(
                       itemsPerPage: itemsPerPage,
                       onPageChanged: onPageChanged,
                       onItemsPerPageChanged: onItemsPerPageChanged,
+                      selectedIds: selectedIds,
+                      onToggleSelection: onToggleSelection,
                     ),
                   ),
                 ],
@@ -395,7 +577,7 @@ Widget mainContent(
 Widget _buildMobileHeader(
   String selectedProvider,
   List<DocumentSnapshot> allScholarships,
-  ValueChanged<String> onYearChanged,
+  ValueChanged<String> onProviderChanged,
   TextEditingController searchController,
   ScholarshipData? sc,
 ) {
@@ -423,25 +605,47 @@ Widget _buildMobileHeader(
               ),
             ],
           ),
-          Row(children: [UploadDocumentButton(formType: 'scholarship')]),
+          UploadDocumentButton(formType: 'scholarship'),
         ],
       ),
       const SizedBox(height: 16),
       buildSearchField('scholarship name', searchController),
       const SizedBox(height: 12),
-      Row(
-        children: [
-          Expanded(
-            child: ScholarshipProviderDropdown(
-              allScholarships: allScholarships,
-              initialValue: selectedProvider,
-              onChanged: onYearChanged,
-            ),
-          ),
-        ],
+      ScholarshipProviderDropdown(
+        allScholarships: allScholarships,
+        initialValue: selectedProvider,
+        onChanged: onProviderChanged,
       ),
     ],
   );
+}
+
+List<DocumentSnapshot> _getFilteredScholarships(
+  List<DocumentSnapshot> docs,
+  String selectedProvider,
+  String searchQuery,
+) {
+  return docs.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final scholarshipName =
+        (data['name'] ?? '').toString().toLowerCase().trim();
+    final scholarshipProvider =
+        (data['scholarshipProvider'] ?? '').toString().toLowerCase().trim();
+    final query = searchQuery.toLowerCase().trim();
+    final providerFilter = selectedProvider.toLowerCase().trim();
+
+    bool matchesProvider =
+        providerFilter == 'all' ||
+        providerFilter == 'all providers' ||
+        scholarshipProvider == providerFilter;
+
+    bool matchesSearch =
+        query.isEmpty ||
+        scholarshipName.contains(query) ||
+        scholarshipProvider.contains(query);
+
+    return matchesProvider && matchesSearch;
+  }).toList();
 }
 
 Widget _buildScholarshipList({
@@ -452,29 +656,14 @@ Widget _buildScholarshipList({
   required int itemsPerPage,
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
+  required Set<String> selectedIds,
+  required Function(String) onToggleSelection,
 }) {
-  final filtered =
-      allScholarships.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final scholarshipName =
-            (data['name'] ?? '').toString().toLowerCase().trim();
-        final scholarshipProvider =
-            (data['scholarshipProvider'] ?? '').toString().toLowerCase().trim();
-        final query = searchQuery.toLowerCase().trim();
-        final providerFilter = selectedProvider.toLowerCase().trim();
-
-        bool matchesProvider =
-            providerFilter == 'all' ||
-            providerFilter == 'all providers' ||
-            scholarshipProvider == providerFilter;
-
-        bool matchesSearch =
-            query.isEmpty ||
-            scholarshipName.contains(query) ||
-            scholarshipProvider.contains(query);
-
-        return matchesProvider && matchesSearch;
-      }).toList();
+  final filtered = _getFilteredScholarships(
+    allScholarships,
+    selectedProvider,
+    searchQuery,
+  );
 
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
@@ -490,64 +679,65 @@ Widget _buildScholarshipList({
   return Column(
     children: [
       Expanded(
-        child:
-            currentPageScholarships.isEmpty
-                ? const Center(
-                  child: Text('No scholarships match your criteria.'),
-                )
-                : ListView.builder(
-                  shrinkWrap: false,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: currentPageScholarships.length,
-                  itemBuilder: (context, index) {
-                    final doc = currentPageScholarships[index];
-                    final data = doc.data() as Map<String, dynamic>;
+        child: currentPageScholarships.isEmpty
+            ? const Center(
+                child: Text('No scholarships match your criteria.'),
+              )
+            : ListView.builder(
+                shrinkWrap: false,
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: currentPageScholarships.length,
+                itemBuilder: (context, index) {
+                  final doc = currentPageScholarships[index];
+                  final data = doc.data() as Map<String, dynamic>;
 
-                    List<String> eligibilityRequirements = [];
-
-                    if (data['eligibilityRequirements'] != null) {
-                      final reqs =
-                          (data['eligibilityRequirements'] as List<dynamic>?)
-                              ?.map((c) => c.toString().trim())
-                              .where((c) => c.isNotEmpty)
-                              .toList() ??
-                          [];
-                      eligibilityRequirements.addAll(reqs);
-                    }
-
-                    final List<String> privileges =
-                        (data['privileges'] as List<dynamic>?)
-                            ?.map((c) => c.toString())
+                  List<String> eligibilityRequirements = [];
+                  if (data['eligibilityRequirements'] != null) {
+                    final reqs =
+                        (data['eligibilityRequirements'] as List<dynamic>?)
+                            ?.map((c) => c.toString().trim())
+                            .where((c) => c.isNotEmpty)
                             .toList() ??
                         [];
+                    eligibilityRequirements.addAll(reqs);
+                  }
 
-                    String deadline = '-';
-                    if (data['deadline'] != null) {
-                      if (data['deadline'] is Timestamp) {
-                        deadline = DateFormat(
-                          "MMMM d, yyyy",
-                        ).format((data['deadline'] as Timestamp).toDate());
-                      } else {
-                        deadline = data['deadline'].toString();
-                      }
+                  final List<String> privileges =
+                      (data['privileges'] as List<dynamic>?)
+                          ?.map((c) => c.toString())
+                          .toList() ??
+                      [];
+
+                  String deadline = '-';
+                  if (data['deadline'] != null) {
+                    if (data['deadline'] is Timestamp) {
+                      deadline = DateFormat("MMMM d, yyyy")
+                          .format((data['deadline'] as Timestamp).toDate());
+                    } else {
+                      deadline = data['deadline'].toString();
                     }
+                  }
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _buildScholarshipRow(
-                        context: context,
-                        doc: doc,
-                        name: data['name'] ?? 'N/A',
-                        description: data['description'] ?? 'N/A',
-                        eligibilityRequirements: eligibilityRequirements,
-                        scholarshipProvider:
-                            data['scholarshipProvider'] ?? 'N/A',
-                        privileges: privileges,
-                        deadline: deadline,
-                      ),
-                    );
-                  },
-                ),
+                  final isSelected = selectedIds.contains(doc.id);
+
+                  return Padding(
+                    key: ValueKey(doc.id),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildScholarshipRow(
+                      context: context,
+                      doc: doc,
+                      name: data['name'] ?? 'N/A',
+                      description: data['description'] ?? 'N/A',
+                      eligibilityRequirements: eligibilityRequirements,
+                      scholarshipProvider: data['scholarshipProvider'] ?? 'N/A',
+                      privileges: privileges,
+                      deadline: deadline,
+                      isSelected: isSelected,
+                      onToggleSelection: () => onToggleSelection(doc.id),
+                    ),
+                  );
+                },
+              ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -572,6 +762,8 @@ Widget _buildScholarshipRow({
   required List<String>? eligibilityRequirements,
   required String deadline,
   required List<String>? privileges,
+  required bool isSelected,
+  required VoidCallback onToggleSelection,
 }) {
   return _ScholarshipRowWidget(
     context: context,
@@ -582,13 +774,15 @@ Widget _buildScholarshipRow({
     eligibilityRequirements: eligibilityRequirements,
     deadline: deadline,
     privileges: privileges,
+    isSelected: isSelected,
+    onToggleSelection: onToggleSelection,
   );
 }
 
 Widget _buildHeader(
   String selectedProvider,
   List<DocumentSnapshot> allScholarships,
-  ValueChanged<String> onYearChanged,
+  ValueChanged<String> onProviderChanged,
   TextEditingController searchController,
   ScholarshipData? sc,
 ) {
@@ -621,7 +815,7 @@ Widget _buildHeader(
                   ),
                 ],
               ),
-              Row(children: [UploadDocumentButton(formType: 'scholarship')]),
+              UploadDocumentButton(formType: 'scholarship'),
             ],
           ),
           Padding(
@@ -668,7 +862,7 @@ Widget _buildHeader(
               ScholarshipProviderDropdown(
                 allScholarships: allScholarships,
                 initialValue: selectedProvider,
-                onChanged: onYearChanged,
+                onChanged: onProviderChanged,
               ),
             ],
           ),
@@ -678,7 +872,12 @@ Widget _buildHeader(
   );
 }
 
-Widget _buildTableHeader() {
+Widget _buildTableHeader(
+  bool isAllSelected,
+  VoidCallback onSelectAll,
+  Set<String> selectedIds,
+  List<DocumentSnapshot> filteredDocs,
+) {
   return LayoutBuilder(
     builder: (context, constraints) {
       double screenWidth = MediaQuery.of(context).size.width;
@@ -692,9 +891,9 @@ Widget _buildTableHeader() {
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(6),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Expanded(
+              const Expanded(
                 flex: 3,
                 child: Text(
                   'Scholarship',
@@ -705,7 +904,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              Expanded(
+              const Expanded(
                 flex: 3,
                 child: Text(
                   'Eligibility/Requirements',
@@ -716,7 +915,49 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 40),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: filteredDocs.isEmpty ? null : onSelectAll,
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Select All',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                          border: Border.all(
+                            color: isAllSelected
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFFD1D5DB),
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: isAllSelected
+                            ? const Icon(
+                                Icons.check,
+                                size: 12,
+                                color: Colors.white,
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -778,7 +1019,49 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            SizedBox(width: isTablet ? 60 : 80),
+            SizedBox(width: isTablet ? 40 : 5),
+            InkWell(
+              onTap: filteredDocs.isEmpty ? null : onSelectAll,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Select All',
+                      style: TextStyle(
+                        fontSize: isTablet ? 12 : 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                        border: Border.all(
+                          color: isAllSelected
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFD1D5DB),
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: isAllSelected
+                          ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -891,6 +1174,8 @@ class _ScholarshipRowWidget extends StatefulWidget {
   final List<String>? eligibilityRequirements;
   final String deadline;
   final List<String>? privileges;
+  final bool isSelected;
+  final VoidCallback onToggleSelection;
 
   const _ScholarshipRowWidget({
     required this.context,
@@ -901,6 +1186,8 @@ class _ScholarshipRowWidget extends StatefulWidget {
     required this.eligibilityRequirements,
     required this.deadline,
     required this.privileges,
+    required this.isSelected,
+    required this.onToggleSelection,
   });
 
   @override
@@ -913,13 +1200,13 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
 
   @override
   Widget build(BuildContext context) {
-    DocumentSnapshot doc = widget.doc;
     double screenWidth = MediaQuery.of(context).size.width;
     bool isMobile = screenWidth < 600;
     bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
     if (isMobile) {
       return Container(
+        key: ValueKey(widget.doc.id),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -931,6 +1218,36 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Custom Checkbox
+              InkWell(
+                onTap: widget.onToggleSelection,
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: widget.isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                      border: Border.all(
+                        color: widget.isSelected
+                            ? const Color(0xFF2E7D32)
+                            : const Color(0xFFD1D5DB),
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: widget.isSelected
+                        ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Colors.white,
+                          )
+                        : null,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
               // Scholarship Name Column
               Expanded(
                 flex: 3,
@@ -970,8 +1287,7 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                   items: widget.eligibilityRequirements ?? [],
                   emptyText: 'No eligibility',
                   isExpanded: eligibilityExpanded,
-                  onToggle:
-                      (value) => setState(() => eligibilityExpanded = value),
+                  onToggle: (value) => setState(() => eligibilityExpanded = value),
                 ),
               ),
               const SizedBox(width: 8),
@@ -983,45 +1299,43 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                   if (value == 'edit') {
                     showDialog(
                       context: context,
-                      builder:
-                          (context) => ScholarshipFormDialog(
-                            doc: widget.doc,
-                            isEdit: true,
-                          ),
+                      builder: (context) => ScholarshipFormDialog(
+                        doc: widget.doc,
+                        isEdit: true,
+                      ),
                     );
                   } else if (value == 'delete') {
                     showDeleteConfirmation(
                       context,
-                      doc,
+                      widget.doc,
                       DeleteConfigs.scholarships,
                       'scholarships',
                       customDeleteHandler: handleScholarshipDelete,
                     );
                   }
                 },
-                itemBuilder:
-                    (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit, size: 18),
-                            SizedBox(width: 8),
-                            Text('Edit'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, size: 18, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Delete', style: TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                      ),
-                    ],
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1031,6 +1345,7 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
 
     // Tablet & Desktop View
     return Container(
+      key: ValueKey(widget.doc.id),
       padding: EdgeInsets.symmetric(
         vertical: isTablet ? 14 : 16,
         horizontal: isTablet ? 12 : 16,
@@ -1045,6 +1360,36 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Custom Checkbox
+            InkWell(
+              onTap: widget.onToggleSelection,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: widget.isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    border: Border.all(
+                      color: widget.isSelected
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFFD1D5DB),
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: widget.isSelected
+                      ? const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: Colors.white,
+                        )
+                      : null,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
             // Scholarship Name
             Expanded(
               flex: 3,
@@ -1081,8 +1426,7 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                 items: widget.eligibilityRequirements ?? [],
                 emptyText: 'No eligibility/requirements',
                 isExpanded: eligibilityExpanded,
-                onToggle:
-                    (value) => setState(() => eligibilityExpanded = value),
+                onToggle: (value) => setState(() => eligibilityExpanded = value),
               ),
             ),
             const SizedBox(width: 85),
@@ -1115,45 +1459,43 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                 if (value == 'edit') {
                   showDialog(
                     context: context,
-                    builder:
-                        (context) => ScholarshipFormDialog(
-                          doc: widget.doc,
-                          isEdit: true,
-                        ),
+                    builder: (context) => ScholarshipFormDialog(
+                      doc: widget.doc,
+                      isEdit: true,
+                    ),
                   );
                 } else if (value == 'delete') {
                   showDeleteConfirmation(
                     context,
-                    doc,
+                    widget.doc,
                     DeleteConfigs.scholarships,
                     'scholarships',
                     customDeleteHandler: handleScholarshipDelete,
                   );
                 }
               },
-              itemBuilder:
-                  (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 18),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, size: 18, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Delete', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
-                    ),
-                  ],
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),

@@ -1,8 +1,11 @@
 import 'dart:async';
 
+import 'package:capstone_project/modules/admin_module/buttons/bulk.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/statcard_management.dart';
 import 'package:capstone_project/modules/admin_module/information_bank_module/ib_format.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
@@ -24,11 +27,12 @@ class InformationBankPage extends StatefulWidget {
   State<InformationBankPage> createState() => _InformationBankPageState();
 }
 
-class _InformationBankPageState extends State<InformationBankPage> {
+class _InformationBankPageState extends State<InformationBankPage>
+    with BulkSelectionMixin {
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
-  bool isLoading = true; // ✅ Start with loading true
+  bool isLoading = true;
   final StatDataManagement statData = StatDataManagement();
 
   InformationBankData? ibData;
@@ -40,6 +44,7 @@ class _InformationBankPageState extends State<InformationBankPage> {
     setState(() {
       selectedCategory = newCategory;
       currentPage = 1;
+      clearSelection();
     });
   }
 
@@ -50,21 +55,20 @@ class _InformationBankPageState extends State<InformationBankPage> {
     _loadStatsAsync();
   }
 
-  // ✅ Set isLoading to false after data loads
   Future<void> _loadStatsAsync() async {
     try {
       final data = await statData.getInformationBankData();
       if (mounted) {
         setState(() {
           ibData = data;
-          isLoading = false; // ✅ Done loading
+          isLoading = false;
         });
       }
     } catch (e) {
       print("Error loading information bank data: $e");
       if (mounted) {
         setState(() {
-          isLoading = false; // ✅ Still stop loading even on error
+          isLoading = false;
         });
       }
     }
@@ -73,6 +77,7 @@ class _InformationBankPageState extends State<InformationBankPage> {
   void _onSearchChanged() {
     setState(() {
       currentPage = 1;
+      clearSelection();
     });
   }
 
@@ -96,9 +101,22 @@ class _InformationBankPageState extends State<InformationBankPage> {
     });
   }
 
+  void _handleBulkDelete() async {
+    await handleBulkDelete(
+      context: context,
+      selectedIds: selectedIds,
+      collection: 'information_bank',
+      itemType: 'documents',
+      onSuccess: () {
+        clearSelection();
+        _loadStatsAsync();
+      },
+      customDeleteHandler: handleInformationBankDelete,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ✅ Show loading spinner while stats are loading
     if (isLoading) {
       return const Scaffold(
         backgroundColor: Colors.white,
@@ -120,7 +138,13 @@ class _InformationBankPageState extends State<InformationBankPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         ib: ibData,
-        // ✅ Pass the stream
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
       tabletBody: TabletInformationBank(
         selectedCategory: selectedCategory,
@@ -131,7 +155,13 @@ class _InformationBankPageState extends State<InformationBankPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         ib: ibData,
-        // ✅ Pass the stream
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
       desktopBody: DesktopInformationBank(
         selectedCategory: selectedCategory,
@@ -142,13 +172,17 @@ class _InformationBankPageState extends State<InformationBankPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         ib: ibData,
-        // ✅ Pass the stream
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
     );
   }
 }
-
-// ✅ Update all layout classes to accept the stream
 
 class DesktopInformationBank extends StatelessWidget {
   final String selectedCategory;
@@ -159,6 +193,13 @@ class DesktopInformationBank extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final InformationBankData? ib;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const DesktopInformationBank({
     super.key,
@@ -170,6 +211,13 @@ class DesktopInformationBank extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.ib,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
@@ -185,6 +233,13 @@ class DesktopInformationBank extends StatelessWidget {
       24.0,
       ib,
       context,
+      selectedIds,
+      isSelectionMode,
+      onToggleSelection,
+      onToggleSelectAll,
+      onClearSelection,
+      onBulkDelete,
+      isAllSelected,
     );
   }
 }
@@ -198,6 +253,13 @@ class TabletInformationBank extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final InformationBankData? ib;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const TabletInformationBank({
     super.key,
@@ -209,6 +271,13 @@ class TabletInformationBank extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.ib,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
@@ -224,6 +293,13 @@ class TabletInformationBank extends StatelessWidget {
       20.0,
       ib,
       context,
+      selectedIds,
+      isSelectionMode,
+      onToggleSelection,
+      onToggleSelectAll,
+      onClearSelection,
+      onBulkDelete,
+      isAllSelected,
     );
   }
 }
@@ -237,6 +313,13 @@ class MobileInformationBank extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final InformationBankData? ib;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const MobileInformationBank({
     super.key,
@@ -248,98 +331,123 @@ class MobileInformationBank extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.ib,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: _buildMobileHeader(
-                selectedCategory,
-                onCategoryChanged,
-                searchController,
-                ib,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Container(
-                height: MediaQuery.of(context).size.height * 0.8,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('information_bank')
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          // Show loading only on first load
+          if (!snapshot.hasData && snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final allDocs = snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
+          final filtered = _getFilteredDocs(
+            allDocs,
+            selectedCategory,
+            searchController.text,
+          );
+          final filteredIds = filtered.map((d) => d.id).toList();
+
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _buildMobileHeader(
+                    selectedCategory,
+                    onCategoryChanged,
+                    searchController,
+                    ib,
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    _buildTableHeader(),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: StreamBuilder<QuerySnapshot>(
-                        stream:
-                            FirebaseFirestore.instance
-                                .collection('information_bank')
-                                .orderBy('createdAt', descending: true)
-                                .snapshots(),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-
-                          if (snapshot.hasError) {
-                            return Center(
-                              child: Text('Error: ${snapshot.error}'),
-                            );
-                          }
-
-                          if (!snapshot.hasData ||
-                              snapshot.data!.docs.isEmpty) {
-                            return const Center(
-                              child: Text('No documents found.'),
-                            );
-                          }
-
-                          return _buildIBList(
-                            context: context,
-                            getAllDocuments: snapshot.data!.docs,
-                            selectedCategory: selectedCategory,
-                            searchQuery: searchController.text,
-                            currentPage: currentPage,
-                            itemsPerPage: itemsPerPage,
-                            onPageChanged: onPageChanged,
-                            onItemsPerPageChanged: onItemsPerPageChanged,
-                          );
-                        },
-                      ),
+                if (isSelectionMode)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: BulkDeleteBar(
+                      selectedCount: selectedIds.length,
+                      onToggleSelectAll: () => onToggleSelectAll(filteredIds),
+                      onBulkDelete: onBulkDelete,
+                      isAllSelected: isAllSelected(filteredIds),
+                      itemType: 'documents',
                     ),
-                  ],
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Container(
+                    height: MediaQuery.of(context).size.height * 0.8,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          spreadRadius: 1,
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        buildTableHeader(
+                          selectedIds.length == filtered.length &&
+                              filtered.isNotEmpty,
+                          () => onToggleSelectAll(filteredIds),
+                          selectedIds,
+                          filtered,
+                        ),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: allDocs.isEmpty
+                              ? const Center(
+                                  child: Text('No documents found.'),
+                                )
+                              : _buildIBList(
+                                  context: context,
+                                  getAllDocuments: allDocs,
+                                  selectedCategory: selectedCategory,
+                                  searchQuery: searchController.text,
+                                  currentPage: currentPage,
+                                  itemsPerPage: itemsPerPage,
+                                  onPageChanged: onPageChanged,
+                                  onItemsPerPageChanged: onItemsPerPageChanged,
+                                  selectedIds: selectedIds,
+                                  onToggleSelection: onToggleSelection,
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
 
-// ✅ Update mainContent to accept and use the stream
 Widget mainContent(
   final String selectedCategory,
   final ValueChanged<String> onCategoryChanged,
@@ -351,90 +459,118 @@ Widget mainContent(
   final double padding,
   final InformationBankData? ib,
   final BuildContext context,
+  final Set<String> selectedIds,
+  final bool isSelectionMode,
+  final Function(String) onToggleSelection,
+  final Function(List<String>) onToggleSelectAll,
+  final VoidCallback onClearSelection,
+  final VoidCallback onBulkDelete,
+  final Function(List<String>) isAllSelected,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
-    body: Padding(
-      padding: EdgeInsets.all(padding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(
-            selectedCategory,
-            onCategoryChanged,
-            searchController,
-            ib,
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Container(
-              padding: EdgeInsets.all(padding),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
+    body: StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('information_bank')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        // Show loading only on first load
+        if (!snapshot.hasData && snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        final allDocs = snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
+        final filtered = _getFilteredDocs(
+          allDocs,
+          selectedCategory,
+          searchController.text,
+        );
+        final filteredIds = filtered.map((d) => d.id).toList();
+
+        return Padding(
+          padding: EdgeInsets.all(padding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(
+                selectedCategory,
+                onCategoryChanged,
+                searchController,
+                ib,
               ),
-              child: Column(
-                children: [
-                  _buildTableHeader(),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: StreamBuilder<QuerySnapshot>(
-                      stream:
-                          FirebaseFirestore.instance
-                              .collection('information_bank')
-                              .orderBy('createdAt', descending: true)
-                              .snapshots(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-
-                        if (snapshot.hasError) {
-                          return Center(
-                            child: Text('Error: ${snapshot.error}'),
-                          );
-                        }
-
-                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                          return const Center(
-                            child: Text('No documents found.'),
-                          );
-                        }
-
-                        return _buildIBList(
-                          context: context,
-                          getAllDocuments: snapshot.data!.docs,
-                          selectedCategory: selectedCategory,
-                          searchQuery: searchController.text,
-                          currentPage: currentPage,
-                          itemsPerPage: itemsPerPage,
-                          onPageChanged: onPageChanged,
-                          onItemsPerPageChanged: onItemsPerPageChanged,
-                        );
-                      },
-                    ),
+              const SizedBox(height: 16),
+              if (isSelectionMode)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: BulkDeleteBar(
+                    selectedCount: selectedIds.length,
+                    onToggleSelectAll: () => onToggleSelectAll(filteredIds),
+                    onBulkDelete: onBulkDelete,
+                    isAllSelected: isAllSelected(filteredIds),
+                    itemType: 'documents',
                   ),
-                ],
+                ),
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.all(padding),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 1,
+                        blurRadius: 3,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      buildTableHeader(
+                        selectedIds.length == filtered.length &&
+                            filtered.isNotEmpty,
+                        () => onToggleSelectAll(filteredIds),
+                        selectedIds,
+                        filtered,
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: allDocs.isEmpty
+                            ? const Center(
+                                child: Text('No documents found.'),
+                              )
+                            : _buildIBList(
+                                context: context,
+                                getAllDocuments: allDocs,
+                                selectedCategory: selectedCategory,
+                                searchQuery: searchController.text,
+                                currentPage: currentPage,
+                                itemsPerPage: itemsPerPage,
+                                onPageChanged: onPageChanged,
+                                onItemsPerPageChanged: onItemsPerPageChanged,
+                                selectedIds: selectedIds,
+                                onToggleSelection: onToggleSelection,
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     ),
   );
 }
 
+// Keep existing helper functions unchanged
 Widget _buildMobileHeader(
   String selectedCategory,
   ValueChanged<String> onCategoryChanged,
@@ -444,7 +580,6 @@ Widget _buildMobileHeader(
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // Title
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -487,7 +622,6 @@ Widget _buildHeader(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title and Upload Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -512,8 +646,6 @@ Widget _buildHeader(
               UploadDocumentButton(),
             ],
           ),
-
-          // Stat Cards Section
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Row(
@@ -547,10 +679,7 @@ Widget _buildHeader(
               ],
             ),
           ),
-
           const SizedBox(height: 24),
-
-          // Search and Filter Row
           Row(
             children: [
               Expanded(
@@ -573,7 +702,37 @@ Widget _buildHeader(
   );
 }
 
-Widget _buildTableHeader() {
+List<DocumentSnapshot> _getFilteredDocs(
+  List<DocumentSnapshot> docs,
+  String selectedCategory,
+  String searchQuery,
+) {
+  return docs.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final title = (data['ib_title'] ?? '').toString().toLowerCase();
+    final source = (data['source'] ?? '').toString().toLowerCase();
+    final category = (data['category'] ?? '').toString().toLowerCase();
+
+    bool matchesCategory =
+        selectedCategory == 'All Categories' ||
+        category == selectedCategory.toLowerCase();
+
+    bool matchesSearch =
+        searchQuery.isEmpty ||
+        title.contains(searchQuery.toLowerCase()) ||
+        source.contains(searchQuery.toLowerCase()) ||
+        category.contains(searchQuery.toLowerCase());
+
+    return matchesCategory && matchesSearch;
+  }).toList();
+}
+
+Widget buildTableHeader(
+  bool isAllSelected,
+  VoidCallback onSelectAll,
+  Set<String> selectedIds,
+  List<DocumentSnapshot> filteredDocs,
+) {
   return LayoutBuilder(
     builder: (context, constraints) {
       double screenWidth = MediaQuery.of(context).size.width;
@@ -587,9 +746,9 @@ Widget _buildTableHeader() {
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(6),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Expanded(
+              const Expanded(
                 flex: 3,
                 child: Text(
                   'Document',
@@ -600,8 +759,8 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 20),
-              Expanded(
+              const SizedBox(width: 20),
+              const Expanded(
                 flex: 3,
                 child: Text(
                   'Category',
@@ -612,7 +771,49 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 40), // space for actions
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: filteredDocs.isEmpty ? null : onSelectAll,
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Select All',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                          border: Border.all(
+                            color: isAllSelected
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFFD1D5DB),
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: isAllSelected
+                            ? const Icon(
+                                Icons.check,
+                                size: 12,
+                                color: Colors.white,
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -664,13 +865,55 @@ Widget _buildTableHeader() {
               ),
             ),
             SizedBox(width: isTablet ? 40 : 5),
-            const SizedBox(width: 40), // Fixed space for action button
+            InkWell(
+              onTap: filteredDocs.isEmpty ? null : onSelectAll,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Select All',
+                      style: TextStyle(
+                        fontSize: isTablet ? 12 : 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                        border: Border.all(
+                          color: isAllSelected
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFD1D5DB),
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: isAllSelected
+                          ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );
     },
   );
 }
+
 
 Widget _buildIBList({
   required BuildContext context,
@@ -681,25 +924,14 @@ Widget _buildIBList({
   required int itemsPerPage,
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
+  required Set<String> selectedIds,
+  required Function(String) onToggleSelection,
 }) {
-  final filtered = getAllDocuments.where((doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final title = (data['ib_title'] ?? '').toString().toLowerCase();
-    final source = (data['source'] ?? '').toString().toLowerCase();
-    final category = (data['category'] ?? '').toString().toLowerCase();
-
-    bool matchesCategory =
-        selectedCategory == 'All Categories' ||
-        category == selectedCategory.toLowerCase();
-
-    bool matchesSearch =
-        searchQuery.isEmpty ||
-        title.contains(searchQuery.toLowerCase()) ||
-        source.contains(searchQuery.toLowerCase()) ||
-        category.contains(searchQuery.toLowerCase());
-
-    return matchesCategory && matchesSearch;
-  }).toList();
+  final filtered = _getFilteredDocs(
+    getAllDocuments,
+    selectedCategory,
+    searchQuery,
+  );
 
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
@@ -732,11 +964,10 @@ Widget _buildIBList({
                   final String formattedDate = DateFormat(
                     "MMMM d, yyyy 'at' hh:mm a",
                   ).format(date);
-                  
+
                   final contentStr = data['content'] as String;
                   final source = data['source'] ?? 'Unknown';
 
-                  // ✅ Use smart formatter for preview
                   final preview = ContentFormatter.getPreviewText(
                     contentStr,
                     source,
@@ -753,6 +984,8 @@ Widget _buildIBList({
                       source: source,
                       category: data['category'] ?? 'General',
                       content: preview,
+                      isSelected: selectedIds.contains(doc.id),
+                      onToggleSelection: () => onToggleSelection(doc.id),
                     ),
                   );
                 },
@@ -779,6 +1012,8 @@ Widget _buildIBRow({
   required String category,
   required String source,
   required String content,
+  required bool isSelected,
+  required VoidCallback onToggleSelection,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
   bool isMobile = screenWidth < 600;
@@ -787,16 +1022,51 @@ Widget _buildIBRow({
   final categoryStyle = getCategoryStyle(category);
 
   return Container(
+    key: ValueKey(doc.id),
     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
     decoration: BoxDecoration(
       color: Colors.white,
-      border: Border.all(color: Colors.grey[200]!),
+      border: Border.all(
+        color: Colors.grey[200]!,
+        width: 1,
+      ),
       borderRadius: BorderRadius.circular(6),
     ),
     child: InkWell(
       onTap: () => showIBInfoModal(context, doc),
       child: Row(
         children: [
+          // Custom Checkbox
+          InkWell(
+            onTap: onToggleSelection,
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFFD1D5DB),
+                    width: 2,
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: isSelected
+                    ? const Icon(
+                        Icons.check,
+                        size: 14,
+                        color: Colors.white,
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+
           // Document Title - flex: 3
           Expanded(
             flex: 3,
@@ -863,7 +1133,14 @@ Widget _buildIBRow({
           SizedBox(
             width: 40,
             child: PopupMenuButton<String>(
-              icon: const Icon(Icons.more_horiz),
+              icon: Icon(
+                Icons.more_vert,
+                color: Colors.grey[600],
+                size: 20,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               onSelected: (value) {
                 if (value == 'edit') {
                   showEditIBModal(context, doc);
@@ -877,29 +1154,28 @@ Widget _buildIBRow({
                   );
                 }
               },
-              itemBuilder:
-                  (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 18),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, size: 18, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Delete', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
-                    ),
-                  ],
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_outlined, size: 18, color: Color(0xFF6B7280)),
+                      SizedBox(width: 8),
+                      Text('Edit', style: TextStyle(color: Color(0xFF1F2937))),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],

@@ -1,4 +1,5 @@
 import 'package:capstone_project/modules/admin_module/buttons/add_faq_button.dart';
+import 'package:capstone_project/modules/admin_module/buttons/bulk.dart';
 import 'package:capstone_project/modules/admin_module/widgets/faq_category_dropdown_button.dart';
 import 'package:capstone_project/modules/admin_module/widgets/pagination.dart';
 import 'package:capstone_project/modules/admin_module/widgets/search_field.dart';
@@ -25,7 +26,8 @@ class FaqManagementPage extends StatefulWidget {
   State<FaqManagementPage> createState() => _FaqManagementPageState();
 }
 
-class _FaqManagementPageState extends State<FaqManagementPage> {
+class _FaqManagementPageState extends State<FaqManagementPage>
+    with BulkSelectionMixin {
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
   bool isLoading = true;
@@ -34,14 +36,16 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
 
   FAQsData? faqData;
 
+  int currentPage = 1;
+  int itemsPerPage = 10;
+
   void _onCategoryChanged(String newCategory) {
     setState(() {
       selectedCategory = newCategory;
+      currentPage = 1;
+      clearSelection();
     });
   }
-
-  int currentPage = 1;
-  int itemsPerPage = 10;
 
   @override
   void initState() {
@@ -67,7 +71,7 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
         isLoading = false;
       });
     } catch (e) {
-      print("Error loading information bank data: $e");
+      print("Error loading FAQ data: $e");
       if (!mounted) return;
       setState(() {
         isLoading = false;
@@ -85,6 +89,7 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
   void _onSearchChanged() {
     setState(() {
       currentPage = 1;
+      clearSelection();
     });
   }
 
@@ -101,10 +106,49 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
     });
   }
 
+  Future<void> _loadStatsAsync() async {
+    try {
+      final data = await statData.getFAQsData();
+      if (mounted) {
+        setState(() {
+          faqData = data;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading FAQ data: $e");
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _handleBulkDelete() async {
+    await handleBulkDelete(
+      context: context,
+      selectedIds: selectedIds,
+      collection: 'faqs',
+      itemType: 'faqs',
+      onSuccess: () {
+        clearSelection();
+        _loadStatsAsync();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF2E7D32),
+          ),
+        ),
+      );
     }
     return ResponsiveLayout(
       mobileBody: MobileFaqManagement(
@@ -116,6 +160,13 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         faq: faqData,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
       tabletBody: TabletFaqManagement(
         selectedCategory: selectedCategory,
@@ -126,6 +177,13 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         faq: faqData,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
       desktopBody: DesktopFaqManagement(
         selectedCategory: selectedCategory,
@@ -136,6 +194,13 @@ class _FaqManagementPageState extends State<FaqManagementPage> {
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         faq: faqData,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
       ),
     );
   }
@@ -150,6 +215,13 @@ class DesktopFaqManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final FAQsData? faq;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const DesktopFaqManagement({
     super.key,
@@ -161,6 +233,13 @@ class DesktopFaqManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.faq,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
@@ -176,6 +255,13 @@ class DesktopFaqManagement extends StatelessWidget {
       onItemsPerPageChanged,
       24.0,
       faq,
+      selectedIds,
+      isSelectionMode,
+      onToggleSelection,
+      onToggleSelectAll,
+      onClearSelection,
+      onBulkDelete,
+      isAllSelected,
     );
   }
 }
@@ -189,6 +275,13 @@ class TabletFaqManagement extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final FAQsData? faq;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const TabletFaqManagement({
     super.key,
@@ -200,6 +293,13 @@ class TabletFaqManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.faq,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
@@ -215,6 +315,13 @@ class TabletFaqManagement extends StatelessWidget {
       onItemsPerPageChanged,
       20.0,
       faq,
+      selectedIds,
+      isSelectionMode,
+      onToggleSelection,
+      onToggleSelectAll,
+      onClearSelection,
+      onBulkDelete,
+      isAllSelected,
     );
   }
 }
@@ -228,6 +335,13 @@ class MobileFaqManagement extends StatelessWidget {
   final int itemsPerPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final Function(String) onToggleSelection;
+  final Function(List<String>) onToggleSelectAll;
+  final VoidCallback onClearSelection;
+  final VoidCallback onBulkDelete;
+  final Function(List<String>) isAllSelected;
 
   const MobileFaqManagement({
     super.key,
@@ -239,91 +353,116 @@ class MobileFaqManagement extends StatelessWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     this.faq,
+    required this.selectedIds,
+    required this.isSelectionMode,
+    required this.onToggleSelection,
+    required this.onToggleSelectAll,
+    required this.onClearSelection,
+    required this.onBulkDelete,
+    required this.isAllSelected,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Header section
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: _buildMobileHeader(
-                selectedCategory,
-                onCategoryChanged,
-                searchController,
-                faq,
-              ),
-            ),
-            // Table section with fixed height
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Container(
-                height: MediaQuery.of(context).size.height * 0.8,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('faqs')
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData && snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final allDocs = snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
+          final filtered = _getFilteredFAQs(
+            allDocs,
+            selectedCategory,
+            searchController.text,
+          );
+          final filteredIds = filtered.map((d) => d.id).toList();
+
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _buildMobileHeader(
+                    selectedCategory,
+                    onCategoryChanged,
+                    searchController,
+                    faq,
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    _buildTableHeader(),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: StreamBuilder<QuerySnapshot>(
-                        stream:
-                            FirebaseFirestore.instance
-                                .collection('faqs')
-                                .snapshots(),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-
-                          if (snapshot.hasError) {
-                            return Center(
-                              child: Text('Error: ${snapshot.error}'),
-                            );
-                          }
-
-                          if (!snapshot.hasData ||
-                              snapshot.data!.docs.isEmpty) {
-                            return const Center(child: Text('No FAQs found.'));
-                          }
-
-                          return _buildFAQList(
-                            context: context,
-                            getAllFAQs: snapshot.data!.docs,
-                            selectedCategory: selectedCategory,
-                            searchQuery: searchController.text,
-                            currentPage: currentPage,
-                            itemsPerPage: itemsPerPage,
-                            onPageChanged: onPageChanged,
-                            onItemsPerPageChanged: onItemsPerPageChanged,
-                          );
-                        },
-                      ),
+                if (isSelectionMode)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: BulkDeleteBar(
+                      selectedCount: selectedIds.length,
+                      onToggleSelectAll: () => onToggleSelectAll(filteredIds),
+                      onBulkDelete: onBulkDelete,
+                      isAllSelected: isAllSelected(filteredIds),
+                      itemType: 'faqs',
                     ),
-                  ],
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Container(
+                    height: MediaQuery.of(context).size.height * 0.8,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          spreadRadius: 1,
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        _buildTableHeader(
+                          selectedIds.length == filtered.length && filtered.isNotEmpty,
+                          () => onToggleSelectAll(filteredIds),
+                          selectedIds,
+                          filtered,
+                        ),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: allDocs.isEmpty
+                              ? const Center(
+                                  child: Text('No FAQs found.'),
+                                )
+                              : _buildFAQList(
+                                  context: context,
+                                  getAllFAQs: allDocs,
+                                  selectedCategory: selectedCategory,
+                                  searchQuery: searchController.text,
+                                  currentPage: currentPage,
+                                  itemsPerPage: itemsPerPage,
+                                  onPageChanged: onPageChanged,
+                                  onItemsPerPageChanged: onItemsPerPageChanged,
+                                  selectedIds: selectedIds,
+                                  onToggleSelection: onToggleSelection,
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -340,83 +479,111 @@ Widget mainContent(
   final ValueChanged<int> onItemsPerPageChanged,
   final double padding,
   final FAQsData? faq,
+  final Set<String> selectedIds,
+  final bool isSelectionMode,
+  final Function(String) onToggleSelection,
+  final Function(List<String>) onToggleSelectAll,
+  final VoidCallback onClearSelection,
+  final VoidCallback onBulkDelete,
+  final Function(List<String>) isAllSelected,
 ) {
   return Scaffold(
     backgroundColor: Colors.grey[100],
-    body: Padding(
-      padding: EdgeInsets.all(padding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(
-            selectedCategory,
-            onCategoryChanged,
-            searchController,
-            faq,
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Container(
-              padding: EdgeInsets.all(padding),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
+    body: StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('faqs')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData && snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        final allDocs = snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
+        final filtered = _getFilteredFAQs(
+          allDocs,
+          selectedCategory,
+          searchController.text,
+        );
+        final filteredIds = filtered.map((d) => d.id).toList();
+
+        return Padding(
+          padding: EdgeInsets.all(padding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(
+                selectedCategory,
+                onCategoryChanged,
+                searchController,
+                faq,
               ),
-              child: Column(
-                children: [
-                  _buildTableHeader(),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: StreamBuilder<QuerySnapshot>(
-                      stream:
-                          FirebaseFirestore.instance
-                              .collection('faqs')
-                              .snapshots(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-
-                        if (snapshot.hasError) {
-                          return Center(
-                            child: Text('Error: ${snapshot.error}'),
-                          );
-                        }
-
-                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                          return const Center(child: Text('No FAQs found.'));
-                        }
-
-                        return _buildFAQList(
-                          context: context,
-                          getAllFAQs: snapshot.data!.docs,
-                          selectedCategory: selectedCategory,
-                          searchQuery: searchController.text,
-                          currentPage: currentPage,
-                          itemsPerPage: itemsPerPage,
-                          onPageChanged: onPageChanged,
-                          onItemsPerPageChanged: onItemsPerPageChanged,
-                        );
-                      },
-                    ),
+              const SizedBox(height: 16),
+              if (isSelectionMode)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: BulkDeleteBar(
+                    selectedCount: selectedIds.length,
+                    onToggleSelectAll: () => onToggleSelectAll(filteredIds),
+                    onBulkDelete: onBulkDelete,
+                    isAllSelected: isAllSelected(filteredIds),
+                    itemType: 'faqs',
                   ),
-                ],
+                ),
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.all(padding),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 1,
+                        blurRadius: 3,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      _buildTableHeader(
+                        selectedIds.length == filtered.length && filtered.isNotEmpty,
+                        () => onToggleSelectAll(filteredIds),
+                        selectedIds,
+                        filtered,
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: allDocs.isEmpty
+                            ? const Center(
+                                child: Text('No FAQs found.'),
+                              )
+                            : _buildFAQList(
+                                context: context,
+                                getAllFAQs: allDocs,
+                                selectedCategory: selectedCategory,
+                                searchQuery: searchController.text,
+                                currentPage: currentPage,
+                                itemsPerPage: itemsPerPage,
+                                onPageChanged: onPageChanged,
+                                onItemsPerPageChanged: onItemsPerPageChanged,
+                                selectedIds: selectedIds,
+                                onToggleSelection: onToggleSelection,
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     ),
   );
 }
@@ -472,7 +639,6 @@ Widget _buildHeader(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title and Add FAQ Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -497,8 +663,6 @@ Widget _buildHeader(
               AddFaqButton(),
             ],
           ),
-
-          // Stat Cards Section
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Row(
@@ -541,8 +705,7 @@ Widget _buildHeader(
               ],
             ),
           ),
-
-          // Search and Filter Row
+          const SizedBox(height: 24),
           Row(
             children: [
               Expanded(
@@ -565,7 +728,12 @@ Widget _buildHeader(
   );
 }
 
-Widget _buildTableHeader() {
+Widget _buildTableHeader(
+  bool isAllSelected,
+  VoidCallback onSelectAll,
+  Set<String> selectedIds,
+  List<DocumentSnapshot> filteredDocs,
+) {
   return LayoutBuilder(
     builder: (context, constraints) {
       double screenWidth = MediaQuery.of(context).size.width;
@@ -579,9 +747,9 @@ Widget _buildTableHeader() {
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(6),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Expanded(
+              const Expanded(
                 flex: 4,
                 child: Text(
                   'Question',
@@ -592,8 +760,8 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 12),
-              Expanded(
+              const SizedBox(width: 12),
+              const Expanded(
                 flex: 3,
                 child: Text(
                   'Answer',
@@ -604,7 +772,49 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 60), // Space for popup menu
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: filteredDocs.isEmpty ? null : onSelectAll,
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Select All',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                          border: Border.all(
+                            color: isAllSelected
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFFD1D5DB),
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: isAllSelected
+                            ? const Icon(
+                                Icons.check,
+                                size: 12,
+                                color: Colors.white,
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -656,12 +866,79 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
-            const SizedBox(width: 60),
+            SizedBox(width: isTablet ? 40 : 5),
+            InkWell(
+              onTap: filteredDocs.isEmpty ? null : onSelectAll,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Select All',
+                      style: TextStyle(
+                        fontSize: isTablet ? 12 : 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                        border: Border.all(
+                          color: isAllSelected
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFD1D5DB),
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: isAllSelected
+                          ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );
     },
   );
+}
+
+List<DocumentSnapshot> _getFilteredFAQs(
+  List<DocumentSnapshot> docs,
+  String selectedCategory,
+  String searchQuery,
+) {
+  return docs.where((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final question = (data['question'] ?? '').toString().toLowerCase();
+    final answer = (data['answer'] ?? '').toString().toLowerCase();
+    final category = (data['category'] ?? '').toString().toLowerCase();
+
+    bool matchesCategory =
+        selectedCategory == 'All Categories' ||
+        category == selectedCategory.toLowerCase();
+
+    bool matchesSearch =
+        searchQuery.isEmpty ||
+        question.contains(searchQuery.toLowerCase()) ||
+        answer.contains(searchQuery.toLowerCase()) ||
+        category.contains(searchQuery.toLowerCase());
+
+    return matchesCategory && matchesSearch;
+  }).toList();
 }
 
 Widget _buildFAQList({
@@ -673,24 +950,14 @@ Widget _buildFAQList({
   required int itemsPerPage,
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
+  required Set<String> selectedIds,
+  required Function(String) onToggleSelection,
 }) {
-  final filtered =
-      getAllFAQs.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final question = (data['question'] ?? '').toString().toLowerCase();
-        final category = (data['category'] ?? '').toString().toLowerCase();
-
-        bool matchesCategory =
-            selectedCategory == 'All Categories' ||
-            category == selectedCategory.toLowerCase();
-
-        bool matchesSearch =
-            searchQuery.isEmpty ||
-            question.contains(searchQuery.toLowerCase()) ||
-            category.contains(searchQuery.toLowerCase());
-
-        return matchesCategory && matchesSearch;
-      }).toList();
+  final filtered = _getFilteredFAQs(
+    getAllFAQs,
+    selectedCategory,
+    searchQuery,
+  );
 
   final totalItems = filtered.length;
   final totalPages = totalItems == 0 ? 1 : (totalItems / itemsPerPage).ceil();
@@ -706,31 +973,34 @@ Widget _buildFAQList({
   return Column(
     children: [
       Expanded(
-        child:
-            currentPageFAQs.isEmpty
-                ? const Center(
-                  child: Text('No FAQs match your search criteria.'),
-                )
-                : ListView.builder(
-                  shrinkWrap: false,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: currentPageFAQs.length,
-                  itemBuilder: (context, index) {
-                    final doc = currentPageFAQs[index];
-                    final data = doc.data() as Map<String, dynamic>;
+        child: currentPageFAQs.isEmpty
+            ? const Center(
+                child: Text('No FAQs match your search criteria.'),
+              )
+            : ListView.builder(
+                shrinkWrap: false,
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: currentPageFAQs.length,
+                itemBuilder: (context, index) {
+                  final doc = currentPageFAQs[index];
+                  final data = doc.data() as Map<String, dynamic>;
+                  final isSelected = selectedIds.contains(doc.id);
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _buildFAQRow(
-                        context: context,
-                        doc: doc,
-                        question: data['question'] ?? 'N/A',
-                        answer: data['answer'] ?? 'N/A',
-                        category: data['category'] ?? 'General',
-                      ),
-                    );
-                  },
-                ),
+                  return Padding(
+                    key: ValueKey(doc.id),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildFAQRow(
+                      context: context,
+                      doc: doc,
+                      question: data['question'] ?? 'N/A',
+                      answer: data['answer'] ?? 'N/A',
+                      category: data['category'] ?? 'General',
+                      isSelected: isSelected,
+                      onToggleSelection: () => onToggleSelection(doc.id),
+                    ),
+                  );
+                },
+              ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -752,24 +1022,62 @@ Widget _buildFAQRow({
   required String question,
   required String answer,
   required String category,
+  required bool isSelected,
+  required VoidCallback onToggleSelection,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
   bool isMobile = screenWidth < 600;
+  bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
   final categoryStyle = getCategoryStyle(category);
 
   return Container(
+    key: ValueKey(doc.id),
     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
     decoration: BoxDecoration(
       color: Colors.white,
-      border: Border.all(color: Colors.grey[200]!),
+      border: Border.all(
+        color: Colors.grey[200]!,
+        width: 1,
+      ),
       borderRadius: BorderRadius.circular(6),
     ),
     child: InkWell(
       onTap: () => showFAQInfoModal(context, doc),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Custom Checkbox
+          InkWell(
+            onTap: onToggleSelection,
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFFD1D5DB),
+                    width: 2,
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: isSelected
+                    ? const Icon(
+                        Icons.check,
+                        size: 14,
+                        color: Colors.white,
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Question - flex: 4
           Expanded(
             flex: 4,
             child: Text(
@@ -781,28 +1089,30 @@ Widget _buildFAQRow({
               textAlign: TextAlign.left,
             ),
           ),
+          if (isMobile) ...[const SizedBox(width: 12)],
+
+          // Answer - flex: 3
           Expanded(
             flex: 3,
             child: Text(
               answer,
-              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-              softWrap: true,
+              style: const TextStyle(fontSize: 13),
               maxLines: 2,
-              textAlign: TextAlign.left,
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          const SizedBox(width: 40),
+
+          // Spacing to match header
+          if (!isMobile) const SizedBox(width: 40),
+
+          // Category - flex: 3 (only on tablet/desktop)
           if (!isMobile)
             Expanded(
               flex: 3,
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: categoryStyle.backgroundColor,
                     borderRadius: BorderRadius.circular(4),
@@ -818,11 +1128,22 @@ Widget _buildFAQRow({
                 ),
               ),
             ),
-          SizedBox(width: isMobile ? 12 : 12),
+
+          // Spacing before action button
+          SizedBox(width: isTablet ? 40 : 5),
+
+          // Action button - Fixed width 40
           SizedBox(
-            width: 48, // Fixed width for popup menu
+            width: 40,
             child: PopupMenuButton<String>(
-              icon: const Icon(Icons.more_horiz),
+              icon: Icon(
+                Icons.more_vert,
+                color: Colors.grey[600],
+                size: 20,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               onSelected: (value) {
                 if (value == 'edit') {
                   showEditFAQModal(context, doc);
@@ -835,29 +1156,28 @@ Widget _buildFAQRow({
                   );
                 }
               },
-              itemBuilder:
-                  (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 18),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, size: 18, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Delete', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
-                    ),
-                  ],
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_outlined, size: 18, color: Color(0xFF6B7280)),
+                      SizedBox(width: 8),
+                      Text('Edit', style: TextStyle(color: Color(0xFF1F2937))),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
