@@ -1,9 +1,9 @@
 
 
-import { onRequest } from "firebase-functions/v2/https";
-import { defineSecret } from "firebase-functions/params";
+import {onRequest} from "firebase-functions/v2/https";
+import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
-import { Pinecone } from "@pinecone-database/pinecone";
+import {Pinecone} from "@pinecone-database/pinecone";
 import axios from "axios";
 
 // Secrets
@@ -28,7 +28,7 @@ export async function generateCohereEmbedding(
       },
       {
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         timeout: 30000,
@@ -55,7 +55,7 @@ async function* generateCohereResponseStream(
     const response = await fetch("https://api.cohere.ai/v1/chat", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -80,10 +80,10 @@ async function* generateCohereResponseStream(
     let buffer = "";
 
     while (true) {
-      const { done, value } = await reader.read();
+      const {done, value} = await reader.read();
       if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, {stream: true});
       const lines = buffer.split("\n");
 
       // Keep the last incomplete line in buffer
@@ -96,9 +96,9 @@ async function* generateCohereResponseStream(
         if (!trimmedLine || trimmedLine.startsWith(":")) continue;
 
         // Remove "data: " prefix
-        const jsonStr = trimmedLine.startsWith("data: ")
-          ? trimmedLine.substring(6).trim()
-          : trimmedLine;
+        const jsonStr = trimmedLine.startsWith("data: ") ?
+          trimmedLine.substring(6).trim() :
+          trimmedLine;
 
         // Skip DONE signal or empty data
         if (jsonStr === "[DONE]" || !jsonStr) continue;
@@ -173,7 +173,7 @@ export async function generateCohereResponse(
       },
       {
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         timeout: 30000,
@@ -198,7 +198,7 @@ export async function generateCohereResponse(
 
 function getContextualContent(chunks: any[], bestChunk: any): string {
   try {
-    console.log(`\n📝 getContextualContent called:`);
+    console.log("\n📝 getContextualContent called:");
     console.log(`   Total chunks: ${chunks.length}`);
     console.log(`   Best chunk ID: ${bestChunk.id}`);
 
@@ -217,9 +217,9 @@ function getContextualContent(chunks: any[], bestChunk: any): string {
         "";
 
       if (!text || text.trim().length === 0) {
-        console.log(`⚠️ WARNING: No text content found!`);
+        console.log("⚠️ WARNING: No text content found!");
         console.log(
-          `   Available metadata:`,
+          "   Available metadata:",
           JSON.stringify(metadata, null, 2)
         );
         return "";
@@ -299,7 +299,7 @@ function getContextualContent(chunks: any[], bestChunk: any): string {
       // 🔥 DEBUG: Log first chunk's full metadata
       if (contextChunks.length > 0) {
         console.log(
-          `   Sample chunk metadata:`,
+          "   Sample chunk metadata:",
           JSON.stringify(contextChunks[0]?.metadata, null, 2)
         );
       }
@@ -359,9 +359,9 @@ function buildConversationContext(
   for (const message of recentHistory) {
     const role = message.sender === "user" ? "User" : "Assistant";
     const content =
-      message.content.length > 500
-        ? message.content.substring(0, 500) + "..."
-        : message.content;
+      message.content.length > 500 ?
+        message.content.substring(0, 500) + "..." :
+        message.content;
     contextParts.push(`${role}: ${content}`);
   }
 
@@ -459,12 +459,12 @@ async function findMatchingFAQ(
   similarityThreshold = 0.85 // ✅ LOWERED from 0.85
 ): Promise<{ question: string; answer: string; similarity: number } | null> {
   try {
-    console.log(`🔍 ===========================================`);
-    console.log(`🔍 FAQ MATCHING START`);
+    console.log("🔍 ===========================================");
+    console.log("🔍 FAQ MATCHING START");
     console.log(`🔍 Query: "${query}"`);
     console.log(`🔍 Threshold: ${similarityThreshold}`);
     console.log(`🔍 Query embedding dimensions: ${queryEmbedding.length}`);
-    console.log(`🔍 ===========================================`);
+    console.log("🔍 ===========================================");
 
     // ✅ Only fetch FAQs with non-empty answers
     const faqSnapshot = await db
@@ -477,7 +477,7 @@ async function findMatchingFAQ(
     );
 
     if (faqSnapshot.docs.length === 0) {
-      console.log(`❌ No FAQs found in database!`);
+      console.log("❌ No FAQs found in database!");
       return null;
     }
 
@@ -592,9 +592,9 @@ async function findMatchingFAQ(
       console.log(`   Answer: ${faqAnswer.length} chars`);
       console.log(
         `   Similarity: ${similarity.toFixed(4)} ${
-          similarity >= similarityThreshold
-            ? "✅ ABOVE THRESHOLD"
-            : "❌ BELOW THRESHOLD"
+          similarity >= similarityThreshold ?
+            "✅ ABOVE THRESHOLD" :
+            "❌ BELOW THRESHOLD"
         }`
       );
 
@@ -612,17 +612,17 @@ async function findMatchingFAQ(
     }
 
     // Summary
-    console.log(`📊 ===========================================`);
-    console.log(`📊 FAQ MATCHING SUMMARY`);
+    console.log("📊 ===========================================");
+    console.log("📊 FAQ MATCHING SUMMARY");
     console.log(`📊 Total FAQs in DB: ${faqSnapshot.docs.length}`);
     console.log(`📊 Processed: ${processedCount}`);
     console.log(`📊 Skipped: ${skippedCount}`);
     console.log(`📊 Highest Similarity: ${highestSimilarity.toFixed(4)}`);
     console.log(`📊 Threshold: ${similarityThreshold}`);
-    console.log(`📊 ===========================================`);
+    console.log("📊 ===========================================");
 
     // Show top 5 matches with more details
-    console.log(`🏆 TOP 5 CLOSEST MATCHES:`);
+    console.log("🏆 TOP 5 CLOSEST MATCHES:");
     allSimilarities
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, 5)
@@ -637,15 +637,15 @@ async function findMatchingFAQ(
       });
 
     if (bestMatch) {
-      console.log(`✅ ===========================================`);
-      console.log(`✅ FAQ MATCH FOUND!`);
+      console.log("✅ ===========================================");
+      console.log("✅ FAQ MATCH FOUND!");
       console.log(`✅ Question: "${bestMatch.question}"`);
       console.log(`✅ Similarity: ${bestMatch.similarity.toFixed(4)}`);
       console.log(`✅ Answer length: ${bestMatch.answer.length} chars`);
       console.log(
         `✅ Answer preview: "${bestMatch.answer.substring(0, 100)}..."`
       );
-      console.log(`✅ ===========================================`);
+      console.log("✅ ===========================================");
 
       // Update FAQ stats
       const faqDoc = faqSnapshot.docs.find(
@@ -656,17 +656,17 @@ async function findMatchingFAQ(
           similarityCount: admin.firestore.FieldValue.increment(1),
           lastAsked: admin.firestore.FieldValue.serverTimestamp(),
         });
-        console.log(`✅ Updated FAQ stats`);
+        console.log("✅ Updated FAQ stats");
       }
     } else {
-      console.log(`❌ ===========================================`);
-      console.log(`❌ NO FAQ MATCH FOUND`);
+      console.log("❌ ===========================================");
+      console.log("❌ NO FAQ MATCH FOUND");
       console.log(`❌ Best similarity: ${highestSimilarity.toFixed(4)}`);
       console.log(`❌ Required: ${similarityThreshold}`);
       console.log(
         `❌ Gap: ${(similarityThreshold - highestSimilarity).toFixed(4)}`
       );
-      console.log(`❌ ===========================================`);
+      console.log("❌ ===========================================");
     }
 
     return bestMatch;
@@ -727,7 +727,7 @@ async function retrieveRelevantDocuments(
     // 🔥 NEW: Log first match details for debugging
     if (similarChunks.matches.length > 0) {
       const firstMatch = similarChunks.matches[0];
-      console.log(`📝 First match details:`);
+      console.log("📝 First match details:");
       console.log(`   ID: ${firstMatch.id}`);
       console.log(`   Score: ${firstMatch.score}`);
       console.log(
@@ -827,7 +827,7 @@ async function retrieveRelevantDocuments(
           `⚠️ Empty contextual content for document ${docId}, skipping`
         );
         console.log(
-          `   Best chunk metadata:`,
+          "   Best chunk metadata:",
           JSON.stringify(bestChunk.metadata, null, 2)
         );
         continue;
@@ -947,11 +947,11 @@ export const generateAnswer = onRequest(
         return;
       }
 
-      console.log(`\n🤖 ========================================`);
+      console.log("\n🤖 ========================================");
       console.log(`🤖 Query: "${query}"`);
       console.log(`🤖 Streaming: ${stream}`);
       console.log(`🤖 Settings: topK=${topK}, minSimilarity=${minSimilarityScore}`);
-      console.log(`🤖 ========================================\n`);
+      console.log("🤖 ========================================\n");
 
       const pineconeKey = PINECONE_API_KEY.value();
       const cohereKey = COHERE_API_KEY.value();
@@ -976,7 +976,7 @@ export const generateAnswer = onRequest(
       );
 
       if (faqMatch) {
-        console.log(`✅ Using FAQ answer`);
+        console.log("✅ Using FAQ answer");
 
         if (stream) {
           res.setHeader("Content-Type", "text/event-stream");
@@ -992,11 +992,11 @@ export const generateAnswer = onRequest(
               i,
               Math.min(i + chunkSize, answer.length)
             );
-            
+
             res.write(
               `data: ${JSON.stringify({
                 type: "content-delta",
-                delta: { message: { content: { text: chunk } } },
+                delta: {message: {content: {text: chunk}}},
               })}\n\n`
             );
 
@@ -1029,7 +1029,7 @@ export const generateAnswer = onRequest(
       console.log("ℹ️ No FAQ match, proceeding with document retrieval...");
 
       // Initialize Pinecone
-      const pineconeClient = new Pinecone({ apiKey: pineconeKey });
+      const pineconeClient = new Pinecone({apiKey: pineconeKey});
       const pineconeIndex = pineconeClient.Index("oasp-assist");
 
       // Build conversation context
@@ -1045,10 +1045,10 @@ export const generateAnswer = onRequest(
       console.log(`🔍 Enhanced query: "${contextualQuery}"`);
 
       // ✅ PROGRESSIVE THRESHOLD RETRIEVAL
-      console.log(`\n📊 ========================================`);
-      console.log(`📊 PROGRESSIVE THRESHOLD SEARCH`);
-      console.log(`📊 ========================================`);
-      
+      console.log("\n📊 ========================================");
+      console.log("📊 PROGRESSIVE THRESHOLD SEARCH");
+      console.log("📊 ========================================");
+
       const thresholds = [0.35, 0.25, 0.18, 0.12];
       let results: any[] = [];
       let usedThreshold = minSimilarityScore;
@@ -1058,9 +1058,9 @@ export const generateAnswer = onRequest(
           console.log(`⏭️ Skip threshold ${threshold} (below minimum ${minSimilarityScore})`);
           continue;
         }
-        
+
         console.log(`\n🔍 Attempting threshold: ${threshold}`);
-        
+
         results = await retrieveRelevantDocuments(
           contextualQuery,
           queryEmbedding,
@@ -1068,31 +1068,31 @@ export const generateAnswer = onRequest(
           topK,
           threshold
         );
-        
+
         if (results.length > 0) {
           usedThreshold = threshold;
           console.log(`✅ SUCCESS! Found ${results.length} documents`);
           console.log(`📊 Used threshold: ${threshold}`);
           break;
         }
-        
+
         console.log(`⚠️ No results at ${threshold}, trying lower...`);
       }
 
-      console.log(`\n📊 ========================================`);
+      console.log("\n📊 ========================================");
       if (results.length === 0) {
-        console.log(`❌ FINAL: No documents found (tried all thresholds)`);
+        console.log("❌ FINAL: No documents found (tried all thresholds)");
       } else {
         console.log(`✅ FINAL: ${results.length} documents (threshold: ${usedThreshold})`);
       }
-      console.log(`📊 ========================================\n`);
+      console.log("📊 ========================================\n");
 
       let prompt: string;
       let documentContext = "";
 
       if (results.length === 0) {
         console.log("⚠️ Using general knowledge mode");
-        
+
         prompt = `You are OASP Assist, the official assistant for Central Mindanao University's Office of Admissions, Scholarships, and Placements.
 
 CONTEXT:
@@ -1110,10 +1110,9 @@ INSTRUCTIONS:
 - Keep your response conversational and helpful
 
 Please provide a helpful response:`;
-
       } else {
         console.log(`📚 Using ${results.length} documents (threshold: ${usedThreshold})`);
-        
+
         documentContext = buildDocumentContext(results);
         prompt = buildContextAwarePrompt(query, documentContext, contextHistory);
       }
@@ -1142,7 +1141,7 @@ Please provide a helpful response:`;
               res.write(
                 `data: ${JSON.stringify({
                   type: "content-delta",
-                  delta: { message: { content: { text: chunk } } },
+                  delta: {message: {content: {text: chunk}}},
                 })}\n\n`
               );
             }
@@ -1154,7 +1153,7 @@ Please provide a helpful response:`;
             res.write(
               `data: ${JSON.stringify({
                 type: "content-delta",
-                delta: { message: { content: { text: fallbackMsg } } },
+                delta: {message: {content: {text: fallbackMsg}}},
               })}\n\n`
             );
             fullResponse = fallbackMsg;
@@ -1185,16 +1184,16 @@ Please provide a helpful response:`;
           res.write(
             `data: ${JSON.stringify({
               type: "content-delta",
-              delta: { message: { content: { text: errorMsg } } },
+              delta: {message: {content: {text: errorMsg}}},
             })}\n\n`
           );
           res.write(
             `data: ${JSON.stringify({
               type: "error",
               error:
-                streamError instanceof Error
-                  ? streamError.message
-                  : "Unknown error",
+                streamError instanceof Error ?
+                  streamError.message :
+                  "Unknown error",
             })}\n\n`
           );
           res.write("data: [DONE]\n\n");
@@ -1252,7 +1251,7 @@ Please provide a helpful response:`;
           res.write(
             `data: ${JSON.stringify({
               type: "content-delta",
-              delta: { message: { content: { text: errorMsg } } },
+              delta: {message: {content: {text: errorMsg}}},
             })}\n\n`
           );
           res.write(
@@ -1342,8 +1341,8 @@ export const debugFAQs = onRequest(
    Question: ${data.question ? data.question.substring(0, 60) : "MISSING"}...
    Has Answer: ${faqInfo.hasAnswer} (${faqInfo.answerLength} chars)
    Has Embedding: ${faqInfo.hasEmbedding} (${
-          faqInfo.embeddingDimensions
-        } dimensions)
+  faqInfo.embeddingDimensions
+} dimensions)
    Category: ${faqInfo.category}
    Times Asked: ${faqInfo.similarityCount}
         `);
@@ -1403,7 +1402,7 @@ export const reembedAllFAQsV3 = onRequest(
             },
             {
               headers: {
-                Authorization: `Bearer ${cohereKey}`,
+                "Authorization": `Bearer ${cohereKey}`,
                 "Content-Type": "application/json",
               },
               timeout: 30000,
@@ -1442,11 +1441,10 @@ export const reembedAllFAQsV3 = onRequest(
       });
     } catch (error) {
       console.error("❌ Error:", error);
-      res.status(500).json({ error: String(error) });
+      res.status(500).json({error: String(error)});
     }
   }
 );
-
 
 
 export const debugPineconeVector = onRequest(
@@ -1456,10 +1454,10 @@ export const debugPineconeVector = onRequest(
   },
   async (req, res) => {
     try {
-      const { vectorId, query } = req.body;
+      const {vectorId, query} = req.body;
 
       const pineconeKey = PINECONE_API_KEY.value();
-      const pineconeClient = new Pinecone({ apiKey: pineconeKey });
+      const pineconeClient = new Pinecone({apiKey: pineconeKey});
       const pineconeIndex = pineconeClient.Index("oasp-assist");
 
       if (vectorId) {
@@ -1474,17 +1472,17 @@ export const debugPineconeVector = onRequest(
           hasText: !!result.records?.[vectorId]?.metadata?.text,
           hasContent: !!result.records?.[vectorId]?.metadata?.content,
           textLength:
-            typeof result.records?.[vectorId]?.metadata?.text === "string"
-              ? result.records?.[vectorId]?.metadata?.text.length
-              : Array.isArray(result.records?.[vectorId]?.metadata?.text)
-              ? result.records?.[vectorId]?.metadata?.text.length
-              : 0,
+            typeof result.records?.[vectorId]?.metadata?.text === "string" ?
+              result.records?.[vectorId]?.metadata?.text.length :
+              Array.isArray(result.records?.[vectorId]?.metadata?.text) ?
+                result.records?.[vectorId]?.metadata?.text.length :
+                0,
           contentLength:
-            typeof result.records?.[vectorId]?.metadata?.content === "string"
-              ? result.records?.[vectorId]?.metadata?.content.length
-              : Array.isArray(result.records?.[vectorId]?.metadata?.content)
-              ? result.records?.[vectorId]?.metadata?.content.length
-              : 0,
+            typeof result.records?.[vectorId]?.metadata?.content === "string" ?
+              result.records?.[vectorId]?.metadata?.content.length :
+              Array.isArray(result.records?.[vectorId]?.metadata?.content) ?
+                result.records?.[vectorId]?.metadata?.content.length :
+                0,
         });
       } else if (query) {
         // Query similar vectors
@@ -1531,11 +1529,11 @@ export const debugPineconeVector = onRequest(
           matches,
         });
       } else {
-        res.status(400).json({ error: "Provide either vectorId or query" });
+        res.status(400).json({error: "Provide either vectorId or query"});
       }
     } catch (error: any) {
       console.error("Error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({error: error.message});
     }
   }
 );

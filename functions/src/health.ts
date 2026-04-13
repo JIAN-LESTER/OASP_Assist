@@ -21,7 +21,7 @@ export const testSync = onCall(
     console.log("🧪 Test function called");
     console.log("Auth:", request.auth ? "Yes" : "No");
     console.log("Data:", request.data);
-    
+
     return {
       success: true,
       message: "Test function working!",

@@ -14,7 +14,7 @@ async function isAdmin(uid: string): Promise<boolean> {
         return true;
       }
     }
-    
+
     try {
       const userRecord = await admin.auth().getUser(uid);
       if (userRecord.customClaims?.admin === true) {
@@ -23,7 +23,7 @@ async function isAdmin(uid: string): Promise<boolean> {
     } catch (authError) {
       console.error("Error checking custom claims:", authError);
     }
-    
+
     return false;
   } catch (error) {
     console.error("Error checking admin status:", error);
@@ -33,11 +33,11 @@ async function isAdmin(uid: string): Promise<boolean> {
 
 export const createUser = onCall(
   {
-    region: 'us-central1', 
-    cors: true, 
-    invoker: 'private',
+    region: "us-central1",
+    cors: true,
+    invoker: "private",
     timeoutSeconds: 60,
-    memory: '256MiB',
+    memory: "256MiB",
   },
   async (request) => {
     console.log("========================================");
@@ -56,7 +56,7 @@ export const createUser = onCall(
 
       const callerUid = request.auth.uid;
       const callerIsAdmin = await isAdmin(callerUid);
-      
+
       if (!callerIsAdmin) {
         throw new HttpsError(
           "permission-denied",
@@ -101,9 +101,9 @@ export const createUser = onCall(
         name: displayName || email.split("@")[0],
         role: role || "user",
         profileComplete: false,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(), // ✅ Add server timestamp
-  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  verifiedAt: admin.firestore.FieldValue.serverTimestamp(), // ✅ Add server timestamp
+        createdAt: admin.firestore.FieldValue.serverTimestamp(), // ✅ Add server timestamp
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp(), // ✅ Add server timestamp
         createdBy: callerUid,
         isActive: true,
         isVerified: true,
@@ -139,7 +139,7 @@ export const createUser = onCall(
       // Create log entry
       await db.collection("logs").add({
         user: displayName || email,
-        action: `Admin created ${role || 'user'} account (auto-verified, no email sent)`,
+        action: `Admin created ${role || "user"} account (auto-verified, no email sent)`,
         time: admin.firestore.FieldValue.serverTimestamp(),
         userId: userRecord.uid,
         createdBy: callerUid,
@@ -153,23 +153,23 @@ export const createUser = onCall(
       };
     } catch (error: any) {
       console.error("❌ Error creating user:", error);
-      
+
       if (error instanceof HttpsError) {
         throw error;
       }
-      
+
       if (error.code === "auth/email-already-exists") {
         throw new HttpsError("already-exists", "This email is already registered.");
       }
-      
+
       if (error.code === "auth/invalid-email") {
         throw new HttpsError("invalid-argument", "Invalid email address.");
       }
-      
+
       if (error.code === "auth/weak-password") {
         throw new HttpsError("invalid-argument", "Password must be at least 6 characters.");
       }
-      
+
       throw new HttpsError("internal", error.message || "Failed to create user");
     }
   }
@@ -177,16 +177,16 @@ export const createUser = onCall(
 
 export const updateUser = onCall(
   {
-    region: 'us-central1',
+    region: "us-central1",
     cors: true,
-    invoker: 'private',
+    invoker: "private",
     timeoutSeconds: 60,
-    memory: '256MiB',
+    memory: "256MiB",
   },
   async (request) => {
     console.log("🔥 updateUser function called");
     console.log("📊 Update data:", JSON.stringify(request.data, null, 2));
-    
+
     try {
       if (!request.auth) {
         throw new HttpsError("unauthenticated", "You must be logged in.");
@@ -194,7 +194,7 @@ export const updateUser = onCall(
 
       const callerUid = request.auth.uid;
       const callerIsAdmin = await isAdmin(callerUid);
-      
+
       if (!callerIsAdmin) {
         throw new HttpsError("permission-denied", "Only admins can update users.");
       }
@@ -254,13 +254,13 @@ export const updateUser = onCall(
           if (year !== undefined) firestoreUpdate.year = year;
           if (program !== undefined) firestoreUpdate.program = program;
           if (scholarship !== undefined) firestoreUpdate.scholarship = scholarship;
-          
+
           // Remove fields that don't belong
           firestoreUpdate.lrn = admin.firestore.FieldValue.delete();
           firestoreUpdate.serviceUnit = admin.firestore.FieldValue.delete();
         } else if (affiliation === "Incoming Freshman Applicant") {
           if (lrn !== undefined) firestoreUpdate.lrn = lrn;
-          
+
           // Remove fields that don't belong
           firestoreUpdate.studentId = admin.firestore.FieldValue.delete();
           firestoreUpdate.year = admin.firestore.FieldValue.delete();
@@ -278,7 +278,7 @@ export const updateUser = onCall(
         }
       } else if (role === "staff") {
         if (serviceUnit !== undefined) firestoreUpdate.serviceUnit = serviceUnit;
-        
+
         // Remove user-specific fields
         firestoreUpdate.affiliation = admin.firestore.FieldValue.delete();
         firestoreUpdate.studentId = admin.firestore.FieldValue.delete();
@@ -303,25 +303,25 @@ export const updateUser = onCall(
       // Create log entry
       await db.collection("logs").add({
         user: displayName || email || "Unknown",
-        action: `Admin updated ${role || 'user'} account`,
+        action: `Admin updated ${role || "user"} account`,
         time: admin.firestore.FieldValue.serverTimestamp(),
         userId: uid,
         updatedBy: callerUid,
       });
 
       console.log("✅ User updated successfully:", uid);
-      
+
       return {
         success: true,
         message: `User ${uid} updated successfully.`,
       };
     } catch (error: any) {
       console.error("❌ Error updating user:", error);
-      
+
       if (error instanceof HttpsError) {
         throw error;
       }
-      
+
       throw new HttpsError("internal", error.message || "Failed to update user");
     }
   }
@@ -329,15 +329,15 @@ export const updateUser = onCall(
 
 export const deleteUser = onCall(
   {
-    region: 'us-central1',
+    region: "us-central1",
     cors: true,
-    invoker: 'private',
+    invoker: "private",
     timeoutSeconds: 120,
-    memory: '512MiB',
+    memory: "512MiB",
   },
   async (request) => {
     console.log("🔥 deleteUser function called");
-    
+
     try {
       if (!request.auth) {
         throw new HttpsError("unauthenticated", "You must be logged in.");
@@ -345,7 +345,7 @@ export const deleteUser = onCall(
 
       const callerUid = request.auth.uid;
       const callerIsAdmin = await isAdmin(callerUid);
-      
+
       if (!callerIsAdmin) {
         throw new HttpsError("permission-denied", "Only admins can delete users.");
       }
@@ -358,21 +358,21 @@ export const deleteUser = onCall(
       console.log(`🗑️ Starting cascade delete for user: ${uid}`);
 
       // Get user document
-      const userDoc = await db.collection('users').doc(uid).get();
+      const userDoc = await db.collection("users").doc(uid).get();
       if (!userDoc.exists) {
         console.warn(`⚠️ User document not found: ${uid}`);
       }
 
       // Delete conversations and messages
       let conversationsSnapshot = await db
-        .collection('conversations')
-        .where('userID', '==', uid)
+        .collection("conversations")
+        .where("userID", "==", uid)
         .get();
 
       if (conversationsSnapshot.empty) {
         conversationsSnapshot = await db
-          .collection('conversations')
-          .where('userId', '==', uid)
+          .collection("conversations")
+          .where("userId", "==", uid)
           .get();
       }
 
@@ -391,14 +391,14 @@ export const deleteUser = onCall(
 
       // Delete escalations
       let escSnapshot = await db
-        .collection('escalations')
-        .where('userID', '==', uid)
+        .collection("escalations")
+        .where("userID", "==", uid)
         .get();
 
       if (escSnapshot.empty) {
         escSnapshot = await db
-          .collection('escalations')
-          .where('userId', '==', uid)
+          .collection("escalations")
+          .where("userId", "==", uid)
           .get();
       }
 
@@ -428,8 +428,8 @@ export const deleteUser = onCall(
       }
 
       // Create log entry
-      await db.collection('logs').add({
-        action: 'Admin deleted user account (cascade)',
+      await db.collection("logs").add({
+        action: "Admin deleted user account (cascade)",
         userId: uid,
         deletedConversations: conversationsSnapshot.size,
         deletedEscalations: escSnapshot.size,
@@ -447,11 +447,11 @@ export const deleteUser = onCall(
       };
     } catch (error: any) {
       console.error("❌ Error deleting user:", error);
-      
+
       if (error instanceof HttpsError) {
         throw error;
       }
-      
+
       throw new HttpsError("internal", error.message || "Failed to delete user");
     }
   }
@@ -459,15 +459,15 @@ export const deleteUser = onCall(
 
 export const setAdminRole = onCall(
   {
-    region: 'us-central1',
+    region: "us-central1",
     cors: true,
-    invoker: 'private',
+    invoker: "private",
     timeoutSeconds: 60,
-    memory: '256MiB',
+    memory: "256MiB",
   },
   async (request) => {
     console.log("🔥 setAdminRole function called");
-    
+
     try {
       if (!request.auth) {
         throw new HttpsError("unauthenticated", "You must be logged in.");
@@ -475,7 +475,7 @@ export const setAdminRole = onCall(
 
       const callerUid = request.auth.uid;
       const callerIsAdmin = await isAdmin(callerUid);
-      
+
       if (!callerIsAdmin) {
         throw new HttpsError("permission-denied", "Only admins can change admin roles.");
       }
@@ -492,8 +492,8 @@ export const setAdminRole = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      await admin.auth().setCustomUserClaims(uid, { 
-        admin: makeAdmin 
+      await admin.auth().setCustomUserClaims(uid, {
+        admin: makeAdmin,
       });
 
       return {
@@ -502,18 +502,18 @@ export const setAdminRole = onCall(
       };
     } catch (error: any) {
       console.error("❌ Error setting admin role:", error);
-      
+
       if (error instanceof HttpsError) {
         throw error;
       }
-      
+
       throw new HttpsError("internal", error.message || "Failed to set admin role");
     }
   }
 );
 
 export const onUserDelete = onDocumentDeleted(
-  'users/{userId}',
+  "users/{userId}",
   async (event) => {
     const userId = event.params.userId;
     const db = admin.firestore();
@@ -531,14 +531,14 @@ export const onUserDelete = onDocumentDeleted(
 
       // Delete conversations
       let conversationsSnapshot = await db
-        .collection('conversations')
-        .where('userID', '==', userId)
+        .collection("conversations")
+        .where("userID", "==", userId)
         .get();
 
       if (conversationsSnapshot.empty) {
         conversationsSnapshot = await db
-          .collection('conversations')
-          .where('userId', '==', userId)
+          .collection("conversations")
+          .where("userId", "==", userId)
           .get();
       }
 
@@ -553,14 +553,14 @@ export const onUserDelete = onDocumentDeleted(
 
       // Delete escalations
       let escSnapshot = await db
-        .collection('escalations')
-        .where('userID', '==', userId)
+        .collection("escalations")
+        .where("userID", "==", userId)
         .get();
 
       if (escSnapshot.empty) {
         escSnapshot = await db
-          .collection('escalations')
-          .where('userId', '==', userId)
+          .collection("escalations")
+          .where("userId", "==", userId)
           .get();
       }
 
@@ -574,8 +574,8 @@ export const onUserDelete = onDocumentDeleted(
       }
 
       // Create a log entry
-      await db.collection('logs').add({
-        action: 'Cascade user delete (trigger)',
+      await db.collection("logs").add({
+        action: "Cascade user delete (trigger)",
         userId,
         deletedConversations: conversationsSnapshot.size,
         deletedEscalations: escSnapshot.size,
@@ -585,7 +585,6 @@ export const onUserDelete = onDocumentDeleted(
       console.log(`🚀 [TRIGGER] Completed cascade delete for user: ${userId}`);
 
       return true;
-
     } catch (error) {
       console.error(`❌ [TRIGGER] Cascade delete error for ${userId}:`, error);
       throw error;

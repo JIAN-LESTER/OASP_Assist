@@ -141,44 +141,46 @@ class ChatProvider extends ChangeNotifier {
     _onMessageAdded = null;
   }
 
-bool get canSendMessage {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
-  if (userId == null) return false;
+  bool get canSendMessage {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return false;
 
-  final now = DateTime.now();
+    final now = DateTime.now();
 
-  // ✅ NEW USER CHECK: If count is 0 and no reset date, they can send
-  if (_userDailyMessageCount == 0 && _userLastResetDate == null) {
-    print('ℹ️ New user detected - allowing first message');
-    return true;
-  }
-
-  // ✅ RESET CHECK: Check if it's past 8 AM and last reset was before today's 8 AM
-  if (_userLastResetDate != null) {
-    final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
-
-    final shouldReset =
-        now.isAfter(resetTime) && _userLastResetDate!.isBefore(resetTime);
-
-    if (shouldReset) {
-      print('ℹ️ Reset time reached - allowing message');
+    // ✅ NEW USER CHECK: If count is 0 and no reset date, they can send
+    if (_userDailyMessageCount == 0 && _userLastResetDate == null) {
+      print('ℹ️ New user detected - allowing first message');
       return true;
     }
+
+    // ✅ RESET CHECK: Check if it's past 8 AM and last reset was before today's 8 AM
+    if (_userLastResetDate != null) {
+      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
+
+      final shouldReset =
+          now.isAfter(resetTime) && _userLastResetDate!.isBefore(resetTime);
+
+      if (shouldReset) {
+        print('ℹ️ Reset time reached - allowing message');
+        return true;
+      }
+    }
+
+    // ✅ FIX: User can send if count is STRICTLY LESS than max
+    // This means: 0,1,2,3,4 = can send (total 5 messages)
+    // 5 or more = cannot send
+    final canSend = _userDailyMessageCount < MAX_DAILY_MESSAGES;
+
+    print('🔍 Message limit check:');
+    print('   Current count: $_userDailyMessageCount');
+    print('   Max allowed: $MAX_DAILY_MESSAGES');
+    print('   Can send: $canSend');
+    print(
+      '   Messages sent today: $_userDailyMessageCount/$MAX_DAILY_MESSAGES',
+    );
+
+    return canSend;
   }
-
-  // ✅ FIX: User can send if count is STRICTLY LESS than max
-  // This means: 0,1,2,3,4 = can send (total 5 messages)
-  // 5 or more = cannot send
-  final canSend = _userDailyMessageCount < MAX_DAILY_MESSAGES;
-
-  print('🔍 Message limit check:');
-  print('   Current count: $_userDailyMessageCount');
-  print('   Max allowed: $MAX_DAILY_MESSAGES');
-  print('   Can send: $canSend');
-  print('   Messages sent today: $_userDailyMessageCount/$MAX_DAILY_MESSAGES');
-
-  return canSend;
-}
 
   static const int MAX_DAILY_ESCALATIONS = 2;
 
@@ -1124,81 +1126,83 @@ bool get canSendMessage {
               : allMessages;
 
       // ✅ CREATE BOT MESSAGE INSTANTLY (before streaming starts)
-     final botMessageId = "bot_${userMsg.id}";
+      final botMessageId = "bot_${userMsg.id}";
 
-final botMessage = Message(
-  id: botMessageId,
-  conversationId: conversationId!,
-  content: "",
-  sender: "bot",
-  status: "sent",
-  type: "text",
-  sentAt: DateTime.now(),
-  count: count,
-);
+      final botMessage = Message(
+        id: botMessageId,
+        conversationId: conversationId!,
+        content: "",
+        sender: "bot",
+        status: "sent",
+        type: "text",
+        sentAt: DateTime.now(),
+        count: count,
+      );
 
-// ✅ FIX: Add bot message to UI IMMEDIATELY (before streaming)
-_messages.add(botMessage);
-_processedMessages.add(botMessageId);
+      // ✅ FIX: Add bot message to UI IMMEDIATELY (before streaming)
+      _messages.add(botMessage);
+      _processedMessages.add(botMessageId);
 
-// ✅ Register for streaming with empty string
-// This will trigger the typing bubble in _buildMessagesList
-_streamingContent[botMessageId] = "";
+      // ✅ Register for streaming with empty string
+      // This will trigger the typing bubble in _buildMessagesList
+      _streamingContent[botMessageId] = "";
 
-// ✅ NOTE: We don't need _showTypingIndicator anymore
-// The typing bubble is shown when streamingContent exists but is empty
+      // ✅ NOTE: We don't need _showTypingIndicator anymore
+      // The typing bubble is shown when streamingContent exists but is empty
 
-// ✅ FIX: Notify UI to show the typing bubble for this message
-notifyListeners();
-_onMessageAdded?.call();
+      // ✅ FIX: Notify UI to show the typing bubble for this message
+      notifyListeners();
+      _onMessageAdded?.call();
 
-String finalAnswer = "";
+      String finalAnswer = "";
 
-// FAQ STREAMING
-if (existingFAQ != null) {
-  final String answer = existingFAQ["answer"];
-  const int chunkSize = 50;
+      // FAQ STREAMING
+      if (existingFAQ != null) {
+        final String answer = existingFAQ["answer"];
+        const int chunkSize = 50;
 
-  for (int i = 0; i < answer.length; i += chunkSize) {
-    final chunk = answer.substring(
-      i,
-      (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
-    );
+        for (int i = 0; i < answer.length; i += chunkSize) {
+          final chunk = answer.substring(
+            i,
+            (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
+          );
 
-    // ✅ FIX: Update streaming content
-    _streamingContent[botMessageId] =
-        _streamingContent[botMessageId]! + chunk;
+          // ✅ FIX: Update streaming content
+          _streamingContent[botMessageId] =
+              _streamingContent[botMessageId]! + chunk;
 
-    notifyListeners();
-    _onMessageAdded?.call();
-    
-    await Future.delayed(Duration(milliseconds: 20));
-  }
+          notifyListeners();
+          _onMessageAdded?.call();
 
-  finalAnswer = answer;
-  
-  _incrementFAQSimilarityCountAsync(existingFAQ["question"]).catchError((e) {
-    print('⚠️ Background FAQ count error: $e');
-  });
-} else {
-  // RAG STREAMING
-  await for (final streamedText in _retriever.generateAnswerStream(
-    question,
-    conversationHistory: recentHistory,
-    conversationId: conversationId!,
-  )) {
-    // ✅ FIX: Always update streaming content (even if empty initially)
-    _streamingContent[botMessageId] = streamedText;
+          await Future.delayed(Duration(milliseconds: 20));
+        }
 
-    notifyListeners();
-    _onMessageAdded?.call();
+        finalAnswer = answer;
 
-    finalAnswer = streamedText;
-  }
-}
+        _incrementFAQSimilarityCountAsync(existingFAQ["question"]).catchError((
+          e,
+        ) {
+          print('⚠️ Background FAQ count error: $e');
+        });
+      } else {
+        // RAG STREAMING
+        await for (final streamedText in _retriever.generateAnswerStream(
+          question,
+          conversationHistory: recentHistory,
+          conversationId: conversationId!,
+        )) {
+          // ✅ FIX: Always update streaming content (even if empty initially)
+          _streamingContent[botMessageId] = streamedText;
 
-// Remove streaming content (will trigger final message render)
-_streamingContent.remove(botMessageId);
+          notifyListeners();
+          _onMessageAdded?.call();
+
+          finalAnswer = streamedText;
+        }
+      }
+
+      // Remove streaming content (will trigger final message render)
+      _streamingContent.remove(botMessageId);
 
       // Remove duplication
       String verified = finalAnswer;
@@ -2849,11 +2853,11 @@ $question
 
       final response = await http.post(
         Uri.parse(
-          "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=$_geminiApiKey",
+          // ✅ Back to v1beta
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=$_geminiApiKey",
         ),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          "model": "models/text-embedding-004",
           "content": {
             "parts": [
               {"text": question},

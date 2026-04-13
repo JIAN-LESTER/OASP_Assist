@@ -1,15 +1,15 @@
-import { onSchedule } from "firebase-functions/v2/scheduler";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
-import { HttpsError, onCall } from "firebase-functions/https";
+import {HttpsError, onCall} from "firebase-functions/https";
 
 const db = admin.firestore();
 
 /**
  * Check Facebook token expiration and send notifications
- * 
+ *
  * TESTING MODE: Runs every 3 days, notifies at 59-60 days
  * PRODUCTION MODE: Runs every 3 days, notifies at 14 days
- * 
+ *
  * To switch to production:
  * 1. Change NOTIFICATION_THRESHOLD from 60 to 14
  * 2. Optionally change schedule to run more frequently (e.g., "0 9 * * *" for daily)
@@ -23,7 +23,7 @@ export const checkFacebookTokenExpiration = onSchedule(
   async (event) => {
     console.log("========================================");
     console.log("🔍 Checking Facebook token expiration...");
-    console.log(`📅 Current time: ${new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila" })}`);
+    console.log(`📅 Current time: ${new Date().toLocaleString("en-PH", {timeZone: "Asia/Manila"})}`);
     console.log("========================================\n");
 
     try {
@@ -50,15 +50,15 @@ export const checkFacebookTokenExpiration = onSchedule(
       const msUntilExpiry = expiresAt - now;
       const daysUntilExpiry = Math.ceil(msUntilExpiry / (1000 * 60 * 60 * 24));
 
-      console.log(`📊 Token Status:`);
-      console.log(`   Expires at: ${new Date(expiresAt).toLocaleString("en-PH", { timeZone: "Asia/Manila" })}`);
+      console.log("📊 Token Status:");
+      console.log(`   Expires at: ${new Date(expiresAt).toLocaleString("en-PH", {timeZone: "Asia/Manila"})}`);
       console.log(`   Days until expiry: ${daysUntilExpiry}`);
       console.log(`   Hours until expiry: ${Math.ceil(msUntilExpiry / (1000 * 60 * 60))}`);
 
       // ✅ TESTING: 60 days threshold
       // 🚀 PRODUCTION: Change to 14 days
       const NOTIFICATION_THRESHOLD = 60; // Change to 14 for production
-      
+
       console.log(`⚙️ Current threshold: ${NOTIFICATION_THRESHOLD} days`);
       console.log(`⚙️ Mode: ${NOTIFICATION_THRESHOLD === 60 ? "TESTING" : "PRODUCTION"}`);
 
@@ -71,7 +71,6 @@ export const checkFacebookTokenExpiration = onSchedule(
           daysUntilExpiry,
           expiresAt
         );
-        
       } else if (daysUntilExpiry <= NOTIFICATION_THRESHOLD) {
         console.log(`\n⚠️ Token expiring in ${daysUntilExpiry} days - sending notifications`);
         await sendExpirationNotifications(
@@ -80,19 +79,17 @@ export const checkFacebookTokenExpiration = onSchedule(
           daysUntilExpiry,
           expiresAt
         );
-        
       } else {
         console.log(`\n✅ Token is still valid (${daysUntilExpiry} days remaining)`);
-        console.log(`   Next check will be in 3 days`);
+        console.log("   Next check will be in 3 days");
         console.log(`   Will notify when ≤ ${NOTIFICATION_THRESHOLD} days remain`);
       }
-      
     } catch (error: any) {
       console.error("\n❌ ========================================");
       console.error("❌ Error checking token expiration");
       console.error(`❌ Error: ${error.message}`);
       console.error("❌ ========================================\n");
-      
+
       throw error;
     }
   }
@@ -109,10 +106,10 @@ async function sendExpirationNotifications(
   expiresAt: number
 ): Promise<void> {
   try {
-    console.log(`\n📤 ========================================`);
+    console.log("\n📤 ========================================");
     console.log(`📤 Sending notifications for status: ${status}`);
     console.log(`📤 Days left: ${daysLeft}`);
-    console.log(`📤 ========================================\n`);
+    console.log("📤 ========================================\n");
 
     // Get all active admins
     const adminsSnapshot = await db
@@ -139,9 +136,9 @@ async function sendExpirationNotifications(
     console.log(`\n🔑 Notification key: ${notificationKey}`);
 
     // Prepare notification content
-    const title = status === "expired" 
-      ? "🔴 Facebook Token Expired" 
-      : "⚠️ Facebook Token Expiring Soon";
+    const title = status === "expired" ?
+      "🔴 Facebook Token Expired" :
+      "⚠️ Facebook Token Expiring Soon";
 
     const expirationDate = new Date(expiresAt).toLocaleString("en-PH", {
       timeZone: "Asia/Manila",
@@ -153,7 +150,7 @@ async function sendExpirationNotifications(
     });
 
     // Create notifications in Firestore
-    console.log(`\n📝 Creating Firestore notifications...`);
+    console.log("\n📝 Creating Firestore notifications...");
     const batch = db.batch();
     let notificationCount = 0;
 
@@ -183,7 +180,7 @@ async function sendExpirationNotifications(
           readBy: [],
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         },
-        { merge: true }
+        {merge: true}
       );
 
       notificationCount++;
@@ -193,7 +190,7 @@ async function sendExpirationNotifications(
     console.log(`✅ Created ${notificationCount} Firestore notification(s)`);
 
     // Send FCM notifications
-    console.log(`\n📱 Preparing FCM notifications...`);
+    console.log("\n📱 Preparing FCM notifications...");
     await sendFCMNotifications(
       adminIds,
       title,
@@ -210,11 +207,10 @@ async function sendExpirationNotifications(
       }
     );
 
-    console.log(`\n✅ ========================================`);
-    console.log(`✅ Notifications sent successfully`);
+    console.log("\n✅ ========================================");
+    console.log("✅ Notifications sent successfully");
     console.log(`✅ Total admins notified: ${adminIds.length}`);
-    console.log(`✅ ========================================\n`);
-
+    console.log("✅ ========================================\n");
   } catch (error: any) {
     console.error("\n❌ ========================================");
     console.error("❌ Error sending notifications");
@@ -235,7 +231,7 @@ async function sendFCMNotifications(
 ): Promise<void> {
   try {
     console.log(`📱 Sending FCM to ${userIds.length} admin(s)...`);
-    
+
     // Get FCM tokens for all admins
     const userTokensMap = await getUserFCMTokens(userIds);
 
@@ -257,7 +253,7 @@ async function sendFCMNotifications(
     }
 
     console.log(`📱 Sending to ${allTokens.length} device(s)`);
-    console.log(`   Token distribution:`);
+    console.log("   Token distribution:");
     userTokensMap.forEach((tokens, userId) => {
       console.log(`   - ${userId}: ${tokens.length} token(s)`);
     });
@@ -288,12 +284,12 @@ async function sendFCMNotifications(
       apns: {
         payload: {
           aps: {
-            alert: {
+            "alert": {
               title: title,
               body: body,
             },
-            sound: "default",
-            badge: 1,
+            "sound": "default",
+            "badge": 1,
             "content-available": 1,
           },
         },
@@ -301,22 +297,22 @@ async function sendFCMNotifications(
     };
 
     const response = await admin.messaging().sendEachForMulticast(message);
-    
-    console.log(`\n📊 FCM Results:`);
+
+    console.log("\n📊 FCM Results:");
     console.log(`   ✅ Successful: ${response.successCount}`);
     console.log(`   ❌ Failed: ${response.failureCount}`);
 
     // Clean up invalid tokens
     if (response.failureCount > 0) {
-      console.log(`\n🗑️ Cleaning up invalid tokens...`);
+      console.log("\n🗑️ Cleaning up invalid tokens...");
       const tokensToRemove = new Map<string, string[]>();
 
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           const error = resp.error;
-          
+
           console.log(`   ❌ Failed token ${idx + 1}: ${error?.code} - ${error?.message}`);
-          
+
           if (
             error?.code === "messaging/invalid-registration-token" ||
             error?.code === "messaging/registration-token-not-registered"
@@ -348,12 +344,11 @@ async function sendFCMNotifications(
         });
 
         await batch.commit();
-        console.log(`   ✅ Invalid tokens removed from Firestore`);
+        console.log("   ✅ Invalid tokens removed from Firestore");
       }
     }
-    
-    console.log(`\n✅ FCM notifications sent successfully`);
-    
+
+    console.log("\n✅ FCM notifications sent successfully");
   } catch (error: any) {
     console.error("\n❌ Error sending FCM notifications:", error);
     console.error(`   ${error.message}`);
@@ -369,7 +364,7 @@ async function getUserFCMTokens(
 ): Promise<Map<string, string[]>> {
   try {
     console.log(`\n🔍 Fetching FCM tokens for ${userIds.length} user(s)...`);
-    
+
     const userTokensMap = new Map<string, string[]>();
     const allSeenTokens = new Set<string>();
 
@@ -386,7 +381,7 @@ async function getUserFCMTokens(
         const data = doc.data();
         const userId = data.userId;
         const rawTokens = Array.isArray(data.tokens) ? data.tokens : [];
-        
+
         const tokens: string[] = rawTokens
           .map((t) => (typeof t === "string" ? t : String(t)))
           .filter((t) => t && t.length > 0);
@@ -411,7 +406,7 @@ async function getUserFCMTokens(
 
     console.log(`✅ Found tokens for ${userTokensMap.size} user(s)`);
     console.log(`   Total unique tokens: ${allSeenTokens.size}`);
-    
+
     return userTokensMap;
   } catch (error: any) {
     console.error("❌ Error getting FCM tokens:", error);
@@ -424,7 +419,7 @@ async function getUserFCMTokens(
  * Call this from Flutter or Firebase Console to test notifications
  */
 export const manualCheckFacebookToken = onCall(
-  { cors: true, secrets: [] },
+  {cors: true, secrets: []},
   async (request) => {
     try {
       if (!request.auth) {
@@ -477,12 +472,12 @@ export const manualCheckFacebookToken = onCall(
       console.log(`📊 Token expires in: ${daysUntilExpiry} days`);
 
       // Always send notification for manual check
-      const status: "expired" | "expiring_soon" = 
+      const status: "expired" | "expiring_soon" =
         daysUntilExpiry <= 0 ? "expired" : "expiring_soon";
 
-      const message = daysUntilExpiry <= 0
-        ? "Your Facebook API token has expired!"
-        : `Your Facebook API token will expire in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? "s" : ""}.`;
+      const message = daysUntilExpiry <= 0 ?
+        "Your Facebook API token has expired!" :
+        `Your Facebook API token will expire in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? "s" : ""}.`;
 
       await sendExpirationNotifications(status, message, daysUntilExpiry, expiresAt);
 
@@ -494,7 +489,6 @@ export const manualCheckFacebookToken = onCall(
         daysUntilExpiry,
         status,
       };
-
     } catch (error: any) {
       console.error("❌ Manual check error:", error);
       throw new HttpsError("internal", error.message);

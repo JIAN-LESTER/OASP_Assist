@@ -24,7 +24,7 @@ class GeminiService {
         throw Exception('Gemini API key not found in .env file');
       }
       
-      _embedUrl = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=$_apiKey";
+      _embedUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=$_apiKey";
       
       if (kDebugMode) {
         print('🖥️ Using desktop Gemini implementation');
@@ -70,11 +70,10 @@ class GeminiService {
         Uri.parse(_embedUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'model': 'models/text-embedding-004',
+          'model': 'models/gemini-embedding-001',
           'content': {
             'parts': [{'text': text}]
           },
-          'taskType': taskType,
         }),
       );
 

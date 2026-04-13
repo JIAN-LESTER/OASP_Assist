@@ -8,9 +8,8 @@ if (!admin.apps.length) {
 // RAG Chatbot Functions
 export {
   generateAnswer,
- 
-  generateEmbedding,
 
+  generateEmbedding,
 
 
 } from "./ragChat";
@@ -20,7 +19,7 @@ export {
   queryPinecone,
   insertPineconeDocument,
   insertPineconeDocumentBatch,
-  
+
   deletePineconeDocuments,
 
   getPineconeStats,
@@ -30,12 +29,12 @@ export {
   generateGeminiResponse,
   generateCohereEmbedding,
   generateCohereResponse,
-checkPineconeHealth,
+  checkPineconeHealth,
 
-    analyzeCohereAdmission,
+  analyzeCohereAdmission,
   analyzeCohereScholarship,
   analyzeCoherePlacement,
-  
+
 } from "./documentCrud";
 
 // User Management Functions
@@ -53,7 +52,7 @@ export {
   manualSyncFacebookPostsHttp,
   reprocessExistingAnnouncements,
   cleanupDeletedAnnouncement,
-  
+
   batchSyncCategoriesToInfoBank,
 
 
@@ -84,6 +83,6 @@ export {
 export {
   checkFacebookTokenExpiration,
   manualCheckFacebookToken,
-  
-  
+
+
 } from "./fbTokenExpiry";
