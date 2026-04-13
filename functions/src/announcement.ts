@@ -1,7 +1,7 @@
-import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
-import { onSchedule } from "firebase-functions/v2/scheduler";
-import { onDocumentUpdated } from "firebase-functions/v2/firestore";
-import { defineSecret } from "firebase-functions/params";
+import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
+import {onSchedule} from "firebase-functions/v2/scheduler";
+import {onDocumentUpdated} from "firebase-functions/v2/firestore";
+import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import axios from "axios";
 
@@ -54,7 +54,7 @@ interface CohereResult {
 async function getPageId(): Promise<string> {
   try {
     const tokenDoc = await db
-      .collection("fb_tokens")  
+      .collection("fb_tokens")
       .doc("facebook_admin")
       .get();
 
@@ -65,10 +65,10 @@ async function getPageId(): Promise<string> {
     }
 
     const data = tokenDoc.data();
-    
+
     // Get the page ID from saved configuration
     const pageId = data?.pageId;
-    
+
     if (!pageId) {
       throw new Error(
         "No Page ID configured. Please add your Facebook Page ID in settings."
@@ -77,7 +77,6 @@ async function getPageId(): Promise<string> {
 
     console.log(`✅ Using Page ID: ${pageId}`);
     return pageId;
-
   } catch (error: any) {
     console.error("❌ Error getting Page ID:", error.message);
     throw error;
@@ -88,7 +87,7 @@ function extractAllImagesFromPost(post: FacebookPost): string[] {
   const images: string[] = [];
 
   // 🔥 FIX: Simple extraction without deduplication
-  console.log(`📸 Extracting images from post...`);
+  console.log("📸 Extracting images from post...");
 
   // Extract from attachments FIRST (higher quality)
   if (post.attachments?.data) {
@@ -133,7 +132,7 @@ function extractAllImagesFromPost(post: FacebookPost): string[] {
 
   // Only add full_picture if we found NO images from attachments
   if (images.length === 0 && post.full_picture) {
-    console.log(`  📸 Using full_picture (no attachments found)`);
+    console.log("  📸 Using full_picture (no attachments found)");
     images.push(post.full_picture);
   }
 
@@ -160,7 +159,7 @@ async function downloadAndUploadAllImages(
         responseType: "arraybuffer",
         timeout: 30000,
         maxBodyLength: 50 * 1024 * 1024,
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; OASP-Bot/1.0)" },
+        headers: {"User-Agent": "Mozilla/5.0 (compatible; OASP-Bot/1.0)"},
       } as any);
 
       const buffer = Buffer.from(response.data as Buffer);
@@ -169,9 +168,9 @@ async function downloadAndUploadAllImages(
 
       // 🔥 FIX: Use index suffix for multiple images
       const fileName =
-        imageUrls.length > 1
-          ? `announcements/${postId}_${i}.${ext}`
-          : `announcements/${postId}.${ext}`;
+        imageUrls.length > 1 ?
+          `announcements/${postId}_${i}.${ext}` :
+          `announcements/${postId}.${ext}`;
 
       const bucket = storage.bucket();
       const file = bucket.file(fileName);
@@ -352,7 +351,7 @@ function extractSchedulesFromOCR(ocrText: string): ScheduleEntry[] {
 
     if (isLocation && !isGenericInCampus) {
       // Clean up location
-      let location = line.replace(/[()]/g, " ").trim();
+      const location = line.replace(/[()]/g, " ").trim();
       if (location && location.length > 3) {
         currentLocations.push(location);
       }
@@ -438,15 +437,15 @@ async function extractTextFromImage(imageUrl: string): Promise<string> {
       return extractedText;
     }
 
-    console.log(`⚠️ No text found in image`);
+    console.log("⚠️ No text found in image");
     return "";
   } catch (error: any) {
-    console.error(`❌ Error extracting text from image:`, error.message);
+    console.error("❌ Error extracting text from image:", error.message);
 
     if (error.response) {
       console.error(`❌ Vision API Status: ${error.response.status}`);
       console.error(
-        `❌ Vision API Response:`,
+        "❌ Vision API Response:",
         JSON.stringify(error.response.data)
       );
     }
@@ -547,10 +546,10 @@ async function getAccessToken(): Promise<string> {
 async function fetchFacebookPosts(): Promise<FacebookPost[]> {
   try {
     console.log("🔍 Fetching Facebook posts...");
-    
+
     // ✅ Get Page ID from config instead of hardcoded constant
     const PAGE_ID = await getPageId();
-    
+
     console.log("📍 Page ID:", PAGE_ID);
     console.log("📍 API Version:", FB_API_VERSION);
 
@@ -624,7 +623,7 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
       const oldest = new Date(Math.min(...dates.map((d) => d.getTime())));
       const newest = new Date(Math.max(...dates.map((d) => d.getTime())));
 
-      console.log(`📊 Post date range:`);
+      console.log("📊 Post date range:");
       console.log(`   Oldest: ${oldest.toISOString()}`);
       console.log(`   Newest: ${newest.toISOString()}`);
     }
@@ -725,10 +724,10 @@ function parseDeadlineToTimestamp(
     }
 
     const relativeDatePatterns = [
-      { pattern: /tomorrow/i, days: 1 },
-      { pattern: /in\s+(\d+)\s+days?/i, daysFromMatch: true },
-      { pattern: /next\s+week/i, days: 7 },
-      { pattern: /(\d+)\s+days?\s+from\s+now/i, daysFromMatch: true },
+      {pattern: /tomorrow/i, days: 1},
+      {pattern: /in\s+(\d+)\s+days?/i, daysFromMatch: true},
+      {pattern: /next\s+week/i, days: 7},
+      {pattern: /(\d+)\s+days?\s+from\s+now/i, daysFromMatch: true},
     ];
 
     for (const entry of relativeDatePatterns) {
@@ -771,7 +770,7 @@ function parseDeadlineToTimestamp(
       }
     }
 
-    let parsedDate = new Date(cleanedDeadline);
+    const parsedDate = new Date(cleanedDeadline);
     if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() > 2020) {
       parsedDate.setHours(23, 59, 59, 999);
       console.log(`✅ Parsed (native Date): ${parsedDate.toISOString()}`);
@@ -832,7 +831,7 @@ async function analyzeAnnouncement(
       },
       {
         headers: {
-          Authorization: `Bearer ${cohereKey}`,
+          "Authorization": `Bearer ${cohereKey}`,
           "Content-Type": "application/json",
         },
       }
@@ -870,7 +869,7 @@ async function analyzeAnnouncement(
           `🤖 Cohere analysis: Category="${category}", Deadline="${deadline}"`
         );
 
-        return { category, deadline };
+        return {category, deadline};
       } catch (e) {
         console.log("JSON parse error, using fallback analysis");
         return fallbackAnalysis(message);
@@ -898,7 +897,7 @@ function extractJsonFromResponse(text: string): string {
   if (categoryMatch) {
     const category = categoryMatch[1];
     const deadline = deadlineMatch ? deadlineMatch[1] || null : null;
-    return JSON.stringify({ category, deadline });
+    return JSON.stringify({category, deadline});
   }
 
   throw new Error("Could not extract JSON from response");
@@ -975,7 +974,7 @@ function fallbackAnalysis(message: string): CohereResult {
 
   deadline = extractDeadlines(message);
 
-  return { category, deadline };
+  return {category, deadline};
 }
 
 function extractDeadlines(message: string): string | null {
@@ -1090,9 +1089,9 @@ async function extractAdmissionData(
 
 Announcement: "${message}"
 ${
-  ocrText
-    ? `\nImage Text (OCR from ${imageCount || 0} image(s)):\n"${ocrText}"`
-    : ""
+  ocrText ?
+    `\nImage Text (OCR from ${imageCount || 0} image(s)):\n"${ocrText}"` :
+    ""
 }
 
 CRITICAL INSTRUCTIONS:
@@ -1143,7 +1142,7 @@ Respond ONLY in this JSON format:
       },
       {
         headers: {
-          Authorization: `Bearer ${cohereKey}`,
+          "Authorization": `Bearer ${cohereKey}`,
           "Content-Type": "application/json",
         },
       }
@@ -1155,20 +1154,20 @@ Respond ONLY in this JSON format:
 
     // ✅ Extract type with fallback detection
     let admissionType = result.type || null;
-    
+
     // Fallback: detect type from content if not provided by AI
     if (!admissionType) {
-      const contentToCheck = `${message} ${ocrText || ''}`.toUpperCase();
-      if (contentToCheck.includes('CMUCAT')) {
-        admissionType = 'CMUCAT';
-      } else if (contentToCheck.includes('GSAT')) {
-        admissionType = 'GSAT';
-      } else if (contentToCheck.includes('ULHSAT')) {
-        admissionType = 'ULHSAT';
+      const contentToCheck = `${message} ${ocrText || ""}`.toUpperCase();
+      if (contentToCheck.includes("CMUCAT")) {
+        admissionType = "CMUCAT";
+      } else if (contentToCheck.includes("GSAT")) {
+        admissionType = "GSAT";
+      } else if (contentToCheck.includes("ULHSAT")) {
+        admissionType = "ULHSAT";
       }
     }
 
-    console.log(`📋 Detected admission type: ${admissionType || 'Not specified'}`);
+    console.log(`📋 Detected admission type: ${admissionType || "Not specified"}`);
 
     let finalSchedules = result.schedules || [];
     if (finalSchedules.length < extractedSchedules.length) {
@@ -1190,27 +1189,27 @@ Respond ONLY in this JSON format:
       title: result.title || message.substring(0, 100),
       content: enhancedContent,
       steps: Array.isArray(result.steps) ? result.steps : [],
-      requirements: Array.isArray(result.requirements)
-        ? result.requirements
-        : [],
+      requirements: Array.isArray(result.requirements) ?
+        result.requirements :
+        [],
       contacts: Array.isArray(result.contacts) ? result.contacts : [],
       academicYear: result.academicYear || null,
       schedules: finalSchedules,
     };
   } catch (error) {
     console.error("Error extracting admission data:", error);
-    
+
     // Fallback type detection
     let detectedType = null;
-    const fullText = `${message} ${ocrText || ''}`.toUpperCase();
-    if (fullText.includes('CMUCAT')) {
-      detectedType = 'CMUCAT';
-    } else if (fullText.includes('GSAT')) {
-      detectedType = 'GSAT';
-    } else if (fullText.includes('ULHSAT')) {
-      detectedType = 'ULHSAT';
+    const fullText = `${message} ${ocrText || ""}`.toUpperCase();
+    if (fullText.includes("CMUCAT")) {
+      detectedType = "CMUCAT";
+    } else if (fullText.includes("GSAT")) {
+      detectedType = "GSAT";
+    } else if (fullText.includes("ULHSAT")) {
+      detectedType = "ULHSAT";
     }
-    
+
     return {
       type: detectedType, // ✅ NEW FIELD
       title: message.substring(0, 100),
@@ -1237,9 +1236,9 @@ async function extractScholarshipData(
 
 Announcement: "${message}"
 ${
-  ocrText
-    ? `\nImage Text (OCR from ${imageCount || 0} image(s)):\n"${ocrText}"`
-    : ""
+  ocrText ?
+    `\nImage Text (OCR from ${imageCount || 0} image(s)):\n"${ocrText}"` :
+    ""
 }
 
 Extract these fields (look in BOTH text and images):
@@ -1270,7 +1269,7 @@ Respond ONLY in this JSON format:
       },
       {
         headers: {
-          Authorization: `Bearer ${cohereKey}`,
+          "Authorization": `Bearer ${cohereKey}`,
           "Content-Type": "application/json",
         },
       }
@@ -1292,9 +1291,9 @@ Respond ONLY in this JSON format:
       name: result.name || "Scholarship Announcement",
       description: enhancedDescription,
       scholarshipProvider: result.scholarshipProvider || "",
-      eligibilityRequirements: Array.isArray(result.eligibilityRequirements)
-        ? result.eligibilityRequirements
-        : [],
+      eligibilityRequirements: Array.isArray(result.eligibilityRequirements) ?
+        result.eligibilityRequirements :
+        [],
       privileges: Array.isArray(result.privileges) ? result.privileges : [],
       applicationLink: result.applicationLink || "",
     };
@@ -1302,9 +1301,9 @@ Respond ONLY in this JSON format:
     console.error("Error extracting scholarship data:", error);
     return {
       name: "Scholarship Announcement",
-      description: ocrText
-        ? `${message}\n\n[Image Text]:\n${ocrText}`
-        : message,
+      description: ocrText ?
+        `${message}\n\n[Image Text]:\n${ocrText}` :
+        message,
       scholarshipProvider: "",
       eligibilityRequirements: [],
       privileges: [],
@@ -1326,9 +1325,9 @@ async function extractPlacementData(
 
 Announcement: "${message}"
 ${
-  ocrText
-    ? `\nImage Text (OCR from ${imageCount || 0} image(s)):\n"${ocrText}"`
-    : ""
+  ocrText ?
+    `\nImage Text (OCR from ${imageCount || 0} image(s)):\n"${ocrText}"` :
+    ""
 }
 
 Extract these fields (look in BOTH text and images):
@@ -1355,7 +1354,7 @@ Respond ONLY in this JSON format:
       },
       {
         headers: {
-          Authorization: `Bearer ${cohereKey}`,
+          "Authorization": `Bearer ${cohereKey}`,
           "Content-Type": "application/json",
         },
       }
@@ -1404,7 +1403,7 @@ async function createAdmissionFromAnnouncement(
         return;
       }
       console.log(`✅ Admission already exists for post ${postId}`);
-      
+
       // Check if Information Bank exists
       const infoBankId = `admission_${postId}`;
       const infoBankDoc = await db
@@ -1413,11 +1412,11 @@ async function createAdmissionFromAnnouncement(
         .get();
 
       if (infoBankDoc.exists) {
-        console.log(`✅ Information Bank also exists - skipping`);
+        console.log("✅ Information Bank also exists - skipping");
         return;
       }
 
-      console.log(`📋 Creating Information Bank for existing admission...`);
+      console.log("📋 Creating Information Bank for existing admission...");
       const extractedData = await extractAdmissionData(
         message,
         cohereKey,
@@ -1432,12 +1431,12 @@ async function createAdmissionFromAnnouncement(
         cohereKey
       );
 
-      console.log(`✅ Information Bank created for existing admission`);
+      console.log("✅ Information Bank created for existing admission");
       return;
     }
 
     // Both missing - create both
-    console.log(`✨ Creating new admission and Information Bank...`);
+    console.log("✨ Creating new admission and Information Bank...");
 
     const extractedData = await extractAdmissionData(
       message,
@@ -1467,7 +1466,7 @@ async function createAdmissionFromAnnouncement(
     });
 
     console.log(
-      `✅ Created ${extractedData.type || 'general'} admission with ${extractedData.schedules.length} schedules`
+      `✅ Created ${extractedData.type || "general"} admission with ${extractedData.schedules.length} schedules`
     );
 
     await createInfoBankFromCategory(
@@ -1477,7 +1476,7 @@ async function createAdmissionFromAnnouncement(
       cohereKey
     );
 
-    console.log(`✅ Admission + Information Bank synced to Pinecone`);
+    console.log("✅ Admission + Information Bank synced to Pinecone");
   } catch (error: any) {
     console.error(
       `❌ Error creating admission from announcement ${postId}:`,
@@ -1518,12 +1517,12 @@ async function createScholarshipFromAnnouncement(
         .get();
 
       if (infoBankDoc.exists) {
-        console.log(`✅ Information Bank also exists - skipping`);
+        console.log("✅ Information Bank also exists - skipping");
         return;
       }
 
       // ✅ Scholarship exists but Info Bank missing - create it
-      console.log(`📋 Creating Information Bank for existing scholarship...`);
+      console.log("📋 Creating Information Bank for existing scholarship...");
 
       const extractedData = await extractScholarshipData(
         message,
@@ -1539,12 +1538,12 @@ async function createScholarshipFromAnnouncement(
         cohereKey
       );
 
-      console.log(`✅ Information Bank created for existing scholarship`);
+      console.log("✅ Information Bank created for existing scholarship");
       return;
     }
 
     // Both missing - create both
-    console.log(`✨ Creating new scholarship and Information Bank...`);
+    console.log("✨ Creating new scholarship and Information Bank...");
 
     const extractedData = await extractScholarshipData(
       message,
@@ -1579,7 +1578,7 @@ async function createScholarshipFromAnnouncement(
       cohereKey
     );
 
-    console.log(`✅ Scholarship + Information Bank synced to Pinecone`);
+    console.log("✅ Scholarship + Information Bank synced to Pinecone");
   } catch (error: any) {
     console.error(
       `❌ Error creating scholarship from announcement ${postId}:`,
@@ -1589,7 +1588,7 @@ async function createScholarshipFromAnnouncement(
   }
 }
 export const debugInfoBank = onCall(
-  { cors: true, secrets: [COHERE_API_KEY] },
+  {cors: true, secrets: [COHERE_API_KEY]},
   async (request) => {
     const announcementId = request.data.announcementId;
 
@@ -1655,12 +1654,12 @@ async function createPlacementFromAnnouncement(
         .get();
 
       if (infoBankDoc.exists) {
-        console.log(`✅ Information Bank also exists - skipping`);
+        console.log("✅ Information Bank also exists - skipping");
         return;
       }
 
       // ✅ NEW: Placement exists but Info Bank missing - create it
-      console.log(`📋 Creating Information Bank for existing placement...`);
+      console.log("📋 Creating Information Bank for existing placement...");
 
       const extractedData = await extractPlacementData(
         message,
@@ -1676,12 +1675,12 @@ async function createPlacementFromAnnouncement(
         cohereKey
       );
 
-      console.log(`✅ Information Bank created for existing placement`);
+      console.log("✅ Information Bank created for existing placement");
       return;
     }
 
     // Both placement and Info Bank are missing - create both
-    console.log(`✨ Creating new placement and Information Bank...`);
+    console.log("✨ Creating new placement and Information Bank...");
 
     const extractedData = await extractPlacementData(
       message,
@@ -1715,7 +1714,7 @@ async function createPlacementFromAnnouncement(
       cohereKey
     );
 
-    console.log(`✅ Placement + Information Bank synced to Pinecone`);
+    console.log("✅ Placement + Information Bank synced to Pinecone");
   } catch (error: any) {
     console.error(
       `❌ Error creating placement from announcement ${postId}:`,
@@ -1727,131 +1726,131 @@ async function createPlacementFromAnnouncement(
 
 async function createInfoBankFromCategory(
   documentId: string,
-  categoryType: 'admission' | 'scholarship' | 'placement',
+  categoryType: "admission" | "scholarship" | "placement",
   extractedData: any,
   cohereKey: string
 ): Promise<void> {
   const functionStart = Date.now();
-  
-  console.log(`\n🏦 ========================================`);
-  console.log(`🏦 START: createInfoBankFromCategory`);
+
+  console.log("\n🏦 ========================================");
+  console.log("🏦 START: createInfoBankFromCategory");
   console.log(`🏦 Category: ${categoryType}`);
   console.log(`🏦 Document ID: ${documentId}`);
-  console.log(`🏦 ========================================`);
-  
+  console.log("🏦 ========================================");
+
   try {
     // ============================================================================
     // STEP 1: Check if this category item was extracted from a document upload
     // ============================================================================
-    console.log(`\n📋 STEP 1: Checking category document source...`);
-    
+    console.log("\n📋 STEP 1: Checking category document source...");
+
     const categoryDoc = await db.collection(`${categoryType}s`).doc(documentId).get();
-    
+
     if (!categoryDoc.exists) {
       throw new Error(`Category document ${documentId} not found`);
     }
-    
+
     const categoryData = categoryDoc.data()!;
-    
+
     // 🔥 CRITICAL CHECK: Skip if extracted from document upload
     if (categoryData.extractedFromDocument === true) {
       const sourceDocId = categoryData.sourceDocumentId;
       console.log(`   ⏭️ SKIPPING: This ${categoryType} was extracted from document: ${sourceDocId}`);
-      console.log(`   ℹ️ The original document already has an Info Bank entry`);
-      console.log(`   ℹ️ No need to create duplicate Info Bank entry`);
-      
-      console.log(`\n🏦 ========================================`);
-      console.log(`🏦 SKIPPED: Extracted from document`);
+      console.log("   ℹ️ The original document already has an Info Bank entry");
+      console.log("   ℹ️ No need to create duplicate Info Bank entry");
+
+      console.log("\n🏦 ========================================");
+      console.log("🏦 SKIPPED: Extracted from document");
       console.log(`🏦 Source Document: ${sourceDocId}`);
       console.log(`🏦 Time: ${Date.now() - functionStart}ms`);
-      console.log(`🏦 ========================================\n`);
-      
+      console.log("🏦 ========================================\n");
+
       return; // 🔥 EXIT EARLY - Don't create Info Bank
     }
-    
+
     // 🔥 If this is from Facebook/announcement (not document), proceed normally
-    console.log(`   ✅ Category document source: ${categoryData.announcementId ? 'Facebook/Announcement' : 'Unknown'}`);
-    console.log(`   ✅ Proceeding with Info Bank creation...`);
+    console.log(`   ✅ Category document source: ${categoryData.announcementId ? "Facebook/Announcement" : "Unknown"}`);
+    console.log("   ✅ Proceeding with Info Bank creation...");
 
     // ============================================================================
     // STEP 2: Validate inputs (rest of existing code)
     // ============================================================================
-    console.log(`\n📋 STEP 2: Validating inputs...`);
-    
+    console.log("\n📋 STEP 2: Validating inputs...");
+
     if (!documentId || documentId.trim().length === 0) {
-      throw new Error('documentId is empty or invalid');
+      throw new Error("documentId is empty or invalid");
     }
-    
-    if (!categoryType || !['admission', 'scholarship', 'placement'].includes(categoryType)) {
+
+    if (!categoryType || !["admission", "scholarship", "placement"].includes(categoryType)) {
       throw new Error(`Invalid categoryType: ${categoryType}`);
     }
-    
+
     if (!extractedData) {
-      throw new Error('extractedData is null or undefined');
+      throw new Error("extractedData is null or undefined");
     }
-    
-    console.log(`   ✅ Inputs validated`);
-    console.log(`   📊 extractedData keys: ${Object.keys(extractedData).join(', ')}`);
+
+    console.log("   ✅ Inputs validated");
+    console.log(`   📊 extractedData keys: ${Object.keys(extractedData).join(", ")}`);
 
     // ============================================================================
     // STEP 2: Create Information Bank ID and check for duplicates
     // ============================================================================
     const infoBankId = `${categoryType}_${documentId}`;
-    console.log(`\n📋 STEP 2: Checking for duplicates...`);
+    console.log("\n📋 STEP 2: Checking for duplicates...");
     console.log(`   📌 Target Info Bank ID: ${infoBankId}`);
 
     // 🔥 CHECK 1: Exact ID match
-    const existingDoc = await db.collection('information_bank').doc(infoBankId).get();
+    const existingDoc = await db.collection("information_bank").doc(infoBankId).get();
 
     if (existingDoc.exists) {
       const existingData = existingDoc.data()!;
-      console.log(`   ℹ️ Entry already exists with exact ID`);
-      console.log(`   📊 Existing source: ${existingData.uploadedViaFlutter ? 'Flutter' : 'Cloud Function'}`);
-      console.log(`   📊 Created: ${existingData.createdAt?.toDate?.()?.toISOString?.() || 'Unknown'}`);
-      
+      console.log("   ℹ️ Entry already exists with exact ID");
+      console.log(`   📊 Existing source: ${existingData.uploadedViaFlutter ? "Flutter" : "Cloud Function"}`);
+      console.log(`   📊 Created: ${existingData.createdAt?.toDate?.()?.toISOString?.() || "Unknown"}`);
+
       // Update timestamp and exit
-      await db.collection('information_bank').doc(infoBankId).update({
+      await db.collection("information_bank").doc(infoBankId).update({
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         lastChecked: admin.firestore.FieldValue.serverTimestamp(),
       });
-      console.log(`   ✅ Timestamp updated - skipping recreation`);
+      console.log("   ✅ Timestamp updated - skipping recreation");
       return;
     }
 
     // 🔥 CHECK 2: Look for duplicates by categoryDocId + category
-    console.log(`   🔍 Searching for duplicates by categoryDocId...`);
+    console.log("   🔍 Searching for duplicates by categoryDocId...");
     const possibleDuplicates = await db
-      .collection('information_bank')
-      .where('categoryDocumentId', '==', documentId)
-      .where('category', '==', categoryType)
+      .collection("information_bank")
+      .where("categoryDocumentId", "==", documentId)
+      .where("category", "==", categoryType)
       .get();
 
     if (!possibleDuplicates.empty) {
       console.log(`   ⚠️ Found ${possibleDuplicates.docs.length} potential duplicate(s):`);
-      
+
       for (const dupDoc of possibleDuplicates.docs) {
         const dupData = dupDoc.data();
         const dupId = dupDoc.id;
-        
+
         console.log(`\n   📄 Duplicate found: ${dupId}`);
-        console.log(`      Source: ${dupData.uploadedViaFlutter ? 'Flutter' : 'Cloud Function'}`);
+        console.log(`      Source: ${dupData.uploadedViaFlutter ? "Flutter" : "Cloud Function"}`);
         console.log(`      Chunks: ${dupData.totalChunks || 0}`);
-        console.log(`      Created: ${dupData.createdAt?.toDate?.()?.toISOString?.() || 'Unknown'}`);
-        
+        console.log(`      Created: ${dupData.createdAt?.toDate?.()?.toISOString?.() || "Unknown"}`);
+
         // If this has the wrong ID format, delete it
         if (dupId !== infoBankId) {
-          console.log(`      🗑️ Wrong ID format - removing duplicate...`);
-          
+          console.log("      🗑️ Wrong ID format - removing duplicate...");
+
           try {
             // Delete old Pinecone vectors
             const oldChunkIds = dupData.chunkIds || [];
             if (oldChunkIds.length > 0) {
               console.log(`         Deleting ${oldChunkIds.length} Pinecone vectors...`);
-              
+
               // Delete from Pinecone
               const PINECONE_KEY = PINECONE_API_KEY.value();
               const PINECONE_URL = PINECONE_HOST.value();
-              
+
               if (PINECONE_KEY && PINECONE_URL) {
                 try {
                   await axios.post(
@@ -1861,8 +1860,8 @@ async function createInfoBankFromCategory(
                     },
                     {
                       headers: {
-                        'Api-Key': PINECONE_KEY,
-                        'Content-Type': 'application/json',
+                        "Api-Key": PINECONE_KEY,
+                        "Content-Type": "application/json",
                       },
                       timeout: 30000,
                     }
@@ -1872,27 +1871,26 @@ async function createInfoBankFromCategory(
                   console.error(`         ⚠️ Pinecone deletion failed: ${pineconeError.message}`);
                 }
               } else {
-                console.warn(`         ⚠️ Pinecone credentials missing - vectors not deleted`);
+                console.warn("         ⚠️ Pinecone credentials missing - vectors not deleted");
               }
             }
-            
+
             // Delete Firestore document
             await dupDoc.ref.delete();
-            console.log(`      ✅ Duplicate removed from Firestore`);
-            
+            console.log("      ✅ Duplicate removed from Firestore");
           } catch (deleteError: any) {
             console.error(`      ❌ Failed to delete duplicate: ${deleteError.message}`);
           }
         }
       }
     } else {
-      console.log(`   ✅ No duplicates found`);
+      console.log("   ✅ No duplicates found");
     }
 
     // ============================================================================
     // STEP 3: Format content
     // ============================================================================
-    console.log(`\n📋 STEP 3: Formatting content...`);
+    console.log("\n📋 STEP 3: Formatting content...");
     const textContent = formatCategoryAsText(categoryType, extractedData);
     const title = getCategoryTitle(categoryType, extractedData);
 
@@ -1900,18 +1898,18 @@ async function createInfoBankFromCategory(
     console.log(`   📝 Content: ${textContent.length} chars`);
 
     if (!textContent || textContent.trim().length === 0) {
-      throw new Error('Formatted content is empty');
+      throw new Error("Formatted content is empty");
     }
 
     // ============================================================================
     // STEP 4: Split into chunks
     // ============================================================================
-    console.log(`\n📋 STEP 4: Splitting into chunks...`);
+    console.log("\n📋 STEP 4: Splitting into chunks...");
     const chunks = splitIntoChunks(textContent, title, `${categoryType}_category`);
     console.log(`   📄 Created ${chunks.length} chunk(s)`);
 
     if (chunks.length === 0) {
-      throw new Error('No chunks created from content');
+      throw new Error("No chunks created from content");
     }
 
     let parentPineconeId: string | null = null;
@@ -1921,7 +1919,7 @@ async function createInfoBankFromCategory(
     // STEP 5: Process each chunk with retries
     // ============================================================================
     console.log(`\n📋 STEP 5: Processing ${chunks.length} chunks...`);
-    
+
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       console.log(`\n   📌 Chunk ${i + 1}/${chunks.length}`);
@@ -1931,24 +1929,24 @@ async function createInfoBankFromCategory(
       // Generate embedding with retry
       let embedding: number[] | null = null;
       let retries = 3;
-      
+
       while (retries > 0 && !embedding) {
         try {
           console.log(`      🔄 Generating embedding (attempt ${4 - retries}/3)...`);
-          
+
           const embeddingResponse = await axios.post(
-            "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=" + GEMINI_API_KEY.value(),
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=" + GEMINI_API_KEY.value(),
             {
-              model: "text-embedding-004",
+              model: "gemini-embedding-001",
               content: {
                 parts: [
-                  { text: chunk.text }
-                ]
-              }
+                  {text: chunk.text},
+                ],
+              },
             },
             {
               headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
               },
               timeout: 30000,
             }
@@ -1959,30 +1957,29 @@ async function createInfoBankFromCategory(
           // Try multiple possible response structures
           if (responseData?.embedding?.values && Array.isArray(responseData.embedding.values)) {
             embedding = responseData.embedding.values;
-            console.log(`      ✅ Found embedding in .embedding.values`);
+            console.log("      ✅ Found embedding in .embedding.values");
           } else if (responseData?.embeddings?.[0]?.values && Array.isArray(responseData.embeddings[0].values)) {
             embedding = responseData.embeddings[0].values;
-            console.log(`      ✅ Found embedding in .embeddings[0].values`);
+            console.log("      ✅ Found embedding in .embeddings[0].values");
           } else if (Array.isArray(responseData?.values)) {
             embedding = responseData.values;
-            console.log(`      ✅ Found embedding in .values`);
+            console.log("      ✅ Found embedding in .values");
           }
 
           if (!embedding || embedding.length === 0) {
-            console.error(`      ❌ Unexpected response structure:`, JSON.stringify(responseData, null, 2));
+            console.error("      ❌ Unexpected response structure:", JSON.stringify(responseData, null, 2));
             throw new Error("Invalid embedding response");
           }
-          
+
           console.log(`      ✅ Embedding: ${embedding.length} dimensions`);
-          
         } catch (error: any) {
           retries--;
           console.error(`      ❌ Attempt failed: ${error.message}`);
-          
+
           if (retries > 0) {
             const waitTime = (4 - retries) * 2000; // Exponential backoff
             console.log(`      ⏳ Retrying in ${waitTime / 1000}s...`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
+            await new Promise((resolve) => setTimeout(resolve, waitTime));
           } else {
             throw new Error(`Embedding generation failed after 3 attempts: ${error.message}`);
           }
@@ -1993,58 +1990,58 @@ async function createInfoBankFromCategory(
         throw new Error("Embedding generation failed");
       }
 
-      const chunkTitle = chunks.length > 1
-        ? `${title} (Part ${i + 1}/${chunks.length})`
-        : title;
+      const chunkTitle = chunks.length > 1 ?
+        `${title} (Part ${i + 1}/${chunks.length})` :
+        title;
 
       // 🔥 CRITICAL: Flat metadata structure matching Flutter code
       const metadata = {
         // === PRIMARY IDENTIFIERS ===
-        'docId': documentId,
-        'originalDocId': documentId,
-        'documentId': documentId,
-        'categoryDocId': documentId,
-        'categoryDocumentId': documentId, // For duplicate detection
-        
+        "docId": documentId,
+        "originalDocId": documentId,
+        "documentId": documentId,
+        "categoryDocId": documentId,
+        "categoryDocumentId": documentId, // For duplicate detection
+
         // === CONTENT (primary fields first) ===
-        'text': chunk.text,
-        'content': chunk.text,
-        
+        "text": chunk.text,
+        "content": chunk.text,
+
         // === TITLES ===
-        'title': chunkTitle,
-        'originalTitle': title,
-        'fileName': title,
-        
+        "title": chunkTitle,
+        "originalTitle": title,
+        "fileName": title,
+
         // === CHUNKING INFO (matching Flutter naming) ===
-        'chunkIndex': i,
-        'chunk_index': i,
-        'totalChunks': chunks.length,
-        'chunkCount': chunks.length,
-        'chunkSize': chunk.text.length,
-        'isFirstChunk': i === 0,
-        'isLastChunk': i === chunks.length - 1,
-        
+        "chunkIndex": i,
+        "chunk_index": i,
+        "totalChunks": chunks.length,
+        "chunkCount": chunks.length,
+        "chunkSize": chunk.text.length,
+        "isFirstChunk": i === 0,
+        "isLastChunk": i === chunks.length - 1,
+
         // === SOURCE & CATEGORY ===
-        'source': `${categoryType}_category`,
-        'category': categoryType,
-        'categoryID': categoryType,
-        'categoryType': categoryType,
-        
+        "source": `${categoryType}_category`,
+        "category": categoryType,
+        "categoryID": categoryType,
+        "categoryType": categoryType,
+
         // === TIMESTAMPS & FLAGS ===
-        'createdAt': new Date().toISOString(),
-        'syncedFromCategory': true,
-        'autoGeneratedFromAnnouncement': true,
-        'uploadedViaFlutter': false, // 🔥 Mark as Cloud Function generated
-        
+        "createdAt": new Date().toISOString(),
+        "syncedFromCategory": true,
+        "autoGeneratedFromAnnouncement": true,
+        "uploadedViaFlutter": false, // 🔥 Mark as Cloud Function generated
+
         // === CATEGORY-SPECIFIC METADATA ===
         ...getCategorySpecificMetadata(categoryType, extractedData),
       };
 
       // Store in Pinecone with retry
-      console.log(`      🔄 Storing in Pinecone...`);
+      console.log("      🔄 Storing in Pinecone...");
       let stored = false;
       retries = 3;
-      
+
       while (retries > 0 && !stored) {
         try {
           await storePineconeVector(chunk.id, embedding, metadata);
@@ -2053,11 +2050,11 @@ async function createInfoBankFromCategory(
         } catch (error: any) {
           retries--;
           console.error(`      ❌ Storage failed: ${error.message}`);
-          
+
           if (retries > 0) {
             const waitTime = (4 - retries) * 2000;
             console.log(`      ⏳ Retrying in ${waitTime / 1000}s...`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
+            await new Promise((resolve) => setTimeout(resolve, waitTime));
           } else {
             throw new Error(`Pinecone storage failed after 3 attempts: ${error.message}`);
           }
@@ -2066,81 +2063,80 @@ async function createInfoBankFromCategory(
 
       chunkIds.push(chunk.id);
       if (i === 0) parentPineconeId = chunk.id;
-      
+
       console.log(`      ✅ Chunk ${i + 1}/${chunks.length} complete`);
     }
 
     // ============================================================================
     // STEP 6: Save to Firestore (matching Flutter structure)
     // ============================================================================
-    console.log(`\n📋 STEP 6: Saving to Firestore...`);
-    
+    console.log("\n📋 STEP 6: Saving to Firestore...");
+
     const firestoreData = {
-      'ibID': infoBankId,
-      'id': infoBankId,
-      'originalId': documentId, // 🔥 NEW: Store original document ID
-      'ib_title': title,
-      'title': title,
-      'content': textContent,
-      'source': `${categoryType}_category`,
-      'category': categoryType,
-      'categoryID': categoryType,
-      'categoryType': categoryType,
-      'categoryDocumentId': documentId, // 🔥 For duplicate detection
-      'announcementId': documentId,
-      'pinecone_id': parentPineconeId,
-      'totalChunks': chunks.length,
-      'chunkIds': chunkIds,
-      'chunked': chunks.length > 1,
-      'chunkSize': 1000,
-      'chunkOverlap': 200,
-      'syncedFromCategory': true,
-      'autoGeneratedFromAnnouncement': true,
-      'uploadedViaFlutter': false, // 🔥 Mark as Cloud Function generated
-      'createdAt': admin.firestore.FieldValue.serverTimestamp(),
-      'updatedAt': admin.firestore.FieldValue.serverTimestamp(),
-      
+      "ibID": infoBankId,
+      "id": infoBankId,
+      "originalId": documentId, // 🔥 NEW: Store original document ID
+      "ib_title": title,
+      "title": title,
+      "content": textContent,
+      "source": `${categoryType}_category`,
+      "category": categoryType,
+      "categoryID": categoryType,
+      "categoryType": categoryType,
+      "categoryDocumentId": documentId, // 🔥 For duplicate detection
+      "announcementId": documentId,
+      "pinecone_id": parentPineconeId,
+      "totalChunks": chunks.length,
+      "chunkIds": chunkIds,
+      "chunked": chunks.length > 1,
+      "chunkSize": 1000,
+      "chunkOverlap": 200,
+      "syncedFromCategory": true,
+      "autoGeneratedFromAnnouncement": true,
+      "uploadedViaFlutter": false, // 🔥 Mark as Cloud Function generated
+      "createdAt": admin.firestore.FieldValue.serverTimestamp(),
+      "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+
       // 🔥 NEW: Add category-specific fields to root
-      ...(categoryType === 'admission' && extractedData.type && {
-        'admissionType': extractedData.type,
-        'testType': extractedData.type,
+      ...(categoryType === "admission" && extractedData.type && {
+        "admissionType": extractedData.type,
+        "testType": extractedData.type,
       }),
     };
 
-    await db.collection('information_bank').doc(infoBankId).set(firestoreData);
-    console.log(`   ✅ Firestore write successful`);
+    await db.collection("information_bank").doc(infoBankId).set(firestoreData);
+    console.log("   ✅ Firestore write successful");
     console.log(`   📊 Document ID: ${infoBankId}`);
     console.log(`   📊 Chunks: ${chunks.length}`);
     console.log(`   📊 Parent Pinecone ID: ${parentPineconeId}`);
 
     const totalElapsed = Date.now() - functionStart;
-    
-    console.log(`\n🏦 ========================================`);
-    console.log(`🏦 SUCCESS: Info Bank Created`);
+
+    console.log("\n🏦 ========================================");
+    console.log("🏦 SUCCESS: Info Bank Created");
     console.log(`🏦 ID: ${infoBankId}`);
     console.log(`🏦 Category: ${categoryType}`);
     console.log(`🏦 Chunks: ${chunks.length}`);
     console.log(`🏦 Time: ${totalElapsed}ms (${(totalElapsed / 1000).toFixed(2)}s)`);
-    console.log(`🏦 ========================================\n`);
-
+    console.log("🏦 ========================================\n");
   } catch (error: any) {
     const totalElapsed = Date.now() - functionStart;
-    
-    console.error(`\n❌ ========================================`);
-    console.error(`❌ FAILURE: Info Bank Creation Failed`);
+
+    console.error("\n❌ ========================================");
+    console.error("❌ FAILURE: Info Bank Creation Failed");
     console.error(`❌ Category: ${categoryType}`);
     console.error(`❌ Document: ${documentId}`);
     console.error(`❌ Error Type: ${error.constructor.name}`);
     console.error(`❌ Error Message: ${error.message}`);
     console.error(`❌ Time: ${totalElapsed}ms`);
-    console.error(`❌ ========================================`);
-    console.error(`\n❌ Stack Trace:`);
+    console.error("❌ ========================================");
+    console.error("\n❌ Stack Trace:");
     console.error(error.stack);
-    console.error(`❌ ========================================\n`);
-    
+    console.error("❌ ========================================\n");
+
     // Log to Firestore error collection for tracking
     try {
-      await db.collection('info_bank_errors').add({
+      await db.collection("info_bank_errors").add({
         categoryType,
         documentId,
         infoBankId: `${categoryType}_${documentId}`,
@@ -2151,11 +2147,11 @@ async function createInfoBankFromCategory(
         extractedDataKeys: extractedData ? Object.keys(extractedData) : [],
         functionDuration: totalElapsed,
       });
-      console.log(`   📝 Error logged to Firestore (info_bank_errors collection)`);
+      console.log("   📝 Error logged to Firestore (info_bank_errors collection)");
     } catch (logError: any) {
       console.error(`   ❌ Failed to log error to Firestore: ${logError.message}`);
     }
-    
+
     throw new Error(`Info Bank creation failed for ${categoryType} ${documentId}: ${error.message}`);
   }
 }
@@ -2180,9 +2176,9 @@ function getCategorySpecificMetadata(
 ): Record<string, any> {
   if (categoryType === "admission") {
     return {
-      academicYear: data.academicYear
-        ? JSON.stringify(data.academicYear)
-        : null,
+      academicYear: data.academicYear ?
+        JSON.stringify(data.academicYear) :
+        null,
       hasSchedules: (data.schedules?.length || 0) > 0,
       scheduleCount: data.schedules?.length || 0,
     };
@@ -2236,9 +2232,9 @@ function splitIntoChunks(
     const trimmedSentence = sentence.trim();
     if (!trimmedSentence) continue;
 
-    const proposedChunk = currentChunk
-      ? `${currentChunk}. ${trimmedSentence}`
-      : trimmedSentence;
+    const proposedChunk = currentChunk ?
+      `${currentChunk}. ${trimmedSentence}` :
+      trimmedSentence;
 
     if (proposedChunk.length > maxChunkSize && currentChunk) {
       chunks.push({
@@ -2248,9 +2244,9 @@ function splitIntoChunks(
 
       // Start new chunk with overlap
       const overlapText = getOverlapText(currentChunk, chunkOverlap);
-      currentChunk = overlapText
-        ? `${overlapText}. ${trimmedSentence}`
-        : trimmedSentence;
+      currentChunk = overlapText ?
+        `${overlapText}. ${trimmedSentence}` :
+        trimmedSentence;
     } else {
       currentChunk = proposedChunk;
     }
@@ -2289,7 +2285,7 @@ async function storePineconeVector(
   const PINECONE_KEY = PINECONE_API_KEY.value();
   const PINECONE_URL = PINECONE_HOST.value(); // ✅ Changed from process.env
 
-  console.log(`🔍 Pinecone credentials check:`);
+  console.log("🔍 Pinecone credentials check:");
   console.log(`   API Key available: ${!!PINECONE_KEY}`);
   console.log(`   Host available: ${!!PINECONE_URL}`);
   console.log(`   Host value: ${PINECONE_URL || "NOT SET"}`);
@@ -2343,7 +2339,7 @@ async function storePineconeVector(
         headers: {
           "Api-Key": PINECONE_KEY,
           "Content-Type": "application/json",
-          Accept: "application/json",
+          "Accept": "application/json",
         },
         timeout: 30000,
         validateStatus: (status) => status < 500,
@@ -2352,7 +2348,7 @@ async function storePineconeVector(
 
     if (response.status !== 200) {
       console.error(`❌ Pinecone returned non-200 status: ${response.status}`);
-      console.error(`   Response data:`, JSON.stringify(response.data));
+      console.error("   Response data:", JSON.stringify(response.data));
       throw new Error(
         `Pinecone API returned status ${response.status}: ${JSON.stringify(
           response.data
@@ -2368,7 +2364,7 @@ async function storePineconeVector(
 
     if (error.response) {
       console.error(`   HTTP Status: ${error.response.status}`);
-      console.error(`   Response data:`, JSON.stringify(error.response.data));
+      console.error("   Response data:", JSON.stringify(error.response.data));
     }
 
     if (error.code === "ENOTFOUND" || error.code === "ECONNREFUSED") {
@@ -2501,9 +2497,9 @@ async function processPost(
   const postId = post.id;
   const originalMessage = post.message || "";
 
-  console.log(`\n========================================`);
+  console.log("\n========================================");
   console.log(`🔍 Processing post: ${postId}`);
-  console.log(`========================================`);
+  console.log("========================================");
 
   const postRef = db.collection("announcements").doc(postId);
   const doc = await postRef.get();
@@ -2547,9 +2543,9 @@ async function processPost(
   // Combine message with OCR text
   let messageForAnalysis = originalMessage;
   if (hasImageText) {
-    messageForAnalysis = originalMessage
-      ? `${originalMessage}\n\n[Text from ${ocrResults.length} image(s)]:\n${combinedOcrText}`
-      : combinedOcrText;
+    messageForAnalysis = originalMessage ?
+      `${originalMessage}\n\n[Text from ${ocrResults.length} image(s)]:\n${combinedOcrText}` :
+      combinedOcrText;
   }
 
   if (!messageForAnalysis || messageForAnalysis.trim().length === 0) {
@@ -2570,7 +2566,7 @@ async function processPost(
   // ✅ NEW DOCUMENT PATH
   // ============================================================================
   if (!doc.exists) {
-    console.log(`✨ Creating new announcement...`);
+    console.log("✨ Creating new announcement...");
 
     // Analyze with Cohere
     const cohereResult = await analyzeAnnouncement(
@@ -2603,7 +2599,7 @@ async function processPost(
     };
 
     await postRef.set(newData);
-    console.log(`✅ Created announcement document`);
+    console.log("✅ Created announcement document");
 
     // Create category-specific documents AND Information Bank
     await createCategoryAndInfoBank(
@@ -2629,15 +2625,15 @@ async function processPost(
       return;
     }
 
-    console.log(`🔄 Updating existing announcement...`);
+    console.log("🔄 Updating existing announcement...");
 
     // Update announcement
     await postRef.update({
       message: originalMessage,
       images:
-        uploadedImageUrls.length > 0
-          ? uploadedImageUrls
-          : docData?.images || [],
+        uploadedImageUrls.length > 0 ?
+          uploadedImageUrls :
+          docData?.images || [],
       image_count: uploadedImageUrls.length || docData?.image_count || 0,
       full_picture: uploadedImageUrls[0] || docData?.full_picture || "",
       permalink_url: post.permalink_url || "",
@@ -2651,7 +2647,7 @@ async function processPost(
       total_image_count: allImageUrls.length,
     });
 
-    console.log(`✅ Updated announcement document`);
+    console.log("✅ Updated announcement document");
 
     // ✅ NEW: Create/update category documents and Information Bank if needed
     const category = docData?.category?.toLowerCase() || "";
@@ -2660,7 +2656,7 @@ async function processPost(
       category &&
       ["admission", "scholarship", "placement"].includes(category)
     ) {
-      console.log(`\n🔄 Checking category document and Information Bank...`);
+      console.log("\n🔄 Checking category document and Information Bank...");
 
       // Check if category document exists
       const categoryDoc = await db.collection(`${category}s`).doc(postId).get();
@@ -2679,7 +2675,7 @@ async function processPost(
       console.log(`   📊 Info Bank exists: ${infoBankDoc.exists}`);
 
       if (needsCategoryDoc || needsInfoBank) {
-        console.log(`   🔧 Creating missing documents...`);
+        console.log("   🔧 Creating missing documents...");
 
         // Get deadline from announcement
         const deadlineTimestamp = docData?.deadline || null;
@@ -2695,13 +2691,13 @@ async function processPost(
           allImageUrls.length
         );
 
-        console.log(`   ✅ Missing documents created`);
+        console.log("   ✅ Missing documents created");
       } else {
-        console.log(`   ℹ️ All documents already exist`);
+        console.log("   ℹ️ All documents already exist");
       }
     }
 
-    console.log(`✅ Update complete\n`);
+    console.log("✅ Update complete\n");
   }
 }
 
@@ -2727,7 +2723,7 @@ async function createCategoryAndInfoBank(
         ocrText,
         imageCount
       );
-      console.log(`✅ Admission + Information Bank created`);
+      console.log("✅ Admission + Information Bank created");
     } else if (categoryLower === "scholarship") {
       await createScholarshipFromAnnouncement(
         postId,
@@ -2737,7 +2733,7 @@ async function createCategoryAndInfoBank(
         ocrText,
         imageCount
       );
-      console.log(`✅ Scholarship + Information Bank created`);
+      console.log("✅ Scholarship + Information Bank created");
     } else if (categoryLower === "placement") {
       await createPlacementFromAnnouncement(
         postId,
@@ -2747,9 +2743,9 @@ async function createCategoryAndInfoBank(
         ocrText,
         imageCount
       );
-      console.log(`✅ Placement + Information Bank created`);
+      console.log("✅ Placement + Information Bank created");
     } else {
-      console.log(`ℹ️ General category - no special processing`);
+      console.log("ℹ️ General category - no special processing");
     }
   } catch (categoryError: any) {
     console.error(
@@ -2767,7 +2763,7 @@ async function createCategoryAndInfoBank(
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
     } catch (logError) {
-      console.error(`   ❌ Failed to log error:`, logError);
+      console.error("   ❌ Failed to log error:", logError);
     }
 
     // ✅ Re-throw to make error visible
@@ -3001,7 +2997,7 @@ export const manualSyncFacebookPostsHttp = onRequest(
 
       const result = await syncFacebookPostsLogic();
 
-      res.json({ result });
+      res.json({result});
     } catch (error: any) {
       console.error("❌ Sync HTTP error:", error);
       res.status(500).json({
@@ -3079,66 +3075,66 @@ export const reprocessExistingAnnouncements = onCall(
 );
 
 async function syncCategoryToInfoBank(
-  categoryType: 'admission' | 'scholarship' | 'placement',
+  categoryType: "admission" | "scholarship" | "placement",
   documentId: string,
   cohereKey: string,
   config: CategoryToInfoBankConfig = {
     includeInSearch: true,
     autoSync: true,
-    generateSummary: true
+    generateSummary: true,
   }
 ): Promise<void> {
   try {
     console.log(`🔄 Syncing ${categoryType} document ${documentId} to Information Bank...`);
-    
+
     // Fetch the category document
     const categoryDoc = await db.collection(`${categoryType}s`).doc(documentId).get();
-    
+
     if (!categoryDoc.exists) {
       console.warn(`⚠️ ${categoryType} document ${documentId} not found`);
       return;
     }
-    
+
     const categoryData = categoryDoc.data()!;
-    
+
     // Skip if deleted
     if (categoryData.deleted === true) {
       console.log(`⏭️ Skipping deleted ${categoryType} document ${documentId}`);
       return;
     }
-    
+
     // Convert category data to searchable text content
     const textContent = formatCategoryAsText(categoryType, categoryData);
-    
+
     // Generate title for Information Bank
     const title = generateInfoBankTitle(categoryType, categoryData);
-    
+
     // Split into chunks (for long content)
     const chunks = splitIntoChunks(textContent, title, `${categoryType}_category`);
     console.log(`📄 Split ${categoryType} into ${chunks.length} chunks`);
-    
+
     // Generate embeddings and store in Pinecone
     const chunkIds: string[] = [];
     let parentPineconeId: string | null = null;
-    
+
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      
+
       // Generate embedding using Gemini
       const embeddingResponse = await axios.post(
-        "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=" + GEMINI_API_KEY.value(),
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=" + GEMINI_API_KEY.value(),
         {
-          model: "text-embedding-004",
+          model: "gemini-embedding-001",
           content: {
             parts: [
-              { text: chunk.text }
-            ]
-          }
+              {text: chunk.text},
+            ],
+          },
         },
         {
           headers: {
-            "Content-Type": "application/json"
-          }
+            "Content-Type": "application/json",
+          },
         }
       );
 
@@ -3155,108 +3151,107 @@ async function syncCategoryToInfoBank(
       }
 
       if (!embedding || embedding.length === 0) {
-        console.error(`Unexpected embedding response:`, JSON.stringify(responseData, null, 2));
+        console.error("Unexpected embedding response:", JSON.stringify(responseData, null, 2));
         throw new Error("Invalid embedding response from Gemini API");
       }
-      
-      const chunkTitle = chunks.length > 1 
-        ? `${title} (Part ${i + 1}/${chunks.length})`
-        : title;
-      
+
+      const chunkTitle = chunks.length > 1 ?
+        `${title} (Part ${i + 1}/${chunks.length})` :
+        title;
+
       // 🔥 CRITICAL: Flat metadata structure for Pinecone (matching Flutter code)
       const metadata = {
         // === DOCUMENT IDENTIFICATION ===
-        'docId': documentId,
-        'originalDocId': documentId,
-        'documentId': documentId,
-        'categoryDocId': documentId, // Link back to category document
-        
+        "docId": documentId,
+        "originalDocId": documentId,
+        "documentId": documentId,
+        "categoryDocId": documentId, // Link back to category document
+
         // === CONTENT ===
-        'text': chunk.text,
-        'content': chunk.text,
-        
+        "text": chunk.text,
+        "content": chunk.text,
+
         // === TITLES ===
-        'title': chunkTitle,
-        'originalTitle': title,
-        'fileName': title,
-        
+        "title": chunkTitle,
+        "originalTitle": title,
+        "fileName": title,
+
         // === CHUNKING INFO ===
-        'chunkIndex': i,
-        'chunk_index': i,
-        'totalChunks': chunks.length,
-        'chunkCount': chunks.length,
-        'isFirstChunk': i === 0,
-        'isLastChunk': i === chunks.length - 1,
-        
+        "chunkIndex": i,
+        "chunk_index": i,
+        "totalChunks": chunks.length,
+        "chunkCount": chunks.length,
+        "isFirstChunk": i === 0,
+        "isLastChunk": i === chunks.length - 1,
+
         // === SOURCE & CATEGORY ===
-        'source': `${categoryType}_category`,
-        'category': categoryType,
-        'categoryID': categoryType,
-        'categoryType': categoryType, // admission, scholarship, or placement
-        
+        "source": `${categoryType}_category`,
+        "category": categoryType,
+        "categoryID": categoryType,
+        "categoryType": categoryType, // admission, scholarship, or placement
+
         // === ADDITIONAL METADATA ===
-        'chunkSize': chunk.text.length,
-        'createdAt': new Date().toISOString(),
-        'syncedFromCategory': true,
-        
+        "chunkSize": chunk.text.length,
+        "createdAt": new Date().toISOString(),
+        "syncedFromCategory": true,
+
         // === CATEGORY-SPECIFIC DATA ===
-        ...(categoryType === 'admission' && {
-          'academicYear': categoryData.academicYear || null,
-          'hasSchedules': (categoryData.schedules?.length || 0) > 0,
-          'scheduleCount': categoryData.schedules?.length || 0,
+        ...(categoryType === "admission" && {
+          "academicYear": categoryData.academicYear || null,
+          "hasSchedules": (categoryData.schedules?.length || 0) > 0,
+          "scheduleCount": categoryData.schedules?.length || 0,
         }),
-        ...(categoryType === 'scholarship' && {
-          'scholarshipProvider': categoryData.scholarshipProvider || '',
-          'hasDeadline': !!categoryData.deadline,
+        ...(categoryType === "scholarship" && {
+          "scholarshipProvider": categoryData.scholarshipProvider || "",
+          "hasDeadline": !!categoryData.deadline,
         }),
-        ...(categoryType === 'placement' && {
-          'partnerCompany': categoryData.partnerCompany || '',
-          'isRecruiting': categoryData.isRecruiting || false,
+        ...(categoryType === "placement" && {
+          "partnerCompany": categoryData.partnerCompany || "",
+          "isRecruiting": categoryData.isRecruiting || false,
         }),
       };
-      
+
       // Store in Pinecone
       await storePineconeVector(
         chunk.id,
         embedding,
         metadata
       );
-      
+
       chunkIds.push(chunk.id);
-      
+
       if (i === 0) {
         parentPineconeId = chunk.id;
       }
-      
+
       console.log(`  ✓ Chunk ${i + 1}/${chunks.length} embedded and stored`);
     }
-    
+
     // Save to Information Bank collection
     const infoBankId = `${categoryType}_${documentId}`;
-    await db.collection('information_bank').doc(infoBankId).set({
-      'ibID': infoBankId,
-      'id': infoBankId,
-      'ib_title': title,
-      'title': title,
-      'content': textContent,
-      'source': `${categoryType}_category`,
-      'category': categoryType,
-      'categoryID': categoryType,
-      'categoryType': categoryType,
-      'categoryDocumentId': documentId, // Link to original category document
-      'pinecone_id': parentPineconeId,
-      'totalChunks': chunks.length,
-      'chunkIds': chunkIds,
-      'chunked': chunks.length > 1,
-      'chunkSize': 1000, // maxChunkSize
-      'chunkOverlap': 200, // chunkOverlap
-      'syncedFromCategory': true,
-      'createdAt': admin.firestore.FieldValue.serverTimestamp(),
-      'updatedAt': admin.firestore.FieldValue.serverTimestamp(),
+    await db.collection("information_bank").doc(infoBankId).set({
+      "ibID": infoBankId,
+      "id": infoBankId,
+      "ib_title": title,
+      "title": title,
+      "content": textContent,
+      "source": `${categoryType}_category`,
+      "category": categoryType,
+      "categoryID": categoryType,
+      "categoryType": categoryType,
+      "categoryDocumentId": documentId, // Link to original category document
+      "pinecone_id": parentPineconeId,
+      "totalChunks": chunks.length,
+      "chunkIds": chunkIds,
+      "chunked": chunks.length > 1,
+      "chunkSize": 1000, // maxChunkSize
+      "chunkOverlap": 200, // chunkOverlap
+      "syncedFromCategory": true,
+      "createdAt": admin.firestore.FieldValue.serverTimestamp(),
+      "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
     });
-    
+
     console.log(`✅ ${categoryType} document synced to Information Bank with ${chunks.length} Pinecone vectors`);
-    
   } catch (error) {
     console.error(`❌ Error syncing ${categoryType} to Information Bank:`, error);
     throw error;
@@ -3272,12 +3267,12 @@ function formatCategoryAsText(
   try {
     if (categoryType === "admission") {
       buffer.push("ADMISSION INFORMATION\n");
-      
+
       // ✅ Add type if present
       if (data.type) {
         buffer.push(`Test Type: ${data.type}\n`);
       }
-      
+
       buffer.push(`Title: ${data.title || "Untitled"}\n`);
       buffer.push(`Content: ${data.content || "No content"}\n`);
 
@@ -3336,7 +3331,7 @@ function formatCategoryAsText(
         });
       }
     } else if (categoryType === "scholarship") {
-      console.log(`   Processing scholarship data...`);
+      console.log("   Processing scholarship data...");
       console.log(`   - Name: ${data.name || "N/A"}`);
       console.log(
         `   - Description length: ${(data.description || "").length}`
@@ -3373,7 +3368,7 @@ function formatCategoryAsText(
         buffer.push(`Application Link: ${data.applicationLink}\n`);
       }
     } else if (categoryType === "placement") {
-      console.log(`   Processing placement data...`);
+      console.log("   Processing placement data...");
       console.log(`   - Company: ${data.partnerCompany || "N/A"}`);
       console.log(`   - Positions: ${data.positions?.length || 0}`);
       console.log(`   - Contacts: ${data.contacts?.length || 0}`);
@@ -3382,9 +3377,9 @@ function formatCategoryAsText(
       buffer.push(`Company: ${data.partnerCompany || "Unknown"}\n`);
       buffer.push(
         `Status: ${
-          data.isRecruiting
-            ? "Currently Recruiting"
-            : "Not Currently Recruiting"
+          data.isRecruiting ?
+            "Currently Recruiting" :
+            "Not Currently Recruiting"
         }\n`
       );
 
@@ -3413,11 +3408,11 @@ function formatCategoryAsText(
 
     const result = buffer.join("").trim();
 
-    console.log(`\n📝 Formatted result:`);
+    console.log("\n📝 Formatted result:");
     console.log(`   Total length: ${result.length} chars`);
-    console.log(`   Preview (first 300 chars):`);
+    console.log("   Preview (first 300 chars):");
     console.log(`   ${result.substring(0, 300)}...`);
-    console.log(`📝 ========================================\n`);
+    console.log("📝 ========================================\n");
 
     if (result.length === 0) {
       throw new Error("Formatted content is empty after processing");
@@ -3425,11 +3420,11 @@ function formatCategoryAsText(
 
     return result;
   } catch (error: any) {
-    console.error(`\n❌ ERROR in formatCategoryAsText:`);
+    console.error("\n❌ ERROR in formatCategoryAsText:");
     console.error(`   Category: ${categoryType}`);
     console.error(`   Error: ${error.message}`);
     console.error(`   Stack: ${error.stack}`);
-    console.error(`❌ ========================================\n`);
+    console.error("❌ ========================================\n");
 
     throw error; // ✅ Re-throw instead of returning error message
   }
@@ -3461,18 +3456,18 @@ export const testCreateInfoBank = onCall(
         throw new HttpsError("unauthenticated", "Authentication required");
       }
 
-      const { announcementId } = request.data;
+      const {announcementId} = request.data;
 
       if (!announcementId) {
         throw new HttpsError("invalid-argument", "announcementId is required");
       }
 
-      console.log(`\n🧪 ========================================`);
+      console.log("\n🧪 ========================================");
       console.log(`🧪 TEST: Creating Information Bank for ${announcementId}`);
-      console.log(`🧪 ========================================\n`);
+      console.log("🧪 ========================================\n");
 
       // Get announcement
-      console.log(`📋 Step 1: Fetching announcement...`);
+      console.log("📋 Step 1: Fetching announcement...");
       const announcementDoc = await db
         .collection("announcements")
         .doc(announcementId)
@@ -3486,7 +3481,7 @@ export const testCreateInfoBank = onCall(
       }
 
       const announcementData = announcementDoc.data()!;
-      console.log(`   ✅ Announcement found`);
+      console.log("   ✅ Announcement found");
       console.log(`   📊 Category: ${announcementData.category}`);
       console.log(
         `   📊 Message length: ${(announcementData.message || "").length} chars`
@@ -3520,11 +3515,11 @@ export const testCreateInfoBank = onCall(
       }
 
       const categoryData = categoryDoc.data()!;
-      console.log(`   ✅ Category document found`);
+      console.log("   ✅ Category document found");
       console.log(`   📊 Fields: ${Object.keys(categoryData).join(", ")}`);
 
       // Prepare extracted data
-      console.log(`\n📋 Step 3: Preparing extracted data...`);
+      console.log("\n📋 Step 3: Preparing extracted data...");
       let extractedData: any = {};
 
       if (category === "admission") {
@@ -3537,7 +3532,7 @@ export const testCreateInfoBank = onCall(
           academicYear: categoryData.academicYear || null,
           schedules: categoryData.schedules || [],
         };
-        console.log(`   ✅ Admission data prepared`);
+        console.log("   ✅ Admission data prepared");
         console.log(`      - Steps: ${extractedData.steps.length}`);
         console.log(
           `      - Requirements: ${extractedData.requirements.length}`
@@ -3552,7 +3547,7 @@ export const testCreateInfoBank = onCall(
           privileges: categoryData.privileges || [],
           applicationLink: categoryData.applicationLink || "",
         };
-        console.log(`   ✅ Scholarship data prepared`);
+        console.log("   ✅ Scholarship data prepared");
         console.log(
           `      - Eligibility: ${extractedData.eligibilityRequirements.length}`
         );
@@ -3564,7 +3559,7 @@ export const testCreateInfoBank = onCall(
           contacts: categoryData.contacts || [],
           isRecruiting: categoryData.isRecruiting !== false,
         };
-        console.log(`   ✅ Placement data prepared`);
+        console.log("   ✅ Placement data prepared");
         console.log(`      - Company: ${extractedData.partnerCompany}`);
         console.log(`      - Positions: ${extractedData.positions.length}`);
       }
@@ -3580,13 +3575,13 @@ export const testCreateInfoBank = onCall(
         console.log(
           `\n⚠️ Information Bank entry already exists: ${infoBankId}`
         );
-        console.log(`   Deleting existing entry first...`);
+        console.log("   Deleting existing entry first...");
         await db.collection("information_bank").doc(infoBankId).delete();
-        console.log(`   ✅ Existing entry deleted`);
+        console.log("   ✅ Existing entry deleted");
       }
 
       // Create Information Bank entry
-      console.log(`\n📋 Step 4: Creating Information Bank entry...`);
+      console.log("\n📋 Step 4: Creating Information Bank entry...");
       await createInfoBankFromCategory(
         announcementId,
         category as "admission" | "scholarship" | "placement",
@@ -3595,7 +3590,7 @@ export const testCreateInfoBank = onCall(
       );
 
       // Verify creation
-      console.log(`\n📋 Step 5: Verifying creation...`);
+      console.log("\n📋 Step 5: Verifying creation...");
       const verifyInfoBank = await db
         .collection("information_bank")
         .doc(infoBankId)
@@ -3606,7 +3601,7 @@ export const testCreateInfoBank = onCall(
       }
 
       const infoBankData = verifyInfoBank.data()!;
-      console.log(`   ✅ Information Bank entry verified`);
+      console.log("   ✅ Information Bank entry verified");
       console.log(`   📊 Total chunks: ${infoBankData.totalChunks}`);
       console.log(`   📊 Pinecone ID: ${infoBankData.pinecone_id}`);
       console.log(
@@ -3615,7 +3610,7 @@ export const testCreateInfoBank = onCall(
 
       const result = {
         success: true,
-        message: `Information Bank entry created successfully`,
+        message: "Information Bank entry created successfully",
         announcementId,
         category,
         infoBankId,
@@ -3627,16 +3622,16 @@ export const testCreateInfoBank = onCall(
         },
       };
 
-      console.log(`\n🧪 ========================================`);
-      console.log(`🧪 TEST SUCCESSFUL`);
-      console.log(`🧪 ========================================\n`);
+      console.log("\n🧪 ========================================");
+      console.log("🧪 TEST SUCCESSFUL");
+      console.log("🧪 ========================================\n");
 
       return result;
     } catch (error: any) {
-      console.error(`\n❌ ========================================`);
-      console.error(`❌ TEST FAILED`);
+      console.error("\n❌ ========================================");
+      console.error("❌ TEST FAILED");
       console.error(`❌ Error: ${error.message}`);
-      console.error(`❌ ========================================\n`);
+      console.error("❌ ========================================\n");
 
       throw new HttpsError("internal", `Test failed: ${error.message}`, {
         originalError: error.toString(),
@@ -3650,7 +3645,7 @@ export const testCreateInfoBank = onCall(
 // ============================================================================
 
 export const listInfoBankEntries = onCall(
-  { cors: true, secrets: [] },
+  {cors: true, secrets: []},
   async (request) => {
     try {
       if (!request.auth) {
@@ -3697,14 +3692,14 @@ export const listInfoBankEntries = onCall(
 // ============================================================================
 
 export const deleteInfoBankEntry = onCall(
-  { cors: true, secrets: [] },
+  {cors: true, secrets: []},
   async (request) => {
     try {
       if (!request.auth) {
         throw new HttpsError("unauthenticated", "Authentication required");
       }
 
-      const { infoBankId } = request.data;
+      const {infoBankId} = request.data;
 
       if (!infoBankId) {
         throw new HttpsError("invalid-argument", "infoBankId is required");
@@ -3755,11 +3750,11 @@ export const fixAnnouncementInfoBankMetadata = onCall(
         throw new HttpsError("unauthenticated", "Authentication required");
       }
 
-      console.log(`\n🔧 ========================================`);
-      console.log(`🔧 FIXING ANNOUNCEMENT-BASED INFO BANK ENTRIES`);
-      console.log(`🔧 ========================================\n`);
+      console.log("\n🔧 ========================================");
+      console.log("🔧 FIXING ANNOUNCEMENT-BASED INFO BANK ENTRIES");
+      console.log("🔧 ========================================\n");
 
-   
+
       const pineconeKey = PINECONE_API_KEY.value();
       const pineconeUrl = PINECONE_HOST.value();
 
@@ -3769,8 +3764,8 @@ export const fixAnnouncementInfoBankMetadata = onCall(
 
       // Get all announcement-based Info Bank entries
       const infoBankSnapshot = await db
-        .collection('information_bank')
-        .where('syncedFromCategory', '==', true)
+        .collection("information_bank")
+        .where("syncedFromCategory", "==", true)
         .get();
 
       console.log(`📊 Found ${infoBankSnapshot.docs.length} announcement-based entries\n`);
@@ -3778,7 +3773,7 @@ export const fixAnnouncementInfoBankMetadata = onCall(
       for (const doc of infoBankSnapshot.docs) {
         const data = doc.data();
         const infoBankId = doc.id;
-        const categoryType = data.categoryType as 'admission' | 'scholarship' | 'placement';
+        const categoryType = data.categoryType as "admission" | "scholarship" | "placement";
         const documentId = data.categoryDocumentId || data.announcementId;
 
         console.log(`\n📄 Processing: ${infoBankId}`);
@@ -3786,7 +3781,7 @@ export const fixAnnouncementInfoBankMetadata = onCall(
         console.log(`   Document ID: ${documentId}`);
 
         if (!categoryType || !documentId) {
-          console.log(`   ⚠️ Missing required fields - skipping`);
+          console.log("   ⚠️ Missing required fields - skipping");
           totalSkipped++;
           continue;
         }
@@ -3799,7 +3794,7 @@ export const fixAnnouncementInfoBankMetadata = onCall(
             .get();
 
           if (!categoryDoc.exists) {
-            console.log(`   ⚠️ Category document not found - skipping`);
+            console.log("   ⚠️ Category document not found - skipping");
             totalSkipped++;
             continue;
           }
@@ -3811,7 +3806,7 @@ export const fixAnnouncementInfoBankMetadata = onCall(
           console.log(`   📊 Has ${chunkIds.length} chunks to update`);
 
           if (chunkIds.length === 0) {
-            console.log(`   ⚠️ No chunks found - skipping`);
+            console.log("   ⚠️ No chunks found - skipping");
             totalSkipped++;
             continue;
           }
@@ -3828,19 +3823,19 @@ export const fixAnnouncementInfoBankMetadata = onCall(
 
             // Generate new embedding with correct model
             const embeddingResponse = await axios.post(
-              "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=" + GEMINI_API_KEY.value(),
+              "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=" + GEMINI_API_KEY.value(),
               {
-                model: "text-embedding-004",
+                model: "gemini-embedding-001",
                 content: {
                   parts: [
-                    { text: chunk.text }
-                  ]
-                }
+                    {text: chunk.text},
+                  ],
+                },
               },
               {
                 headers: {
-                  "Content-Type": "application/json"
-                }
+                  "Content-Type": "application/json",
+                },
               }
             );
 
@@ -3860,47 +3855,47 @@ export const fixAnnouncementInfoBankMetadata = onCall(
               throw new Error("Failed to generate embedding");
             }
 
-            const chunkTitle = chunks.length > 1
-              ? `${title} (Part ${i + 1}/${chunks.length})`
-              : title;
+            const chunkTitle = chunks.length > 1 ?
+              `${title} (Part ${i + 1}/${chunks.length})` :
+              title;
 
             // 🔥 CRITICAL: Updated metadata structure matching Flutter
             const metadata = {
               // Primary identifiers
-              'docId': documentId,
-              'originalDocId': documentId,
-              'documentId': documentId,
-              'categoryDocId': documentId,
-              
+              "docId": documentId,
+              "originalDocId": documentId,
+              "documentId": documentId,
+              "categoryDocId": documentId,
+
               // Content
-              'text': chunk.text,
-              'content': chunk.text,
-              
+              "text": chunk.text,
+              "content": chunk.text,
+
               // Titles
-              'title': chunkTitle,
-              'originalTitle': title,
-              'fileName': title,
-              
+              "title": chunkTitle,
+              "originalTitle": title,
+              "fileName": title,
+
               // Chunking info
-              'chunkIndex': i,
-              'chunk_index': i,
-              'totalChunks': chunks.length,
-              'chunkCount': chunks.length,
-              'chunkSize': chunk.text.length,
-              'isFirstChunk': i === 0,
-              'isLastChunk': i === chunks.length - 1,
-              
+              "chunkIndex": i,
+              "chunk_index": i,
+              "totalChunks": chunks.length,
+              "chunkCount": chunks.length,
+              "chunkSize": chunk.text.length,
+              "isFirstChunk": i === 0,
+              "isLastChunk": i === chunks.length - 1,
+
               // Source & category
-              'source': `${categoryType}_category`,
-              'category': categoryType,
-              'categoryID': categoryType,
-              'categoryType': categoryType,
-              
+              "source": `${categoryType}_category`,
+              "category": categoryType,
+              "categoryID": categoryType,
+              "categoryType": categoryType,
+
               // Timestamps & flags
-              'createdAt': new Date().toISOString(),
-              'syncedFromCategory': true,
-              'autoGeneratedFromAnnouncement': true,
-              
+              "createdAt": new Date().toISOString(),
+              "syncedFromCategory": true,
+              "autoGeneratedFromAnnouncement": true,
+
               // Category-specific
               ...getCategorySpecificMetadata(categoryType, categoryData),
             };
@@ -3913,12 +3908,12 @@ export const fixAnnouncementInfoBankMetadata = onCall(
                   id: chunkId,
                   values: embedding,
                   metadata: metadata,
-                }]
+                }],
               },
               {
                 headers: {
-                  'Api-Key': pineconeKey,
-                  'Content-Type': 'application/json',
+                  "Api-Key": pineconeKey,
+                  "Content-Type": "application/json",
                 },
                 timeout: 30000,
               }
@@ -3928,25 +3923,24 @@ export const fixAnnouncementInfoBankMetadata = onCall(
           }
 
           // Update Firestore document
-          await db.collection('information_bank').doc(infoBankId).update({
-            'content': textContent,
-            'ib_title': title,
-            'title': title,
-            'totalChunks': chunks.length,
-            'updatedAt': admin.firestore.FieldValue.serverTimestamp(),
-            'metadataFixed': true,
-            'fixedAt': admin.firestore.FieldValue.serverTimestamp(),
+          await db.collection("information_bank").doc(infoBankId).update({
+            "content": textContent,
+            "ib_title": title,
+            "title": title,
+            "totalChunks": chunks.length,
+            "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+            "metadataFixed": true,
+            "fixedAt": admin.firestore.FieldValue.serverTimestamp(),
           });
 
           totalFixed++;
           console.log(`   ✅ Fixed ${chunkIds.length} chunks`);
-
         } catch (error: any) {
           totalFailed++;
           console.error(`   ❌ Failed: ${error.message}`);
-          
+
           // Log error
-          await db.collection('info_bank_fix_errors').add({
+          await db.collection("info_bank_fix_errors").add({
             infoBankId,
             categoryType,
             documentId,
@@ -3967,21 +3961,20 @@ export const fixAnnouncementInfoBankMetadata = onCall(
         },
       };
 
-      console.log(`\n🔧 ========================================`);
-      console.log(`🔧 FIX COMPLETE`);
+      console.log("\n🔧 ========================================");
+      console.log("🔧 FIX COMPLETE");
       console.log(`🔧 Fixed: ${totalFixed}`);
       console.log(`🔧 Skipped: ${totalSkipped}`);
       console.log(`🔧 Failed: ${totalFailed}`);
-      console.log(`🔧 ========================================\n`);
+      console.log("🔧 ========================================\n");
 
       return summary;
-
     } catch (error: any) {
-      console.error(`\n❌ ========================================`);
-      console.error(`❌ FIX OPERATION FAILED`);
+      console.error("\n❌ ========================================");
+      console.error("❌ FIX OPERATION FAILED");
       console.error(`❌ Error: ${error.message}`);
-      console.error(`❌ ========================================\n`);
-      
+      console.error("❌ ========================================\n");
+
       throw new HttpsError("internal", error.message);
     }
   }

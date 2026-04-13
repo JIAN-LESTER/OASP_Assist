@@ -1,0 +1,7 @@
+{
+  "eslint.workingDirectories": [
+    { "directory": "./functions", "changeProcessCWD": true }
+  ],
+  "typescript.tsdk": "./functions/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}

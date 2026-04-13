@@ -1,7 +1,7 @@
-import { onCall } from "firebase-functions/v2/https";
-import { defineSecret } from "firebase-functions/params";
+import {HttpsError, onCall} from "firebase-functions/v2/https";
+import {defineSecret} from "firebase-functions/params";
 import axios from "axios";
-import { Pinecone } from "@pinecone-database/pinecone";
+import {Pinecone} from "@pinecone-database/pinecone";
 import * as admin from "firebase-admin";
 
 const PINECONE_HOST = defineSecret("PINECONE_HOST");
@@ -14,7 +14,7 @@ const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
 // ============================================================================
 
 export const checkPineconeHealth = onCall(
-  { 
+  {
     secrets: [PINECONE_API_KEY],
     timeoutSeconds: 30,
   },
@@ -22,19 +22,19 @@ export const checkPineconeHealth = onCall(
     if (!request.auth) throw new Error("Unauthorized");
 
     try {
-      const pinecone = new Pinecone({ apiKey: PINECONE_API_KEY.value() });
-      const index = pinecone.Index("oasp-assist-gemini");
+      const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
+      const index = pinecone.Index("oasp-assist-v2");
 
       // Try to get index stats as a health check
       await index.describeIndexStats();
 
-      return { 
+      return {
         healthy: true,
         message: "Pinecone is operational",
       };
     } catch (error: any) {
       console.error("❌ Pinecone health check failed:", error.message);
-      return { 
+      return {
         healthy: false,
         error: error.message,
       };
@@ -47,62 +47,70 @@ export const checkPineconeHealth = onCall(
 // ============================================================================
 
 export const generateGeminiEmbedding = onCall(
-  { secrets: [GEMINI_API_KEY] },
+  { secrets: [GEMINI_API_KEY], timeoutSeconds: 60 },
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
+    if (!request.auth) throw new HttpsError("unauthenticated", "Unauthorized");
 
-    const { text, taskType = 'RETRIEVAL_DOCUMENT' } = request.data;
-    if (!text) throw new Error("Text required");
+    const { text } = request.data;
+    if (!text) throw new HttpsError("invalid-argument", "Text required");
 
     try {
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY.value()}`,
+       
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY.value()}`,
         {
-          model: "models/text-embedding-004",
+          model: "models/gemini-embedding-001",
           content: { parts: [{ text }] },
-          taskType,
         },
         { timeout: 30000 }
       );
 
       const embedding = response.data?.embedding?.values;
-      if (!Array.isArray(embedding)) {
-        throw new Error("Invalid Gemini embedding");
+
+      if (!Array.isArray(embedding) || embedding.length === 0) {
+        console.error("❌ Unexpected Gemini response:", JSON.stringify(response.data));
+        throw new HttpsError("internal", "No embedding returned from Gemini");
       }
 
+      console.log(`✅ Embedding generated: ${embedding.length} dimensions`);
       return { embedding };
+
     } catch (error: any) {
-      console.error("❌ Gemini embedding error:", error.message);
-      throw new Error(`Failed to generate embedding: ${error.message}`);
+      if (error instanceof HttpsError) throw error;
+
+      const msg = error.response?.data?.error?.message ?? error.message;
+      console.error("❌ Gemini embedding error:", msg);
+      console.error("❌ Full Gemini error:", JSON.stringify(error.response?.data ?? {}));
+      throw new HttpsError("internal", `Gemini embedding failed: ${msg}`);
     }
   }
 );
 
 export const generateGeminiResponse = onCall(
-  { secrets: [GEMINI_API_KEY] },
+  {secrets: [GEMINI_API_KEY]},
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const { prompt } = request.data;
+    const {prompt} = request.data;
     if (!prompt) throw new Error("Prompt required");
 
     try {
       const response = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY.value()}`,
         {
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [{parts: [{text: prompt}]}],
           generationConfig: {
             temperature: 0.3,
             maxOutputTokens: 1024,
-          }
+          },
         },
-        { timeout: 30000 }
+        {timeout: 30000}
       );
 
       const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!text) throw new Error("No response generated");
 
-      return { text };
+      return {text};
     } catch (error: any) {
       console.error("❌ Gemini response error:", error.message);
       throw new Error(`Failed to generate response: ${error.message}`);
@@ -115,11 +123,11 @@ export const generateGeminiResponse = onCall(
 // ============================================================================
 
 export const generateCohereEmbedding = onCall(
-  { secrets: [COHERE_API_KEY] },
+  {secrets: [COHERE_API_KEY]},
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const { text } = request.data;
+    const {text} = request.data;
     if (!text) throw new Error("Text required");
 
     try {
@@ -132,7 +140,7 @@ export const generateCohereEmbedding = onCall(
         },
         {
           headers: {
-            Authorization: `Bearer ${COHERE_API_KEY.value()}`,
+            "Authorization": `Bearer ${COHERE_API_KEY.value()}`,
             "Content-Type": "application/json",
           },
           timeout: 30000,
@@ -144,7 +152,7 @@ export const generateCohereEmbedding = onCall(
         throw new Error("Invalid Cohere embedding");
       }
 
-      return { embedding };
+      return {embedding};
     } catch (error: any) {
       console.error("❌ Cohere embedding error:", error.message);
       throw new Error(`Failed to generate embedding: ${error.message}`);
@@ -153,25 +161,25 @@ export const generateCohereEmbedding = onCall(
 );
 
 export const generateCohereResponse = onCall(
-  { secrets: [COHERE_API_KEY] },
+  {secrets: [COHERE_API_KEY]},
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const { prompt } = request.data;
+    const {prompt} = request.data;
     if (!prompt) throw new Error("Prompt required");
 
     try {
       const response = await axios.post(
         "https://api.cohere.ai/v1/chat",
         {
-          model: 'command-r-08-2024',
+          model: "command-r-08-2024",
           message: prompt,
           max_tokens: 1024,
           temperature: 0.3,
         },
         {
           headers: {
-            Authorization: `Bearer ${COHERE_API_KEY.value()}`,
+            "Authorization": `Bearer ${COHERE_API_KEY.value()}`,
             "Content-Type": "application/json",
           },
           timeout: 30000,
@@ -181,7 +189,7 @@ export const generateCohereResponse = onCall(
       const text = response.data?.text;
       if (!text) throw new Error("No response generated");
 
-      return { text };
+      return {text};
     } catch (error: any) {
       console.error("❌ Cohere response error:", error.message);
       throw new Error(`Failed to generate response: ${error.message}`);
@@ -190,11 +198,11 @@ export const generateCohereResponse = onCall(
 );
 
 export const analyzeCohereAdmission = onCall(
-  { secrets: [COHERE_API_KEY] },
+  {secrets: [COHERE_API_KEY]},
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const { message } = request.data;
+    const {message} = request.data;
     if (!message) throw new Error("Message required");
 
     const prompt = `
@@ -248,14 +256,14 @@ Return valid JSON only in this exact format:
       const response = await axios.post(
         "https://api.cohere.ai/v1/chat",
         {
-          model: 'command-r-08-2024',
+          model: "command-r-08-2024",
           message: prompt,
           max_tokens: 3500,
           temperature: 0.0,
         },
         {
           headers: {
-            Authorization: `Bearer ${COHERE_API_KEY.value()}`,
+            "Authorization": `Bearer ${COHERE_API_KEY.value()}`,
             "Content-Type": "application/json",
           },
           timeout: 30000,
@@ -264,36 +272,36 @@ Return valid JSON only in this exact format:
 
       const generatedText = response.data?.text?.trim();
       if (!generatedText) {
-        return { success: false };
+        return {success: false};
       }
 
       let cleanedResponse = generatedText
-        .replace(/```json/g, '')
-        .replace(/```/g, '')
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
         .trim();
 
-      const startIndex = cleanedResponse.indexOf('{');
-      const endIndex = cleanedResponse.lastIndexOf('}');
-      
+      const startIndex = cleanedResponse.indexOf("{");
+      const endIndex = cleanedResponse.lastIndexOf("}");
+
       if (startIndex !== -1 && endIndex !== -1) {
         cleanedResponse = cleanedResponse.substring(startIndex, endIndex + 1);
       }
 
       const result = JSON.parse(cleanedResponse);
-      return { success: true, ...result };
+      return {success: true, ...result};
     } catch (error: any) {
       console.error("❌ Cohere admission analysis error:", error.message);
-      return { success: false };
+      return {success: false};
     }
   }
 );
 
 export const analyzeCohereScholarship = onCall(
-  { secrets: [COHERE_API_KEY] },
+  {secrets: [COHERE_API_KEY]},
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const { message } = request.data;
+    const {message} = request.data;
     if (!message) throw new Error("Message required");
 
     const prompt = `
@@ -330,14 +338,14 @@ Respond in valid JSON format only:
       const response = await axios.post(
         "https://api.cohere.ai/v1/chat",
         {
-          model: 'command-r-08-2024',
+          model: "command-r-08-2024",
           message: prompt,
           max_tokens: 3500,
           temperature: 0.0,
         },
         {
           headers: {
-            Authorization: `Bearer ${COHERE_API_KEY.value()}`,
+            "Authorization": `Bearer ${COHERE_API_KEY.value()}`,
             "Content-Type": "application/json",
           },
           timeout: 30000,
@@ -346,17 +354,17 @@ Respond in valid JSON format only:
 
       const generatedText = response.data?.text?.trim();
       if (!generatedText) {
-        return { scholarships: [] };
+        return {scholarships: []};
       }
 
       let cleanedResponse = generatedText
-        .replace(/```json/g, '')
-        .replace(/```/g, '')
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
         .trim();
 
-      const startIndex = cleanedResponse.indexOf('{');
-      const endIndex = cleanedResponse.lastIndexOf('}');
-      
+      const startIndex = cleanedResponse.indexOf("{");
+      const endIndex = cleanedResponse.lastIndexOf("}");
+
       if (startIndex !== -1 && endIndex !== -1) {
         cleanedResponse = cleanedResponse.substring(startIndex, endIndex + 1);
       }
@@ -365,17 +373,17 @@ Respond in valid JSON format only:
       return result;
     } catch (error: any) {
       console.error("❌ Cohere scholarship analysis error:", error.message);
-      return { scholarships: [] };
+      return {scholarships: []};
     }
   }
 );
 
 export const analyzeCoherePlacement = onCall(
-  { secrets: [COHERE_API_KEY] },
+  {secrets: [COHERE_API_KEY]},
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const { message } = request.data;
+    const {message} = request.data;
     if (!message) throw new Error("Message required");
 
     const prompt = `
@@ -410,14 +418,14 @@ Respond in valid JSON format only:
       const response = await axios.post(
         "https://api.cohere.ai/v1/chat",
         {
-          model: 'command-r-08-2024',
+          model: "command-r-08-2024",
           message: prompt,
           max_tokens: 3500,
           temperature: 0.0,
         },
         {
           headers: {
-            Authorization: `Bearer ${COHERE_API_KEY.value()}`,
+            "Authorization": `Bearer ${COHERE_API_KEY.value()}`,
             "Content-Type": "application/json",
           },
           timeout: 30000,
@@ -426,17 +434,17 @@ Respond in valid JSON format only:
 
       const generatedText = response.data?.text?.trim();
       if (!generatedText) {
-        return { placements: [] };
+        return {placements: []};
       }
 
       let cleanedResponse = generatedText
-        .replace(/```json/g, '')
-        .replace(/```/g, '')
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
         .trim();
 
-      const startIndex = cleanedResponse.indexOf('{');
-      const endIndex = cleanedResponse.lastIndexOf('}');
-      
+      const startIndex = cleanedResponse.indexOf("{");
+      const endIndex = cleanedResponse.lastIndexOf("}");
+
       if (startIndex !== -1 && endIndex !== -1) {
         cleanedResponse = cleanedResponse.substring(startIndex, endIndex + 1);
       }
@@ -445,7 +453,7 @@ Respond in valid JSON format only:
       return result;
     } catch (error: any) {
       console.error("❌ Cohere placement analysis error:", error.message);
-      return { placements: [] };
+      return {placements: []};
     }
   }
 );
@@ -455,29 +463,29 @@ Respond in valid JSON format only:
 // ============================================================================
 
 export const queryPinecone = onCall(
-  { secrets: [PINECONE_API_KEY] },
+  {secrets: [PINECONE_API_KEY]},
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const { embedding, topK = 5, namespace, filter } = request.data;
+    const {embedding, topK = 5, namespace, filter} = request.data;
     if (!embedding || !Array.isArray(embedding)) {
       throw new Error("Valid embedding array required");
     }
 
     try {
-      const pinecone = new Pinecone({ apiKey: PINECONE_API_KEY.value() });
-      const index = pinecone.Index("oasp-assist-gemini");
+      const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
+      const index = pinecone.Index("oasp-assist-v2");
 
       const results = await index.query({
         vector: embedding,
         topK,
         includeMetadata: true,
-        ...(namespace && { namespace }),
-        ...(filter && { filter }),
+        ...(namespace && {namespace}),
+        ...(filter && {filter}),
       });
 
       if (!results.matches || results.matches.length === 0) {
-        return { success: false, matches: [] };
+        return {success: false, matches: []};
       }
 
       const matches = results.matches.map((match: any) => ({
@@ -487,7 +495,7 @@ export const queryPinecone = onCall(
         ...match.metadata,
       }));
 
-      return { success: true, matches };
+      return {success: true, matches};
     } catch (error: any) {
       console.error("❌ Pinecone query error:", error.message);
       throw new Error(`Failed to query Pinecone: ${error.message}`);
@@ -496,18 +504,18 @@ export const queryPinecone = onCall(
 );
 
 export const insertPineconeDocument = onCall(
-  { secrets: [PINECONE_API_KEY] },
+  {secrets: [PINECONE_API_KEY]},
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const { id, embedding, metadata } = request.data;
+    const {id, embedding, metadata} = request.data;
     if (!id || !embedding || !metadata) {
       throw new Error("ID, embedding, and metadata required");
     }
 
     try {
-      const pinecone = new Pinecone({ apiKey: PINECONE_API_KEY.value() });
-      const index = pinecone.Index("oasp-assist-gemini");
+      const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
+      const index = pinecone.Index("oasp-assist-v2");
 
       await index.upsert([{
         id,
@@ -515,7 +523,7 @@ export const insertPineconeDocument = onCall(
         metadata,
       }]);
 
-      return { success: true, id };
+      return {success: true, id};
     } catch (error: any) {
       console.error("❌ Pinecone insert error:", error.message);
       throw new Error(`Failed to insert document: ${error.message}`);
@@ -524,7 +532,7 @@ export const insertPineconeDocument = onCall(
 );
 
 export const insertPineconeDocumentBatch = onCall(
-  { 
+  {
     secrets: [PINECONE_API_KEY],
     timeoutSeconds: 120,
     memory: "512MiB",
@@ -532,17 +540,17 @@ export const insertPineconeDocumentBatch = onCall(
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const { documents } = request.data;
-    
+    const {documents} = request.data;
+
     if (!documents || !Array.isArray(documents) || documents.length === 0) {
       throw new Error("Documents array required");
     }
 
     try {
-      const pinecone = new Pinecone({ apiKey: PINECONE_API_KEY.value() });
-      const index = pinecone.Index("oasp-assist-gemini");
+      const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
+      const index = pinecone.Index("oasp-assist-v2");
 
-      const vectors = documents.map(doc => {
+      const vectors = documents.map((doc) => {
         if (!doc.id || !doc.embedding || !doc.metadata) {
           throw new Error("Each document must have id, embedding, and metadata");
         }
@@ -563,8 +571,8 @@ export const insertPineconeDocumentBatch = onCall(
         console.log(`✅ Inserted batch: ${totalInserted}/${vectors.length}`);
       }
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         inserted: totalInserted,
         message: `Successfully inserted ${totalInserted} vectors`,
       };
@@ -576,29 +584,29 @@ export const insertPineconeDocumentBatch = onCall(
 );
 
 export const deletePineconeDocuments = onCall(
-  { 
+  {
     secrets: [PINECONE_API_KEY],
     timeoutSeconds: 60,
   },
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const { ids } = request.data;
-    
+    const {ids} = request.data;
+
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       throw new Error("IDs array required");
     }
 
     try {
-      const pinecone = new Pinecone({ apiKey: PINECONE_API_KEY.value() });
-      const index = pinecone.Index("oasp-assist-gemini");
+      const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
+      const index = pinecone.Index("oasp-assist-v2");
 
       await index.deleteMany(ids);
 
       console.log(`✅ Deleted ${ids.length} vectors from Pinecone`);
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         deleted: ids.length,
         message: `Successfully deleted ${ids.length} vectors`,
       };
@@ -610,18 +618,18 @@ export const deletePineconeDocuments = onCall(
 );
 
 export const getPineconeStats = onCall(
-  { 
+  {
     secrets: [PINECONE_API_KEY],
     timeoutSeconds: 30,
   },
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const { namespace } = request.data;
+    const {namespace} = request.data;
 
     try {
-      const pinecone = new Pinecone({ apiKey: PINECONE_API_KEY.value() });
-      const index = pinecone.Index("oasp-assist-gemini");
+      const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
+      const index = pinecone.Index("oasp-assist-v2");
 
       const stats = await index.describeIndexStats();
 
@@ -630,7 +638,7 @@ export const getPineconeStats = onCall(
         stats: {
           totalVectors: stats.totalRecordCount || 0,
           dimension: stats.dimension || 0,
-        }
+        },
       };
 
       if (stats.namespaces && namespace) {
@@ -643,82 +651,82 @@ export const getPineconeStats = onCall(
       return response;
     } catch (error: any) {
       console.error("❌ Pinecone stats error:", error.message);
-      return { 
-        success: false, 
-        error: error.message 
+      return {
+        success: false,
+        error: error.message,
       };
     }
   }
 );
 
 export const fetchPineconeVectors = onCall(
-  { 
+  {
     secrets: [PINECONE_API_KEY],
     timeoutSeconds: 30,
   },
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const { ids } = request.data;
-    
+    const {ids} = request.data;
+
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       throw new Error("IDs array required");
     }
 
     try {
-      const pinecone = new Pinecone({ apiKey: PINECONE_API_KEY.value() });
-      const index = pinecone.Index("oasp-assist-gemini");
+      const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
+      const index = pinecone.Index("oasp-assist-v2");
 
       const results = await index.fetch(ids);
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         vectors: results.records || {},
         count: Object.keys(results.records || {}).length,
       };
     } catch (error: any) {
       console.error("❌ Pinecone fetch error:", error.message);
-      return { 
-        success: false, 
-        error: error.message 
+      return {
+        success: false,
+        error: error.message,
       };
     }
   }
 );
 
 export const deleteAllPineconeVectors = onCall(
-  { 
+  {
     secrets: [PINECONE_API_KEY],
     timeoutSeconds: 120,
   },
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const userDoc = await admin.firestore().collection('users').doc(request.auth.uid).get();
+    const userDoc = await admin.firestore().collection("users").doc(request.auth.uid).get();
     if (!userDoc.data()?.isAdmin) throw new Error("Admin access required");
 
-    const { namespace, confirm } = request.data;
-    
+    const {namespace, confirm} = request.data;
+
     if (confirm !== "DELETE_ALL") {
-      throw new Error('Must pass confirm: "DELETE_ALL" to proceed');
+      throw new Error("Must pass confirm: \"DELETE_ALL\" to proceed");
     }
 
     try {
-      const pinecone = new Pinecone({ apiKey: PINECONE_API_KEY.value() });
-      const index = pinecone.Index("oasp-assist-gemini");
+      const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
+      const index = pinecone.Index("oasp-assist-v2");
 
       if (namespace) {
         await index.deleteAll();
         console.log(`✅ Deleted all vectors in namespace: ${namespace}`);
-        return { 
-          success: true, 
+        return {
+          success: true,
           message: `Deleted all vectors in namespace: ${namespace}`,
         };
       } else {
         await index.deleteAll();
         console.log("✅ Deleted all vectors in index");
-        return { 
-          success: true, 
+        return {
+          success: true,
           message: "Deleted all vectors in index",
         };
       }
@@ -730,13 +738,13 @@ export const deleteAllPineconeVectors = onCall(
 );
 
 export const deleteFromPinecone = onCall(
-  { secrets: [PINECONE_API_KEY, PINECONE_HOST] },
+  {secrets: [PINECONE_API_KEY, PINECONE_HOST]},
   async (request) => {
     if (!request.auth) {
       throw new Error("Unauthorized");
     }
 
-    const { chunkIds, namespace } = request.data;
+    const {chunkIds, namespace} = request.data;
 
     if (!Array.isArray(chunkIds) || chunkIds.length === 0) {
       throw new Error("chunkIds must be a non-empty array");
@@ -747,7 +755,7 @@ export const deleteFromPinecone = onCall(
         `${PINECONE_HOST.value()}/vectors/delete`,
         {
           ids: chunkIds,
-          ...(namespace ? { namespace } : {}),
+          ...(namespace ? {namespace} : {}),
         },
         {
           headers: {

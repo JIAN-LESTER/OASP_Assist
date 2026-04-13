@@ -25,7 +25,7 @@ class CohereService {
       }
       
       _chatUrl = Uri.parse('https://api.cohere.ai/v1/chat');
-      _embedUrl = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=$_geminiApiKey";
+      _embedUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=$_geminiApiKey";
       
       if (kDebugMode) {
         print('🖥️ Using desktop Cohere implementation');
@@ -71,11 +71,11 @@ class CohereService {
         Uri.parse(_embedUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'model': 'models/text-embedding-004',
+          'model': 'models/gemini-embedding-001',
           'content': {
             'parts': [{'text': text}]
           },
-          'taskType': taskType,
+   
         }),
       );
 
