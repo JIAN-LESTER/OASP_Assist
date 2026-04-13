@@ -69,7 +69,12 @@ class _AdmissionInfoState extends State<AdmissionInfo>
         // ✅ Filter out entries without a type
         final validAdmissions =
             admissions
-                .where((a) => a.type != null && a.type!.isNotEmpty)
+                .where(
+                  (a) =>
+                      a.type != null &&
+                      a.type!.isNotEmpty &&
+                      a.type!.toLowerCase() != 'null',
+                )
                 .toList();
 
         // Group by type and keep the most recent one per type
@@ -350,7 +355,9 @@ class _AdmissionInfoState extends State<AdmissionInfo>
                 _admissionsByType.map((admission) {
                   try {
                     final type = admission.type; // ✅ No fallback
-                    if (type == null || type.isEmpty)
+                    if (type == null ||
+                        type.isEmpty ||
+                        type.toLowerCase() == 'null')
                       return const SizedBox.shrink();
 
                     final isSelected = type == _selectedType;
