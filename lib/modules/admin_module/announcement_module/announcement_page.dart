@@ -252,6 +252,111 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     );
   }
 
+  void _showSyncSettingsDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        width: 480,
+        constraints: const BoxConstraints(maxHeight: 600),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 20, 16, 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.orange[600]!, Colors.orange[700]!],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.settings_suggest_rounded, color: Colors.white, size: 24),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sync Settings',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Auto-create documents & Vision OCR',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            // Content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Info banner
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[50],
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.orange[200]!),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.document_scanner_rounded,
+                              color: Colors.orange[700], size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'When enabled, synced Facebook posts with images will use '
+                              'Google Vision OCR to extract text, then automatically '
+                              'create structured Admission, Scholarship, or Placement documents.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange[900],
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const AnnouncementSyncSettings(),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
   // MOBILE LAYOUT
   Widget _buildMobileLayout() {
     return Scaffold(
@@ -472,6 +577,43 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                 ),
               ),
           ],
+        ),
+         SizedBox(height: 12),
+        // Sync Settings Button
+        Tooltip(
+          message: 'Sync Settings (Auto-create & Vision OCR)',
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.orange[600]!, Colors.orange[700]!],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.orange.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _showSyncSettingsDialog(context),
+                child: Padding(
+                  padding: EdgeInsets.all(isDesktop ? 14 : 12),
+                  child: Icon(
+                    Icons.settings_suggest_rounded,
+                    color: Colors.white,
+                    size: isDesktop ? 24 : 22,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
         SizedBox(height: 12),
         // Manual Sync Button
@@ -796,6 +938,193 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       announcement,
       DeleteConfigs.announcement,
       'announcements',
+    );
+  }
+}
+
+
+class AnnouncementSyncSettings extends StatefulWidget {
+  const AnnouncementSyncSettings({super.key});
+
+  @override
+  State<AnnouncementSyncSettings> createState() => _AnnouncementSyncSettingsState();
+}
+
+class _AnnouncementSyncSettingsState extends State<AnnouncementSyncSettings> {
+  bool _masterEnabled = true;
+  bool _admissionEnabled = true;
+  bool _scholarshipEnabled = true;
+  bool _placementEnabled = true;
+  bool _isLoading = true;
+  bool _isSaving = false;
+
+  final _doc = FirebaseFirestore.instance.collection('settings').doc('announcement_sync');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final snap = await _doc.get();
+      if (snap.exists) {
+        final data = snap.data()!;
+        setState(() {
+          _masterEnabled = data['autoCreateDocuments'] != false;
+          _admissionEnabled = data['categories']?['admission'] != false;
+          _scholarshipEnabled = data['categories']?['scholarship'] != false;
+          _placementEnabled = data['categories']?['placement'] != false;
+        });
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    setState(() => _isSaving = true);
+    try {
+      await _doc.set({
+        'autoCreateDocuments': _masterEnabled,
+        'categories': {
+          'admission': _admissionEnabled,
+          'scholarship': _scholarshipEnabled,
+          'placement': _placementEnabled,
+        },
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Settings saved'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SettingsTile(
+          title: 'Auto-create documents from announcements',
+          subtitle: 'When a post is synced, automatically create the matching '
+              'admission, scholarship, or placement document.',
+          value: _masterEnabled,
+          onChanged: (v) => setState(() => _masterEnabled = v),
+        ),
+        AnimatedOpacity(
+          opacity: _masterEnabled ? 1.0 : 0.4,
+          duration: const Duration(milliseconds: 200),
+          child: IgnorePointer(
+            ignoring: !_masterEnabled,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16),
+              child: Column(
+                children: [
+                  _SettingsTile(
+                    title: 'Admissions',
+                    subtitle: 'CMUCAT, GSAT, ULHSAT schedules and requirements.',
+                    value: _admissionEnabled,
+                    onChanged: (v) => setState(() => _admissionEnabled = v),
+                    isSubItem: true,
+                  ),
+                  _SettingsTile(
+                    title: 'Scholarships',
+                    subtitle: 'Eligibility, privileges, and deadlines.',
+                    value: _scholarshipEnabled,
+                    onChanged: (v) => setState(() => _scholarshipEnabled = v),
+                    isSubItem: true,
+                  ),
+                  _SettingsTile(
+                    title: 'Placements',
+                    subtitle: 'Partner companies and open positions.',
+                    value: _placementEnabled,
+                    onChanged: (v) => setState(() => _placementEnabled = v),
+                    isSubItem: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: _isSaving ? null : _saveSettings,
+            child: _isSaving
+                ? const SizedBox(width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Save settings'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final bool isSubItem;
+
+  const _SettingsTile({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+    this.isSubItem = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          left: isSubItem
+              ? BorderSide(color: Theme.of(context).dividerColor, width: 2)
+              : BorderSide.none,
+        ),
+        borderRadius: isSubItem ? BorderRadius.zero : BorderRadius.circular(12),
+        boxShadow: isSubItem ? null : [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 1)),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                const SizedBox(height: 4),
+                Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+              ],
+            ),
+          ),
+          Switch(value: value, onChanged: onChanged),
+        ],
+      ),
     );
   }
 }

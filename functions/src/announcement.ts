@@ -51,6 +51,33 @@ interface CohereResult {
 }
 
 
+async function getAutoCreateSettings(): Promise<{
+  enabled: boolean;
+  categories: { admission: boolean; scholarship: boolean; placement: boolean };
+}> {
+  try {
+    const settingsDoc = await db.collection("settings").doc("announcement_sync").get();
+    if (!settingsDoc.exists) {
+      // Default: everything enabled if setting doesn't exist yet
+      return { enabled: true, categories: { admission: true, scholarship: true, placement: true } };
+    }
+    const data = settingsDoc.data()!;
+    return {
+      enabled: data.autoCreateDocuments !== false,
+      categories: {
+        admission: data.categories?.admission !== false,
+        scholarship: data.categories?.scholarship !== false,
+        placement: data.categories?.placement !== false,
+      },
+    };
+  } catch (error) {
+    console.warn("⚠️ Could not read auto-create settings, defaulting to enabled:", error);
+    return { enabled: true, categories: { admission: true, scholarship: true, placement: true } };
+  }
+}
+
+
+
 async function getPageId(): Promise<string> {
   try {
     const tokenDoc = await db
@@ -556,19 +583,20 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
     const accessToken = await getAccessToken();
     console.log("✅ Access token retrieved");
 
-    // Calculate start of current month (midnight on the 1st)
+    // Calculate start of December (midnight on the 1st)
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    startOfMonth.setHours(0, 0, 0, 0);
+    const decemberYear = now.getMonth() >= 11 ? now.getFullYear() : now.getFullYear() - 1;
+    const startOfDecember = new Date(decemberYear, 11, 1);
+    startOfDecember.setHours(0, 0, 0, 0);
 
-    //     const startOfMonth = new Date(2024, 10, 1);
-    // startOfMonth.setHours(0, 0, 0, 0);
+    //     const startOfDecember = new Date(2024, 11, 1);
+    // startOfDecember.setHours(0, 0, 0, 0);
 
     // Convert to Unix timestamp (seconds since epoch)
-    const sinceTimestamp = Math.floor(startOfMonth.getTime() / 1000);
+    const sinceTimestamp = Math.floor(startOfDecember.getTime() / 1000);
 
     console.log("📅 Filtering posts:");
-    console.log(`   Start date: ${startOfMonth.toISOString()}`);
+    console.log(`   Start date: ${startOfDecember.toISOString()}`);
     console.log(`   Unix timestamp: ${sinceTimestamp}`);
     console.log(`   Current time: ${now.toISOString()}`);
 
@@ -584,7 +612,7 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
     console.log("📡 Request params:", {
       ...params,
       access_token: "***",
-      since: `${params.since} (${startOfMonth.toISOString()})`,
+      since: `${params.since} (${startOfDecember.toISOString()})`,
     });
 
     const response = await axios.get<{ data: FacebookPost[] }>(url, {
@@ -595,24 +623,24 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
     console.log("✅ Facebook API response status:", response.status);
     console.log("✅ Posts received:", response.data.data?.length || 0);
 
-    // Filter out posts before this month (double-check on our side)
+    // Filter out posts before December (double-check on our side)
     const filteredPosts = (response.data.data || []).filter((post) => {
       const postDate = new Date(post.created_time);
-      const isThisMonth = postDate >= startOfMonth;
+      const isDecemberOrLater = postDate >= startOfDecember;
 
-      if (!isThisMonth) {
+      if (!isDecemberOrLater) {
         console.log(
           `⏭️ Skipping post ${
             post.id
-          } from ${postDate.toISOString()} (before this month)`
+          } from ${postDate.toISOString()} (before December)`
         );
       }
 
-      return isThisMonth;
+      return isDecemberOrLater;
     });
 
     console.log(
-      `✅ Posts from this month: ${filteredPosts.length}/${
+      `✅ Posts from December onwards: ${filteredPosts.length}/${
         response.data.data?.length || 0
       }`
     );
@@ -2710,9 +2738,23 @@ async function createCategoryAndInfoBank(
   ocrText: string,
   imageCount: number
 ): Promise<void> {
-  const categoryLower = category.toLowerCase();
-  console.log(`📋 Creating ${category} document AND Information Bank...`);
+  // ✅ NEW: Check setting before doing anything
+  const settings = await getAutoCreateSettings();
+  const categoryLower = category.toLowerCase() as "admission" | "scholarship" | "placement";
 
+  if (!settings.enabled) {
+    console.log(`⏭️ Auto-create documents is disabled globally — skipping ${category} for post ${postId}`);
+    return;
+  }
+
+  if (
+    ["admission", "scholarship", "placement"].includes(categoryLower) &&
+    !settings.categories[categoryLower]
+  ) {
+    console.log(`⏭️ Auto-create is disabled for category "${category}" — skipping post ${postId}`);
+    return;
+  }
+  
   try {
     if (categoryLower === "admission") {
       await createAdmissionFromAnnouncement(
@@ -2856,11 +2898,11 @@ async function syncFacebookPostsLogic(): Promise<any> {
   try {
     console.log("📡 Starting Facebook sync...");
 
-    // ✅ Use the updated function that filters by this month
-    console.log("📡 Fetching Facebook posts from this month onwards...");
-    const posts = await fetchFacebookPosts(); // Now filters by this month
+    // ✅ Use the updated function that filters by December
+    console.log("📡 Fetching Facebook posts from December onwards...");
+    const posts = await fetchFacebookPosts(); // Now filters by December
 
-    console.log(`✅ Fetched ${posts.length} posts from this month`);
+    console.log(`✅ Fetched ${posts.length} posts from December onwards`);
 
     let processed = 0;
     let failed = 0;
@@ -2900,13 +2942,13 @@ async function syncFacebookPostsLogic(): Promise<any> {
     return {
       success: true,
       message:
-        `Successfully synced ${processed} posts from this month (${withOCR} with image text extraction)` +
+        `Successfully synced ${processed} posts from December onwards (${withOCR} with image text extraction)` +
         (failed > 0 ? ` (${failed} failed)` : ""),
       count: processed,
       failed: failed,
       withOCR: withOCR,
       total: posts.length,
-      dateFilter: "This month onwards",
+      dateFilter: "December onwards",
     };
   } catch (error: any) {
     console.error("❌ syncFacebookPostsLogic error:", error);
