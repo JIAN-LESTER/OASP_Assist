@@ -23,7 +23,7 @@ export const checkPineconeHealth = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-v2");
+      const index = pinecone.Index("oasp-assist-gemini");
 
       // Try to get index stats as a health check
       await index.describeIndexStats();
@@ -61,6 +61,7 @@ export const generateGeminiEmbedding = onCall(
         {
           model: "models/gemini-embedding-001",
           content: { parts: [{ text }] },
+          outputDimensionality: 768,
         },
         { timeout: 30000 }
       );
@@ -474,7 +475,7 @@ export const queryPinecone = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-v2");
+      const index = pinecone.Index("oasp-assist-gemini");
 
       const results = await index.query({
         vector: embedding,
@@ -515,7 +516,7 @@ export const insertPineconeDocument = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-v2");
+      const index = pinecone.Index("oasp-assist-gemini");
 
       await index.upsert([{
         id,
@@ -548,7 +549,7 @@ export const insertPineconeDocumentBatch = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-v2");
+      const index = pinecone.Index("oasp-assist-gemini");
 
       const vectors = documents.map((doc) => {
         if (!doc.id || !doc.embedding || !doc.metadata) {
@@ -599,7 +600,7 @@ export const deletePineconeDocuments = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-v2");
+      const index = pinecone.Index("oasp-assist-gemini");
 
       await index.deleteMany(ids);
 
@@ -629,7 +630,7 @@ export const getPineconeStats = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-v2");
+      const index = pinecone.Index("oasp-assist-gemini");
 
       const stats = await index.describeIndexStats();
 
@@ -675,7 +676,7 @@ export const fetchPineconeVectors = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-v2");
+      const index = pinecone.Index("oasp-assist-gemini");
 
       const results = await index.fetch(ids);
 
@@ -713,7 +714,7 @@ export const deleteAllPineconeVectors = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-v2");
+      const index = pinecone.Index("oasp-assist-gemini");
 
       if (namespace) {
         await index.deleteAll();

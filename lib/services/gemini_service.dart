@@ -74,6 +74,7 @@ class GeminiService {
           'content': {
             'parts': [{'text': text}]
           },
+          'outputDimensionality': 768,
         }),
       );
 
@@ -148,8 +149,10 @@ class GeminiService {
           'contents': [
             {
               'parts': [{'text': prompt}]
-            }
+            },
+        
           ],
+          'outputDimensionality': 768,
           'generationConfig': {
             'temperature': 0.3,
             'maxOutputTokens': 1024,

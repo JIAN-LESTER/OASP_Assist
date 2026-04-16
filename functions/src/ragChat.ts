@@ -1,4 +1,3 @@
-
 import {onCall, onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
@@ -28,13 +27,12 @@ export const generateEmbedding = onCall(
 
     try {
       const response = await axios.post(
-        // ✅ Use gemini-embedding-001
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY.value()}`,
         {
-          // ✅ No taskType for gemini-embedding-001
           content: {
             parts: [{text}],
           },
+          outputDimensionality: 768,
         },
         {timeout: 30000}
       );
@@ -43,6 +41,12 @@ export const generateEmbedding = onCall(
       if (!Array.isArray(embedding) || embedding.length === 0) {
         throw new Error("Invalid Gemini embedding response");
       }
+
+      // Safety check: always return exactly 768 dimensions.
+      if (embedding.length !== 768) {
+        throw new Error(`Unexpected embedding dimension: ${embedding.length} (expected 768)`);
+      }
+
       return {embedding};
     } catch (error: any) {
       console.error("❌ generateEmbedding error:", error.message);
@@ -54,6 +58,7 @@ export const generateEmbedding = onCall(
     }
   }
 );
+
 // ================= COHERE =================
 
 export const generateCohereEmbedding = onCall(
@@ -92,17 +97,18 @@ export const generateCohereEmbedding = onCall(
 async function generateGeminiEmbedding(
   text: string,
   apiKey: string,
-  inputType: "search_document" | "search_query" = "search_document"
+  // inputType param kept for API compatibility but gemini-embedding-001
+  // doesn't use taskType — outputDimensionality is what matters.
+  _inputType: "search_document" | "search_query" = "search_document"
 ): Promise<number[]> {
   try {
     const response = await axios.post(
-      // ✅ Use gemini-embedding-001
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
       {
-        // ✅ No taskType for gemini-embedding-001
         content: {
           parts: [{text}],
         },
+        outputDimensionality: 768,
       },
       {
         headers: {"Content-Type": "application/json"},
@@ -114,13 +120,17 @@ async function generateGeminiEmbedding(
     if (!Array.isArray(embedding) || embedding.length === 0) {
       throw new Error("Invalid embedding response");
     }
+
+    if (embedding.length !== 768) {
+      throw new Error(`Unexpected embedding size: ${embedding.length} (expected 768)`);
+    }
+
     return embedding;
   } catch (error: any) {
     console.error("❌ Gemini embedding error:", error.message);
     throw error;
   }
 }
-
 
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
   if (vecA.length === 0 || vecB.length === 0 || vecA.length !== vecB.length) {
@@ -141,6 +151,9 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return dotProduct / (Math.sqrt(magnitudeA) * Math.sqrt(magnitudeB));
 }
 
+// FIX: findMatchingFAQ now reads BOTH 'embedding' (auto-promoted / normalised
+// client field) and 'geminiEmbedding' (legacy server-stored field) so no FAQ
+// is ever silently skipped due to a field-name mismatch.
 async function findMatchingFAQ(
   query: string,
   queryEmbedding: number[],
@@ -167,19 +180,32 @@ async function findMatchingFAQ(
 
       if (!faqQuestion || !faqAnswer) continue;
 
+      // FIX: prefer the already-stored embedding (either field name) to avoid
+      // unnecessary Gemini API calls.  Only fall back to generating a new one
+      // when neither field is present.
       let faqEmbedding: number[];
+      const storedEmbedding = data.embedding ?? data.geminiEmbedding;
 
-      if (data.geminiEmbedding && Array.isArray(data.geminiEmbedding)) {
-        faqEmbedding = data.geminiEmbedding;
+      if (storedEmbedding && Array.isArray(storedEmbedding) && storedEmbedding.length === 768) {
+        faqEmbedding = storedEmbedding as number[];
       } else {
+        console.log(`⚠️ No valid 768-d embedding for FAQ "${faqQuestion.substring(0, 40)}" — generating…`);
         faqEmbedding = await generateGeminiEmbedding(faqQuestion, geminiApiKey, "search_document");
+
+        // FIX: Persist BOTH field names so the next read (client or server)
+        // always finds a valid embedding regardless of which field it checks.
         await doc.ref.update({
+          embedding: faqEmbedding,
           geminiEmbedding: faqEmbedding,
-          geminiEmbeddingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          embeddingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
 
-      if (faqEmbedding.length !== queryEmbedding.length) continue;
+      // Skip if dimensions still don't match (shouldn't happen after fix above).
+      if (faqEmbedding.length !== queryEmbedding.length) {
+        console.warn(`⚠️ Skipping FAQ (dim mismatch ${faqEmbedding.length} vs ${queryEmbedding.length}): ${faqQuestion}`);
+        continue;
+      }
 
       const similarity = cosineSimilarity(queryEmbedding, faqEmbedding);
 
@@ -230,12 +256,11 @@ function filterAndRankContext(
     confidence = "medium";
   }
 
-  // ✅ Take more context for better answers (was 3, now 5)
   const qualityThreshold = topScore > 0.65 ? 0.50 : 0.40;
   const filtered = results.filter((r) => r.similarity_score >= qualityThreshold);
 
   const contexts = filtered
-    .slice(0, 5) // Increased from 3 to 5
+    .slice(0, 5)
     .map((doc) => ({
       content: doc.content,
       title: doc.ib_title,
@@ -252,15 +277,11 @@ function buildConversationContext(
 ): string {
   if (!conversationHistory || conversationHistory.length === 0) return "";
 
-  // Take last 10 messages (5 exchanges) for better context
   const recentHistory = conversationHistory.slice(-10);
   const contextParts: string[] = [];
 
   for (const message of recentHistory) {
-    // Map sender to proper role names
     const role = message.sender === "user" ? "User" : "Assistant";
-
-    // Truncate very long messages but keep reasonable length
     const content = message.content.length > 500 ?
       message.content.substring(0, 500) + "..." :
       message.content;
@@ -268,16 +289,8 @@ function buildConversationContext(
     contextParts.push(`${role}: ${content}`);
   }
 
-  const fullContext = contextParts.join("\n\n");
-
-  console.log("📝 Built conversation context:");
-  console.log(`   Messages included: ${recentHistory.length}`);
-  console.log(`   Total context length: ${fullContext.length} chars`);
-
-  return fullContext;
+  return contextParts.join("\n\n");
 }
-
-// ✅ UPDATED: Enhanced prompts to better use conversation history
 
 function buildContextAwarePrompt(
   query: string,
@@ -294,7 +307,6 @@ function buildContextAwarePrompt(
     `Previous conversation context (use this to understand follow-up questions and maintain continuity):\n${conversationHistory}\n\n` :
     "";
 
-  // ✅ NEW: Add current date and time for real-time awareness
   const now = new Date();
   const dateInfo = `Current Date and Time: ${now.toLocaleDateString("en-US", {
     weekday: "long",
@@ -352,7 +364,6 @@ If this is a follow-up question, acknowledge the previous context naturally in y
 Answer:`;
 }
 
-
 function buildPartialInfoPrompt(
   query: string,
   contexts: Array<{ content: string; title: string; score: number }>,
@@ -367,7 +378,6 @@ function buildPartialInfoPrompt(
     `Recent conversation (use for context):\n${conversationHistory}\n\n` :
     "";
 
-  // ✅ NEW: Add current date for partial info prompt too
   const now = new Date();
   const dateInfo = `Current Date: ${now.toLocaleDateString("en-US", {
     weekday: "long",
@@ -418,7 +428,7 @@ async function retrieveRelevantDocuments(
 
     const similarChunks = await pineconeIndex.query({
       vector: queryEmbedding,
-      topK: topK * 4, // Increased multiplier for better filtering
+      topK: topK * 4,
       includeMetadata: true,
     });
 
@@ -427,13 +437,9 @@ async function retrieveRelevantDocuments(
       return [];
     }
 
-    console.log(`📊 Found ${similarChunks.matches.length} chunks`);
-
     const filteredChunks = similarChunks.matches.filter(
       (chunk: any) => (chunk.score || 0) >= minSimilarityScore
     );
-
-    console.log(`✅ ${filteredChunks.length} chunks above threshold`);
 
     const documentChunks: { [key: string]: any[] } = {};
 
@@ -455,8 +461,7 @@ async function retrieveRelevantDocuments(
       const chunks = documentChunks[docId];
       chunks.sort((a, b) => (b.score || 0) - (a.score || 0));
 
-      // ✅ Combine multiple chunks from same document for fuller context
-      const topChunks = chunks.slice(0, 3); // Take top 3 chunks per document
+      const topChunks = chunks.slice(0, 3);
       const combinedContent = topChunks
         .map((c) => c.metadata?.text || c.metadata?.content || c.metadata?.chunk_text || "")
         .filter((text) => text.trim())
@@ -531,7 +536,6 @@ export const generateAnswer = onRequest(
 
       console.log("🔧 Generating query embedding...");
 
-      // ✅ OPTIMIZED: Generate embedding in parallel with Pinecone client init
       const [queryEmbedding, pineconeClient] = await Promise.all([
         generateGeminiEmbedding(query, geminiKey, "search_query"),
         Promise.resolve(new Pinecone({apiKey: pineconeKey})),
@@ -539,13 +543,12 @@ export const generateAnswer = onRequest(
 
       console.log(`✅ Embedding generated: ${queryEmbedding.length} dimensions`);
 
-      // ✅ OPTIMIZED: Check FAQ and init Pinecone index in parallel
       const [faqMatch, pineconeIndex] = await Promise.all([
         findMatchingFAQ(query, queryEmbedding, geminiKey),
-        Promise.resolve(pineconeClient.Index("oasp-assist-v2")),
+        Promise.resolve(pineconeClient.Index("oasp-assist-gemini")),
       ]);
 
-      // FAQ MATCH - OPTIMIZED STREAMING
+      // FAQ MATCH
       if (faqMatch) {
         console.log("✅ Returning FAQ answer");
 
@@ -555,7 +558,6 @@ export const generateAnswer = onRequest(
           res.setHeader("Connection", "keep-alive");
 
           const answer = faqMatch.answer;
-          // ✅ OPTIMIZED: Larger chunks for faster display
           const chunkSize = 40;
 
           for (let i = 0; i < answer.length; i += chunkSize) {
@@ -564,7 +566,6 @@ export const generateAnswer = onRequest(
               type: "content-delta",
               delta: {message: {content: {text: chunk}}},
             })}\n\n`);
-            // ✅ NO artificial delays - stream as fast as possible
           }
 
           res.write(`data: ${JSON.stringify({
@@ -690,7 +691,6 @@ Answer:`;
         let streamSucceeded = false;
 
         try {
-          // ✅ OPTIMIZED: Stream directly without buffering
           for await (const chunk of generateGeminiResponseStream(prompt, geminiKey)) {
             if (chunk && chunk.length > 0) {
               streamSucceeded = true;
@@ -698,7 +698,6 @@ Answer:`;
                 type: "content-delta",
                 delta: {message: {content: {text: chunk}}},
               })}\n\n`);
-              // ✅ NO artificial delays - stream as fast as possible
             }
           }
 
@@ -717,10 +716,8 @@ Answer:`;
 
         // FALLBACK IF STREAMING FAILS
         try {
-          console.log("⚠️ Using fallback non-streaming mode");
           const fullAnswer = await generateGeminiResponse(prompt, geminiKey);
 
-          // ✅ OPTIMIZED: Larger chunks, minimal delay
           const chunkSize = 30;
           for (let i = 0; i < fullAnswer.length; i += chunkSize) {
             const chunk = fullAnswer.substring(i, Math.min(i + chunkSize, fullAnswer.length));
@@ -728,7 +725,6 @@ Answer:`;
               type: "content-delta",
               delta: {message: {content: {text: chunk}}},
             })}\n\n`);
-            // ✅ OPTIMIZED: Minimal delay (5ms instead of 30ms)
             await new Promise((resolve) => setTimeout(resolve, 5));
           }
 
@@ -747,7 +743,6 @@ Answer:`;
           res.end();
         }
       } else {
-        // NON-STREAMING RESPONSE
         const answer = await generateGeminiResponse(prompt, geminiKey);
         res.json({
           answer: answer.trim(),
@@ -775,7 +770,7 @@ async function generateGeminiResponse(
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
       {
-        contents: [{parts: [{text: prompt}]}],
+        contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.3,
           maxOutputTokens: 4096,
@@ -790,7 +785,6 @@ async function generateGeminiResponse(
     );
 
     if (response.status !== 200) {
-      console.error(`❌ Gemini API error: ${response.status}`, response.data);
       throw new Error(`Gemini API error: ${response.statusText}`);
     }
 
@@ -798,20 +792,16 @@ async function generateGeminiResponse(
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!text) {
-      console.error("❌ Empty response structure:", JSON.stringify(data).substring(0, 200));
       throw new Error("Empty response from Gemini");
     }
 
     return text;
   } catch (error: any) {
     console.error("❌ Gemini response error:", error.message);
-    if (error.response) {
-      console.error("   Response data:", error.response.data);
-    }
     throw error;
   }
 }
-// ✅ IMPROVED: Streaming with better config
+
 async function* generateGeminiResponseStream(
   prompt: string,
   apiKey: string
@@ -876,7 +866,6 @@ async function* generateGeminiResponseStream(
 
           if (text) {
             chunkCount++;
-            // ✅ OPTIMIZED: Yield immediately, no batching
             yield text;
           }
 
@@ -899,32 +888,21 @@ async function* generateGeminiResponseStream(
 
 export const resetDailyMessageCounts = onSchedule(
   {
-    schedule: "0 8 * * *", // 8:00 AM daily
-    timeZone: "Asia/Manila", // Philippine Time (UTC+8)
+    schedule: "0 8 * * *",
+    timeZone: "Asia/Manila",
     memory: "256MiB",
   },
   async (event) => {
     try {
       const now = new Date();
       console.log(`🔄 Starting daily message count reset at ${now.toISOString()}`);
-      console.log(`   Philippine Time: ${now.toLocaleString("en-PH", {timeZone: "Asia/Manila"})}`);
 
-      // ✅ FIXED: Get current time in Philippine timezone
       const phNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
-
-      // ✅ FIXED: Reset time is TODAY at 8:00 AM Philippine time
       const resetTime = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate(), 8, 0, 0);
       const resetTimestamp = admin.firestore.Timestamp.fromDate(resetTime);
 
-      console.log(`📅 Reset time: ${resetTime.toISOString()}`);
-      console.log(`   Philippine Time: ${resetTime.toLocaleString("en-PH", {timeZone: "Asia/Manila"})}`);
-
-      // ✅ SIMPLIFIED: Get ALL users (we'll check individually)
       const usersSnapshot = await db.collection("users").get();
 
-      console.log(`📊 Found ${usersSnapshot.docs.length} total users`);
-
-      // Process in batches of 500 (Firestore batch limit)
       const batchSize = 500;
       let processedCount = 0;
       let resetCount = 0;
@@ -937,21 +915,14 @@ export const resetDailyMessageCounts = onSchedule(
           const data = doc.data();
           const lastReset = data.lastMessageResetDate?.toDate();
 
-          // ✅ FIXED: Simplified reset logic
           let shouldReset = false;
 
           if (!lastReset) {
-            // Never been reset - reset now
             shouldReset = true;
-            console.log(`   User ${doc.id.substring(0, 8)}: First time reset`);
           } else {
-            // ✅ FIXED: Check if last reset was BEFORE today's 8 AM
             const lastResetPH = new Date(lastReset.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
-
-            // If last reset was before today at 8 AM, reset
             if (lastResetPH < resetTime) {
               shouldReset = true;
-              console.log(`   User ${doc.id.substring(0, 8)}: Last reset ${lastResetPH.toISOString()}, resetting`);
             }
           }
 
@@ -966,13 +937,9 @@ export const resetDailyMessageCounts = onSchedule(
         }
 
         await batch.commit();
-        console.log(`✅ Processed batch ${Math.floor(i / batchSize) + 1}: ${batchDocs.length} users`);
       }
 
-      console.log("✅ Daily reset complete:");
-      console.log(`   Total processed: ${processedCount}`);
-      console.log(`   Actually reset: ${resetCount}`);
-      console.log(`   Skipped (already reset today): ${processedCount - resetCount}`);
+      console.log(`✅ Daily reset complete: ${resetCount}/${processedCount} users reset`);
     } catch (error: any) {
       console.error("❌ Error in daily reset:", error);
       throw error;
@@ -980,34 +947,17 @@ export const resetDailyMessageCounts = onSchedule(
   }
 );
 
-// ✅ FIXED: Manual reset endpoint for testing
 export const manualResetMessageCounts = onRequest(
   {
     cors: true,
     memory: "256MiB",
   },
   async (req, res) => {
-    // ✅ OPTIONAL: Add authentication for production
-    // Uncomment these lines to require authorization:
-    /*
-    const authHeader = req.headers.authorization;
-    if (!authHeader || authHeader !== 'Bearer YOUR_SECRET_KEY') {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-    */
-
     try {
       const now = new Date();
-      console.log(`🔧 Manual reset triggered at ${now.toISOString()}`);
-
       const phNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
-
-      // ✅ FIXED: Reset to today at 8:00 AM
       const resetTime = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate(), 8, 0, 0);
       const resetTimestamp = admin.firestore.Timestamp.fromDate(resetTime);
-
-      console.log(`📅 Resetting to: ${resetTime.toISOString()}`);
 
       const usersSnapshot = await db.collection("users").get();
 
@@ -1029,14 +979,10 @@ export const manualResetMessageCounts = onRequest(
         await batch.commit();
       }
 
-      console.log(`✅ Manual reset complete: ${resetCount} users reset`);
-
       res.json({
         success: true,
         reset: resetCount,
         timestamp: now.toISOString(),
-        philippineTime: phNow.toISOString(),
-        resetTime: resetTime.toISOString(),
       });
     } catch (error: any) {
       console.error("❌ Error in manual reset:", error);
@@ -1044,7 +990,6 @@ export const manualResetMessageCounts = onRequest(
     }
   }
 );
-
 
 export const checkResetStatus = onRequest(
   {
@@ -1056,23 +1001,16 @@ export const checkResetStatus = onRequest(
       const now = new Date();
       const phNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
 
-      // Today's reset time at 8:00 AM
       const todayResetTime = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate(), 8, 0, 0);
 
-      // Next reset time
       let nextResetTime: Date;
       if (phNow < todayResetTime) {
-        // Haven't hit today's reset yet
         nextResetTime = todayResetTime;
       } else {
-        // Today's reset has passed, next is tomorrow
         nextResetTime = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate() + 1, 8, 0, 0);
       }
 
-      // Sample 10 users to check status
-      const usersSnapshot = await db.collection("users")
-        .limit(10)
-        .get();
+      const usersSnapshot = await db.collection("users").limit(10).get();
 
       const userStatus = usersSnapshot.docs.map((doc) => {
         const data = doc.data();
@@ -1085,24 +1023,14 @@ export const checkResetStatus = onRequest(
           userId: doc.id.substring(0, 8) + "...",
           messageCount: data.dailyMessageCount || 0,
           lastReset: lastResetPH ? lastResetPH.toISOString() : "never",
-          lastResetPH: lastResetPH ? lastResetPH.toLocaleString("en-PH", {timeZone: "Asia/Manila"}) : "never",
           needsReset: !lastResetPH || lastResetPH < todayResetTime,
         };
       });
 
-      const timeUntilReset = getTimeUntilReset(phNow, nextResetTime);
-
       res.json({
         currentTime: now.toISOString(),
         philippineTime: phNow.toISOString(),
-        philippineTimeFormatted: phNow.toLocaleString("en-PH", {timeZone: "Asia/Manila"}),
-        todayResetTime: todayResetTime.toISOString(),
-        todayResetTimeFormatted: todayResetTime.toLocaleString("en-PH", {timeZone: "Asia/Manila"}),
         nextResetTime: nextResetTime.toISOString(),
-        nextResetTimeFormatted: nextResetTime.toLocaleString("en-PH", {timeZone: "Asia/Manila"}),
-        timeUntilReset: timeUntilReset,
-        scheduledFunctionCron: "0 8 * * *",
-        timezone: "Asia/Manila (UTC+8)",
         sampleUsers: userStatus,
       });
     } catch (error: any) {
@@ -1111,19 +1039,3 @@ export const checkResetStatus = onRequest(
     }
   }
 );
-
-function getTimeUntilReset(now: Date, resetTime: Date): string {
-  let nextReset: Date;
-
-  if (now < resetTime) {
-    nextReset = resetTime;
-  } else {
-    nextReset = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 8, 0, 0);
-  }
-
-  const diff = nextReset.getTime() - now.getTime();
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-  return `${hours}h ${minutes}m`;
-}
