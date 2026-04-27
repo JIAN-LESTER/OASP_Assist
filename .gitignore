@@ -12,11 +12,29 @@
 .swiftpm/
 migrate_working_dir/
 
+# .gitignore
+# Environment files - NEVER commit these!
+.env
+.env.local
+.env.*.local
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+
+# Flutter
+*.g.dart
+*.freezed.dart
+build/
+
 # IntelliJ related
 *.iml
 *.ipr
 *.iws
 .idea/
+
+.env
 
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line

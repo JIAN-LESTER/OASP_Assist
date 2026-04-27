@@ -1,288 +1,134 @@
-import { onRequest } from "firebase-functions/v2/https";
-import { defineSecret } from "firebase-functions/params";
+import {onCall, onRequest} from "firebase-functions/v2/https";
+import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
-import { Pinecone } from "@pinecone-database/pinecone";
+import {Pinecone} from "@pinecone-database/pinecone";
 import axios from "axios";
+import {onSchedule} from "firebase-functions/scheduler";
 
 // Secrets
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
+const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
 
-// Firestore reference
 const db = admin.firestore();
 
-export async function generateCohereEmbedding(
-  text: string,
-  apiKey: string,
-  inputType: "search_document" | "search_query" = "search_document"
-): Promise<number[]> {
-  try {
+// ============================================================================
+// GEMINI FUNCTIONS
+// ============================================================================
+
+const GEMINI_MODEL = "gemini-2.5-flash";
+
+export const generateEmbedding = onCall(
+  {secrets: [GEMINI_API_KEY]},
+  async (request) => {
+    if (!request.auth) throw new Error("Unauthorized");
+    const {text} = request.data;
+    if (!text) throw new Error("Text required");
+
+    try {
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY.value()}`,
+        {
+          content: {
+            parts: [{text}],
+          },
+          outputDimensionality: 768,
+        },
+        {timeout: 30000}
+      );
+
+      const embedding = response.data?.embedding?.values;
+      if (!Array.isArray(embedding) || embedding.length === 0) {
+        throw new Error("Invalid Gemini embedding response");
+      }
+
+      // Safety check: always return exactly 768 dimensions.
+      if (embedding.length !== 768) {
+        throw new Error(`Unexpected embedding dimension: ${embedding.length} (expected 768)`);
+      }
+
+      return {embedding};
+    } catch (error: any) {
+      console.error("❌ generateEmbedding error:", error.message);
+      if (error.response) {
+        console.error("   Status:", error.response.status);
+        console.error("   Data:", JSON.stringify(error.response.data).substring(0, 500));
+      }
+      throw new Error(`Embedding failed: ${error.message}`);
+    }
+  }
+);
+
+// ================= COHERE =================
+
+export const generateCohereEmbedding = onCall(
+  {secrets: [COHERE_API_KEY]},
+  async (request) => {
+    if (!request.auth) throw new Error("Unauthorized");
+
+    const {text} = request.data;
+    if (!text) throw new Error("Text required");
+
     const response = await axios.post(
       "https://api.cohere.ai/v1/embed",
       {
         texts: [text],
         model: "embed-multilingual-v3.0",
-        input_type: inputType,
+        input_type: "search_document",
       },
       {
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          "Authorization": `Bearer ${COHERE_API_KEY.value()}`,
           "Content-Type": "application/json",
         },
         timeout: 30000,
       }
     );
 
-    if (response.status !== 200) {
-      throw new Error(`Cohere Embed API error: ${response.statusText}`);
+    const embedding = response.data?.embeddings?.[0];
+    if (!Array.isArray(embedding)) {
+      throw new Error("Invalid Cohere embedding");
     }
 
-    const data = response.data as { embeddings: number[][] };
-    return data.embeddings[0];
-  } catch (error) {
-    console.error("Error generating Cohere embedding:", error);
-    throw error;
+    return {embedding};
   }
-}
+);
 
-async function* generateCohereResponseStream(
-  prompt: string,
-  apiKey: string
-): AsyncGenerator<string, void, unknown> {
-  try {
-    const response = await fetch("https://api.cohere.ai/v1/chat", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "command-a-03-2025",
-        message: prompt,
-        max_tokens: 1024,
-        temperature: 0.3,
-        stream: true,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Cohere Chat API error: ${response.statusText}`);
-    }
-
-    if (!response.body) {
-      throw new Error("Response body is null");
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-
-      // Keep the last incomplete line in buffer
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-
-        // Skip empty lines and comments
-        if (!trimmedLine || trimmedLine.startsWith(":")) continue;
-
-        // Remove "data: " prefix
-        const jsonStr = trimmedLine.startsWith("data: ")
-          ? trimmedLine.substring(6).trim()
-          : trimmedLine;
-
-        // Skip DONE signal or empty data
-        if (jsonStr === "[DONE]" || !jsonStr) continue;
-
-        try {
-          const data = JSON.parse(jsonStr);
-
-          console.log("📦 Stream event:", data.event_type || data.type);
-
-          // Handle different Cohere streaming event types
-          if (data.event_type === "text-generation" && data.text) {
-            yield data.text;
-          } else if (data.event_type === "stream-start") {
-            console.log("🌊 Stream started");
-          } else if (data.event_type === "search-queries-generation") {
-            console.log("🔍 Search queries generated");
-          } else if (data.event_type === "search-results") {
-            console.log("📚 Search results received");
-          } else if (data.event_type === "stream-end") {
-            console.log("✅ Stream ended");
-            if (data.response && data.response.text) {
-              // Some models return final text in stream-end
-              yield data.response.text;
-            }
-            break;
-          }
-          // Handle alternative format (some Cohere versions use 'type' instead of 'event_type')
-          else if (
-            data.type === "content-delta" &&
-            data.delta?.message?.content?.text
-          ) {
-            yield data.delta.message.content.text;
-          } else if (data.type === "message-end") {
-            console.log("✅ Message ended");
-            break;
-          }
-          // Handle error events
-          else if (data.event_type === "error" || data.error) {
-            throw new Error(data.error || "Stream error occurred");
-          }
-        } catch (parseError) {
-          console.error("⚠️ Error parsing streaming chunk:", parseError);
-          console.error("⚠️ Problematic line:", trimmedLine);
-          // Continue processing other chunks instead of breaking
-          continue;
-        }
-      }
-    }
-
-    console.log("✅ Streaming complete");
-  } catch (error) {
-    console.error("❌ Error generating Cohere streaming response:", error);
-    throw error;
-  }
-}
-
-/**
- * Non-streaming version (kept for backward compatibility)
- */
-export async function generateCohereResponse(
-  prompt: string,
-  apiKey: string
-): Promise<string> {
+async function generateGeminiEmbedding(
+  text: string,
+  apiKey: string,
+  // inputType param kept for API compatibility but gemini-embedding-001
+  // doesn't use taskType — outputDimensionality is what matters.
+  _inputType: "search_document" | "search_query" = "search_document"
+): Promise<number[]> {
   try {
     const response = await axios.post(
-      "https://api.cohere.ai/v1/chat",
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
       {
-        model: "command-a-03-2025",
-        message: prompt,
-        max_tokens: 1024,
-        temperature: 0.3,
+        content: {
+          parts: [{text}],
+        },
+        outputDimensionality: 768,
       },
       {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
+        headers: {"Content-Type": "application/json"},
         timeout: 30000,
       }
     );
 
-    if (response.status !== 200) {
-      throw new Error(`Cohere Chat API error: ${response.statusText}`);
+    const embedding = response.data?.embedding?.values;
+    if (!Array.isArray(embedding) || embedding.length === 0) {
+      throw new Error("Invalid embedding response");
     }
 
-    const data = response.data as { text?: string };
-    return data.text || "";
-  } catch (error) {
-    console.error("Error generating Cohere response:", error);
+    if (embedding.length !== 768) {
+      throw new Error(`Unexpected embedding size: ${embedding.length} (expected 768)`);
+    }
+
+    return embedding;
+  } catch (error: any) {
+    console.error("❌ Gemini embedding error:", error.message);
     throw error;
-  }
-}
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-function getContextualContent(chunks: any[], bestChunk: any): string {
-  try {
-    console.log(`📝 Processing ${chunks.length} chunk(s)`);
-    console.log(
-      "📝 Best chunk metadata keys:",
-      Object.keys(bestChunk.metadata || {})
-    );
-
-    if (chunks.length === 1) {
-      const text =
-        bestChunk.metadata?.text ||
-        bestChunk.metadata?.content ||
-        bestChunk.metadata?.chunk_text ||
-        bestChunk.metadata?.body ||
-        "";
-
-      if (!text || text.trim().length === 0) {
-        console.log("⚠️ Warning: No text content found in metadata");
-        console.log(
-          "📝 Metadata keys available:",
-          Object.keys(bestChunk.metadata || {})
-        );
-      }
-
-      const cleanText = text.trim();
-      console.log(`📝 Single chunk content length: ${cleanText.length}`);
-      return cleanText;
-    }
-
-    const sortedChunks = chunks
-      .slice()
-      .sort(
-        (a, b) =>
-          (a.metadata?.chunkIndex ?? a.metadata?.chunk_index ?? 0) -
-          (b.metadata?.chunkIndex ?? b.metadata?.chunk_index ?? 0)
-      );
-
-    const bestChunkIndex =
-      bestChunk.metadata?.chunkIndex ?? bestChunk.metadata?.chunk_index ?? 0;
-
-    const contextChunks = sortedChunks.filter((chunk) => {
-      const chunkIndex =
-        chunk.metadata?.chunkIndex ?? chunk.metadata?.chunk_index ?? 0;
-      return Math.abs(chunkIndex - bestChunkIndex) <= 1;
-    });
-
-    contextChunks.sort(
-      (a, b) =>
-        (a.metadata?.chunkIndex ?? a.metadata?.chunk_index ?? 0) -
-        (b.metadata?.chunkIndex ?? b.metadata?.chunk_index ?? 0)
-    );
-
-    const contentParts: string[] = [];
-    for (const chunk of contextChunks) {
-      const content =
-        chunk.metadata?.text ||
-        chunk.metadata?.content ||
-        chunk.metadata?.chunk_text ||
-        chunk.metadata?.body ||
-        "";
-
-      const cleanContent = content.trim();
-      if (cleanContent.length > 0) {
-        contentParts.push(cleanContent);
-      } else {
-        console.log(
-          `⚠️ Empty content in chunk index ${chunk.metadata?.chunkIndex}`
-        );
-      }
-    }
-
-    if (contentParts.length === 0) {
-      console.log(
-        `❌ No content parts found across ${contextChunks.length} chunks`
-      );
-      return "";
-    }
-
-    const result = contentParts.join("\n\n").trim();
-    console.log(
-      `📝 Combined content length: ${result.length} from ${contentParts.length} chunks`
-    );
-    return result;
-  } catch (error) {
-    console.error("Error getting contextual content:", error);
-    const fallback =
-      bestChunk.metadata?.text || bestChunk.metadata?.content || "";
-    console.log(`📝 Using fallback, length: ${fallback.length}`);
-    return fallback;
   }
 }
 
@@ -305,125 +151,26 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return dotProduct / (Math.sqrt(magnitudeA) * Math.sqrt(magnitudeB));
 }
 
-function buildConversationContext(
-  conversationHistory: Array<{ sender: string; content: string }>
-): string {
-  if (!conversationHistory || conversationHistory.length === 0) return "";
-
-  const recentHistory = conversationHistory.slice(-6);
-  const contextParts: string[] = [];
-
-  for (const message of recentHistory) {
-    const role = message.sender === "user" ? "User" : "Assistant";
-    const content =
-      message.content.length > 500
-        ? message.content.substring(0, 500) + "..."
-        : message.content;
-    contextParts.push(`${role}: ${content}`);
-  }
-
-  return contextParts.join("\n");
-}
-
-async function enhanceQueryWithContext(
-  query: string,
-  conversationContext: string,
-  cohereApiKey: string
-): Promise<string> {
-  if (!conversationContext) return query;
-
-  try {
-    const enhancementPrompt = `Based on the conversation history, enhance this query to include relevant context for better information retrieval.
-
-Conversation History:
-${conversationContext}
-
-Current Query: "${query}"
-
-Enhanced Query (keep it concise, focus on key concepts):`;
-
-    const enhanced = await generateCohereResponse(
-      enhancementPrompt,
-      cohereApiKey
-    );
-
-    if (!enhanced || enhanced.trim().length === 0) {
-      return query;
-    }
-
-    return `${query} ${enhanced.trim()}`;
-  } catch (error) {
-    console.error("Error enhancing query:", error);
-    return query;
-  }
-}
-
-function buildDocumentContext(
-  results: Array<{
-    ibID: string;
-    ib_title: string;
-    content: string;
-    similarity_score: number;
-  }>
-): string {
-  const sorted = results
-    .slice()
-    .sort((a, b) => b.similarity_score - a.similarity_score);
-  const contextParts: string[] = [];
-
-  for (let i = 0; i < Math.min(3, sorted.length); i++) {
-    const doc = sorted[i];
-    const relevance = Math.round(doc.similarity_score * 100);
-    contextParts.push(
-      `Document: ${doc.ib_title} (Relevance: ${relevance}%)\nContent: ${doc.content}`
-    );
-  }
-
-  return contextParts.join("\n\n---\n\n");
-}
-
-function buildContextAwarePrompt(
-  query: string,
-  documentContext: string,
-  conversationHistory: string
-): string {
-  return `You are OASP Assist, the official assistant for Central Mindanao University's Office of Admissions, Scholarships, and Placements.
-
-CONTEXT AWARENESS INSTRUCTIONS:
-- Consider the conversation history to understand the context and any follow-up questions
-- If the user is asking a follow-up question (like "what are those?" or "how many?"), refer to the previous conversation to understand what they're asking about
-- Maintain continuity in the conversation by referencing previous topics when relevant
-- Only answer based on the provided document context below
-- If the context doesn't contain enough information, say: "I don't have complete information about that. Please contact OASP staff for detailed assistance."
-
-CONVERSATION HISTORY:
-${conversationHistory}
-
-CURRENT QUESTION: "${query}"
-
-AVAILABLE DOCUMENT CONTEXT:
-${documentContext}
-
-Based on the conversation history and document context above, provide a helpful and contextually aware answer:`;
-}
-
+// FIX: findMatchingFAQ now reads BOTH 'embedding' (auto-promoted / normalised
+// client field) and 'geminiEmbedding' (legacy server-stored field) so no FAQ
+// is ever silently skipped due to a field-name mismatch.
 async function findMatchingFAQ(
   query: string,
   queryEmbedding: number[],
-  cohereApiKey: string,
-  similarityThreshold = 0.9
-): Promise<{ question: string; answer: string; similarity: number } | null> {
+  geminiApiKey: string,
+  similarityThreshold = 0.75
+): Promise<{ question: string; answer: string; similarity: number; category: string } | null> {
   try {
+    console.log(`🔍 FAQ MATCHING START for: "${query}"`);
+
     const faqSnapshot = await db
       .collection("faqs")
       .where("answer", "!=", "")
       .get();
 
-    let bestMatch: {
-      question: string;
-      answer: string;
-      similarity: number;
-    } | null = null;
+    console.log(`📚 Checking ${faqSnapshot.docs.length} FAQs`);
+
+    let bestMatch: any = null;
     let highestSimilarity = 0;
 
     for (const doc of faqSnapshot.docs) {
@@ -433,17 +180,31 @@ async function findMatchingFAQ(
 
       if (!faqQuestion || !faqAnswer) continue;
 
+      // FIX: prefer the already-stored embedding (either field name) to avoid
+      // unnecessary Gemini API calls.  Only fall back to generating a new one
+      // when neither field is present.
       let faqEmbedding: number[];
-      if (data.embedding && Array.isArray(data.embedding)) {
-        faqEmbedding = data.embedding;
-      } else {
-        faqEmbedding = await generateCohereEmbedding(
-          faqQuestion,
-          cohereApiKey,
-          "search_document"
-        );
+      const storedEmbedding = data.embedding ?? data.geminiEmbedding;
 
-        await doc.ref.update({ embedding: faqEmbedding });
+      if (storedEmbedding && Array.isArray(storedEmbedding) && storedEmbedding.length === 768) {
+        faqEmbedding = storedEmbedding as number[];
+      } else {
+        console.log(`⚠️ No valid 768-d embedding for FAQ "${faqQuestion.substring(0, 40)}" — generating…`);
+        faqEmbedding = await generateGeminiEmbedding(faqQuestion, geminiApiKey, "search_document");
+
+        // FIX: Persist BOTH field names so the next read (client or server)
+        // always finds a valid embedding regardless of which field it checks.
+        await doc.ref.update({
+          embedding: faqEmbedding,
+          geminiEmbedding: faqEmbedding,
+          embeddingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Skip if dimensions still don't match (shouldn't happen after fix above).
+      if (faqEmbedding.length !== queryEmbedding.length) {
+        console.warn(`⚠️ Skipping FAQ (dim mismatch ${faqEmbedding.length} vs ${queryEmbedding.length}): ${faqQuestion}`);
+        continue;
       }
 
       const similarity = cosineSimilarity(queryEmbedding, faqEmbedding);
@@ -453,232 +214,280 @@ async function findMatchingFAQ(
         bestMatch = {
           question: faqQuestion,
           answer: faqAnswer,
+          category: data.category || "General",
           similarity: similarity,
         };
       }
     }
 
     if (bestMatch) {
-      console.log(
-        `Found FAQ match: "${
-          bestMatch.question
-        }" (similarity: ${bestMatch.similarity.toFixed(3)})`
-      );
-
-      const faqDoc = faqSnapshot.docs.find(
-        (doc) => doc.data().question === bestMatch!.question
-      );
-      if (faqDoc) {
-        await faqDoc.ref.update({
-          similarityCount: admin.firestore.FieldValue.increment(1),
-          lastAsked: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
+      console.log(`✅ FAQ MATCH: ${bestMatch.question.substring(0, 50)}... (${bestMatch.similarity.toFixed(3)})`);
+    } else {
+      console.log(`❌ No FAQ match above threshold ${similarityThreshold}`);
     }
 
     return bestMatch;
   } catch (error) {
-    console.error("Error finding matching FAQ:", error);
+    console.error("❌ Error in findMatchingFAQ:", error);
     return null;
   }
+}
+
+function filterAndRankContext(
+  results: Array<{
+    ibID: string;
+    ib_title: string;
+    content: string;
+    similarity_score: number;
+  }>,
+  query: string
+): {
+  contexts: Array<{ content: string; title: string; score: number }>;
+  confidence: "high" | "medium" | "low";
+} {
+  const topScore = results[0]?.similarity_score || 0;
+  const avgScore = results.reduce((sum, r) => sum + r.similarity_score, 0) / results.length;
+
+  let confidence: "high" | "medium" | "low" = "low";
+
+  if (topScore > 0.70 && avgScore > 0.55) {
+    confidence = "high";
+  } else if (topScore > 0.55 && avgScore > 0.40) {
+    confidence = "medium";
+  }
+
+  const qualityThreshold = topScore > 0.65 ? 0.50 : 0.40;
+  const filtered = results.filter((r) => r.similarity_score >= qualityThreshold);
+
+  const contexts = filtered
+    .slice(0, 5)
+    .map((doc) => ({
+      content: doc.content,
+      title: doc.ib_title,
+      score: doc.similarity_score,
+    }));
+
+  console.log(`📊 Context confidence: ${confidence} (top: ${topScore.toFixed(2)}, avg: ${avgScore.toFixed(2)})`);
+
+  return {contexts, confidence};
+}
+
+function buildConversationContext(
+  conversationHistory: Array<{ sender: string; content: string }>
+): string {
+  if (!conversationHistory || conversationHistory.length === 0) return "";
+
+  const recentHistory = conversationHistory.slice(-10);
+  const contextParts: string[] = [];
+
+  for (const message of recentHistory) {
+    const role = message.sender === "user" ? "User" : "Assistant";
+    const content = message.content.length > 500 ?
+      message.content.substring(0, 500) + "..." :
+      message.content;
+
+    contextParts.push(`${role}: ${content}`);
+  }
+
+  return contextParts.join("\n\n");
+}
+
+function buildContextAwarePrompt(
+  query: string,
+  contexts: Array<{ content: string; title: string; score: number }>,
+  conversationHistory: string,
+  confidence: "high" | "medium" | "low"
+): string {
+  let knowledgeSection = "";
+  contexts.forEach((ctx, idx) => {
+    knowledgeSection += `Document ${idx + 1}: ${ctx.title}\n${ctx.content}\n\n`;
+  });
+
+  const historySection = conversationHistory ?
+    `Previous conversation context (use this to understand follow-up questions and maintain continuity):\n${conversationHistory}\n\n` :
+    "";
+
+  const now = new Date();
+  const dateInfo = `Current Date and Time: ${now.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })}, ${now.toLocaleTimeString("en-US")}`;
+
+  return `You are OASP Assist, the official AI assistant for Central Mindanao University's Office of Admissions, Scholarships, and Placement (OASP).
+
+${dateInfo}
+
+${historySection}Current question: "${query}"
+
+Knowledge Base Documents:
+${knowledgeSection}
+
+CRITICAL INSTRUCTIONS:
+1. **Real-time Awareness**: 
+   - You know the current date and time shown above
+   - Use this information to provide context-aware responses about deadlines, dates, and time-sensitive matters
+   - Calculate relative dates (e.g., "in 2 weeks", "next month") based on current date
+
+2. **Context Awareness**: 
+   - If this is a follow-up question (indicated by conversation history), reference previous discussion
+   - Use pronouns and context clues from history to understand what "it", "that", "those" refer to
+   - Maintain continuity in your responses based on what was discussed before
+
+3. **Intelligent Fallback**:
+   - If the knowledge base has SOME relevant information, provide it comprehensively
+   - If the knowledge base lacks specific details but you can infer or provide general guidance, do so
+   - ONLY suggest contacting OASP if the question requires truly specific information not available
+
+4. **Comprehensiveness**: Provide detailed, thorough answers using ALL relevant information from the documents
+
+5. **Accuracy**: Prioritize information from the knowledge base, but use general knowledge when appropriate for:
+   - Date calculations and calendar information
+   - General university processes and procedures
+   - Common academic terminology and concepts
+
+6. **Structure**: Organize complex answers with clear explanations, including:
+   - Step-by-step procedures when applicable
+   - Specific requirements, dates, and deadlines
+   - All relevant details (fees, contacts, locations, etc.)
+
+7. **Natural Language**: Write as a knowledgeable university assistant would - friendly but professional
+
+8. **NO UNNECESSARY DISCLAIMERS**: 
+   - Don't say "I don't have information" if you can provide helpful general guidance
+   - Don't suggest contacting OASP for information you can reasonably answer
+   - Be helpful and resourceful with the information available
+
+If this is a follow-up question, acknowledge the previous context naturally in your response.
+
+Answer:`;
+}
+
+function buildPartialInfoPrompt(
+  query: string,
+  contexts: Array<{ content: string; title: string; score: number }>,
+  conversationHistory: string
+): string {
+  let knowledgeSection = "";
+  contexts.forEach((ctx) => {
+    knowledgeSection += `[${ctx.title}]\n${ctx.content}\n\n`;
+  });
+
+  const historySection = conversationHistory ?
+    `Recent conversation (use for context):\n${conversationHistory}\n\n` :
+    "";
+
+  const now = new Date();
+  const dateInfo = `Current Date: ${now.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })}`;
+
+  return `You are OASP Assist for Central Mindanao University.
+
+${dateInfo}
+
+${historySection}Question: "${query}"
+
+Available Information:
+${knowledgeSection}
+
+Instructions:
+1. **Real-time Context**: You know today's date - use it to provide relevant time-based information
+2. If this is a follow-up question, use conversation history to understand the full context
+3. Provide whatever specific information IS available from the documents
+4. Be thorough with what you CAN answer
+5. If you can provide helpful general guidance even without specific details, do so
+6. Use your knowledge of university processes to supplement available information when appropriate
+7. Only suggest contacting OASP if truly critical specific information is genuinely unavailable
+8. Maintain natural conversation flow if there's prior context
+
+Answer:`;
 }
 
 async function retrieveRelevantDocuments(
   query: string,
   queryEmbedding: number[],
   pineconeIndex: any,
-  topK = 5,
-  minSimilarityScore = 0.3
-): Promise<
-  Array<{
-    ibID: string;
-    ib_title: string;
-    content: string;
-    source: string;
-    categoryID: string;
-    similarity_score: number;
-    chunk_info: any;
-  }>
-> {
+  topK = 8,
+  minSimilarityScore = 0.30
+): Promise<Array<{
+  ibID: string;
+  ib_title: string;
+  content: string;
+  source: string;
+  categoryID: string;
+  similarity_score: number;
+  chunk_info: any;
+}>> {
   try {
-    console.log(`🔍 Starting retrieval for query: "${query}"`);
-    console.log(`📊 Query embedding dimensions: ${queryEmbedding.length}`);
-    console.log(`📊 Requesting topK: ${topK * 3} chunks`);
+    console.log(`🔍 Querying Pinecone for: "${query}"`);
 
     const similarChunks = await pineconeIndex.query({
       vector: queryEmbedding,
-      topK: topK * 3,
+      topK: topK * 4,
       includeMetadata: true,
     });
 
-    console.log(
-      "📊 Pinecone response:",
-      JSON.stringify({
-        matchCount: similarChunks.matches?.length || 0,
-        hasMatches: !!similarChunks.matches,
-        namespace: similarChunks.namespace,
-      })
-    );
-
     if (!similarChunks.matches || similarChunks.matches.length === 0) {
-      console.log("❌ No similar document chunks found in Pinecone");
-      console.log("⚠️ Check if documents are indexed in Pinecone");
+      console.log("❌ No documents found in Pinecone");
       return [];
-    }
-
-    console.log(`📊 Found ${similarChunks.matches.length} similar chunks`);
-
-    if (similarChunks.matches.length > 0) {
-      const firstMatch = similarChunks.matches[0];
-      console.log(`📝 First match score: ${firstMatch.score}`);
-      console.log(
-        "📝 First match metadata keys:",
-        Object.keys(firstMatch.metadata || {})
-      );
     }
 
     const filteredChunks = similarChunks.matches.filter(
       (chunk: any) => (chunk.score || 0) >= minSimilarityScore
     );
 
-    console.log(
-      `✅ Filtered chunks: ${filteredChunks.length} (threshold: ${minSimilarityScore})`
-    );
-
-    if (filteredChunks.length === 0) {
-      console.log(
-        `❌ No chunks meet minimum similarity threshold of ${minSimilarityScore}`
-      );
-      console.log(
-        `⚠️ Best score found: ${similarChunks.matches[0]?.score || 0}`
-      );
-      return [];
-    }
-
     const documentChunks: { [key: string]: any[] } = {};
 
     for (const chunk of filteredChunks) {
       const metadata = chunk.metadata || {};
+      const docId = metadata.docId || metadata.originalDocId || chunk.id?.split("_chunk_")[0];
 
-      const originalDocId =
-        metadata.docId ||
-        metadata.originalDocId ||
-        metadata.documentId ||
-        metadata.id ||
-        chunk.id?.split("_chunk_")[0];
-
-      console.log(
-        `📝 Chunk ${chunk.id}: docId = ${originalDocId}, score = ${chunk.score}`
-      );
-
-      if (originalDocId) {
-        if (!documentChunks[originalDocId]) {
-          documentChunks[originalDocId] = [];
+      if (docId) {
+        if (!documentChunks[docId]) {
+          documentChunks[docId] = [];
         }
-        documentChunks[originalDocId].push({
-          ...chunk,
-          metadata,
-        });
-      } else {
-        console.log(`⚠️ Chunk ${chunk.id} has no identifiable document ID`);
+        documentChunks[docId].push({...chunk, metadata});
       }
     }
 
-    console.log(
-      `📄 Grouped chunks into ${Object.keys(documentChunks).length} documents`
-    );
-
-    const results: Array<{
-      ibID: string;
-      ib_title: string;
-      content: string;
-      source: string;
-      categoryID: string;
-      similarity_score: number;
-      chunk_info: any;
-    }> = [];
+    const results: any[] = [];
 
     for (const docId of Object.keys(documentChunks)) {
       const chunks = documentChunks[docId];
-
       chunks.sort((a, b) => (b.score || 0) - (a.score || 0));
 
-      const bestChunk = chunks[0];
-      const bestScore = bestChunk.score || 0;
+      const topChunks = chunks.slice(0, 3);
+      const combinedContent = topChunks
+        .map((c) => c.metadata?.text || c.metadata?.content || c.metadata?.chunk_text || "")
+        .filter((text) => text.trim())
+        .join("\n\n");
 
-      const contextualContent = getContextualContent(chunks, bestChunk);
+      if (!combinedContent.trim()) continue;
 
-      if (!contextualContent || contextualContent.trim().length === 0) {
-        console.log(
-          `⚠️ Empty contextual content for document ${docId}, skipping`
-        );
-        continue;
-      }
-
-      const docMetadata = await getDocumentMetadata(docId);
-
-      const result = {
-        ibID: docMetadata?.ibID || docMetadata?.id || docId,
-        ib_title:
-          docMetadata?.ib_title ||
-          docMetadata?.title ||
-          bestChunk.metadata?.originalTitle ||
-          bestChunk.metadata?.fileName ||
-          bestChunk.metadata?.title ||
-          "Untitled Document",
-        content: contextualContent,
-        source:
-          docMetadata?.source ||
-          bestChunk.metadata?.source ||
-          bestChunk.metadata?.fileName ||
-          "Unknown",
-        categoryID:
-          docMetadata?.category ||
-          docMetadata?.categoryID ||
-          bestChunk.metadata?.category ||
-          "General",
-        similarity_score: bestScore,
+      results.push({
+        ibID: docId,
+        ib_title: topChunks[0].metadata?.title || "Untitled",
+        content: combinedContent.trim(),
+        source: topChunks[0].metadata?.source || "Unknown",
+        categoryID: topChunks[0].metadata?.category || "General",
+        similarity_score: topChunks[0].score || 0,
         chunk_info: {
           total_chunks_found: chunks.length,
-          best_chunk_index:
-            bestChunk.metadata?.chunkIndex ||
-            bestChunk.metadata?.chunk_index ||
-            0,
-          is_chunked_document: chunks.length > 1,
+          chunks_used: topChunks.length,
         },
-      };
-
-      results.push(result);
-      console.log(
-        `✅ Added result: ${result.ib_title} (score: ${bestScore.toFixed(3)})`
-      );
+      });
     }
 
     results.sort((a, b) => b.similarity_score - a.similarity_score);
-
-    const topResults = results.slice(0, topK);
-
-    console.log(`🎯 Final results: ${topResults.length} documents retrieved`);
-    return topResults;
+    return results.slice(0, topK);
   } catch (error) {
-    console.error("❌ Error retrieving relevant documents:", error);
+    console.error("❌ Error retrieving documents:", error);
     return [];
-  }
-}
-
-async function getDocumentMetadata(docId: string): Promise<any> {
-  try {
-    const safeDocId = docId.replace(/[/\\]/g, "-");
-    const doc = await db.collection("information_bank").doc(safeDocId).get();
-
-    if (doc.exists) {
-      return doc.data();
-    }
-
-    return null;
-  } catch (error) {
-    console.error(`Error getting document metadata for ${docId}:`, error);
-    return null;
   }
 }
 
@@ -688,14 +497,14 @@ async function getDocumentMetadata(docId: string): Promise<any> {
 
 export const generateAnswer = onRequest(
   {
-    secrets: [PINECONE_API_KEY, COHERE_API_KEY],
+    secrets: [PINECONE_API_KEY, GEMINI_API_KEY],
     cors: true,
     timeoutSeconds: 60,
     memory: "1GiB",
   },
   async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "POST");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.set("Access-Control-Allow-Headers", "Content-Type");
 
     if (req.method === "OPTIONS") {
@@ -703,269 +512,530 @@ export const generateAnswer = onRequest(
       return;
     }
 
+    if (req.method !== "POST") {
+      res.status(405).json({error: "Method not allowed", answer: "Please use POST method"});
+      return;
+    }
+
     try {
-      const {
-        query,
-        conversationHistory = [],
-        topK = 5,
-        minSimilarityScore = 0.3,
-        stream = true, // New parameter for streaming
-      } = req.body;
+      const {query, conversationHistory = [], topK = 8, minSimilarityScore = 0.30, stream = true} = req.body;
 
       if (!query || typeof query !== "string" || query.trim().length === 0) {
         res.status(400).json({
+          error: "Invalid query",
           answer: "Please provide a valid question.",
           source: "error",
         });
         return;
       }
 
-      console.log(
-        `🤖 Generating answer for: "${query}" (streaming: ${stream})`
-      );
+      console.log(`📩 Received query: "${query}"`);
 
+      const geminiKey = GEMINI_API_KEY.value();
       const pineconeKey = PINECONE_API_KEY.value();
-      const cohereKey = COHERE_API_KEY.value();
 
-      const pineconeClient = new Pinecone({ apiKey: pineconeKey });
-      const pineconeIndex = pineconeClient.Index("oasp-assist");
+      console.log("🔧 Generating query embedding...");
 
-      const contextHistory = buildConversationContext(conversationHistory);
+      const [queryEmbedding, pineconeClient] = await Promise.all([
+        generateGeminiEmbedding(query, geminiKey, "search_query"),
+        Promise.resolve(new Pinecone({apiKey: pineconeKey})),
+      ]);
 
-      const queryEmbedding = await generateCohereEmbedding(
-        query,
-        cohereKey,
-        "search_query"
-      );
+      console.log(`✅ Embedding generated: ${queryEmbedding.length} dimensions`);
 
-      console.log(
-        `✅ Generated embedding with ${queryEmbedding.length} dimensions`
-      );
+      const [faqMatch, pineconeIndex] = await Promise.all([
+        findMatchingFAQ(query, queryEmbedding, geminiKey),
+        Promise.resolve(pineconeClient.Index("oasp-assist-gemini")),
+      ]);
 
-      // Check FAQ first
-      const faqMatch = await findMatchingFAQ(
-        query,
-        queryEmbedding,
-        cohereKey,
-        0.9
-      );
-
+      // FAQ MATCH
       if (faqMatch) {
-        console.log("✅ Using FAQ answer");
+        console.log("✅ Returning FAQ answer");
 
         if (stream) {
-          // For FAQ, simulate streaming by sending the answer in chunks
           res.setHeader("Content-Type", "text/event-stream");
           res.setHeader("Cache-Control", "no-cache");
           res.setHeader("Connection", "keep-alive");
 
           const answer = faqMatch.answer;
-          const chunkSize = 10; // characters per chunk
+          const chunkSize = 40;
 
           for (let i = 0; i < answer.length; i += chunkSize) {
-            const chunk = answer.substring(
-              i,
-              Math.min(i + chunkSize, answer.length)
-            );
-            res.write(
-              `data: ${JSON.stringify({
-                type: "content-delta",
-                delta: { message: { content: { text: chunk } } },
-              })}\n\n`
-            );
-
-            // Small delay to simulate streaming
-            await new Promise((resolve) => setTimeout(resolve, 30));
+            const chunk = answer.substring(i, Math.min(i + chunkSize, answer.length));
+            res.write(`data: ${JSON.stringify({
+              type: "content-delta",
+              delta: {message: {content: {text: chunk}}},
+            })}\n\n`);
           }
 
-          res.write(`data: ${JSON.stringify({ type: "message-end" })}\n\n`);
+          res.write(`data: ${JSON.stringify({
+            type: "message-end",
+            metadata: {source: "faq", category: faqMatch.category},
+          })}\n\n`);
           res.write("data: [DONE]\n\n");
           res.end();
         } else {
           res.json({
             answer: faqMatch.answer,
             source: "faq",
-            similarity: faqMatch.similarity,
+            category: faqMatch.category,
           });
         }
         return;
       }
 
-      // Retrieve documents
-      const contextualQuery = await enhanceQueryWithContext(
-        query,
-        contextHistory,
-        cohereKey
-      );
-
+      // RETRIEVE DOCUMENTS FROM PINECONE
+      console.log("🔧 Querying Pinecone...");
       const results = await retrieveRelevantDocuments(
-        contextualQuery,
+        query,
         queryEmbedding,
         pineconeIndex,
         topK,
         minSimilarityScore
       );
 
+      // NO DOCUMENTS FOUND - AI FALLBACK
       if (results.length === 0) {
-        console.log("❌ No relevant documents found");
-        const errorMsg =
-          "Sorry, I couldn't find relevant information about that topic. Please contact OASP staff for assistance.";
+        console.log("⚠️ No documents found - using AI fallback");
+
+        const conversationContext = buildConversationContext(conversationHistory);
+        const now = new Date();
+        const dateInfo = `Current Date: ${now.toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })}`;
+
+        const fallbackPrompt = `You are OASP Assist for Central Mindanao University.
+
+${dateInfo}
+
+${conversationContext ? `Recent conversation:\n${conversationContext}\n\n` : ""}Question: "${query}"
+
+IMPORTANT: My knowledge base doesn't have specific documents about this topic, but I should still try to help.
+
+Instructions:
+1. Use your general knowledge about universities, admissions, scholarships, and student services
+2. Provide helpful, accurate general information when possible
+3. Use the current date for time-sensitive queries
+4. If this is truly specific to CMU OASP policies I cannot answer, politely suggest contacting OASP staff
+5. Be helpful and professional
+6. Don't say "I don't have information" - try to provide useful guidance first
+
+Answer:`;
 
         if (stream) {
           res.setHeader("Content-Type", "text/event-stream");
-          res.write(
-            `data: ${JSON.stringify({
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+
+          try {
+            for await (const chunk of generateGeminiResponseStream(fallbackPrompt, geminiKey)) {
+              if (chunk && chunk.length > 0) {
+                res.write(`data: ${JSON.stringify({
+                  type: "content-delta",
+                  delta: {message: {content: {text: chunk}}},
+                })}\n\n`);
+              }
+            }
+
+            res.write(`data: ${JSON.stringify({
+              type: "message-end",
+              metadata: {source: "ai_fallback"},
+            })}\n\n`);
+            res.write("data: [DONE]\n\n");
+            res.end();
+          } catch (error) {
+            console.error("❌ AI fallback streaming failed:", error);
+            const errorMsg = "I'm having trouble processing your request. Please contact OASP staff directly for assistance.";
+            res.write(`data: ${JSON.stringify({
               type: "content-delta",
-              delta: { message: { content: { text: errorMsg } } },
-            })}\n\n`
-          );
-          res.write(`data: ${JSON.stringify({ type: "message-end" })}\n\n`);
-          res.write("data: [DONE]\n\n");
-          res.end();
+              delta: {message: {content: {text: errorMsg}}},
+            })}\n\n`);
+            res.write(`data: ${JSON.stringify({type: "message-end"})}\n\n`);
+            res.write("data: [DONE]\n\n");
+            res.end();
+          }
         } else {
-          res.json({
-            answer: errorMsg,
-            source: "no_documents",
-          });
+          try {
+            const answer = await generateGeminiResponse(fallbackPrompt, geminiKey);
+            res.json({answer: answer.trim(), source: "ai_fallback"});
+          } catch (error) {
+            console.error("❌ AI fallback failed:", error);
+            res.json({
+              answer: "I'm having trouble processing your request. Please contact OASP staff directly for assistance.",
+              source: "error",
+            });
+          }
         }
         return;
       }
 
-      console.log(`📚 Using ${results.length} documents for context`);
+      // DOCUMENTS FOUND - GENERATE RAG RESPONSE
+      console.log(`✅ Found ${results.length} relevant documents`);
 
-      const documentContext = buildDocumentContext(results);
-      const prompt = buildContextAwarePrompt(
-        query,
-        documentContext,
-        contextHistory
-      );
+      const {contexts, confidence} = filterAndRankContext(results, query);
+      const conversationContext = buildConversationContext(conversationHistory);
 
-      // Generate response (streaming or non-streaming)
+      const prompt = confidence === "low" ?
+        buildPartialInfoPrompt(query, contexts, conversationContext) :
+        buildContextAwarePrompt(query, contexts, conversationContext, confidence);
+
+      // STREAMING RESPONSE
       if (stream) {
         res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
-        res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
 
-        console.log("🌊 Starting streaming response...");
-
-        let hasContent = false;
-        let fullResponse = "";
+        let streamSucceeded = false;
 
         try {
-          for await (const chunk of generateCohereResponseStream(
-            prompt,
-            cohereKey
-          )) {
+          for await (const chunk of generateGeminiResponseStream(prompt, geminiKey)) {
             if (chunk && chunk.length > 0) {
-              hasContent = true;
-              fullResponse += chunk;
-
-              res.write(
-                `data: ${JSON.stringify({
-                  type: "content-delta",
-                  delta: { message: { content: { text: chunk } } },
-                })}\n\n`
-              );
+              streamSucceeded = true;
+              res.write(`data: ${JSON.stringify({
+                type: "content-delta",
+                delta: {message: {content: {text: chunk}}},
+              })}\n\n`);
             }
           }
 
-          // If no content was streamed, provide fallback
-          if (!hasContent) {
-            console.log("⚠️ No content streamed, sending fallback message");
-            const fallbackMsg =
-              "I'm having trouble processing your question right now. Please try again or contact OASP staff for assistance.";
-            res.write(
-              `data: ${JSON.stringify({
-                type: "content-delta",
-                delta: { message: { content: { text: fallbackMsg } } },
-              })}\n\n`
-            );
+          if (streamSucceeded) {
+            res.write(`data: ${JSON.stringify({
+              type: "message-end",
+              metadata: {source: "information_bank", confidence, documentsUsed: contexts.length},
+            })}\n\n`);
+            res.write("data: [DONE]\n\n");
+            res.end();
+            return;
+          }
+        } catch (streamError) {
+          console.error("❌ Streaming failed, using fallback:", streamError);
+        }
+
+        // FALLBACK IF STREAMING FAILS
+        try {
+          const fullAnswer = await generateGeminiResponse(prompt, geminiKey);
+
+          const chunkSize = 30;
+          for (let i = 0; i < fullAnswer.length; i += chunkSize) {
+            const chunk = fullAnswer.substring(i, Math.min(i + chunkSize, fullAnswer.length));
+            res.write(`data: ${JSON.stringify({
+              type: "content-delta",
+              delta: {message: {content: {text: chunk}}},
+            })}\n\n`);
+            await new Promise((resolve) => setTimeout(resolve, 5));
           }
 
-          // Send metadata and end signal
-          res.write(
-            `data: ${JSON.stringify({
-              type: "message-end",
-              metadata: {
-                documentsUsed: results.length,
-                documentTitles: results.map((r) => r.ib_title),
-                responseLength: fullResponse.length,
-              },
-            })}\n\n`
-          );
+          res.write(`data: ${JSON.stringify({
+            type: "message-end",
+            metadata: {source: "information_bank", confidence},
+          })}\n\n`);
           res.write("data: [DONE]\n\n");
           res.end();
-
-          console.log(`✅ Streaming complete (${fullResponse.length} chars)`);
-        } catch (streamError) {
-          console.error("❌ Streaming error:", streamError);
-
-          // Send error message to client
-          const errorMsg =
-            "An error occurred while generating the response. Please try again.";
-          res.write(
-            `data: ${JSON.stringify({
-              type: "content-delta",
-              delta: { message: { content: { text: errorMsg } } },
-            })}\n\n`
-          );
-          res.write(
-            `data: ${JSON.stringify({
-              type: "error",
-              error:
-                streamError instanceof Error
-                  ? streamError.message
-                  : "Unknown error",
-            })}\n\n`
-          );
-          res.write("data: [DONE]\n\n");
+        } catch (fallbackError) {
+          console.error("❌ Fallback also failed:", fallbackError);
+          res.write(`data: ${JSON.stringify({
+            type: "error",
+            error: "Failed to generate response",
+          })}\n\n`);
           res.end();
         }
       } else {
-        // Non-streaming response
-        const answer = await generateCohereResponse(prompt, cohereKey);
-
-        if (!answer || answer.trim().length === 0) {
-          console.log("❌ Cohere returned empty response");
-          res.json({
-            answer:
-              "I'm having trouble processing your question right now. Please try again or contact OASP staff for assistance.",
-            source: "empty_response",
-          });
-          return;
-        }
-
-        console.log("✅ Generated contextual answer");
+        const answer = await generateGeminiResponse(prompt, geminiKey);
         res.json({
           answer: answer.trim(),
-          source: "knowledge_base",
-          documentsUsed: results.length,
-          documentTitles: results.map((r) => r.ib_title),
+          source: "information_bank",
+          confidence,
+          documentsFound: results.length,
         });
       }
-    } catch (error) {
-      console.error("❌ Error in generateAnswer:", error);
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      res.status(500).json({
+        error: error.message,
+        answer: "I'm having trouble processing your request right now. Please try again or contact OASP staff directly.",
+        source: "error",
+      });
+    }
+  }
+);
 
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+async function generateGeminiResponse(
+  prompt: string,
+  apiKey: string
+): Promise<string> {
+  try {
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 4096,
+          topP: 0.95,
+          topK: 40,
+        },
+      },
+      {
+        headers: {"Content-Type": "application/json"},
+        timeout: 30000,
+      }
+    );
 
-      if (req.body.stream) {
-        res.setHeader("Content-Type", "text/event-stream");
-        res.write(
-          `data: ${JSON.stringify({
-            error: errorMessage,
-          })}\n\n`
-        );
-        res.end();
+    if (response.status !== 200) {
+      throw new Error(`Gemini API error: ${response.statusText}`);
+    }
+
+    const data: any = response.data;
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!text) {
+      throw new Error("Empty response from Gemini");
+    }
+
+    return text;
+  } catch (error: any) {
+    console.error("❌ Gemini response error:", error.message);
+    throw error;
+  }
+}
+
+async function* generateGeminiResponseStream(
+  prompt: string,
+  apiKey: string
+): AsyncGenerator<string, void, unknown> {
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`,
+      {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          contents: [{parts: [{text: prompt}]}],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 4096,
+            topP: 0.95,
+            topK: 40,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Gemini API error response: ${errorText}`);
+      throw new Error(`Gemini Stream API error: ${response.status} ${response.statusText}`);
+    }
+
+    if (!response.body) {
+      throw new Error("Response body is null");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let chunkCount = 0;
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, {stream: true});
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+
+        if (!trimmedLine || trimmedLine.startsWith("event:") || trimmedLine === "data: [DONE]") {
+          continue;
+        }
+
+        const jsonStr = trimmedLine.startsWith("data: ") ?
+          trimmedLine.substring(6) :
+          trimmedLine;
+
+        if (!jsonStr || jsonStr === "[DONE]") continue;
+
+        try {
+          const data = JSON.parse(jsonStr);
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+          if (text) {
+            chunkCount++;
+            yield text;
+          }
+
+          const finishReason = data?.candidates?.[0]?.finishReason;
+          if (finishReason === "STOP") {
+            console.log(`✅ Stream complete: ${chunkCount} chunks`);
+            return;
+          }
+        } catch (parseError) {
+          console.warn("⚠️ Failed to parse streaming chunk");
+          continue;
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error("❌ Gemini streaming error:", error);
+    throw error;
+  }
+}
+
+export const resetDailyMessageCounts = onSchedule(
+  {
+    schedule: "0 8 * * *",
+    timeZone: "Asia/Manila",
+    memory: "256MiB",
+  },
+  async (event) => {
+    try {
+      const now = new Date();
+      console.log(`🔄 Starting daily message count reset at ${now.toISOString()}`);
+
+      const phNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
+      const resetTime = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate(), 8, 0, 0);
+      const resetTimestamp = admin.firestore.Timestamp.fromDate(resetTime);
+
+      const usersSnapshot = await db.collection("users").get();
+
+      const batchSize = 500;
+      let processedCount = 0;
+      let resetCount = 0;
+
+      for (let i = 0; i < usersSnapshot.docs.length; i += batchSize) {
+        const batch = db.batch();
+        const batchDocs = usersSnapshot.docs.slice(i, i + batchSize);
+
+        for (const doc of batchDocs) {
+          const data = doc.data();
+          const lastReset = data.lastMessageResetDate?.toDate();
+
+          let shouldReset = false;
+
+          if (!lastReset) {
+            shouldReset = true;
+          } else {
+            const lastResetPH = new Date(lastReset.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
+            if (lastResetPH < resetTime) {
+              shouldReset = true;
+            }
+          }
+
+          if (shouldReset) {
+            batch.update(doc.ref, {
+              "dailyMessageCount": 0,
+              "lastMessageResetDate": resetTimestamp,
+            });
+            resetCount++;
+          }
+          processedCount++;
+        }
+
+        await batch.commit();
+      }
+
+      console.log(`✅ Daily reset complete: ${resetCount}/${processedCount} users reset`);
+    } catch (error: any) {
+      console.error("❌ Error in daily reset:", error);
+      throw error;
+    }
+  }
+);
+
+export const manualResetMessageCounts = onRequest(
+  {
+    cors: true,
+    memory: "256MiB",
+  },
+  async (req, res) => {
+    try {
+      const now = new Date();
+      const phNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
+      const resetTime = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate(), 8, 0, 0);
+      const resetTimestamp = admin.firestore.Timestamp.fromDate(resetTime);
+
+      const usersSnapshot = await db.collection("users").get();
+
+      const batchSize = 500;
+      let resetCount = 0;
+
+      for (let i = 0; i < usersSnapshot.docs.length; i += batchSize) {
+        const batch = db.batch();
+        const batchDocs = usersSnapshot.docs.slice(i, i + batchSize);
+
+        for (const doc of batchDocs) {
+          batch.update(doc.ref, {
+            "dailyMessageCount": 0,
+            "lastMessageResetDate": resetTimestamp,
+          });
+          resetCount++;
+        }
+
+        await batch.commit();
+      }
+
+      res.json({
+        success: true,
+        reset: resetCount,
+        timestamp: now.toISOString(),
+      });
+    } catch (error: any) {
+      console.error("❌ Error in manual reset:", error);
+      res.status(500).json({error: error.message});
+    }
+  }
+);
+
+export const checkResetStatus = onRequest(
+  {
+    cors: true,
+    memory: "256MiB",
+  },
+  async (req, res) => {
+    try {
+      const now = new Date();
+      const phNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
+
+      const todayResetTime = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate(), 8, 0, 0);
+
+      let nextResetTime: Date;
+      if (phNow < todayResetTime) {
+        nextResetTime = todayResetTime;
       } else {
-        res.status(500).json({
-          answer:
-            "I encountered an error while processing your question. Please try again or contact OASP staff for assistance.",
-          source: "error",
-          error: errorMessage,
-        });
+        nextResetTime = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate() + 1, 8, 0, 0);
       }
+
+      const usersSnapshot = await db.collection("users").limit(10).get();
+
+      const userStatus = usersSnapshot.docs.map((doc) => {
+        const data = doc.data();
+        const lastReset = data.lastMessageResetDate?.toDate();
+        const lastResetPH = lastReset ?
+          new Date(lastReset.toLocaleString("en-US", {timeZone: "Asia/Manila"})) :
+          null;
+
+        return {
+          userId: doc.id.substring(0, 8) + "...",
+          messageCount: data.dailyMessageCount || 0,
+          lastReset: lastResetPH ? lastResetPH.toISOString() : "never",
+          needsReset: !lastResetPH || lastResetPH < todayResetTime,
+        };
+      });
+
+      res.json({
+        currentTime: now.toISOString(),
+        philippineTime: phNow.toISOString(),
+        nextResetTime: nextResetTime.toISOString(),
+        sampleUsers: userStatus,
+      });
+    } catch (error: any) {
+      console.error("❌ Error checking status:", error);
+      res.status(500).json({error: error.message});
     }
   }
 );

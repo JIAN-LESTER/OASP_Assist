@@ -3,21 +3,72 @@ import 'dart:io' show Platform;
 import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:capstone_project/icon_and_color.dart';
-
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+
+    await Firebase.initializeApp();
   print('📬 ===== BACKGROUND MESSAGE =====');
   print('📬 Message ID: ${message.messageId}');
   print('📬 Title: ${message.notification?.title ?? message.data['title']}');
   print('📬 Body: ${message.notification?.body ?? message.data['body']}');
   print('📬 Data: ${message.data}');
+  print('📬 Target Role: ${message.data['targetRole']}');
+  print('📬 Target User: ${message.data['targetUserId']}');
   print('📬 ===============================');
+  
+  // ✅ CRITICAL: Check if notification is for current user
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('⚠️ No user logged in in background, ignoring notification');
+      return;
+    }
+
+    final currentUserId = user.uid;
+    final targetUserId = message.data['targetUserId'];
+    final notificationType = message.data['type'];
+    
+    // For escalation replies, strictly check targetUserId
+    if (notificationType == 'escalation_reply') {
+      if (targetUserId == null || targetUserId != currentUserId) {
+        print('🚫 Background: Escalation reply not for this user, ignoring');
+        return;
+      }
+      print('✅ Background: Escalation reply is for this user');
+    }
+    
+    // For new escalations, check role
+    if (notificationType == 'new_escalation') {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUserId)
+          .get();
+      
+      final role = userDoc.data()?['role'] ?? 'user';
+      
+      if (role != 'staff' && role != 'admin') {
+        print('🚫 Background: New escalation but user is not staff/admin, ignoring');
+        return;
+      }
+      print('✅ Background: New escalation for staff/admin');
+    }
+    
+    // Announcements and deadlines are for everyone, so allow them
+    print('✅ Background notification will be shown');
+    
+  } catch (e) {
+    print('❌ Error filtering background notification: $e');
+    // Fail closed - don't show on error
+    return;
+  }
 }
+
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -205,7 +256,6 @@ class NotificationService {
     print('✅ Local notifications initialized');
   }
 
-  // ✅ FIXED: Save token as array in single user document
   Future<void> _saveFCMToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -242,14 +292,13 @@ class NotificationService {
       
       final role = userDoc.data()?['role'] ?? 'user';
 
-      // ✅ FIXED: Store tokens as array in single document per user
       await FirebaseFirestore.instance
           .collection('fcm_tokens')
-          .doc(user.uid) // Use userId as document ID
+          .doc(user.uid)
           .set({
         'userId': user.uid,
         'userRole': role,
-        'tokens': FieldValue.arrayUnion([token]), // Add token to array
+        'tokens': FieldValue.arrayUnion([token]),
         'platform': Platform.isAndroid ? 'android' : 'ios',
         'updatedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
@@ -272,11 +321,21 @@ class NotificationService {
     print('📬 Title: ${message.notification?.title ?? message.data['title']}');
     print('📬 Body: ${message.notification?.body ?? message.data['body']}');
     print('📬 Data: ${message.data}');
+    print('📬 Target Role: ${message.data['targetRole']}');
+    print('📬 Target User: ${message.data['targetUserId']}');
     print('📬 ===============================');
 
+    // ✅ CRITICAL: Filter notifications before showing
+    final shouldShow = await _shouldShowNotification(message);
+    
+    if (!shouldShow) {
+      print('🚫 Notification filtered out - not for this user');
+      return;
+    }
+    
+    print('✅ Notification passed filter - showing');
     await _showLocalNotification(message);
   }
-
   Future<void> _showLocalNotification(RemoteMessage message) async {
     print('🔔 Showing local notification...');
 
@@ -404,50 +463,51 @@ class NotificationService {
     _navigateBasedOnNotification(type, data);
   }
 
- Future<void> _navigateBasedOnNotification(
-  String type,
-  Map<String, dynamic> data,
-) async {
-  print('🔍 ===== NAVIGATION DEBUG =====');
-  print('Type: $type');
-  print('Data: $data');
-  print('Handler registered: ${_onNotificationTap != null}');
-  print('=============================');
-  
-  if (_onNotificationTap == null) {
-    print('⚠️ No navigation handler registered');
-    return;
-  }
-
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      print('⚠️ No user logged in');
+  Future<void> _navigateBasedOnNotification(
+    String type,
+    Map<String, dynamic> data,
+  ) async {
+    print('🔍 ===== NAVIGATION DEBUG =====');
+    print('Type: $type');
+    print('Data: $data');
+    print('Handler registered: ${_onNotificationTap != null}');
+    print('=============================');
+    
+    if (_onNotificationTap == null) {
+      print('⚠️ No navigation handler registered');
       return;
     }
 
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-    
-    final role = userDoc.data()?['role'] ?? 'user';
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print('⚠️ No user logged in');
+        return;
+      }
 
-    print('🔔 Navigation: Type=$type, Role=$role');
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      final role = userDoc.data()?['role'] ?? 'user';
 
-    // ✅ FIX: Pass the full data including announcementId
-    if (type == 'new_escalation' && (role == 'staff' || role == 'admin')) {
-      _onNotificationTap!('escalation_detail', data);
-    } else if (type == 'escalation_reply' && role == 'user') {
-      _onNotificationTap!('escalation_response', data);
-    } else if (type == 'announcement' || type == 'deadline_reminder') {
-      // ✅ Pass announcement data for navigation
-      _onNotificationTap!('announcement', data);
+      print('🔔 Navigation: Type=$type, Role=$role');
+
+      // Route based on notification type and user role
+      if (type == 'new_escalation' && (role == 'staff' || role == 'admin')) {
+        _onNotificationTap!('escalation_detail', data);
+      } else if (type == 'escalation_reply' && role == 'user') {
+        _onNotificationTap!('escalation_response', data);
+      } else if (type == 'announcement' || type == 'deadline_reminder') {
+        _onNotificationTap!('announcement', data);
+      } else {
+        print('⚠️ No matching navigation handler for type=$type, role=$role');
+      }
+    } catch (e) {
+      print('❌ Error handling notification navigation: $e');
     }
-  } catch (e) {
-    print('❌ Error handling notification navigation: $e');
   }
-}
 
   Future<void> _saveWebToken() async {
     try {
@@ -463,7 +523,6 @@ class NotificationService {
 
       final webToken = 'web_${user.uid}_${DateTime.now().millisecondsSinceEpoch}';
 
-      // ✅ FIXED: Use same structure for web tokens
       await FirebaseFirestore.instance
           .collection('fcm_tokens')
           .doc(user.uid)
@@ -528,7 +587,6 @@ class NotificationService {
         if (user != null) {
           final token = await _firebaseMessaging.getToken();
           if (token != null) {
-            // ✅ FIXED: Remove token from array instead of deleting document
             await FirebaseFirestore.instance
                 .collection('fcm_tokens')
                 .doc(user.uid)
@@ -545,5 +603,108 @@ class NotificationService {
     } catch (e) {
       print('❌ Error during cleanup: $e');
     }
+  }
+}
+
+Future<bool> _shouldShowNotification(RemoteMessage message) async {
+  try {
+    print('🔍 ===== NOTIFICATION FILTER CHECK =====');
+    print('   Message data: ${message.data}');
+    
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('❌ No user logged in, blocking notification');
+      return false;
+    }
+
+    final currentUserId = user.uid;
+    print('✅ Current user: $currentUserId');
+    
+    // Get current user's role
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUserId)
+        .get();
+    
+    final currentUserRole = userDoc.data()?['role'] ?? 'user';
+    final currentUserServiceUnit = userDoc.data()?['serviceUnit'];
+    
+    print('✅ Current user role: $currentUserRole');
+    print('✅ Current user serviceUnit: $currentUserServiceUnit');
+    
+    // Extract notification metadata
+    final targetRole = message.data['targetRole'] ?? 'any';
+    final targetUserId = message.data['targetUserId'];
+    final notificationType = message.data['type'];
+    final notificationCategory = message.data['category'];
+    
+    print('📋 Notification metadata:');
+    print('   - targetRole: $targetRole');
+    print('   - targetUserId: $targetUserId');
+    print('   - type: $notificationType');
+    print('   - category: $notificationCategory');
+
+    // ✅ CASE 1: Specific user target (escalation replies)
+    if (targetUserId != null && targetUserId.isNotEmpty) {
+      final matches = targetUserId == currentUserId;
+      print('📌 Case 1: Specific user target');
+      print('   Result: ${matches ? "ALLOW" : "BLOCK"}');
+      return matches;
+    }
+
+    // ✅ CASE 2: Role-based with serviceUnit filtering for staff
+    if (targetRole != 'any') {
+      if (targetRole != currentUserRole) {
+        print('📌 Case 2: Role mismatch');
+        print('   Result: BLOCK (target: $targetRole, user: $currentUserRole)');
+        return false;
+      }
+      
+      // ✅ For staff escalations, check serviceUnit match
+      if (currentUserRole == 'staff' && notificationType == 'new_escalation') {
+        if (currentUserServiceUnit == null) {
+          print('⚠️ Staff has no serviceUnit, allowing by default');
+          return true;
+        }
+        
+        // Extract serviceUnit from notification data
+        final escalationServiceUnit = message.data['serviceUnit'] ?? 
+                                      notificationCategory ?? 
+                                      'N/A';
+        
+        print('🔍 ServiceUnit check:');
+        print('   - Staff serviceUnit: $currentUserServiceUnit');
+        print('   - Escalation serviceUnit: $escalationServiceUnit');
+        
+        // Allow if serviceUnit matches or escalation is general (N/A)
+        if (escalationServiceUnit == 'N/A' || 
+            currentUserServiceUnit == escalationServiceUnit) {
+          print('   Result: ALLOW (serviceUnit match)');
+          return true;
+        }
+        
+        print('   Result: BLOCK (serviceUnit mismatch)');
+        return false;
+      }
+      
+      print('📌 Case 2: Role match');
+      print('   Result: ALLOW');
+      return true;
+    }
+
+    // ✅ CASE 3: General notifications (announcements, deadlines)
+    if (notificationType == 'announcement' || notificationType == 'deadline_reminder') {
+      print('📌 Case 3: General notification');
+      print('   Result: ALLOW');
+      return true;
+    }
+
+    // Default: block unknown types
+    print('⚠️ Unknown notification type, blocking by default');
+    return false;
+    
+  } catch (e) {
+    print('❌ Error in notification filter: $e');
+    return false; // Fail closed
   }
 }

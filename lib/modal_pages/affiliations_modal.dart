@@ -1,10 +1,11 @@
+import 'package:capstone_project/modules/admin_module/widgets/empty_state.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
 import 'package:capstone_project/modal_pages/add_edit_affiliation.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
-import 'package:capstone_project/pages/admin_pages/widgets/empty_state.dart';
+
 import 'package:capstone_project/responsive/responsive_layout.dart';
 
 import 'modal_widget/top_right_alert.dart';

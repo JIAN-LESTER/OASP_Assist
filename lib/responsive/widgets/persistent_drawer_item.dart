@@ -1,3 +1,4 @@
+import 'package:capstone_project/responsive/widgets/persistent_drawer_group.dart';
 import 'package:flutter/material.dart';
 
 Widget buildPersistentDrawerItem({
@@ -16,9 +17,8 @@ Widget buildPersistentDrawerItem({
   final bool isServiceSelected =
       (selectedIndex >= 8 && selectedIndex <= 10) && isServiceGroup;
 
-  return Container(
+  Widget itemContent = Container(
     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-    // Remove fixed height to allow dynamic sizing
     constraints: const BoxConstraints(minHeight: 44),
     child: Material(
       color:
@@ -30,13 +30,36 @@ Widget buildPersistentDrawerItem({
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: () => onTap(index),
+        onTap: () {
+          // For sub-items (inside a group), DON'T close the parent group
+          if (isSubItem) {
+            // Just navigate, don't touch expansion states
+            onTap(index);
+            return;
+          }
+
+          // For group items (negative indices), close OTHER groups only
+          if (index < 0) {
+            if (index != -3)
+              PersistentDrawerState.setUserManagementExpanded(false);
+            if (index != -1) PersistentDrawerState.setServicesExpanded(false);
+            if (index != -2) PersistentDrawerState.setLogsExpanded(false);
+
+            bool currentState = PersistentDrawerState.getExpansionState(index);
+            PersistentDrawerState.setExpansionState(index, !currentState);
+          }
+          // For regular items (positive indices), close ALL groups
+          else {
+            PersistentDrawerState.resetExpansionStates();
+          }
+
+          onTap(index);
+        },
         child: Container(
           width: double.infinity,
-          // Remove fixed height constraint
           constraints: const BoxConstraints(minHeight: 44),
           padding: EdgeInsets.symmetric(
-           horizontal: isSubItem ? 8 : 8,
+            horizontal: isSubItem ? 8 : 8,
             vertical: 0,
           ),
           child: Row(
@@ -93,18 +116,11 @@ Widget buildPersistentDrawerItem({
                                 : FontWeight.w400,
                         fontSize: isSubItem ? 13 : 14,
                       ),
-                      // Allow text to wrap and display fully
                       softWrap: true,
                       overflow: TextOverflow.visible,
-                      maxLines: null, // Allow unlimited lines
+                      maxLines: null,
                     ),
                   ),
-                ),
-
-              // Tooltip for collapsed state
-              if (!isExpanded)
-                Expanded(
-                  child: Tooltip(message: title, child: Container(height: 44)),
                 ),
             ],
           ),
@@ -112,4 +128,15 @@ Widget buildPersistentDrawerItem({
       ),
     ),
   );
+
+  // Wrap with Tooltip when collapsed
+  if (!isExpanded) {
+    return Tooltip(
+      message: title,
+      waitDuration: const Duration(milliseconds: 500),
+      child: itemContent,
+    );
+  }
+
+  return itemContent;
 }

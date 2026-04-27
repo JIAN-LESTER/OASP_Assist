@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Conversation {
   final String id;
   final String userId;
@@ -5,7 +7,8 @@ class Conversation {
   final String status;
   final DateTime createdAt;
   final DateTime? endedAt;     
-  final int messageCount;      
+  final int messageCount;     
+   final DateTime? lastResetDate; 
        
 
   Conversation({
@@ -16,6 +19,7 @@ class Conversation {
     required this.createdAt,
     this.endedAt,
     this.messageCount = 0,
+       this.lastResetDate, 
 
   });
 
@@ -29,7 +33,8 @@ class Conversation {
       endedAt: json['ended_at'] != null
           ? DateTime.tryParse(json['ended_at'])
           : null,
-      messageCount: json['message_count'] as int? ?? 0,
+      messageCount: json['message_count'] ?? 0,
+          lastResetDate: (json['lastResetDate'] as Timestamp?)?.toDate(),  
      
     );
   }
@@ -43,7 +48,29 @@ class Conversation {
       'created_at': createdAt.toIso8601String(),
       'ended_at': endedAt?.toIso8601String(),
       'message_count': messageCount,
+      'lastResetDate': lastResetDate != null ? Timestamp.fromDate(lastResetDate!) : null,
     
     };
   }
+
+    Conversation copyWith({
+    String? id,
+    String? userId,
+    String? title,
+    String? status,
+    DateTime? createdAt,
+    int? messageCount,
+    DateTime? lastResetDate,
+  }) {
+    return Conversation(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      title: title ?? this.title,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      messageCount: messageCount ?? this.messageCount,
+      lastResetDate: lastResetDate ?? this.lastResetDate,
+    );
+  }
 }
+

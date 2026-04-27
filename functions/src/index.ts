@@ -8,9 +8,34 @@ if (!admin.apps.length) {
 // RAG Chatbot Functions
 export {
   generateAnswer,
+
+  generateEmbedding,
+
+
+} from "./ragChat";
+
+export {
+  deleteFromPinecone,
+  queryPinecone,
+  insertPineconeDocument,
+  insertPineconeDocumentBatch,
+
+  deletePineconeDocuments,
+
+  getPineconeStats,
+  fetchPineconeVectors,
+  deleteAllPineconeVectors,
+  generateGeminiEmbedding,
+  generateGeminiResponse,
   generateCohereEmbedding,
   generateCohereResponse,
-} from "./ragChat";
+  checkPineconeHealth,
+
+  analyzeCohereAdmission,
+  analyzeCohereScholarship,
+  analyzeCoherePlacement,
+
+} from "./documentCrud";
 
 // User Management Functions
 export {
@@ -27,15 +52,17 @@ export {
   manualSyncFacebookPostsHttp,
   reprocessExistingAnnouncements,
   cleanupDeletedAnnouncement,
+
+  batchSyncCategoriesToInfoBank,
+
+
 } from "./announcement";
 
 // Facebook Token Management Functions
 export {
-  refreshTokensDaily,
   exchangeToken,
   exchangeTokenHttp,
-  testFacebookConnection,
-  testFacebookConnectionHttp,
+
 } from "./facebookToken";
 
 // Notification Functions
@@ -45,8 +72,6 @@ export {
   cleanupOldNotifications,
   onEscalationCreated,
   onEscalationReplied,
-  
-  
 } from "./notification";
 
 // Health Check & Test Functions
@@ -54,3 +79,10 @@ export {
   healthCheck,
   testSync,
 } from "./health";
+
+export {
+  checkFacebookTokenExpiration,
+  manualCheckFacebookToken,
+
+
+} from "./fbTokenExpiry";

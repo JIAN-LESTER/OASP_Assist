@@ -1,38 +1,19 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:capstone_project/auth_pages/login_page.dart';
+import 'package:capstone_project/responsive/widgets/persistent_drawer_group.dart';
 import 'package:capstone_project/notifications.dart';
-import 'package:capstone_project/pages/user_pages/chat_page.dart';
-import 'package:capstone_project/profile.dart'
-    show ProfileModal, ProfilePage;
-import 'package:capstone_project/provider/chat_provider.dart';
-import 'package:capstone_project/services/cohere_service.dart';
-import 'package:capstone_project/models/message.dart';
-import 'package:provider/provider.dart';
+
+import 'package:capstone_project/profile.dart' show ProfileModal;
 
 class AdminConstant {
-  static final TextEditingController _controller = TextEditingController();
-  static final ScrollController _scrollController = ScrollController();
-
-  static bool _isOASPAassistExpanded = false;
-  static String _selectedMenuItem = 'OASP Assist';
-  static String? _expandedCategory;
-
-  static List<Map<String, dynamic>> _recentConversations = [];
-  static String? _selectedConversationId;
-  static StreamSubscription<QuerySnapshot>? _conversationsSubscription;
-  static bool _isServicesExpanded = false;
-  static bool _isLogsExpanded = false;
-
-  static bool _isInitializing = false;
-  static bool _isInitialized = false;
+  // static bool _isServicesExpanded = false;
+  // static bool _isLogsExpanded = false;
 
   static var myDefaultBackground = Colors.grey[50];
 
@@ -358,479 +339,665 @@ class AdminConstant {
                       border: null,
                     ),
                     child: Center(
-                      child: Icon(
-                        Icons.favorite,
-                        color: Colors.grey[300],
-                        size: 28,
+                      child: Image.asset(
+                        'lib/images/oasp.png',
+                        width: 28,
+                        height: 28,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
 
                   // Menu Items
                   Expanded(
-                    child: Column(
-                      children: [
-                        // Dashboard Page
-                        ListTile(
-                          leading: Icon(
-                            Icons.home_outlined,
-                            color:
-                                selectedIndex == 0
-                                    ? Colors.green[700]
-                                    : Colors.grey[600],
-                            size: 20,
-                          ),
-                          title: Text(
-                            "Dashboard",
-                            style: TextStyle(
+                    child: SingleChildScrollView(
+                      physics: BouncingScrollPhysics(),
+                      child: Column(
+                        children: [
+                          // Dashboard Page
+                          ListTile(
+                            leading: Icon(
+                              Icons.home_outlined,
                               color:
                                   selectedIndex == 0
-                                      ? Colors.green[800]
-                                      : Colors.grey[700],
-                              fontSize: 14,
-                              fontWeight:
-                                  selectedIndex == 0
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
+                                      ? Colors.green[700]
+                                      : Colors.grey[600],
+                              size: 20,
                             ),
+                            title: Text(
+                              "Dashboard",
+                              style: TextStyle(
+                                color:
+                                    selectedIndex == 0
+                                        ? Colors.green[800]
+                                        : Colors.grey[700],
+                                fontSize: 14,
+                                fontWeight:
+                                    selectedIndex == 0
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                              ),
+                            ),
+                            tileColor:
+                                selectedIndex == 0 ? Colors.green[50] : null,
+                            onTap: () {
+                              Navigator.pop(context);
+                              onItemTap(0);
+                            },
                           ),
-                          tileColor:
-                              selectedIndex == 0 ? Colors.green[50] : null,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onItemTap(0);
-                          },
-                        ),
 
-                        // Report Page
-                        ListTile(
-                          leading: Icon(
-                            Icons.analytics_outlined,
-                            color:
-                                selectedIndex == 1
-                                    ? Colors.green[700]
-                                    : Colors.grey[600],
-                            size: 20,
-                          ),
-                          title: Text(
-                            "Reports",
-                            style: TextStyle(
+                          // Report Page
+                          ListTile(
+                            leading: Icon(
+                              Icons.analytics_outlined,
                               color:
                                   selectedIndex == 1
-                                      ? Colors.green[800]
-                                      : Colors.grey[700],
-                              fontSize: 14,
-                              fontWeight:
-                                  selectedIndex == 1
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
+                                      ? Colors.green[700]
+                                      : Colors.grey[600],
+                              size: 20,
                             ),
+                            title: Text(
+                              "Reports",
+                              style: TextStyle(
+                                color:
+                                    selectedIndex == 1
+                                        ? Colors.green[800]
+                                        : Colors.grey[700],
+                                fontSize: 14,
+                                fontWeight:
+                                    selectedIndex == 1
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                              ),
+                            ),
+                            tileColor:
+                                selectedIndex == 1 ? Colors.green[50] : null,
+                            selected: selectedIndex == 1,
+                            onTap: () {
+                              Navigator.pop(context);
+                              onItemTap(1);
+                            },
                           ),
-                          tileColor:
-                              selectedIndex == 1 ? Colors.green[50] : null,
-                          selected: selectedIndex == 1,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onItemTap(1);
-                          },
-                        ),
 
-                        // Information Bank Page
-                        ListTile(
-                          leading: Icon(
-                            Icons.book_outlined,
-                            color:
-                                selectedIndex == 2
-                                    ? Colors.green[700]
-                                    : Colors.grey[600],
-                            size: 20,
-                          ),
-                          title: Text(
-                            "Information Bank",
-                            style: TextStyle(
+                          // Information Bank Page
+                          ListTile(
+                            leading: Icon(
+                              Icons.book_outlined,
                               color:
                                   selectedIndex == 2
-                                      ? Colors.green[800]
-                                      : Colors.grey[700],
-                              fontSize: 14,
-                              fontWeight:
-                                  selectedIndex == 2
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
+                                      ? Colors.green[700]
+                                      : Colors.grey[600],
+                              size: 20,
                             ),
+                            title: Text(
+                              "Information Bank",
+                              style: TextStyle(
+                                color:
+                                    selectedIndex == 2
+                                        ? Colors.green[800]
+                                        : Colors.grey[700],
+                                fontSize: 14,
+                                fontWeight:
+                                    selectedIndex == 2
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                              ),
+                            ),
+                            tileColor:
+                                selectedIndex == 2 ? Colors.green[50] : null,
+                            selected: selectedIndex == 2,
+                            onTap: () {
+                              Navigator.pop(context);
+                              onItemTap(2);
+                            },
                           ),
-                          tileColor:
-                              selectedIndex == 2 ? Colors.green[50] : null,
-                          selected: selectedIndex == 2,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onItemTap(2);
-                          },
-                        ),
 
-                        // FAQs Page
-                        ListTile(
-                          leading: Icon(
-                            Icons.help_outline,
-                            color:
-                                selectedIndex == 3
-                                    ? Colors.green[700]
-                                    : Colors.grey[600],
-                            size: 20,
-                          ),
-                          title: Text(
-                            "FAQs",
-                            style: TextStyle(
+                          // FAQs Page
+                          ListTile(
+                            leading: Icon(
+                              Icons.help_outline,
                               color:
                                   selectedIndex == 3
-                                      ? Colors.green[800]
-                                      : Colors.grey[700],
-                              fontSize: 14,
-                              fontWeight:
-                                  selectedIndex == 3
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
+                                      ? Colors.green[700]
+                                      : Colors.grey[600],
+                              size: 20,
                             ),
+                            title: Text(
+                              "FAQs",
+                              style: TextStyle(
+                                color:
+                                    selectedIndex == 3
+                                        ? Colors.green[800]
+                                        : Colors.grey[700],
+                                fontSize: 14,
+                                fontWeight:
+                                    selectedIndex == 3
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                              ),
+                            ),
+                            tileColor:
+                                selectedIndex == 3 ? Colors.green[50] : null,
+                            selected: selectedIndex == 3,
+                            onTap: () {
+                              Navigator.pop(context);
+                              onItemTap(3);
+                            },
                           ),
-                          tileColor:
-                              selectedIndex == 3 ? Colors.green[50] : null,
-                          selected: selectedIndex == 3,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onItemTap(3);
-                          },
-                        ),
 
-                        // Services ExpansionTile
-                        ExpansionTile(
-                          leading: Icon(
-                            Icons.miscellaneous_services_outlined,
-                            color:
+                          // Services ExpansionTile
+                          ExpansionTile(
+                            key: PageStorageKey<String>(
+                              'expansion_Services_${PersistentDrawerState.isServicesExpanded}',
+                            ),
+                            leading: Icon(
+                              Icons.miscellaneous_services_outlined,
+                              color:
+                                  (selectedIndex >= 8 && selectedIndex <= 10)
+                                      ? Colors.green[700]
+                                      : Colors.grey[600],
+                              size: 20,
+                            ),
+                            title: Text(
+                              "Services",
+                              style: TextStyle(
+                                color:
+                                    (selectedIndex >= 8 && selectedIndex <= 10)
+                                        ? Colors.green[800]
+                                        : Colors.grey[700],
+                                fontSize: 14,
+                                fontWeight:
+                                    (selectedIndex >= 8 && selectedIndex <= 10)
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                              ),
+                            ),
+                            backgroundColor:
                                 (selectedIndex >= 8 && selectedIndex <= 10)
-                                    ? Colors.green[700]
-                                    : Colors.grey[600],
-                            size: 20,
-                          ),
-                          title: Text(
-                            "Services",
-                            style: TextStyle(
-                              color:
-                                  (selectedIndex >= 8 && selectedIndex <= 10)
-                                      ? Colors.green[800]
-                                      : Colors.grey[700],
-                              fontSize: 14,
-                              fontWeight:
-                                  (selectedIndex >= 8 && selectedIndex <= 10)
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                            ),
-                          ),
-                          backgroundColor:
-                              (selectedIndex >= 8 && selectedIndex <= 10)
-                                  ? Colors.green[50]
-                                  : null,
-                          collapsedBackgroundColor:
-                              (selectedIndex >= 8 && selectedIndex <= 10)
-                                  ? Colors.green[50]
-                                  : null,
-                          initiallyExpanded: _isServicesExpanded,
-                          onExpansionChanged: (expanded) {
-                            setDrawerState(() {
-                              _isServicesExpanded = expanded;
-                            });
-                          },
-                          children: [
-                            // Admission sub-item
-                            Container(
-                              margin: const EdgeInsets.only(left: 16),
-                              child: ListTile(
-                                leading: Icon(
-                                  Icons.school_outlined,
-                                  color:
+                                    ? Colors.green[50]
+                                    : null,
+                            collapsedBackgroundColor:
+                                (selectedIndex >= 8 && selectedIndex <= 10)
+                                    ? Colors.green[50]
+                                    : null,
+                            initiallyExpanded:
+                                PersistentDrawerState.isServicesExpanded,
+                            onExpansionChanged: (expanded) {
+                              setDrawerState(() {
+                                // ✅ ALWAYS close ALL groups first
+                                PersistentDrawerState.setServicesExpanded(
+                                  false,
+                                );
+                                PersistentDrawerState.setLogsExpanded(false);
+                                PersistentDrawerState.setUserManagementExpanded(
+                                  false,
+                                );
+
+                                // Then ONLY open Services if expanding
+                                if (expanded) {
+                                  PersistentDrawerState.setServicesExpanded(
+                                    true,
+                                  );
+                                }
+                              });
+                            },
+                            children: [
+                              // Admission sub-item
+                              Container(
+                                margin: const EdgeInsets.only(left: 16),
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.school_outlined,
+                                    color:
+                                        selectedIndex == 8
+                                            ? Colors.green[700]
+                                            : Colors.grey[500],
+                                    size: 18,
+                                  ),
+                                  title: Text(
+                                    "Admission",
+                                    style: TextStyle(
+                                      color:
+                                          selectedIndex == 8
+                                              ? Colors.green[800]
+                                              : Colors.grey[600],
+                                      fontSize: 13,
+                                      fontWeight:
+                                          selectedIndex == 8
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                    ),
+                                  ),
+                                  tileColor:
                                       selectedIndex == 8
-                                          ? Colors.green[700]
-                                          : Colors.grey[500],
-                                  size: 18,
+                                          ? Colors.green[50]
+                                          : null,
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    onItemTap(8);
+                                  },
                                 ),
-                                title: Text(
-                                  "Admission",
-                                  style: TextStyle(
-                                    color:
-                                        selectedIndex == 8
-                                            ? Colors.green[800]
-                                            : Colors.grey[600],
-                                    fontSize: 13,
-                                    fontWeight:
-                                        selectedIndex == 8
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                  ),
-                                ),
-                                tileColor:
-                                    selectedIndex == 8
-                                        ? Colors.green[50]
-                                        : null,
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  onItemTap(8);
-                                },
                               ),
-                            ),
-                            // Scholarship sub-item
-                            Container(
-                              margin: const EdgeInsets.only(left: 16),
-                              child: ListTile(
-                                leading: Icon(
-                                  Icons.card_giftcard_outlined,
-                                  color:
+                              // Scholarship sub-item
+                              Container(
+                                margin: const EdgeInsets.only(left: 16),
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.card_giftcard_outlined,
+                                    color:
+                                        selectedIndex == 9
+                                            ? Colors.green[700]
+                                            : Colors.grey[500],
+                                    size: 18,
+                                  ),
+                                  title: Text(
+                                    "Scholarship",
+                                    style: TextStyle(
+                                      color:
+                                          selectedIndex == 9
+                                              ? Colors.green[800]
+                                              : Colors.grey[600],
+                                      fontSize: 13,
+                                      fontWeight:
+                                          selectedIndex == 9
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                    ),
+                                  ),
+                                  tileColor:
                                       selectedIndex == 9
-                                          ? Colors.green[700]
-                                          : Colors.grey[500],
-                                  size: 18,
+                                          ? Colors.green[50]
+                                          : null,
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    onItemTap(9);
+                                  },
                                 ),
-                                title: Text(
-                                  "Scholarship",
-                                  style: TextStyle(
-                                    color:
-                                        selectedIndex == 9
-                                            ? Colors.green[800]
-                                            : Colors.grey[600],
-                                    fontSize: 13,
-                                    fontWeight:
-                                        selectedIndex == 9
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                  ),
-                                ),
-                                tileColor:
-                                    selectedIndex == 9
-                                        ? Colors.green[50]
-                                        : null,
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  onItemTap(9);
-                                },
                               ),
-                            ),
-                            // Placement sub-item
-                            Container(
-                              margin: const EdgeInsets.only(left: 16),
-                              child: ListTile(
-                                leading: Icon(
-                                  Icons.work_outline,
-                                  color:
+                              // Placement sub-item
+                              Container(
+                                margin: const EdgeInsets.only(left: 16),
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.work_outline,
+                                    color:
+                                        selectedIndex == 10
+                                            ? Colors.green[700]
+                                            : Colors.grey[500],
+                                    size: 18,
+                                  ),
+                                  title: Text(
+                                    "Placement",
+                                    style: TextStyle(
+                                      color:
+                                          selectedIndex == 10
+                                              ? Colors.green[800]
+                                              : Colors.grey[600],
+                                      fontSize: 13,
+                                      fontWeight:
+                                          selectedIndex == 10
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                    ),
+                                  ),
+                                  tileColor:
                                       selectedIndex == 10
-                                          ? Colors.green[700]
-                                          : Colors.grey[500],
-                                  size: 18,
+                                          ? Colors.green[50]
+                                          : null,
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    onItemTap(10);
+                                  },
                                 ),
-                                title: Text(
-                                  "Placement",
-                                  style: TextStyle(
-                                    color:
-                                        selectedIndex == 10
-                                            ? Colors.green[800]
-                                            : Colors.grey[600],
-                                    fontSize: 13,
-                                    fontWeight:
-                                        selectedIndex == 10
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                  ),
-                                ),
-                                tileColor:
-                                    selectedIndex == 10
-                                        ? Colors.green[50]
-                                        : null,
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  onItemTap(10);
-                                },
+                              ),
+                            ],
+                          ),
+
+                          // Announcement Page
+                          ListTile(
+                            leading: Icon(
+                              Icons.announcement_outlined,
+                              color:
+                                  selectedIndex == 4
+                                      ? Colors.green[700]
+                                      : Colors.grey[600],
+                              size: 20,
+                            ),
+                            title: Text(
+                              "Announcement",
+                              style: TextStyle(
+                                color:
+                                    selectedIndex == 4
+                                        ? Colors.green[800]
+                                        : Colors.grey[700],
+                                fontSize: 14,
+                                fontWeight:
+                                    selectedIndex == 4
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
                               ),
                             ),
-                          ],
-                        ),
+                            tileColor:
+                                selectedIndex == 4 ? Colors.green[50] : null,
+                            selected: selectedIndex == 4,
+                            onTap: () {
+                              Navigator.pop(context);
+                              onItemTap(4);
+                            },
+                          ),
 
-                        // Announcement Page
-                        ListTile(
-                          leading: Icon(
-                            Icons.announcement_outlined,
-                            color:
-                                selectedIndex == 4
-                                    ? Colors.green[700]
-                                    : Colors.grey[600],
-                            size: 20,
-                          ),
-                          title: Text(
-                            "Announcement",
-                            style: TextStyle(
-                              color:
-                                  selectedIndex == 4
-                                      ? Colors.green[800]
-                                      : Colors.grey[700],
-                              fontSize: 14,
-                              fontWeight:
-                                  selectedIndex == 4
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
+                          // User Management Page
+                          // User Management ExpansionTile
+                          ExpansionTile(
+                            key: PageStorageKey<String>(
+                              'expansion_UserManagement_${PersistentDrawerState.isUserManagementExpanded}',
                             ),
-                          ),
-                          tileColor:
-                              selectedIndex == 4 ? Colors.green[50] : null,
-                          selected: selectedIndex == 4,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onItemTap(4);
-                          },
-                        ),
+                            leading: Icon(
+                              Icons.person_outline,
+                              color:
+                                  (selectedIndex == 6 ||
+                                          selectedIndex == 12 ||
+                                          selectedIndex == 13)
+                                      ? Colors.green[700]
+                                      : Colors.grey[600],
+                              size: 20,
+                            ),
+                            title: Text(
+                              "User Management",
+                              style: TextStyle(
+                                color:
+                                    (selectedIndex == 6 ||
+                                            selectedIndex == 12 ||
+                                            selectedIndex == 13)
+                                        ? Colors.green[800]
+                                        : Colors.grey[700],
+                                fontSize: 14,
+                                fontWeight:
+                                    (selectedIndex == 6 ||
+                                            selectedIndex == 12 ||
+                                            selectedIndex == 13)
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                              ),
+                            ),
+                            backgroundColor:
+                                (selectedIndex == 6 ||
+                                        selectedIndex == 12 ||
+                                        selectedIndex == 13)
+                                    ? Colors.green[50]
+                                    : null,
+                            collapsedBackgroundColor:
+                                (selectedIndex == 6 ||
+                                        selectedIndex == 12 ||
+                                        selectedIndex == 13)
+                                    ? Colors.green[50]
+                                    : null,
+                            initiallyExpanded:
+                                PersistentDrawerState.isUserManagementExpanded,
+                            onExpansionChanged: (expanded) {
+                              setDrawerState(() {
+                                // ✅ ALWAYS close ALL groups first
+                                PersistentDrawerState.setServicesExpanded(
+                                  false,
+                                );
+                                PersistentDrawerState.setLogsExpanded(false);
+                                PersistentDrawerState.setUserManagementExpanded(
+                                  false,
+                                );
 
-                        // User Management Page
-                        ListTile(
-                          leading: Icon(
-                            Icons.person_outline,
-                            color:
-                                selectedIndex == 5
-                                    ? Colors.green[700]
-                                    : Colors.grey[600],
-                            size: 20,
-                          ),
-                          title: Text(
-                            "User Management",
-                            style: TextStyle(
-                              color:
-                                  selectedIndex == 5
-                                      ? Colors.green[800]
-                                      : Colors.grey[700],
-                              fontSize: 14,
-                              fontWeight:
-                                  selectedIndex == 5
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                            ),
-                          ),
-                          tileColor:
-                              selectedIndex == 5 ? Colors.green[50] : null,
-                          selected: selectedIndex == 5,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onItemTap(5);
-                          },
-                        ),
-
-                        // System Logs Page
-                        ExpansionTile(
-                          leading: Icon(
-                            Icons.list_alt_outlined,
-                            color:
-                                (selectedIndex >= 6 && selectedIndex <= 7)
-                                    ? Colors.green[700]
-                                    : Colors.grey[600],
-                            size: 20,
-                          ),
-                          title: Text(
-                            "Logs",
-                            style: TextStyle(
-                              color:
-                                  (selectedIndex >= 6 && selectedIndex <= 7)
-                                      ? Colors.green[800]
-                                      : Colors.grey[700],
-                              fontSize: 14,
-                              fontWeight:
-                                  (selectedIndex >= 6 && selectedIndex <= 7)
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                            ),
-                          ),
-                          backgroundColor:
-                              (selectedIndex >= 6 && selectedIndex <= 7)
-                                  ? Colors.green[50]
-                                  : null,
-                          collapsedBackgroundColor:
-                              (selectedIndex >= 6 && selectedIndex <= 7)
-                                  ? Colors.green[50]
-                                  : null,
-                          initiallyExpanded: _isLogsExpanded,
-                          onExpansionChanged: (expanded) {
-                            setDrawerState(() {
-                              _isLogsExpanded = expanded;
-                            });
-                          },
-                          children: [
-                            // System Activity Logs sub-item
-                            Container(
-                              margin: const EdgeInsets.only(left: 16),
-                              child: ListTile(
-                                leading: Icon(
-                                  Icons.history_outlined,
-                                  color:
+                                // Then ONLY open User Management if expanding
+                                if (expanded) {
+                                  PersistentDrawerState.setUserManagementExpanded(
+                                    true,
+                                  );
+                                }
+                              });
+                            },
+                            children: [
+                              // Users sub-item (index 6)
+                              Container(
+                                margin: const EdgeInsets.only(left: 16),
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.person,
+                                    color:
+                                        selectedIndex == 6
+                                            ? Colors.green[700]
+                                            : Colors.grey[500],
+                                    size: 18,
+                                  ),
+                                  title: Text(
+                                    "Users",
+                                    style: TextStyle(
+                                      color:
+                                          selectedIndex == 6
+                                              ? Colors.green[800]
+                                              : Colors.grey[600],
+                                      fontSize: 13,
+                                      fontWeight:
+                                          selectedIndex == 6
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                    ),
+                                  ),
+                                  tileColor:
                                       selectedIndex == 6
-                                          ? Colors.green[700]
-                                          : Colors.grey[500],
-                                  size: 18,
+                                          ? Colors.green[50]
+                                          : null,
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    onItemTap(6);
+                                  },
                                 ),
-                                title: Text(
-                                  "System Activity Logs",
-                                  style: TextStyle(
+                              ),
+                              // Colleges sub-item (index 12)
+                              Container(
+                                margin: const EdgeInsets.only(left: 16),
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.school,
                                     color:
-                                        selectedIndex == 6
-                                            ? Colors.green[800]
-                                            : Colors.grey[600],
-                                    fontSize: 13,
-                                    fontWeight:
-                                        selectedIndex == 6
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
+                                        selectedIndex == 12
+                                            ? Colors.green[700]
+                                            : Colors.grey[500],
+                                    size: 18,
                                   ),
+                                  title: Text(
+                                    "Colleges",
+                                    style: TextStyle(
+                                      color:
+                                          selectedIndex == 12
+                                              ? Colors.green[800]
+                                              : Colors.grey[600],
+                                      fontSize: 13,
+                                      fontWeight:
+                                          selectedIndex == 12
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                    ),
+                                  ),
+                                  tileColor:
+                                      selectedIndex == 12
+                                          ? Colors.green[50]
+                                          : null,
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    onItemTap(12);
+                                  },
                                 ),
-                                tileColor:
-                                    selectedIndex == 6
-                                        ? Colors.green[50]
-                                        : null,
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  onItemTap(6);
-                                },
+                              ),
+                              // Programs sub-item (index 13)
+                              Container(
+                                margin: const EdgeInsets.only(left: 16),
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.book,
+                                    color:
+                                        selectedIndex == 13
+                                            ? Colors.green[700]
+                                            : Colors.grey[500],
+                                    size: 18,
+                                  ),
+                                  title: Text(
+                                    "Programs",
+                                    style: TextStyle(
+                                      color:
+                                          selectedIndex == 13
+                                              ? Colors.green[800]
+                                              : Colors.grey[600],
+                                      fontSize: 13,
+                                      fontWeight:
+                                          selectedIndex == 13
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                    ),
+                                  ),
+                                  tileColor:
+                                      selectedIndex == 13
+                                          ? Colors.green[50]
+                                          : null,
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    onItemTap(13);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // System Logs Page
+                          ExpansionTile(
+                            key: PageStorageKey<String>(
+                              'expansion_Logs_${PersistentDrawerState.isLogsExpanded}',
+                            ),
+                            leading: Icon(
+                              Icons.list_alt_outlined,
+                              color:
+                                  (selectedIndex >= 6 && selectedIndex <= 7)
+                                      ? Colors.green[700]
+                                      : Colors.grey[600],
+                              size: 20,
+                            ),
+                            title: Text(
+                              "Logs",
+                              style: TextStyle(
+                                color:
+                                    (selectedIndex >= 6 && selectedIndex <= 7)
+                                        ? Colors.green[800]
+                                        : Colors.grey[700],
+                                fontSize: 14,
+                                fontWeight:
+                                    (selectedIndex >= 6 && selectedIndex <= 7)
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
                               ),
                             ),
-                            // Message Logs sub-item
-                            Container(
-                              margin: const EdgeInsets.only(left: 16),
-                              child: ListTile(
-                                leading: Icon(
-                                  Icons.chat_bubble_outline,
-                                  color:
+                            backgroundColor:
+                                (selectedIndex >= 6 && selectedIndex <= 7)
+                                    ? Colors.green[50]
+                                    : null,
+                            collapsedBackgroundColor:
+                                (selectedIndex >= 6 && selectedIndex <= 7)
+                                    ? Colors.green[50]
+                                    : null,
+                            initiallyExpanded:
+                                PersistentDrawerState.isLogsExpanded,
+                            onExpansionChanged: (expanded) {
+                              setDrawerState(() {
+                                // ✅ ALWAYS close ALL groups first
+                                PersistentDrawerState.setServicesExpanded(
+                                  false,
+                                );
+                                PersistentDrawerState.setLogsExpanded(false);
+                                PersistentDrawerState.setUserManagementExpanded(
+                                  false,
+                                );
+
+                                // Then ONLY open Services if expanding
+                                if (expanded) {
+                                  PersistentDrawerState.setServicesExpanded(
+                                    true,
+                                  );
+                                }
+                              });
+                            },
+                            children: [
+                              // System Activity Logs sub-item
+                              Container(
+                                margin: const EdgeInsets.only(left: 16),
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.history_outlined,
+                                    color:
+                                        selectedIndex == 6
+                                            ? Colors.green[700]
+                                            : Colors.grey[500],
+                                    size: 18,
+                                  ),
+                                  title: Text(
+                                    "System Activity Logs",
+                                    style: TextStyle(
+                                      color:
+                                          selectedIndex == 6
+                                              ? Colors.green[800]
+                                              : Colors.grey[600],
+                                      fontSize: 13,
+                                      fontWeight:
+                                          selectedIndex == 6
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                    ),
+                                  ),
+                                  tileColor:
+                                      selectedIndex == 6
+                                          ? Colors.green[50]
+                                          : null,
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    onItemTap(6);
+                                  },
+                                ),
+                              ),
+                              // Message Logs sub-item
+                              Container(
+                                margin: const EdgeInsets.only(left: 16),
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.chat_bubble_outline,
+                                    color:
+                                        selectedIndex == 7
+                                            ? Colors.green[700]
+                                            : Colors.grey[500],
+                                    size: 18,
+                                  ),
+                                  title: Text(
+                                    "Message Logs",
+                                    style: TextStyle(
+                                      color:
+                                          selectedIndex == 7
+                                              ? Colors.green[800]
+                                              : Colors.grey[600],
+                                      fontSize: 13,
+                                      fontWeight:
+                                          selectedIndex == 7
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                    ),
+                                  ),
+                                  tileColor:
                                       selectedIndex == 7
-                                          ? Colors.green[700]
-                                          : Colors.grey[500],
-                                  size: 18,
+                                          ? Colors.green[50]
+                                          : null,
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    onItemTap(7);
+                                  },
                                 ),
-                                title: Text(
-                                  "Message Logs",
-                                  style: TextStyle(
-                                    color:
-                                        selectedIndex == 7
-                                            ? Colors.green[800]
-                                            : Colors.grey[600],
-                                    fontSize: 13,
-                                    fontWeight:
-                                        selectedIndex == 7
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                  ),
-                                ),
-                                tileColor:
-                                    selectedIndex == 7
-                                        ? Colors.green[50]
-                                        : null,
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  onItemTap(7);
-                                },
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -871,7 +1038,12 @@ class AdminConstant {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: Colors.white, border: null),
             child: Center(
-              child: Icon(Icons.favorite, size: 28, color: Colors.grey[300]),
+              child: Image.asset(
+                'lib/images/oasp.png',
+                width: 28,
+                height: 28,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
 
@@ -885,7 +1057,7 @@ class AdminConstant {
                   _buildPersistentDrawerItem(
                     context: context,
                     icon: Icons.home_outlined,
-                    title: 'Dashboardajshdvasjhodv',
+                    title: 'Dashboard',
                     index: 0,
                     selectedIndex: selectedIndex,
                     onTap: onItemTap,
@@ -927,15 +1099,51 @@ class AdminConstant {
                     onTap: onItemTap,
                     isExpanded: isExpanded,
                   ),
-                  _buildPersistentDrawerItem(
+
+                  // ✅ USER MANAGEMENT AS A GROUP (groupIndex: -3)
+                  _buildPersistentDrawerGroup(
                     context: context,
                     icon: Icons.person_outline,
-                    title: 'User Management',
-                    index: 5,
+                    title: "User Management",
+                    groupIndex: -3,
                     selectedIndex: selectedIndex,
                     onTap: onItemTap,
                     isExpanded: isExpanded,
+                    children: [
+                      _buildPersistentDrawerItem(
+                        context: context,
+                        icon: Icons.person,
+                        title: 'Users',
+                        index: 6,
+                        selectedIndex: selectedIndex,
+                        onTap: onItemTap,
+                        isExpanded: isExpanded,
+                        isSubItem: true,
+                      ),
+                      _buildPersistentDrawerItem(
+                        context: context,
+                        icon: Icons.school,
+                        title: 'Colleges',
+                        index: 12,
+                        selectedIndex: selectedIndex,
+                        onTap: onItemTap,
+                        isExpanded: isExpanded,
+                        isSubItem: true,
+                      ),
+                      _buildPersistentDrawerItem(
+                        context: context,
+                        icon: Icons.book,
+                        title: 'Programs',
+                        index: 13,
+                        selectedIndex: selectedIndex,
+                        onTap: onItemTap,
+                        isExpanded: isExpanded,
+                        isSubItem: true,
+                      ),
+                    ],
                   ),
+
+                  // ✅ SERVICES GROUP (groupIndex: -1)
                   _buildPersistentDrawerGroup(
                     context: context,
                     icon: Icons.miscellaneous_services_outlined,
@@ -948,7 +1156,7 @@ class AdminConstant {
                       _buildPersistentDrawerItem(
                         context: context,
                         icon: Icons.school_outlined,
-                        title: 'Admission Information',
+                        title: 'Admission',
                         index: 8,
                         selectedIndex: selectedIndex,
                         onTap: onItemTap,
@@ -958,7 +1166,7 @@ class AdminConstant {
                       _buildPersistentDrawerItem(
                         context: context,
                         icon: Icons.card_giftcard_outlined,
-                        title: 'Scholarship List',
+                        title: 'Scholarship',
                         index: 9,
                         selectedIndex: selectedIndex,
                         onTap: onItemTap,
@@ -968,7 +1176,7 @@ class AdminConstant {
                       _buildPersistentDrawerItem(
                         context: context,
                         icon: Icons.work_outline,
-                        title: 'Placement Information',
+                        title: 'Placement',
                         index: 10,
                         selectedIndex: selectedIndex,
                         onTap: onItemTap,
@@ -977,6 +1185,8 @@ class AdminConstant {
                       ),
                     ],
                   ),
+
+                  // ✅ LOGS GROUP (groupIndex: -2)
                   _buildPersistentDrawerGroup(
                     context: context,
                     icon: Icons.list_alt_outlined,
@@ -988,7 +1198,7 @@ class AdminConstant {
                     children: [
                       _buildPersistentDrawerItem(
                         context: context,
-                        icon: Icons.list_alt_outlined,
+                        icon: Icons.history_outlined,
                         title: 'System Activity Logs',
                         index: 6,
                         selectedIndex: selectedIndex,
@@ -998,7 +1208,7 @@ class AdminConstant {
                       ),
                       _buildPersistentDrawerItem(
                         context: context,
-                        icon: Icons.message_outlined,
+                        icon: Icons.chat_bubble_outline,
                         title: 'Message Logs',
                         index: 7,
                         selectedIndex: selectedIndex,
@@ -1027,97 +1237,133 @@ class AdminConstant {
     required bool isExpanded,
     required List<Widget> children,
   }) {
+    // ✅ Handle all 3 groups with correct index ranges
     final bool isGroupSelected =
-        groupIndex == -1
-            ? (selectedIndex >= 8 && selectedIndex <= 10)
+        groupIndex == -3
+            ? (selectedIndex == 6 ||
+                selectedIndex == 12 ||
+                selectedIndex == 13) // User Management
+            : groupIndex == -1
+            ? (selectedIndex >= 8 && selectedIndex <= 10) // Services
             : groupIndex == -2
-            ? (selectedIndex >= 6 && selectedIndex <= 7)
+            ? (selectedIndex == 6 || selectedIndex == 7) // Logs
             : false;
 
     return isExpanded
-        ? Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              dividerColor: Colors.transparent,
-              expansionTileTheme: ExpansionTileThemeData(
-                backgroundColor:
-                    isGroupSelected ? Colors.green[50] : Colors.transparent,
-                collapsedBackgroundColor:
-                    isGroupSelected ? Colors.green[50] : Colors.transparent,
-                tilePadding: const EdgeInsets.symmetric(
-                  horizontal: 0,
-                  vertical: 0,
+        ? StatefulBuilder(
+          builder: (context, setState) {
+            bool isGroupExpanded = PersistentDrawerState.getExpansionState(
+              groupIndex,
+            );
+
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  dividerColor: Colors.transparent,
+                  expansionTileTheme: ExpansionTileThemeData(
+                    backgroundColor:
+                        isGroupSelected ? Colors.green[50] : Colors.transparent,
+                    collapsedBackgroundColor:
+                        isGroupSelected ? Colors.green[50] : Colors.transparent,
+                    tilePadding: const EdgeInsets.symmetric(
+                      horizontal: 0,
+                      vertical: 0,
+                    ),
+                    childrenPadding: const EdgeInsets.only(left: 4, top: 4),
+                    iconColor:
+                        isGroupSelected ? Colors.green[700] : Colors.grey[600],
+                    collapsedIconColor:
+                        isGroupSelected ? Colors.green[700] : Colors.grey[600],
+                    textColor:
+                        isGroupSelected ? Colors.green[700] : Colors.grey[700],
+                    collapsedTextColor:
+                        isGroupSelected ? Colors.green[700] : Colors.grey[700],
+                    expansionAnimationStyle: AnimationStyle(
+                      duration: Duration.zero,
+                    ),
+                  ),
                 ),
-                childrenPadding: const EdgeInsets.only(left: 4, top: 4),
-                iconColor:
-                    isGroupSelected ? Colors.green[700] : Colors.grey[600],
-                collapsedIconColor:
-                    isGroupSelected ? Colors.green[700] : Colors.grey[600],
-                textColor:
-                    isGroupSelected ? Colors.green[700] : Colors.grey[700],
-                collapsedTextColor:
-                    isGroupSelected ? Colors.green[700] : Colors.grey[700],
-              ),
-            ),
-            child: Material(
-              color: isGroupSelected ? Colors.green[50] : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: ExpansionTile(
-                  minTileHeight: 44,
-                  tilePadding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 0,
-                  ),
-                  leading: Container(
-                    width: 20,
-                    height: 20,
-                    alignment: Alignment.center,
-                    child: Icon(
-                      icon,
-                      color:
-                          isGroupSelected
-                              ? Colors.green[700]
-                              : Colors.grey[600],
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(
-                    title,
-                    style: TextStyle(
-                      color:
-                          isGroupSelected
-                              ? Colors.green[700]
-                              : Colors.grey[700],
-                      fontWeight:
-                          isGroupSelected ? FontWeight.w600 : FontWeight.w400,
-                      fontSize: 14,
-                    ),
-                  ),
-                  initiallyExpanded:
-                      groupIndex == -1 ? _isServicesExpanded : _isLogsExpanded,
-                  onExpansionChanged: (expanded) {
-                    if (groupIndex == -1) {
-                      _isServicesExpanded = expanded;
-                    } else if (groupIndex == -2) {
-                      _isLogsExpanded = expanded;
-                    }
-                  },
-                  children:
-                      children
-                          .map(
-                            (child) => Container(
+                child: Material(
+                  color:
+                      isGroupSelected ? Colors.green[50] : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: ExpansionTile(
+                      minTileHeight: 44,
+                      tilePadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 0,
+                      ),
+                      leading: Container(
+                        width: 20,
+                        height: 20,
+                        alignment: Alignment.center,
+                        child: Icon(
+                          icon,
+                          color:
+                              isGroupSelected
+                                  ? Colors.green[700]
+                                  : Colors.grey[600],
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        title,
+                        style: TextStyle(
+                          color:
+                              isGroupSelected
+                                  ? Colors.green[700]
+                                  : Colors.grey[700],
+                          fontWeight:
+                              isGroupSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                          fontSize: 14,
+                        ),
+                      ),
+                      initiallyExpanded: isGroupExpanded,
+                      onExpansionChanged: (expanded) {
+                        if (expanded) {
+                          // ✅ Close ALL OTHER groups
+                          if (groupIndex != -3)
+                            PersistentDrawerState.setUserManagementExpanded(
+                              false,
+                            );
+                          if (groupIndex != -1)
+                            PersistentDrawerState.setServicesExpanded(false);
+                          if (groupIndex != -2)
+                            PersistentDrawerState.setLogsExpanded(false);
+
+                          // Open current group
+                          PersistentDrawerState.setExpansionState(
+                            groupIndex,
+                            true,
+                          );
+                        } else {
+                          // Close current group
+                          PersistentDrawerState.setExpansionState(
+                            groupIndex,
+                            false,
+                          );
+                        }
+
+                        setState(() {});
+                      },
+                      children:
+                          children.map((child) {
+                            return Container(
                               margin: const EdgeInsets.symmetric(vertical: 1),
                               child: child,
-                            ),
-                          )
-                          .toList(),
+                            );
+                          }).toList(),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         )
         : _buildPersistentDrawerItem(
           context: context,

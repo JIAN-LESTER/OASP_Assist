@@ -1,12 +1,13 @@
-import 'package:flutter/material.dart';
 import 'package:capstone_project/responsive/widgets/persistent_drawer_item.dart';
+import 'package:flutter/material.dart';
 
 // State management class for persistent drawer expansion
 class PersistentDrawerState extends ChangeNotifier {
-  static bool _isServicesExpanded =
-      false; // Changed from true to false para d mag cgeg open ang services dropdown once mo login or refresh the page
+  static bool _isServicesExpanded = false;
   static bool _isLogsExpanded = false;
   static bool _isUserManagementExpanded = false;
+
+  static final List<VoidCallback> _stateListeners = [];
 
   static bool get isServicesExpanded => _isServicesExpanded;
   static bool get isLogsExpanded => _isLogsExpanded;
@@ -14,23 +15,26 @@ class PersistentDrawerState extends ChangeNotifier {
 
   static void setServicesExpanded(bool expanded) {
     _isServicesExpanded = expanded;
+    _notifyAllListeners();
   }
 
   static void setLogsExpanded(bool expanded) {
     _isLogsExpanded = expanded;
+    _notifyAllListeners();
   }
 
   static void setUserManagementExpanded(bool expanded) {
     _isUserManagementExpanded = expanded;
+    _notifyAllListeners();
   }
 
   static bool getExpansionState(int groupIndex) {
     switch (groupIndex) {
-      case -1: // Services
-        return _isUserManagementExpanded;
-      case -2: // Logs
-        return _isServicesExpanded;
       case -3:
+        return _isUserManagementExpanded;
+      case -1:
+        return _isServicesExpanded;
+      case -2:
         return _isLogsExpanded;
       default:
         return false;
@@ -39,23 +43,38 @@ class PersistentDrawerState extends ChangeNotifier {
 
   static void setExpansionState(int groupIndex, bool expanded) {
     switch (groupIndex) {
-      case -1:
+      case -3:
         _isUserManagementExpanded = expanded;
         break;
-      case -2: // Services
+      case -1:
         _isServicesExpanded = expanded;
         break;
-      case -3: // Logs
+      case -2:
         _isLogsExpanded = expanded;
         break;
     }
+    _notifyAllListeners();
   }
 
-  // Optional: Add a method to reset all expansion states to default (collapsed)
   static void resetExpansionStates() {
     _isServicesExpanded = false;
     _isLogsExpanded = false;
     _isUserManagementExpanded = false;
+    _notifyAllListeners();
+  }
+
+  static void addStateListener(VoidCallback listener) {
+    _stateListeners.add(listener);
+  }
+
+  static void removeStateListener(VoidCallback listener) {
+    _stateListeners.remove(listener);
+  }
+
+  static void _notifyAllListeners() {
+    for (var listener in _stateListeners) {
+      listener();
+    }
   }
 }
 
@@ -63,183 +82,220 @@ Widget buildPersistentDrawerGroup({
   required BuildContext context,
   required IconData icon,
   required String title,
-  required int groupIndex, // like -1 for Services, -2 for Logs
+  required int groupIndex,
   required int selectedIndex,
   required Function(int) onTap,
   required bool isExpanded,
   required List<Widget> children,
   required bool isServicesExpanded,
 }) {
-  return isExpanded
-      ? _buildExpandedGroupItem(
-        context: context,
-        icon: icon,
-        title: title,
-        groupIndex: groupIndex,
-        children: children,
-      )
-      : _buildCollapsedGroupItem(
-        context: context,
-        icon: icon,
-        title: title,
-        groupIndex: groupIndex,
-        selectedIndex: selectedIndex,
-        onTap: onTap,
-        children: children,
-      );
-}
-
-Widget _buildExpandedGroupItem({
-  required BuildContext context,
-  required IconData icon,
-  required String title,
-  required int groupIndex,
-  required List<Widget> children,
-}) {
-  // Get current expansion state from the state manager
-  bool currentlyExpanded = PersistentDrawerState.getExpansionState(groupIndex);
-
-  return Container(
-    margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-    child: Theme(
-      data: Theme.of(context).copyWith(
-        dividerColor: Colors.transparent,
-        expansionTileTheme: ExpansionTileThemeData(
-          backgroundColor: Colors.transparent,
-          collapsedBackgroundColor: Colors.transparent,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-          childrenPadding: const EdgeInsets.only(left: 0, top: 4),
-          iconColor: Colors.grey[600],
-          collapsedIconColor: Colors.grey[600],
-          textColor: Colors.grey[700],
-          collapsedTextColor: Colors.grey[700],
-          expansionAnimationStyle: AnimationStyle(duration: Duration.zero),
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: ExpansionTile(
-            minTileHeight: 44,
-            tilePadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-            leading: Container(
-              width: 20,
-              height: 20,
-              margin: const EdgeInsets.only(left: 12),
-              alignment: Alignment.center,
-              child: Icon(icon, color: Colors.grey[600], size: 20),
-            ),
-            title: Container(
-              margin: const EdgeInsets.only(left: 4),
-              child: Text(
-                title,
-                style: TextStyle(
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w400,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-            initiallyExpanded: currentlyExpanded,
-            onExpansionChanged: (expanded) {
-              PersistentDrawerState.setExpansionState(groupIndex, expanded);
-            },
-            children:
-                children.map((child) {
-                  return Container(
-                    margin: const EdgeInsets.symmetric(vertical: 1),
-                    child: child,
-                  );
-                }).toList(),
-          ),
-        ),
-      ),
-    ),
+  return _PersistentDrawerGroupWidget(
+    icon: icon,
+    title: title,
+    groupIndex: groupIndex,
+    selectedIndex: selectedIndex,
+    onTap: onTap,
+    isExpanded: isExpanded,
+    children: children,
   );
 }
 
-Widget _buildCollapsedGroupItem({
-  required BuildContext context,
-  required IconData icon,
-  required String title,
-  required int groupIndex,
-  required int selectedIndex,
-  required Function(int) onTap,
-  required List<Widget> children,
-}) {
-  return StatefulBuilder(
-    builder: (context, setState) {
-      bool isExpanded = PersistentDrawerState.getExpansionState(groupIndex);
+class _PersistentDrawerGroupWidget extends StatefulWidget {
+  final IconData icon;
+  final String title;
+  final int groupIndex;
+  final int selectedIndex;
+  final Function(int) onTap;
+  final bool isExpanded;
+  final List<Widget> children;
 
+  const _PersistentDrawerGroupWidget({
+    required this.icon,
+    required this.title,
+    required this.groupIndex,
+    required this.selectedIndex,
+    required this.onTap,
+    required this.isExpanded,
+    required this.children,
+  });
+
+  @override
+  State<_PersistentDrawerGroupWidget> createState() =>
+      _PersistentDrawerGroupWidgetState();
+}
+
+class _PersistentDrawerGroupWidgetState
+    extends State<_PersistentDrawerGroupWidget> {
+  @override
+  void initState() {
+    super.initState();
+    PersistentDrawerState.addStateListener(_onStateChanged);
+  }
+
+  @override
+  void dispose() {
+    PersistentDrawerState.removeStateListener(_onStateChanged);
+    super.dispose();
+  }
+
+  void _onStateChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _handleTap() {
+    bool currentState = PersistentDrawerState.getExpansionState(
+      widget.groupIndex,
+    );
+
+    // Close ALL OTHER groups first
+    if (widget.groupIndex != -3)
+      PersistentDrawerState.setUserManagementExpanded(false);
+    if (widget.groupIndex != -1)
+      PersistentDrawerState.setServicesExpanded(false);
+    if (widget.groupIndex != -2) PersistentDrawerState.setLogsExpanded(false);
+
+    // Toggle current group
+    PersistentDrawerState.setExpansionState(widget.groupIndex, !currentState);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    bool isGroupExpanded = PersistentDrawerState.getExpansionState(
+      widget.groupIndex,
+    );
+
+    if (!widget.isExpanded) {
+      // Collapsed drawer (icon only) - Show dropdown inline below icon
       return Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Group header with expansion toggle
-          Stack(
-            children: [
-              // Base item using buildPersistentDrawerItem
-              buildPersistentDrawerItem(
-                context: context,
-                icon: icon,
-                title: title,
-                index: groupIndex,
-                selectedIndex: selectedIndex,
-                onTap: (index) {
-                  // Toggle expansion state
-                  setState(() {
-                    bool newState =
-                        !PersistentDrawerState.getExpansionState(groupIndex);
-                    PersistentDrawerState.setExpansionState(
-                      groupIndex,
-                      newState,
-                    );
-                  });
-                },
-                isExpanded: false, // Always false for collapsed drawer
-              ),
-
-              // Expansion indicator
-              Positioned(
-                right: 12,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: Icon(
-                    isExpanded
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
-                    color: Colors.grey[500],
-                    size: 16,
+          // Icon button with dropdown indicator
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: _handleTap,
+                child: Tooltip(
+                  message: widget.title,
+                  waitDuration: const Duration(milliseconds: 500),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(widget.icon, color: Colors.grey[600], size: 20),
+                        // Small dropdown arrow indicator
+                        Positioned(
+                          right: -4,
+                          bottom: -4,
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[400],
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Icon(
+                              isGroupExpanded
+                                  ? Icons.keyboard_arrow_up
+                                  : Icons.keyboard_arrow_down,
+                              color: Colors.white,
+                              size: 8,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-
-          // Children items (shown vertically below when expanded)
-          if (isExpanded) ...[
+          // Show children below icon when expanded
+          if (isGroupExpanded)
             Container(
-              width: 80, // collapsed drawer width
+              width: 80,
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children:
-                    children.map((child) {
-                      return Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 0,
-                          vertical: 1,
-                        ),
-                        child: child,
-                      );
-                    }).toList(),
+                children: widget.children,
               ),
             ),
-          ],
         ],
       );
-    },
-  );
+    }
+
+    // Expanded drawer (with text) - Full dropdown functionality
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: _handleTap,
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 44),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 20,
+                      height: 20,
+                      margin: const EdgeInsets.only(left: 12, right: 8),
+                      child: Icon(
+                        widget.icon,
+                        color: Colors.grey[600],
+                        size: 20,
+                      ),
+                    ),
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.only(left: 4),
+                        child: Text(
+                          widget.title,
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      isGroupExpanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      color: Colors.grey[600],
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (isGroupExpanded)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: widget.children,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

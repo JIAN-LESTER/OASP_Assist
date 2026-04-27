@@ -14,6 +14,8 @@ class User {
   final String? scholarship;
   final String? provider;
   final DateTime createdAt;
+  final int dailyMessageCount;
+  final DateTime? lastMessageResetDate;
 
   User({
     required this.id,
@@ -29,6 +31,8 @@ class User {
     this.profileCompleted = false,
     this.provider,
     required this.createdAt,
+    this.dailyMessageCount=0,
+    this.lastMessageResetDate,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -46,6 +50,8 @@ class User {
       scholarship: json['scholarship'],
       provider: json['provider'],
       createdAt: (json['createdAt'] as Timestamp).toDate(),
+       dailyMessageCount: json['dailyMessageCount'] ?? 0,
+          lastMessageResetDate: (json['lastMessageResetDate'] as Timestamp?)?.toDate(),
     );
   }
 }

@@ -1,19 +1,19 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:capstone_project/modules/user_module/chat_module/chat_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/services.dart';
+
 import 'package:google_sign_in/google_sign_in.dart';
 
-import 'package:capstone_project/notifications.dart';
-import 'package:capstone_project/pages/user_pages/chat_page.dart';
-import 'package:capstone_project/profile.dart' show ProfileModal;
+
+
+
 import 'package:capstone_project/provider/chat_provider.dart';
 import 'package:capstone_project/responsive/widgets/logout.dart';
-import 'package:capstone_project/responsive/widgets/persistent_drawer_group.dart';
-import 'package:capstone_project/responsive/widgets/persistent_drawer_item.dart';
+
 
 import 'package:provider/provider.dart';
 
@@ -35,7 +35,7 @@ class UserConstant {
   static DateTime? _faqCacheTime;
   static const Duration _faqCacheExpiry = Duration(hours: 1);
 
-  static bool _isServicesExpanded = false;
+
    static bool shouldShowFAQs = false;
 
   // Fixed logout method that handles both Firebase Auth and Google Sign In
@@ -304,7 +304,7 @@ class UserConstant {
 
             final conversations =
                 querySnapshot.docs.map((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
+                  final data = doc.data();
                   print(
                     'DEBUG: Found conversation - ID: ${doc.id}, Title: ${data['title']}, Status: ${data['status']}',
                   );
@@ -384,81 +384,81 @@ static Future<void> onConversationSelected(
     }
   }
 
-  static Future<void> deleteAllConversations() async {
+  // static Future<void> deleteAllConversations() async {
+  //   final firestore = FirebaseFirestore.instance;
+
+  //   // Get all conversation documents
+  //   final conversationsSnapshot =
+  //       await firestore.collection('conversations').get();
+
+  //   for (final convoDoc in conversationsSnapshot.docs) {
+  //     final convoId = convoDoc.id;
+
+  //     // Delete all messages in this conversation
+  //     final messagesSnapshot =
+  //         await firestore
+  //             .collection('conversations')
+  //             .doc(convoId)
+  //             .collection('messages')
+  //             .get();
+
+  //     for (final messageDoc in messagesSnapshot.docs) {
+  //       await firestore
+  //           .collection('conversations')
+  //           .doc(convoId)
+  //           .collection('messages')
+  //           .doc(messageDoc.id)
+  //           .delete();
+  //     }
+
+  //     // Delete the conversation itself
+  //     await firestore.collection('conversations').doc(convoId).delete();
+  //     print('Deleted conversation $convoId with its messages.');
+  //   }
+
+  //   print('All conversations and messages deleted.');
+  // }
+
+// In user_constant.dart - Update deleteConversation method
+
+static Future<void> deleteConversation(String conversationId) async {
+  try {
+    print('DEBUG: Deleting conversation: $conversationId');
+
     final firestore = FirebaseFirestore.instance;
 
-    // Get all conversation documents
-    final conversationsSnapshot =
-        await firestore.collection('conversations').get();
+    // Delete all messages in this conversation
+    final messagesSnapshot = await firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .get();
 
-    for (final convoDoc in conversationsSnapshot.docs) {
-      final convoId = convoDoc.id;
+    final batch = firestore.batch();
 
-      // Delete all messages in this conversation
-      final messagesSnapshot =
-          await firestore
-              .collection('conversations')
-              .doc(convoId)
-              .collection('messages')
-              .get();
-
-      for (final messageDoc in messagesSnapshot.docs) {
-        await firestore
-            .collection('conversations')
-            .doc(convoId)
-            .collection('messages')
-            .doc(messageDoc.id)
-            .delete();
-      }
-
-      // Delete the conversation itself
-      await firestore.collection('conversations').doc(convoId).delete();
-      print('Deleted conversation $convoId with its messages.');
+    for (final messageDoc in messagesSnapshot.docs) {
+      batch.delete(messageDoc.reference);
     }
 
-    print('All conversations and messages deleted.');
-  }
+    batch.delete(firestore.collection('conversations').doc(conversationId));
 
-  static Future<void> deleteConversation(String conversationId) async {
-    try {
-      print('DEBUG: Deleting conversation: $conversationId');
+    await batch.commit();
 
-      final firestore = FirebaseFirestore.instance;
+    print('DEBUG: Successfully deleted conversation and its messages');
 
-      // Delete all messages in this conversation
-      final messagesSnapshot =
-          await firestore
-              .collection('conversations')
-              .doc(conversationId)
-              .collection('messages')
-              .get();
-
-      // Use batch delete for efficiency
-      final batch = firestore.batch();
-
-      for (final messageDoc in messagesSnapshot.docs) {
-        batch.delete(messageDoc.reference);
-      }
-
-      // Delete the conversation document itself
-      batch.delete(firestore.collection('conversations').doc(conversationId));
-
-      await batch.commit();
-
-      print('DEBUG: Successfully deleted conversation and its messages');
-
-      // If this was the selected conversation, clear the selection
-      if (_selectedConversationId == conversationId) {
-        _selectedConversationId = null;
-      }
-
-      // Remove from recent conversations list
-      _recentConversations.removeWhere((conv) => conv['id'] == conversationId);
-    } catch (e) {
-      print('DEBUG: Error deleting conversation: $e');
-      rethrow;
+    // ✅ Clear selection if this was the selected conversation
+    if (_selectedConversationId == conversationId) {
+      _selectedConversationId = null;
     }
+
+    // Remove from recent conversations list
+    _recentConversations.removeWhere((conv) => conv['id'] == conversationId);
+    
+  } catch (e) {
+    print('DEBUG: Error deleting conversation: $e');
+    rethrow;
   }
+}
 
   static Future<String> findOrCreateConversation() async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
@@ -520,7 +520,7 @@ static Future<void> onConversationSelected(
         final now = DateTime.now();
 
         for (var doc in activeQuery.docs) {
-          final data = doc.data() as Map<String, dynamic>;
+          final data = doc.data();
           final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
 
           if (createdAt != null) {
@@ -541,7 +541,7 @@ static Future<void> onConversationSelected(
 
         // Return the most recent non-expired conversation
         for (var doc in activeQuery.docs) {
-          final data = doc.data() as Map<String, dynamic>;
+          final data = doc.data();
           final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
 
           if (createdAt != null) {
