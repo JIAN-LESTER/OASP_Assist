@@ -726,7 +726,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
           ),
           const SizedBox(height: 20),
           Text(
-            'Tell Us About Your Role',
+            'Tell Us About Yourself',
             style: TextStyle(
               fontSize: titleFontSize,
               fontWeight: FontWeight.w800,

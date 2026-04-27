@@ -2266,12 +2266,6 @@ $question
     }
   }
 
-  // =========================================================================
-  // FIX 3: FAQ promotion - unified embedding field name ('embedding') so
-  // server and client stay consistent; robust duplicate detection using a
-  // semantic similarity pass instead of only an exact-string match; saves
-  // the embedding that was already computed to avoid a redundant API call.
-  // =========================================================================
   Future<void> _checkAndPromoteToFAQOptimized(
     String question,
     List<double> currentEmbedding,
@@ -2310,7 +2304,6 @@ $question
                   .map((e) => (e as num).toDouble())
                   .toList();
 
-          // FIX: Skip mismatched-dimension embeddings.
           if (pastEmbedding.length != 768 || currentEmbedding.length != 768) {
             continue;
           }
@@ -2333,47 +2326,40 @@ $question
         }
       }
 
-      final batch = _firestore.batch();
-      bool hasBatchOperations = false;
-
       for (var group in questionGroups.values) {
+        // Threshold: 10+ occurrences this month to become a candidate.
         if (group.questionCount >= 10 && group.averageSimilarity > 0.90) {
           final representativeQuestion = group.getMostRepresentativeQuestion();
 
-          // ---- Duplicate detection ----
-          // FIX: Check both exact question match AND semantic similarity against
-          // existing FAQs to prevent near-duplicate promotions.
-          final exactMatch =
+          // ── Duplicate guard: skip if a live FAQ already covers this ──
+          final exactFAQMatch =
               await _firestore
                   .collection('faqs')
                   .where('question', isEqualTo: representativeQuestion)
                   .limit(1)
                   .get();
 
-          if (exactMatch.docs.isNotEmpty) {
-            print(
-              'ℹ️ FAQ already exists (exact match): $representativeQuestion',
-            );
+          if (exactFAQMatch.docs.isNotEmpty) {
+            print('ℹ️ Live FAQ already exists for: $representativeQuestion');
             continue;
           }
 
-          // Semantic duplicate check against existing FAQ embeddings in cache.
+          // Semantic duplicate check against live FAQs in cache.
           bool semanticDuplicateFound = false;
           for (var cacheEntry in FAQCache.cache.values) {
             final rawEmb =
                 cacheEntry['embedding'] ?? cacheEntry['geminiEmbedding'];
             if (rawEmb == null) continue;
-
             try {
               final existingEmb = List<double>.from(
                 (rawEmb as List).map((e) => (e as num).toDouble()),
               );
               if (existingEmb.length != 768) continue;
-
               final sim = cosineSimilarity(currentEmbedding, existingEmb);
               if (sim > 0.92) {
                 print(
-                  'ℹ️ FAQ semantic duplicate detected (sim=${ sim.toStringAsFixed(3)}): '
+                  'ℹ️ Semantic duplicate found in live FAQs '
+                  '(sim=${sim.toStringAsFixed(3)}): '
                   '${cacheEntry['question']}',
                 );
                 semanticDuplicateFound = true;
@@ -2383,36 +2369,97 @@ $question
               continue;
             }
           }
-
           if (semanticDuplicateFound) continue;
 
-          // ---- Promote ----
-          final faqRef = _firestore.collection('faqs').doc();
+          // ── Duplicate guard: skip if a pending candidate already exists ──
+          final existingCandidate =
+              await _firestore
+                  .collection('faq_candidates')
+                  .where('question', isEqualTo: representativeQuestion)
+                  .where('status', isEqualTo: 'pending')
+                  .limit(1)
+                  .get();
 
-          // FIX: Store as 'embedding' (not 'geminiEmbedding') so the client
-          // cache loader and server findMatchingFAQ both find it under the
-          // same normalised field name after the next cache refresh.
-          final faqData = {
+          final now = Timestamp.now();
+
+          if (existingCandidate.docs.isNotEmpty) {
+            // Candidate already exists — just bump the occurrence count and
+            // update the lastSeen timestamp so the admin sees fresh numbers.
+            await existingCandidate.docs.first.reference.update({
+              'occurrenceCount': group.questionCount,
+              'lastSeen': now,
+              'averageSimilarity': group.averageSimilarity,
+            });
+            print(
+              '📈 Updated existing candidate occurrences to '
+              '${group.questionCount}: $representativeQuestion',
+            );
+            continue;
+          }
+
+          // ── New candidate ──
+          // Also do a semantic duplicate check against existing pending
+          // candidates to prevent near-duplicate entries.
+          final pendingCandidates =
+              await _firestore
+                  .collection('faq_candidates')
+                  .where('status', isEqualTo: 'pending')
+                  .where('category', isEqualTo: category)
+                  .get();
+
+          bool candidateDuplicateFound = false;
+          for (var cd in pendingCandidates.docs) {
+            final cdData = cd.data();
+            final cdEmb = cdData['embedding'];
+            if (cdEmb == null) continue;
+            try {
+              final embList = List<double>.from(
+                (cdEmb as List).map((e) => (e as num).toDouble()),
+              );
+              if (embList.length != 768) continue;
+              final sim = cosineSimilarity(currentEmbedding, embList);
+              if (sim > 0.92) {
+                // Bump that existing candidate instead.
+                await cd.reference.update({
+                  'occurrenceCount': FieldValue.increment(group.questionCount),
+                  'lastSeen': now,
+                });
+                print(
+                  'ℹ️ Merged into existing candidate '
+                  '(sim=${sim.toStringAsFixed(3)}): ${cdData['question']}',
+                );
+                candidateDuplicateFound = true;
+                break;
+              }
+            } catch (_) {
+              continue;
+            }
+          }
+          if (candidateDuplicateFound) continue;
+
+          // Write the new candidate.
+          await _firestore.collection('faq_candidates').add({
             'question': representativeQuestion,
             'answer': botAnswer,
             'category': category,
-            'isPredefined': false,
-            'createdAt': Timestamp.now(),
-            'embedding': currentEmbedding,       // unified field name
-            'geminiEmbedding': currentEmbedding, // keep server copy in sync
-            'similarityCount': group.questionCount,
+            'embedding': currentEmbedding,
+            'occurrenceCount': group.questionCount,
             'averageSimilarity': group.averageSimilarity,
-          };
+            'firstSeen': now,
+            'lastSeen': now,
+            'status': 'pending',
+          });
 
-          batch.set(faqRef, faqData);
-          hasBatchOperations = true;
-
-          print('🎯 Auto-promoting FAQ: $representativeQuestion');
-          print('   Questions in group: ${group.questionCount}');
           print(
-            '   Average similarity: ${group.averageSimilarity.toStringAsFixed(3)}',
+            '🎯 New FAQ candidate queued for admin review: '
+            '$representativeQuestion',
           );
-          print('   Category: $category');
+          print('   Occurrences : ${group.questionCount}');
+          print(
+            '   Avg similarity: '
+            '${group.averageSimilarity.toStringAsFixed(3)}',
+          );
+          print('   Category    : $category');
         } else if (group.questionCount >= 5) {
           print(
             '📊 Group approaching threshold: ${group.questionCount}/10 '
@@ -2420,15 +2467,8 @@ $question
           );
         }
       }
-
-      if (hasBatchOperations) {
-        await batch.commit();
-        // Invalidate cache so next request picks up the new FAQ.
-        FAQCache.lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(0);
-        print('✅ FAQ promotion batch committed');
-      }
     } catch (e) {
-      print('❌ Error in FAQ promotion: $e');
+      print('❌ Error in FAQ candidate promotion: $e');
     }
   }
 
@@ -2473,8 +2513,14 @@ $question
             .where(
               (word) =>
                   word.length > 3 &&
-                  !['what', 'how', 'when', 'where', 'why', 'who']
-                      .contains(word),
+                  ![
+                    'what',
+                    'how',
+                    'when',
+                    'where',
+                    'why',
+                    'who',
+                  ].contains(word),
             )
             .toList();
 
@@ -2505,8 +2551,21 @@ $question
     if (meaningfulWords.length < 2) return false;
 
     final questionWords = [
-      'what', 'how', 'when', 'where', 'why', 'who', 'which',
-      'can', 'is', 'are', 'do', 'does', 'will', 'would', 'should',
+      'what',
+      'how',
+      'when',
+      'where',
+      'why',
+      'who',
+      'which',
+      'can',
+      'is',
+      'are',
+      'do',
+      'does',
+      'will',
+      'would',
+      'should',
     ];
     final hasQuestionWord = questionWords.any(
       (qw) => cleanQuestion.contains(qw),
