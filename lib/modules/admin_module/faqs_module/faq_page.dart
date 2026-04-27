@@ -857,6 +857,33 @@ Widget _buildTableHeader(
         ),
         child: Row(
           children: [
+            InkWell(
+              onTap: filteredDocs.isEmpty ? null : onSelectAll,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: isAllSelected
+                        ? const Color(0xFF2E7D32)
+                        : Colors.white,
+                    border: Border.all(
+                      color: isAllSelected
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFFD1D5DB),
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: isAllSelected
+                      ? const Icon(Icons.check, size: 14, color: Colors.white)
+                      : null,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
             const Expanded(
               flex: 4,
               child: Text('Question',
@@ -874,45 +901,8 @@ Widget _buildTableHeader(
                       fontSize: 12,
                       color: Colors.black87)),
             ),
-            const SizedBox(width: 8),
-            InkWell(
-              onTap: filteredDocs.isEmpty ? null : onSelectAll,
-              borderRadius: BorderRadius.circular(4),
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Select All',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[700])),
-                    const SizedBox(width: 6),
-                    Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: isAllSelected
-                            ? const Color(0xFF2E7D32)
-                            : Colors.white,
-                        border: Border.all(
-                          color: isAllSelected
-                              ? const Color(0xFF2E7D32)
-                              : const Color(0xFFD1D5DB),
-                          width: 2,
-                        ),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: isAllSelected
-                          ? const Icon(Icons.check,
-                              size: 12, color: Colors.white)
-                          : null,
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            const SizedBox(width: 5),
+            const SizedBox(width: 40),
           ],
         ),
       );
@@ -927,6 +917,32 @@ Widget _buildTableHeader(
       ),
       child: Row(
         children: [
+          InkWell(
+            onTap: filteredDocs.isEmpty ? null : onSelectAll,
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color:
+                      isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                  border: Border.all(
+                    color: isAllSelected
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFFD1D5DB),
+                    width: 2,
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: isAllSelected
+                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    : null,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             flex: 4,
             child: Text('Question',
@@ -935,7 +951,6 @@ Widget _buildTableHeader(
                     fontSize: isTablet ? 13 : 14,
                     color: Colors.black87)),
           ),
-          const SizedBox(width: 12),
           Expanded(
             flex: 3,
             child: Text('Answer',
@@ -954,45 +969,7 @@ Widget _buildTableHeader(
                     color: Colors.black87)),
           ),
           SizedBox(width: isTablet ? 40 : 5),
-          InkWell(
-            onTap: filteredDocs.isEmpty ? null : onSelectAll,
-            borderRadius: BorderRadius.circular(4),
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Select All',
-                      style: TextStyle(
-                          fontSize: isTablet ? 12 : 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[700])),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: isAllSelected
-                          ? const Color(0xFF2E7D32)
-                          : Colors.white,
-                      border: Border.all(
-                        color: isAllSelected
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFFD1D5DB),
-                        width: 2,
-                      ),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: isAllSelected
-                        ? const Icon(Icons.check,
-                            size: 14, color: Colors.white)
-                        : null,
-                  ),
-                ],
-              ),
-            ),
-          ),
+          const SizedBox(width: 40),
         ],
       ),
     );

@@ -595,14 +595,15 @@ Widget _buildTableHeader() {
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           decoration: BoxDecoration(
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(6),
           ),
           child: const Row(
             children: [
-              SizedBox(width: 8),
+              SizedBox(width: 40),
+              SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'College Name',
@@ -613,7 +614,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 40),
+              SizedBox(width: 48),
             ],
           ),
         );
@@ -622,7 +623,7 @@ Widget _buildTableHeader() {
       return Container(
         padding: EdgeInsets.symmetric(
           vertical: isTablet ? 14 : 16,
-          horizontal: isTablet ? 12 : 16,
+          horizontal: 12,
         ),
         decoration: BoxDecoration(
           color: Colors.grey[50],
@@ -648,6 +649,7 @@ Widget _buildTableHeader() {
               ),
             ),
             SizedBox(width: isTablet ? 60 : 80),
+            const SizedBox(width: 48),
           ],
         ),
       );

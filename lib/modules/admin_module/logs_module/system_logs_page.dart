@@ -564,6 +564,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
+              SizedBox(width: 48),
             ],
           ),
         );
@@ -580,7 +581,6 @@ Widget _buildTableHeader() {
         ),
         child: Row(
           children: [
-            const SizedBox(width: 8),
             Expanded(
               flex: 2,
               child: Text(
@@ -614,6 +614,7 @@ Widget _buildTableHeader() {
                 ),
               ),
             ),
+            const SizedBox(width: 48),
           ],
         ),
       );
