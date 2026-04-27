@@ -18,73 +18,97 @@ class BulkDeleteBar extends StatelessWidget {
     required this.itemType,
   });
 
+  static const Color primaryGreen = Color(0xFF2E7D32);
+  static const Color darkGreen = Color(0xFF14532D);
+  static const Color softGreen = Color(0xFFE8F5E9);
+  static const Color borderGreen = Color(0xFFC8E6C9);
+  static const Color dangerRed = Color(0xFFDC2626);
+  static const Color softRed = Color(0xFFFFF1F2);
+  static const Color borderRed = Color(0xFFFECACA);
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1F2937),
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderGreen, width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: darkGreen.withOpacity(0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF2E7D32),
-              borderRadius: BorderRadius.circular(6),
+              color: softGreen,
+              borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
-              Icons.check_circle,
-              color: Colors.white,
-              size: 18,
+              Icons.check_circle_outline,
+              color: primaryGreen,
+              size: 20,
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            '$selectedCount $itemType selected',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
+
+          Expanded(
+            child: Text(
+              '$selectedCount $itemType selected',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: darkGreen,
+                fontWeight: FontWeight.w700,
+                fontSize: 14.5,
+              ),
             ),
           ),
-          const Spacer(),
-          TextButton.icon(
-            onPressed: onBulkDelete,
-            icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
-            label: const Text(
-              'Delete',
-              style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600),
-            ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-          ),
-          const SizedBox(width: 8),
+
           TextButton.icon(
             onPressed: onToggleSelectAll,
             icon: Icon(
               isAllSelected ? Icons.deselect : Icons.select_all,
-              color: Colors.white,
+              color: primaryGreen,
               size: 18,
             ),
             label: Text(
               isAllSelected ? 'Unselect All' : 'Select All',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                color: primaryGreen,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              backgroundColor: Colors.white.withOpacity(0.1),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              backgroundColor: softGreen,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(10),
+                side: const BorderSide(color: borderGreen),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          TextButton.icon(
+            onPressed: onBulkDelete,
+            icon: const Icon(Icons.delete_outline, color: dangerRed, size: 18),
+            label: const Text(
+              'Delete',
+              style: TextStyle(color: dangerRed, fontWeight: FontWeight.w700),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              backgroundColor: softRed,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: const BorderSide(color: borderRed),
               ),
             ),
           ),
@@ -129,9 +153,9 @@ mixin BulkSelectionMixin<T extends StatefulWidget> on State<T> {
   }
 
   bool isSelected(String id) => selectedIds.contains(id);
-  
-  bool isAllSelected(List<String> allIds) => 
-    selectedIds.length == allIds.length && allIds.isNotEmpty;
+
+  bool isAllSelected(List<String> allIds) =>
+      selectedIds.length == allIds.length && allIds.isNotEmpty;
 }
 
 /// Bulk delete confirmation dialog using existing delete.dart design
@@ -178,7 +202,7 @@ Future<bool?> showBulkDeleteConfirmationDialog(
                   isMobile ? 16 : 20,
                 ),
                 decoration: const BoxDecoration(
-                  color: Color(0xFFFEF2F2),
+                  color: Colors.white,
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(16),
                     topRight: Radius.circular(16),
@@ -187,16 +211,20 @@ Future<bool?> showBulkDeleteConfirmationDialog(
                 child: Column(
                   children: [
                     Container(
-                      width: 64,
-                      height: 64,
+                      width: 68,
+                      height: 68,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEE2E2),
-                        borderRadius: BorderRadius.circular(32),
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(34),
+                        border: Border.all(
+                          color: const Color(0xFFC8E6C9),
+                          width: 1.4,
+                        ),
                       ),
                       child: const Icon(
-                        Icons.warning_amber_outlined,
-                        color: Color(0xFFEF4444),
-                        size: 32,
+                        Icons.warning_amber_rounded,
+                        color: Color(0xFF2E7D32),
+                        size: 34,
                       ),
                     ),
                     SizedBox(height: isMobile ? 16 : 20),
@@ -204,10 +232,11 @@ Future<bool?> showBulkDeleteConfirmationDialog(
                       'Delete $count $itemType?',
                       style: TextStyle(
                         fontSize: isMobile ? 20 : 22,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF111827),
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF14532D),
                         letterSpacing: -0.3,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
@@ -232,13 +261,14 @@ Future<bool?> showBulkDeleteConfirmationDialog(
                           child: OutlinedButton(
                             onPressed: () => Navigator.pop(context, false),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF6B7280),
+                              foregroundColor: const Color(0xFF2E7D32),
                               side: const BorderSide(
-                                color: Color(0xFFD1D5DB),
-                                width: 1,
+                                color: Color(0xFFC8E6C9),
+                                width: 1.2,
                               ),
+                              backgroundColor: const Color(0xFFF8FAF8),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
@@ -246,7 +276,7 @@ Future<bool?> showBulkDeleteConfirmationDialog(
                               'Cancel',
                               style: TextStyle(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -256,11 +286,11 @@ Future<bool?> showBulkDeleteConfirmationDialog(
                           child: ElevatedButton(
                             onPressed: () => Navigator.pop(context, true),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFEF4444),
+                              backgroundColor: const Color(0xFFDC2626),
                               foregroundColor: Colors.white,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
@@ -268,7 +298,7 @@ Future<bool?> showBulkDeleteConfirmationDialog(
                               'Delete',
                               style: TextStyle(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -320,12 +350,13 @@ Future<void> handleBulkDelete({
   showDialog(
     context: context,
     barrierDismissible: false,
-    builder: (context) => const Center(
-      child: CircularProgressIndicator(
-        color: Color(0xFF2E7D32),
-        strokeWidth: 3,
-      ),
-    ),
+    builder:
+        (context) => const Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF2E7D32),
+            strokeWidth: 3,
+          ),
+        ),
   );
 
   try {
@@ -334,10 +365,11 @@ Future<void> handleBulkDelete({
 
     for (final id in selectedIds) {
       try {
-        final doc = await FirebaseFirestore.instance
-            .collection(collection)
-            .doc(id)
-            .get();
+        final doc =
+            await FirebaseFirestore.instance
+                .collection(collection)
+                .doc(id)
+                .get();
 
         if (doc.exists) {
           if (customDeleteHandler != null) {
