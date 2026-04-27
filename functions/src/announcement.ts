@@ -2524,64 +2524,78 @@ async function processPost(
 ): Promise<void> {
   const postId = post.id;
   const originalMessage = post.message || "";
-
+ 
   console.log("\n========================================");
   console.log(`🔍 Processing post: ${postId}`);
   console.log("========================================");
-
+ 
   const postRef = db.collection("announcements").doc(postId);
   const doc = await postRef.get();
-
+ 
+  // ✅ FIX: Fetch sync settings BEFORE running OCR.
+  // OCR via Google Vision is only needed to enrich category documents
+  // (admissions, scholarships, placements). If auto-create is disabled
+  // globally, skip the Vision API call entirely to avoid unnecessary cost.
+  const settings = await getAutoCreateSettings();
+  const ocrEnabled = settings.enabled; // mirrors the master toggle in the UI
+ 
   // Extract ALL images
   const allImageUrls = extractAllImagesFromPost(post);
   console.log(`📸 Post has ${allImageUrls.length} image(s)`);
-
-  // Process OCR for ALL images
+ 
+  // Process OCR for ALL images — only when the master toggle is ON
   let combinedOcrText = "";
   const ocrResults: string[] = [];
-
+ 
   if (allImageUrls.length > 0) {
-    console.log(`🔍 Running OCR on ${allImageUrls.length} image(s)...`);
-
-    for (let i = 0; i < allImageUrls.length; i++) {
-      console.log(`  🔍 Processing image ${i + 1}/${allImageUrls.length}...`);
-      try {
-        const ocrText = await extractTextFromImage(allImageUrls[i]);
-        if (ocrText && ocrText.trim().length > 0) {
-          ocrResults.push(ocrText);
-          console.log(
-            `  ✅ Extracted ${ocrText.length} chars from image ${i + 1}`
-          );
-        } else {
-          console.log(`  ⚠️ No text found in image ${i + 1}`);
+    if (!ocrEnabled) {
+      // ✅ NEW: skip Vision API when auto-create documents is disabled
+      console.log(
+        "⏭️ Skipping Google Vision OCR — auto-create documents is disabled in Sync Settings"
+      );
+    } else {
+      console.log(`🔍 Running OCR on ${allImageUrls.length} image(s)...`);
+ 
+      for (let i = 0; i < allImageUrls.length; i++) {
+        console.log(`  🔍 Processing image ${i + 1}/${allImageUrls.length}...`);
+        try {
+          const ocrText = await extractTextFromImage(allImageUrls[i]);
+          if (ocrText && ocrText.trim().length > 0) {
+            ocrResults.push(ocrText);
+            console.log(
+              `  ✅ Extracted ${ocrText.length} chars from image ${i + 1}`
+            );
+          } else {
+            console.log(`  ⚠️ No text found in image ${i + 1}`);
+          }
+        } catch (err: any) {
+          console.error(`  ❌ OCR failed for image ${i + 1}:`, err.message);
         }
-      } catch (err: any) {
-        console.error(`  ❌ OCR failed for image ${i + 1}:`, err.message);
       }
+ 
+      combinedOcrText = combineOcrResults(ocrResults);
+      console.log(
+        `📝 Total OCR: ${combinedOcrText.length} chars from ${ocrResults.length}/${allImageUrls.length} images`
+      );
     }
-
-    combinedOcrText = combineOcrResults(ocrResults);
-    console.log(
-      `📝 Total OCR: ${combinedOcrText.length} chars from ${ocrResults.length}/${allImageUrls.length} images`
-    );
   }
-
+ 
   const hasImageText = ocrResults.length > 0;
-
-  // Combine message with OCR text
+ 
+  // Combine message with OCR text (only populated when OCR ran)
   let messageForAnalysis = originalMessage;
   if (hasImageText) {
-    messageForAnalysis = originalMessage ?
-      `${originalMessage}\n\n[Text from ${ocrResults.length} image(s)]:\n${combinedOcrText}` :
-      combinedOcrText;
+    messageForAnalysis = originalMessage
+      ? `${originalMessage}\n\n[Text from ${ocrResults.length} image(s)]:\n${combinedOcrText}`
+      : combinedOcrText;
   }
-
+ 
   if (!messageForAnalysis || messageForAnalysis.trim().length === 0) {
     console.log(`⏭️ Skipping post ${postId} - no content`);
     return;
   }
-
-  // Upload ALL images to storage
+ 
+  // Upload ALL images to storage (always runs regardless of OCR setting)
   let uploadedImageUrls: string[] = [];
   if (allImageUrls.length > 0) {
     uploadedImageUrls = await downloadAndUploadAllImages(allImageUrls, postId);
@@ -2589,20 +2603,14 @@ async function processPost(
       `✅ Stored ${uploadedImageUrls.length} images in Firebase Storage`
     );
   }
-
-  // ============================================================================
-  // ✅ NEW DOCUMENT PATH
-  // ============================================================================
+ 
+  // ── NEW DOCUMENT PATH ─────────────────────────────────────────────────────
   if (!doc.exists) {
     console.log("✨ Creating new announcement...");
-
-    // Analyze with Cohere
-    const cohereResult = await analyzeAnnouncement(
-      messageForAnalysis,
-      cohereKey
-    );
+ 
+    const cohereResult = await analyzeAnnouncement(messageForAnalysis, cohereKey);
     const deadlineTimestamp = parseDeadlineToTimestamp(cohereResult.deadline);
-
+ 
     const newData = {
       announcementId: postId,
       message: originalMessage,
@@ -2624,107 +2632,106 @@ async function processPost(
       ocr_processed_count: ocrResults.length,
       ocr_success_count: ocrResults.length,
       total_image_count: allImageUrls.length,
+      // ✅ Record whether OCR was skipped due to settings
+      ocr_skipped_by_settings: allImageUrls.length > 0 && !ocrEnabled,
     };
-
+ 
     await postRef.set(newData);
     console.log("✅ Created announcement document");
-
-    // Create category-specific documents AND Information Bank
+ 
+    // createCategoryAndInfoBank already checks settings internally,
+    // but passing the pre-fetched settings avoids a second Firestore read.
     await createCategoryAndInfoBank(
       postId,
       cohereResult.category,
       messageForAnalysis,
       deadlineTimestamp,
       cohereKey,
-      combinedOcrText,
+      combinedOcrText,  // empty string when OCR was skipped
       allImageUrls.length
     );
-
+ 
     console.log(`✅ Post ${postId} processing complete\n`);
-
-    // ============================================================================
-    // ✅ EXISTING DOCUMENT PATH - NOW ALSO CREATES/UPDATES INFO BANK
-    // ============================================================================
+ 
+  // ── EXISTING DOCUMENT PATH ────────────────────────────────────────────────
   } else {
     const docData = doc.data();
-
+ 
     if (docData?.deleted === true) {
       console.log(`⏭️ Skipping deleted post ${postId}`);
       return;
     }
-
+ 
     console.log("🔄 Updating existing announcement...");
-
-    // Update announcement
+ 
     await postRef.update({
       message: originalMessage,
       images:
-        uploadedImageUrls.length > 0 ?
-          uploadedImageUrls :
-          docData?.images || [],
+        uploadedImageUrls.length > 0
+          ? uploadedImageUrls
+          : docData?.images || [],
       image_count: uploadedImageUrls.length || docData?.image_count || 0,
       full_picture: uploadedImageUrls[0] || docData?.full_picture || "",
       permalink_url: post.permalink_url || "",
       last_synced_at: admin.firestore.FieldValue.serverTimestamp(),
       stored_in_storage:
         uploadedImageUrls.length > 0 || docData?.stored_in_storage,
-      ocr_text: combinedOcrText || docData?.ocr_text || "",
-      has_image_text: hasImageText || docData?.has_image_text,
-      ocr_processed_count:
-        ocrResults.length || docData?.ocr_processed_count || 0,
+      // Only overwrite OCR fields when OCR actually ran this cycle
+      ...(ocrEnabled && {
+        ocr_text: combinedOcrText || docData?.ocr_text || "",
+        has_image_text: hasImageText || docData?.has_image_text,
+        ocr_processed_count:
+          ocrResults.length || docData?.ocr_processed_count || 0,
+        ocr_skipped_by_settings: false,
+      }),
+      // When OCR is disabled, just note it was skipped without wiping stored data
+      ...(!ocrEnabled && allImageUrls.length > 0 && {
+        ocr_skipped_by_settings: true,
+      }),
       total_image_count: allImageUrls.length,
     });
-
+ 
     console.log("✅ Updated announcement document");
-
-    // ✅ NEW: Create/update category documents and Information Bank if needed
+ 
     const category = docData?.category?.toLowerCase() || "";
-
-    if (
-      category &&
-      ["admission", "scholarship", "placement"].includes(category)
-    ) {
+ 
+    if (["admission", "scholarship", "placement"].includes(category)) {
       console.log("\n🔄 Checking category document and Information Bank...");
-
-      // Check if category document exists
+ 
       const categoryDoc = await db.collection(`${category}s`).doc(postId).get();
-
-      // Check if Information Bank entry exists
       const infoBankId = `${category}_${postId}`;
       const infoBankDoc = await db
         .collection("information_bank")
         .doc(infoBankId)
         .get();
-
+ 
       const needsCategoryDoc = !categoryDoc.exists;
       const needsInfoBank = !infoBankDoc.exists;
-
+ 
       console.log(`   📊 Category doc exists: ${categoryDoc.exists}`);
       console.log(`   📊 Info Bank exists: ${infoBankDoc.exists}`);
-
+ 
       if (needsCategoryDoc || needsInfoBank) {
         console.log("   🔧 Creating missing documents...");
-
-        // Get deadline from announcement
+ 
         const deadlineTimestamp = docData?.deadline || null;
-
-        // Create missing category/Info Bank documents
+ 
         await createCategoryAndInfoBank(
           postId,
-          category.charAt(0).toUpperCase() + category.slice(1), // Capitalize
+          category.charAt(0).toUpperCase() + category.slice(1),
           messageForAnalysis,
           deadlineTimestamp,
           cohereKey,
-          combinedOcrText,
+          combinedOcrText,  // empty string when OCR was skipped
           allImageUrls.length
         );
-
+ 
         console.log("   ✅ Missing documents created");
       } else {
         console.log("   ℹ️ All documents already exist");
       }
     }
-
+ 
     console.log("✅ Update complete\n");
   }
 }

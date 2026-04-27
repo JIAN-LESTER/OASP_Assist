@@ -996,7 +996,7 @@ export const onEscalationCreated = onDocumentCreated(
 
       if (!escalationData) {
         console.log("No escalation data found");
-        return;
+        return {success: false, reason: "no_data"};
       }
 
       console.log(`🆕 New escalation: ${escalationId}`);
@@ -1118,7 +1118,7 @@ export const onEscalationCreated = onDocumentCreated(
           normalizedCategory: normalizedCategory,
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        return;
+        return {success: false, reason: "no_recipients"};
       }
 
       let staffNotifications = 0;
@@ -1267,7 +1267,7 @@ export const onEscalationReplied = onDocumentUpdated(
 
       if (!beforeData || !afterData) {
         console.log("No escalation data found");
-        return;
+        return {success: false, reason: "no_escalation_data"};
       }
 
       const hasNewReply =
@@ -1278,7 +1278,7 @@ export const onEscalationReplied = onDocumentUpdated(
 
       if (!hasNewReply) {
         console.log("No new staff reply detected");
-        return;
+        return {success: false, reason: "no_new_reply"};
       }
 
       console.log(`💬 Staff or Admin replied to escalation: ${escalationId}`);
@@ -1318,7 +1318,7 @@ export const onEscalationReplied = onDocumentUpdated(
           reason: "no_user_id",
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        return;
+        return {success: false, reason: "no_user_id"};
       }
 
       // ✅ Verify user exists and is active
@@ -1330,7 +1330,7 @@ export const onEscalationReplied = onDocumentUpdated(
           reason: "user_not_found",
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        return;
+        return {success: false, reason: "user_not_found"};
       }
 
       const userData = userDoc.data();
@@ -1341,7 +1341,7 @@ export const onEscalationReplied = onDocumentUpdated(
           reason: "user_not_active",
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        return;
+        return {success: false, reason: "user_not_active"};
       }
 
       console.log(`✅ Verified user ${userId} exists and is active`);
