@@ -193,11 +193,10 @@ async function downloadAndUploadAllImages(
       const contentType = response.headers["content-type"] || "image/jpeg";
       const ext = contentType.split("/")[1]?.split(";")[0] || "jpg";
 
-      // 🔥 FIX: Use index suffix for multiple images
       const fileName =
-        imageUrls.length > 1 ?
-          `announcements/${postId}_${i}.${ext}` :
-          `announcements/${postId}.${ext}`;
+        imageUrls.length > 1
+          ? `announcements/${postId}_${i}.${ext}`
+          : `announcements/${postId}.${ext}`;
 
       const bucket = storage.bucket();
       const file = bucket.file(fileName);
@@ -212,22 +211,18 @@ async function downloadAndUploadAllImages(
             totalImages: imageUrls.length.toString(),
           },
         },
-        public: true,
+        public: true,           // ✅ saves with public ACL
       });
 
-      const [signedUrl] = await file.getSignedUrl({
-        action: "read",
-        expires: "03-01-2500",
-      });
+      // ✅ Make explicitly public then build the permanent URL
+      await file.makePublic();
+      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
 
-      uploadedUrls.push(signedUrl);
-      console.log(
-        `  ✅ Uploaded image ${i + 1}/${imageUrls.length}: ${fileName}`
-      );
+      uploadedUrls.push(publicUrl);
+      console.log(`  ✅ Uploaded image ${i + 1}/${imageUrls.length}: ${fileName}`);
     } catch (error: any) {
       console.error(`  ❌ Error uploading image ${i + 1}:`, error.message);
-      // Add original URL as fallback
-      uploadedUrls.push(imageUrl);
+      uploadedUrls.push(imageUrl); // fallback to original URL
     }
   }
 
