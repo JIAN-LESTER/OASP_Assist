@@ -1355,6 +1355,7 @@ Widget dashboardContents(
                         ),
                       ),
                       const SizedBox(width: 20),
+
                       Expanded(
                         flex: 1,
                         child: LazyLoadWidget(
@@ -1385,21 +1386,42 @@ Widget dashboardContents(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(
-                selectedTimeFrame,
-                onTimeFrameChanged,
-                onRefresh,
-                isRefreshing,
-                userName,
-                customDateRange,
-                onDateRangeChanged,
-                inq,
-                ud,
-                ad,
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2E7D32).withOpacity(0.12),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                padding: EdgeInsets.all(isMobile ? 16 : 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(
+                      selectedTimeFrame,
+                      onTimeFrameChanged,
+                      onRefresh,
+                      isRefreshing,
+                      userName,
+                      customDateRange,
+                      onDateRangeChanged,
+                      inq,
+                      ud,
+                      ad,
+                    ),
+                
+                
+                  ],
+                ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 20),
               statCards(),
-              const SizedBox(height: 32),
+              const SizedBox(height: 20),
               cardsSection(),
             ],
           ),
@@ -1614,7 +1636,7 @@ Widget _buildHeader(
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.green,
+                      color: Colors.black,
                     ),
                   ),
                   Row(

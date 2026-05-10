@@ -240,7 +240,13 @@ class DashboardCache {
   final DateTime timestamp;
   final Map<String, dynamic>? quickStats;
 
-  DashboardCache({this.inq, this.ud, this.ad, required this.timestamp, this.quickStats});
+  DashboardCache({
+    this.inq,
+    this.ud,
+    this.ad,
+    required this.timestamp,
+    this.quickStats,
+  });
   bool get isValid {
     final now = DateTime.now();
     return now.difference(timestamp).inMinutes < 5;
@@ -366,74 +372,78 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
   }
 
   Future<void> _fetchAndCacheData() async {
-  try {
-    final results = await Future.wait([
-      _firebaseService.getAdminDashboardData(
-        selectedTimeFrame,
-        customDateRange,
-      ),
-      _firebaseService.getUserDemographicsReportsData(
-        selectedTimeFrame,
-        customDateRange,
-      ),
-      // ✅ ADD: Fetch inquiry data separately
-      _firebaseService.getInquiryReportsData(
-        selectedTimeFrame,
-        customDateRange,
-      ),
-    ]);
+    try {
+      final results = await Future.wait([
+        _firebaseService.getAdminDashboardData(
+          selectedTimeFrame,
+          customDateRange,
+        ),
+        _firebaseService.getUserDemographicsReportsData(
+          selectedTimeFrame,
+          customDateRange,
+        ),
+        // ✅ ADD: Fetch inquiry data separately
+        _firebaseService.getInquiryReportsData(
+          selectedTimeFrame,
+          customDateRange,
+        ),
+      ]);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    final adminData = results[0] as AdminDashboardData;
-    final userDemoData = results[1] as UserDemographicsReportsData;
-    final inquiryReportData = results[2] as InquiryReportsData;
+      final adminData = results[0] as AdminDashboardData;
+      final userDemoData = results[1] as UserDemographicsReportsData;
+      final inquiryReportData = results[2] as InquiryReportsData;
 
-    // ✅ FIX: Use inquiryReportData directly instead of creating from adminData
-    final inquiryData = InquiryReportsData(
-      totalMessages: inquiryReportData.totalMessages,
-      userMessages: inquiryReportData.userMessages,
-      botMessages: inquiryReportData.botMessages,
-      escalatedMessages: inquiryReportData.escalatedMessages,
-      escalationRate: inquiryReportData.escalationRate,
-      resolvedMessages: inquiryReportData.resolvedMessages,
-      resolutionRate: inquiryReportData.resolutionRate,
-      inquiryTrend: inquiryReportData.inquiryTrend,
-      categoryDistribution: inquiryReportData.categoryDistribution,
-      topQuestions: inquiryReportData.topQuestions,
-      escalationsOverTime: inquiryReportData.escalationsOverTime,
-      staffPerformance: inquiryReportData.staffPerformance,
-      botVsHumanAnswers: inquiryReportData.botVsHumanAnswers,
-      allEscalations: inquiryReportData.allEscalations, // ✅ This now has the correct value
-      recentLogs: inquiryReportData.recentLogs,
-      msgLogs: inquiryReportData.msgLogs,
-    );
+      // ✅ FIX: Use inquiryReportData directly instead of creating from adminData
+      final inquiryData = InquiryReportsData(
+        totalMessages: inquiryReportData.totalMessages,
+        userMessages: inquiryReportData.userMessages,
+        botMessages: inquiryReportData.botMessages,
+        escalatedMessages: inquiryReportData.escalatedMessages,
+        escalationRate: inquiryReportData.escalationRate,
+        resolvedMessages: inquiryReportData.resolvedMessages,
+        resolutionRate: inquiryReportData.resolutionRate,
+        inquiryTrend: inquiryReportData.inquiryTrend,
+        categoryDistribution: inquiryReportData.categoryDistribution,
+        topQuestions: inquiryReportData.topQuestions,
+        escalationsOverTime: inquiryReportData.escalationsOverTime,
+        staffPerformance: inquiryReportData.staffPerformance,
+        botVsHumanAnswers: inquiryReportData.botVsHumanAnswers,
+        allEscalations:
+            inquiryReportData
+                .allEscalations, // ✅ This now has the correct value
+        recentLogs: inquiryReportData.recentLogs,
+        msgLogs: inquiryReportData.msgLogs,
+      );
 
-    // ✅ UPDATE CACHE
-    _cache[selectedTimeFrame] = DashboardCache(
-      inq: inquiryData,
-      ud: userDemoData,
-      ad: adminData,
-      timestamp: DateTime.now(),
-    );
+      // ✅ UPDATE CACHE
+      _cache[selectedTimeFrame] = DashboardCache(
+        inq: inquiryData,
+        ud: userDemoData,
+        ad: adminData,
+        timestamp: DateTime.now(),
+      );
 
-    setState(() {
-      inq = inquiryData;
-      ud = userDemoData;
-      ad = adminData;
-      
-      // ✅ DEBUG PRINTS
-      print('📊 Inquiry Data Updated:');
-      print('   All Escalations: ${inquiryData.allEscalations}');
-      print('   Escalated Messages: ${inquiryData.escalatedMessages}');
-      print('   Admin Pending Escalations: ${adminData.pendingEscalations}');
-      print('   Top Escalated Messages: ${adminData.topEscalatedMessages.length}');
-    });
-  } catch (e) {
-    print('❌ Error fetching data: $e');
-    rethrow;
+      setState(() {
+        inq = inquiryData;
+        ud = userDemoData;
+        ad = adminData;
+
+        // ✅ DEBUG PRINTS
+        print('📊 Inquiry Data Updated:');
+        print('   All Escalations: ${inquiryData.allEscalations}');
+        print('   Escalated Messages: ${inquiryData.escalatedMessages}');
+        print('   Admin Pending Escalations: ${adminData.pendingEscalations}');
+        print(
+          '   Top Escalated Messages: ${adminData.topEscalatedMessages.length}',
+        );
+      });
+    } catch (e) {
+      print('❌ Error fetching data: $e');
+      rethrow;
+    }
   }
-}
 
   Future<void> _refreshInBackground() async {
     try {
@@ -1121,7 +1131,7 @@ Widget dashboardContents(
               ],
             );
           } else {
-                return Row(
+            return Row(
               children: [
                 Expanded(
                   child: buildStatCard(
@@ -1162,7 +1172,7 @@ Widget dashboardContents(
                   child: buildStatCard(
                     'Escalation and Resolution Rate Ratio ',
                     '${escalationRate.toStringAsFixed(2)}% : ${resolutionRate.toStringAsFixed(2)}%',
-                  
+
                     Colors.red,
                     Icons.analytics,
                   ),
@@ -1176,7 +1186,6 @@ Widget dashboardContents(
           if (isMobile) {
             return Column(
               children: [
-       
                 const SizedBox(height: 20),
                 SizedBox(
                   height: 400,
@@ -1194,7 +1203,7 @@ Widget dashboardContents(
                   ),
                 ),
                 const SizedBox(height: 20),
-                
+
                 SizedBox(
                   height: 350,
                   child: LazyLoadWidget(
@@ -1272,7 +1281,6 @@ Widget dashboardContents(
                   height: 350,
                   child: Row(
                     children: [
-                    
                       Expanded(
                         flex: 2,
                         child: LazyLoadWidget(
@@ -1321,7 +1329,6 @@ Widget dashboardContents(
                     ],
                   ),
                 ),
-                
               ],
             );
           }
@@ -1332,20 +1339,41 @@ Widget dashboardContents(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(
-                selectedTimeFrame,
-                onTimeFrameChanged,
-                onRefresh,
-                isRefreshing,
-                userName,
-                customDateRange,
-                onDateRangeChanged,
-                inq,
-                ud,
-                ad,
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2E7D32).withOpacity(0.12),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                padding: EdgeInsets.all(isMobile ? 16 : 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(
+                      selectedTimeFrame,
+                      onTimeFrameChanged,
+                      onRefresh,
+                      isRefreshing,
+                      userName,
+                      customDateRange,
+                      onDateRangeChanged,
+                      inq,
+                      ud,
+                      ad,
+                    ),
+                    const SizedBox(height: 24),
+                    const Divider(height: 1),
+                    const SizedBox(height: 20),
+                    statCards(),
+                  ],
+                ),
               ),
-              const SizedBox(height: 32),
-              statCards(),
               const SizedBox(height: 32),
               cardsSection(),
             ],
@@ -1561,7 +1589,7 @@ Widget _buildHeader(
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.green,
+                      color: Colors.black,
                     ),
                   ),
                   Row(
@@ -1611,7 +1639,6 @@ Widget _buildHeader(
     },
   );
 }
-
 
 void _showEscalatedMessagesDialog(BuildContext context, String timeFrame) {
   showDialog(

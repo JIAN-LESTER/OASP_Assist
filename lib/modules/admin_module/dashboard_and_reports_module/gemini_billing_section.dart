@@ -94,26 +94,19 @@ class _GeminiBillingSectionState extends State<GeminiBillingSection> {
                         color: Colors.grey[900],
                       ),
                     ),
-                    Text(
-                      kShowPhp ? 'Costs shown in PHP' : 'Costs shown in USD',
-                      style: TextStyle(
-                        fontSize: isMobile ? 11 : 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
                   ],
                 ),
               ],
             ),
-            if (!_loading)
-              TextButton.icon(
-                onPressed: _load,
-                icon: const Icon(Icons.refresh, size: 15),
-                label: const Text('Refresh'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF1A73E8),
-                ),
-              ),
+            // if (!_loading)
+            //   TextButton.icon(
+            //     onPressed: _load,
+            //     icon: const Icon(Icons.refresh, size: 15),
+            //     label: const Text('Refresh'),
+            //     style: TextButton.styleFrom(
+            //       foregroundColor: const Color(0xFF1A73E8),
+            //     ),
+            //   ),
           ],
         ),
         const SizedBox(height: 20),
@@ -378,28 +371,26 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
     };
   }
 
-  String _barLabel(String date, int index) {
+  String _getBarLabel(String date, int index) {
     switch (widget.timeFrame) {
+      case 'Today':
+        if (index % 3 != 0) return '';
+        if (index == 0) return '12am';
+        if (index == 12) return '12pm';
+        final h = index % 12;
+        return '${h}${index < 12 ? 'am' : 'pm'}';
+
       case 'This Week':
-        // Show Mon/Tue/etc
         try {
           final dt = DateTime.parse(date);
-          return ['M', 'T', 'W', 'Th', 'F', 'S', 'Su'][dt.weekday - 1];
+          return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dt.weekday -
+              1];
         } catch (_) {
-          return date.substring(8);
+          return '';
         }
 
-      case 'Today':
-  if (index % 3 != 0) return '';
-  if (index == 0) return '12am';
-  if (index == 12) return '12pm';
-  final h = index % 12;
-  final suffix = index < 12 ? 'am' : 'pm';
-  return '$h$suffix';
-
       case 'This Month':
-        // Group into 4 weeks
-        final day = int.tryParse(date.substring(8)) ?? (index + 1);
+        final day = int.tryParse(date.substring(8)) ?? 0;
         if (day == 1) return 'W1';
         if (day == 8) return 'W2';
         if (day == 15) return 'W3';
@@ -407,33 +398,30 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
         return '';
 
       case 'This Year':
-        // Show Jan/Feb/etc — date = 'yyyy-MM-dd', use month part
-        const months = [
-          'J',
-          'F',
-          'M',
-          'A',
-          'M',
-          'J',
-          'J',
-          'A',
-          'S',
-          'O',
-          'N',
-          'D',
-        ];
         try {
           final m = int.parse(date.substring(5, 7));
-          return months[m - 1];
+          return [
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
+            'Jul',
+            'Aug',
+            'Sep',
+            'Oct',
+            'Nov',
+            'Dec',
+          ][m - 1];
         } catch (_) {
           return '';
         }
 
       case 'All':
-        // Show year, only on first of each year to avoid clutter
         try {
           final dt = DateTime.parse(date);
-          return dt.month == 1 ? '${dt.year}'.substring(2) : '';
+          return dt.month == 1 ? '${dt.year}' : '';
         } catch (_) {
           return '';
         }
@@ -445,37 +433,45 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
                 .inDays ??
             0;
         if (days == 0) {
-          // Single day → hourly
-          final h = index % 12 == 0 ? 12 : index % 12;
-          return '${h}${index < 12 ? 'a' : 'p'}';
+          if (index % 3 != 0) return '';
+          if (index == 0) return '12am';
+          if (index == 12) return '12pm';
+          return '${index % 12}${index < 12 ? 'am' : 'pm'}';
         } else if (days <= 7) {
           try {
             final dt = DateTime.parse(date);
-            return ['M', 'T', 'W', 'Th', 'F', 'S', 'Su'][dt.weekday - 1];
+            return [
+              'Mon',
+              'Tue',
+              'Wed',
+              'Thu',
+              'Fri',
+              'Sat',
+              'Sun',
+            ][dt.weekday - 1];
           } catch (_) {
             return date.substring(8);
           }
         } else if (days <= 31) {
-          final day = int.tryParse(date.substring(8)) ?? (index + 1);
+          final day = int.tryParse(date.substring(8)) ?? 0;
           return day % 5 == 1 ? '$day' : '';
         } else {
           try {
             final m = int.parse(date.substring(5, 7));
-            const months = [
-              'J',
-              'F',
-              'M',
-              'A',
-              'M',
-              'J',
-              'J',
-              'A',
-              'S',
-              'O',
-              'N',
-              'D',
-            ];
-            return months[m - 1];
+            return [
+              'Jan',
+              'Feb',
+              'Mar',
+              'Apr',
+              'May',
+              'Jun',
+              'Jul',
+              'Aug',
+              'Sep',
+              'Oct',
+              'Nov',
+              'Dec',
+            ][m - 1];
           } catch (_) {
             return '';
           }
@@ -483,6 +479,41 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
 
       default:
         return date.length >= 10 ? date.substring(8) : date;
+    }
+  }
+
+  String _tooltipDate(String date, String timeFrame) {
+    switch (timeFrame) {
+      case 'This Week':
+        try {
+          final dt = DateTime.parse(date);
+          return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dt.weekday -
+              1];
+        } catch (_) {
+          return date;
+        }
+      case 'This Year':
+        try {
+          final m = int.parse(date.substring(5, 7));
+          return [
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
+            'Jul',
+            'Aug',
+            'Sep',
+            'Oct',
+            'Nov',
+            'Dec',
+          ][m - 1];
+        } catch (_) {
+          return date;
+        }
+      default:
+        return date;
     }
   }
 
@@ -587,62 +618,97 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
                         style: TextStyle(color: Colors.grey[400]),
                       ),
                     )
+                    
                     : LayoutBuilder(
                       builder: (ctx, box) {
                         return Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
-                          children: List.generate(widget.trend.length, (i) {
-                            final d = widget.trend[i];
-                            final val =
-                                _mode == 'cost'
-                                    ? d.costUsd
-                                    : d.tokens.toDouble();
-                            final ratio = maxVal > 0 ? val / maxVal : 0.0;
-                            final barH = (ratio * (box.maxHeight - 24)).clamp(
-                              2.0,
-                              box.maxHeight - 24,
-                            );
-                            final isToday = d.date == today;
+                          children: List.generate(
+                            widget.timeFrame == 'Today'
+                                ? 24
+                                : widget.trend.length,
+                            (i) {
+                              final d =
+                                  widget.timeFrame == 'Today'
+                                      ? widget.trend.first
+                                      : widget.trend[i];
+                              final now = DateTime.now();
+                              final val =
+                                  (() {
+                                    if (widget.timeFrame == 'Today') {
+                                      // Only the current hour gets the value, rest are 0
+                                      return i == now.hour
+                                          ? (_mode == 'cost'
+                                              ? d.costUsd
+                                              : d.tokens.toDouble())
+                                          : 0.0;
+                                    }
+                                    return _mode == 'cost'
+                                        ? d.costUsd
+                                        : d.tokens.toDouble();
+                                  })();
 
-                            return Expanded(
-                              child: Tooltip(
-                                message:
-                                    '${d.date}\n${_mode == 'cost' ? d.formattedCost : '${formatTokenCount(d.tokens)} tokens'}',
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Container(
-                                      height: barH,
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 1.5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color:
-                                            isToday
-                                                ? Colors.deepOrange
-                                                : const Color(
-                                                  0xFF1A73E8,
-                                                ).withOpacity(0.72),
-                                        borderRadius:
-                                            const BorderRadius.vertical(
-                                              top: Radius.circular(3),
-                                            ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    if (widget.trend.length <= 16)
-                                      Text(
-                                        _barLabel(d.date, i),
-                                        style: TextStyle(
-                                          fontSize: 8,
-                                          color: Colors.grey[500],
+                              final ratio = maxVal > 0 ? val / maxVal : 0.0;
+                              final barH = (ratio * (box.maxHeight - 28)).clamp(
+                                2.0,
+                                box.maxHeight - 28,
+                              );
+
+                              final isToday =
+                                  widget.timeFrame == 'Today'
+                                      ? i == now.hour
+                                      : d.date == today;
+
+                              final label = _getBarLabel(d.date, i);
+                              final showLabel = label.isNotEmpty;
+
+                              return Expanded(
+                                child: Tooltip(
+                                  message:
+                                      '${_tooltipDate(d.date, widget.timeFrame)}\n'
+                                      '${_mode == 'cost' ? d.formattedCost : '${formatTokenCount(d.tokens)} tokens'}',
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      Container(
+                                        height: barH,
+                                        margin: const EdgeInsets.symmetric(
+                                          horizontal: 1.5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              isToday
+                                                  ? Colors.deepOrange
+                                                  : const Color(
+                                                    0xFF1A73E8,
+                                                  ).withOpacity(0.72),
+                                          borderRadius:
+                                              const BorderRadius.vertical(
+                                                top: Radius.circular(3),
+                                              ),
                                         ),
                                       ),
-                                  ],
+                                      const SizedBox(height: 4),
+                                      SizedBox(
+                                        height: 16,
+                                        child:
+                                            showLabel
+                                                ? Text(
+                                                  label,
+                                                  style: TextStyle(
+                                                    fontSize: 8,
+                                                    color: Colors.grey[500],
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                )
+                                                : const SizedBox.shrink(),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          }),
+                              );
+                            },
+                          ),
                         );
                       },
                     ),

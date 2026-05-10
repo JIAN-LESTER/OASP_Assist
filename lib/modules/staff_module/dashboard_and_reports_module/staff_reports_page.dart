@@ -466,36 +466,49 @@ class DesktopDashboard extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            buildHeader(
-              selectedTimeFrame,
-              onTimeFrameChanged,
-              onRefresh,
-              isRefreshing,
-              userName,
-              customDateRange,
-              onDateRangeChanged,
-              inq,
-              ad,
+  padding: const EdgeInsets.all(24.0),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2E7D32).withOpacity(0.12),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
-            const SizedBox(height: 32),
-
-            if (isLoading)
-              ...buildSkeletonReport(isMobile: false)
-            else
-              ...buildInquiryTrendsReport(
-                inq,
-                ad,
-                selectedTimeFrame: selectedTimeFrame,
-                isMobile: false,
-                context: context,
-              ),
           ],
         ),
+        padding: EdgeInsets.all( 20),
+        child: buildHeader(
+          selectedTimeFrame,
+          onTimeFrameChanged,
+          onRefresh,
+          isRefreshing,
+          userName,
+          customDateRange,
+          onDateRangeChanged,
+          inq,
+          ad,
+        ),
       ),
+      const SizedBox(height: 32),
+      if (isLoading)
+        ...buildSkeletonReport(isMobile: false)
+      else
+        ...buildInquiryTrendsReport(
+          inq,
+          ad,
+          selectedTimeFrame: selectedTimeFrame,
+          isMobile: false,
+          context: context,
+        ),
+    ],
+  ),
+),
     );
   }
 }

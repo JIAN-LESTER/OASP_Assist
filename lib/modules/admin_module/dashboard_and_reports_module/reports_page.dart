@@ -165,50 +165,50 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 
   // ✅ When timeframe changes, invalidate and reload current report
- void _onTimeFrameChanged(String newValue) async {
-  // ✅ CORRECT: Show modal when Custom is selected
-  if (newValue == 'Custom') {
-    final DateTimeRange? selectedRange = await showDialog<DateTimeRange>(
-      context: context,
-      barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (BuildContext context) {
-        return DateRangePickerDialog(
-          initialDateRange: customDateRange,
-          firstDate: DateTime(2020, 1, 1),
-          lastDate: DateTime.now(),
-        );
-      },
-    );
+  void _onTimeFrameChanged(String newValue) async {
+    // ✅ CORRECT: Show modal when Custom is selected
+    if (newValue == 'Custom') {
+      final DateTimeRange? selectedRange = await showDialog<DateTimeRange>(
+        context: context,
+        barrierDismissible: true,
+        barrierColor: Colors.black.withOpacity(0.5),
+        builder: (BuildContext context) {
+          return DateRangePickerDialog(
+            initialDateRange: customDateRange,
+            firstDate: DateTime(2020, 1, 1),
+            lastDate: DateTime.now(),
+          );
+        },
+      );
 
-    // If user selected a range, apply it
-    if (selectedRange != null) {
-      _onDateRangeChanged(selectedRange);
+      // If user selected a range, apply it
+      if (selectedRange != null) {
+        _onDateRangeChanged(selectedRange);
+      }
+      // If user cancelled, don't change anything
+      return;
     }
-    // If user cancelled, don't change anything
-    return;
+
+    // Normal timeframe selection
+    setState(() {
+      selectedTimeFrame = newValue;
+      customDateRange = null;
+
+      // Invalidate loaded data flags to force reload
+      switch (selectedReportType) {
+        case 'Inquiry Trends':
+          inquiryDataLoaded = false;
+          break;
+        case 'Chatbot Usage':
+          chatbotDataLoaded = false;
+          break;
+        case 'User Demographics':
+          demographicsDataLoaded = false;
+          break;
+      }
+    });
+    _loadDataForSelectedReport();
   }
-
-  // Normal timeframe selection
-  setState(() {
-    selectedTimeFrame = newValue;
-    customDateRange = null;
-
-    // Invalidate loaded data flags to force reload
-    switch (selectedReportType) {
-      case 'Inquiry Trends':
-        inquiryDataLoaded = false;
-        break;
-      case 'Chatbot Usage':
-        chatbotDataLoaded = false;
-        break;
-      case 'User Demographics':
-        demographicsDataLoaded = false;
-        break;
-    }
-  });
-  _loadDataForSelectedReport();
-}
 
   // Add this new method to handle date range changes:
   void _onDateRangeChanged(DateTimeRange? range) {
@@ -656,23 +656,36 @@ class DesktopDashboard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            buildHeader(
-              selectedTimeFrame,
-              selectedReportType,
-              onTimeFrameChanged,
-              onReportTypeChanged,
-              onRefresh,
-              isRefreshing,
-              userName,
-              customDateRange,
-              onDateRangeChanged,
-                    inq,
-              cb,
-              ud,
-              ad,
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF2E7D32).withOpacity(0.12),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              padding: EdgeInsets.all( 20),
+              child: buildHeader(
+                selectedTimeFrame,
+                selectedReportType,
+                onTimeFrameChanged,
+                onReportTypeChanged,
+                onRefresh,
+                isRefreshing,
+                userName,
+                customDateRange,
+                onDateRangeChanged,
+                inq,
+                cb,
+                ud,
+                ad,
+              ),
             ),
             const SizedBox(height: 32),
-
             if (isLoading)
               ...buildSkeletonReport(selectedReportType, isMobile: false)
             else
@@ -846,7 +859,7 @@ class MobileDashboard extends StatelessWidget {
               userName,
               customDateRange,
               onDateRangeChanged,
-                    inq,
+              inq,
               cb,
               ud,
               ad,
@@ -942,8 +955,7 @@ class ReportsHelper {
     DateTime startDate,
     String timeFrame,
     Map<String, Map<String, int>> timeCategoryCounts,
-    DateTimeRange? customDateRange, // ADD THIS PARAMETER
-    {
+    DateTimeRange? customDateRange, { // ADD THIS PARAMETER
     bool isMobile = false,
     required BuildContext context,
   }) {
@@ -1134,77 +1146,85 @@ List<Widget> buildInquiryTrendsReport(
   }
 
   // Desktop layout
-return [
-  SizedBox(
-    height: 120,
-    child: Row(
-      children: [
-        Expanded(
-          child: Builder(
-            builder: (context) => buildStatCard(
-              'User Messages',  // Clean title
-              '$userMessages',
-              Colors.blue,
-              Icons.message,
-              onTap: () => _showMessagesDialog(
-                context,
-                selectedTimeFrame ?? 'This Month',
-              ),
+  return [
+    SizedBox(
+      height: 120,
+      child: Row(
+        children: [
+          Expanded(
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'User Messages', // Clean title
+                    '$userMessages',
+                    Colors.blue,
+                    Icons.message,
+                    onTap:
+                        () => _showMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: Builder(
-            builder: (context) => buildStatCard(
-              'Bot Messages',  // Clean title
-              '$botMessages',
-              Colors.green,
-              Icons.check_circle,
-              onTap: () => _showAnsweredMessagesDialog(
-                context,
-                selectedTimeFrame ?? 'This Month',
-              ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Bot Messages', // Clean title
+                    '$botMessages',
+                    Colors.green,
+                    Icons.check_circle,
+                    onTap:
+                        () => _showAnsweredMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: Builder(
-            builder: (context) => buildStatCard(
-              'Pending Escalated Messages',  // ✅ FIXED: Clean title, rate shown separately
-              '$escalatedMessages',
-              Colors.red,
-              Icons.warning_amber_rounded,
-              onTap: () => _showEscalatedMessagesDialog(
-                context,
-                selectedTimeFrame ?? 'This Month',
-              ),
-              rateLabel: 'Rate',     // ✅ FIXED: Pass rate as parameter
-              rateValue: escalationRate,
+          const SizedBox(width: 20),
+          Expanded(
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Pending Escalated Messages', // ✅ FIXED: Clean title, rate shown separately
+                    '$escalatedMessages',
+                    Colors.red,
+                    Icons.warning_amber_rounded,
+                    onTap:
+                        () => _showEscalatedMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                    rateLabel: 'Rate', // ✅ FIXED: Pass rate as parameter
+                    rateValue: escalationRate,
+                  ),
             ),
           ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: Builder(
-            builder: (context) => buildStatCard(
-              'Resolved Messages',  // ✅ FIXED: Clean title, rate shown separately
-              '$resolvedMessages',
-              Colors.orange,
-              Icons.check_circle_outline,
-              onTap: () => _showResolvedMessagesDialog(
-                context,
-                selectedTimeFrame ?? 'This Month',
-              ),
-              rateLabel: 'Rate',     
-              rateValue: resolutionRate,
+          const SizedBox(width: 20),
+          Expanded(
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Resolved Messages', // ✅ FIXED: Clean title, rate shown separately
+                    '$resolvedMessages',
+                    Colors.orange,
+                    Icons.check_circle_outline,
+                    onTap:
+                        () => _showResolvedMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                    rateLabel: 'Rate',
+                    rateValue: resolutionRate,
+                  ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
-  ),
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
@@ -1325,29 +1345,36 @@ List<Widget> buildChatbotUsageReport(
         children: [
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Average Response Time',
-                formatResponseTime(data?.averageResponseTime ?? 0),
-                Colors.blue,
-                Icons.timer,
-                onTap: () => _showResponseTimeDetailsDialog(
-                  context,
-                  selectedTimeFrame,
-                  data,
-                ),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Average Response Time',
+                    formatResponseTime(data?.averageResponseTime ?? 0),
+                    Colors.blue,
+                    Icons.timer,
+                    onTap:
+                        () => _showResponseTimeDetailsDialog(
+                          context,
+                          selectedTimeFrame,
+                          data,
+                        ),
+                  ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Total Conversations',
-                '${data?.totalConversations ?? 0}',
-                Colors.green,
-                Icons.chat,
-                onTap: () => _showConversationsDialog(context, selectedTimeFrame),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Total Conversations',
+                    '${data?.totalConversations ?? 0}',
+                    Colors.green,
+                    Icons.chat,
+                    onTap:
+                        () => _showConversationsDialog(
+                          context,
+                          selectedTimeFrame,
+                        ),
+                  ),
             ),
           ),
         ],
@@ -1407,29 +1434,36 @@ List<Widget> buildChatbotUsageReport(
         children: [
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Average Response Time',
-                formatResponseTime(data?.averageResponseTime ?? 0),
-                Colors.blue,
-                Icons.timer,
-                onTap: () => _showResponseTimeDetailsDialog(
-                  context,
-                  selectedTimeFrame,
-                  data,
-                ),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Average Response Time',
+                    formatResponseTime(data?.averageResponseTime ?? 0),
+                    Colors.blue,
+                    Icons.timer,
+                    onTap:
+                        () => _showResponseTimeDetailsDialog(
+                          context,
+                          selectedTimeFrame,
+                          data,
+                        ),
+                  ),
             ),
           ),
           const SizedBox(width: 20),
           Expanded(
             child: Builder(
-              builder: (context) => buildStatCard(
-                'Total Conversations',
-                '${data?.totalConversations ?? 0}',
-                Colors.green,
-                Icons.chat,
-                onTap: () => _showConversationsDialog(context, selectedTimeFrame),
-              ),
+              builder:
+                  (context) => buildStatCard(
+                    'Total Conversations',
+                    '${data?.totalConversations ?? 0}',
+                    Colors.green,
+                    Icons.chat,
+                    onTap:
+                        () => _showConversationsDialog(
+                          context,
+                          selectedTimeFrame,
+                        ),
+                  ),
             ),
           ),
           const SizedBox(width: 20),
@@ -1456,12 +1490,7 @@ List<Widget> buildChatbotUsageReport(
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
-      child: buildPeakUsageCard(
-        data!,
-        selectedTimeFrame,
-        startDate,
-        endDate,
-      ),
+      child: buildPeakUsageCard(data!, selectedTimeFrame, startDate, endDate),
     ),
     const SizedBox(height: 16),
     SizedBox(
@@ -1511,7 +1540,6 @@ List<Widget> buildChatbotUsageReport(
     ),
   ];
 }
-
 
 List<Widget> buildUserDemographicsReport(
   UserDemographicsReportsData? data, {
@@ -1586,9 +1614,11 @@ List<Widget> buildUserDemographicsReport(
       const SizedBox(height: 24),
       SizedBox(
         height: 400,
-        child: buildUserGrowthCard( data?.userGrowthOverTime ?? [],
-        selectedTimeFrame ?? 'This Month',
-        context,),
+        child: buildUserGrowthCard(
+          data?.userGrowthOverTime ?? [],
+          selectedTimeFrame ?? 'This Month',
+          context,
+        ),
       ),
       const SizedBox(height: 16),
       SizedBox(
@@ -1601,11 +1631,11 @@ List<Widget> buildUserDemographicsReport(
         child: buildUsersByYearLevelCard(data?.usersByYear ?? {}),
       ),
       const SizedBox(height: 16),
-            SizedBox(
+      SizedBox(
         height: 400,
         child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
       ),
-      SizedBox(width: 16,),
+      SizedBox(width: 16),
       SizedBox(
         height: 400,
         child: buildScholarshipDistributionCard(
@@ -1707,9 +1737,9 @@ List<Widget> buildUserDemographicsReport(
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
-          child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
+      child: buildUserAffiliationsCard(data?.userAffiliations ?? {}),
     ),
-   const SizedBox(height: 16),
+    const SizedBox(height: 16),
 
     SizedBox(
       height: 400,
@@ -2305,9 +2335,10 @@ Widget buildHeader(
       bool isMobile = screenWidth < 600;
 
       // ✅ Determine page type based on selected report
-      String pageType = selectedReportType == 'Inquiry Trends'
-          ? 'inquiry'
-          : selectedReportType == 'Chatbot Usage'
+      String pageType =
+          selectedReportType == 'Inquiry Trends'
+              ? 'inquiry'
+              : selectedReportType == 'Chatbot Usage'
               ? 'chatbot'
               : 'demographics';
 
@@ -2445,7 +2476,6 @@ Widget buildHeader(
     },
   );
 }
-
 
 // Update _getReportDescription to handle custom date range:
 String _getReportDescription(

@@ -160,3 +160,52 @@ Future<GeminiBillingSummary> fetchGeminiBillingFromFirestore({
 
 String _dateStr(DateTime d) =>
     '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+    String formatGeminiBottomTitle(String date, String timeFrame, DateTimeRange? customRange) {
+  switch (timeFrame) {
+    case 'Today':
+      // date = 'yyyy-MM-dd', use index-based hour via _barLabel instead
+      return date;
+    case 'This Week':
+      try {
+        final dt = DateTime.parse(date);
+        return ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][dt.weekday - 1];
+      } catch (_) { return date; }
+    case 'This Month':
+      final day = int.tryParse(date.substring(8)) ?? 0;
+      if (day == 1)  return 'W1';
+      if (day == 8)  return 'W2';
+      if (day == 15) return 'W3';
+      if (day == 22) return 'W4';
+      return '';
+    case 'This Year':
+      try {
+        final m = int.parse(date.substring(5, 7));
+        return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1];
+      } catch (_) { return ''; }
+    case 'All':
+      try {
+        final dt = DateTime.parse(date);
+        return dt.month == 1 ? '${dt.year}' : '';
+      } catch (_) { return ''; }
+    case 'Custom':
+      final days = customRange?.end.difference(customRange!.start).inDays ?? 0;
+      if (days == 0) return date;
+      if (days <= 7) {
+        try {
+          final dt = DateTime.parse(date);
+          return ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][dt.weekday - 1];
+        } catch (_) { return date.substring(8); }
+      } else if (days <= 31) {
+        final day = int.tryParse(date.substring(8)) ?? 0;
+        return day % 5 == 1 ? '$day' : '';
+      } else {
+        try {
+          final m = int.parse(date.substring(5, 7));
+          return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1];
+        } catch (_) { return ''; }
+      }
+    default:
+      return date.length >= 10 ? date.substring(8) : date;
+  }
+}
