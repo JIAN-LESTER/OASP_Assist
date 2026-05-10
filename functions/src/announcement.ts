@@ -186,12 +186,24 @@ async function downloadAndUploadAllImages(
         responseType: "arraybuffer",
         timeout: 30000,
         maxBodyLength: 50 * 1024 * 1024,
-        headers: {"User-Agent": "Mozilla/5.0 (compatible; OASP-Bot/1.0)"},
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; OASP-Bot/1.0)" },
       } as any);
 
       const buffer = Buffer.from(response.data as Buffer);
-      const contentType = response.headers["content-type"] || "image/jpeg";
-      const ext = contentType.split("/")[1]?.split(";")[0] || "jpg";
+
+      // ✅ Clean content type — strip charset and other parameters
+      const rawContentType =
+        response.headers["content-type"] || "image/jpeg";
+      const contentType = rawContentType.split(";")[0].trim();
+      const extMap: Record<string, string> = {
+        "image/jpeg": "jpg",
+        "image/jpg": "jpg",
+        "image/png": "png",
+        "image/gif": "gif",
+        "image/webp": "webp",
+        "image/bmp": "bmp",
+      };
+      const ext = extMap[contentType] || "jpg";
 
       const fileName =
         imageUrls.length > 1
@@ -201,28 +213,33 @@ async function downloadAndUploadAllImages(
       const bucket = storage.bucket();
       const file = bucket.file(fileName);
 
+      // ✅ Generate a token so Firebase Storage URL works without public ACL
+      const downloadToken = generateToken();
+
       await file.save(buffer, {
         metadata: {
           contentType,
           cacheControl: "public, max-age=31536000",
           metadata: {
+            firebaseStorageDownloadTokens: downloadToken,
             postId,
             imageIndex: i.toString(),
             totalImages: imageUrls.length.toString(),
           },
         },
-        public: true,           // ✅ saves with public ACL
       });
 
-      // ✅ Make explicitly public then build the permanent URL
-      await file.makePublic();
-      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+      // ✅ Build the proper Firebase Storage download URL (works with uniform bucket access)
+      const encodedFileName = encodeURIComponent(fileName);
+      const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedFileName}?alt=media&token=${downloadToken}`;
 
       uploadedUrls.push(publicUrl);
-      console.log(`  ✅ Uploaded image ${i + 1}/${imageUrls.length}: ${fileName}`);
+      console.log(
+        `  ✅ Uploaded image ${i + 1}/${imageUrls.length}: ${fileName}`
+      );
     } catch (error: any) {
       console.error(`  ❌ Error uploading image ${i + 1}:`, error.message);
-      uploadedUrls.push(imageUrl); // fallback to original URL
+      // ✅ Do NOT push the expired Facebook CDN URL as fallback
     }
   }
 
@@ -231,6 +248,7 @@ async function downloadAndUploadAllImages(
   );
   return uploadedUrls;
 }
+
 
 function extractSchedulesFromOCR(ocrText: string): ScheduleEntry[] {
   const schedules: ScheduleEntry[] = [];
@@ -578,20 +596,16 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
     const accessToken = await getAccessToken();
     console.log("✅ Access token retrieved");
 
-    // Calculate start of December (midnight on the 1st)
+    // Calculate start of the current month (midnight on the 1st)
     const now = new Date();
-    const decemberYear = now.getMonth() >= 11 ? now.getFullYear() : now.getFullYear() - 1;
-    const startOfDecember = new Date(decemberYear, 11, 1);
-    startOfDecember.setHours(0, 0, 0, 0);
-
-    //     const startOfDecember = new Date(2024, 11, 1);
-    // startOfDecember.setHours(0, 0, 0, 0);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    startOfMonth.setHours(0, 0, 0, 0);
 
     // Convert to Unix timestamp (seconds since epoch)
-    const sinceTimestamp = Math.floor(startOfDecember.getTime() / 1000);
+    const sinceTimestamp = Math.floor(startOfMonth.getTime() / 1000);
 
     console.log("📅 Filtering posts:");
-    console.log(`   Start date: ${startOfDecember.toISOString()}`);
+    console.log(`   Start date: ${startOfMonth.toISOString()}`);
     console.log(`   Unix timestamp: ${sinceTimestamp}`);
     console.log(`   Current time: ${now.toISOString()}`);
 
@@ -607,7 +621,7 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
     console.log("📡 Request params:", {
       ...params,
       access_token: "***",
-      since: `${params.since} (${startOfDecember.toISOString()})`,
+      since: `${params.since} (${startOfMonth.toISOString()})`,
     });
 
     const response = await axios.get<{ data: FacebookPost[] }>(url, {
@@ -618,24 +632,24 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
     console.log("✅ Facebook API response status:", response.status);
     console.log("✅ Posts received:", response.data.data?.length || 0);
 
-    // Filter out posts before December (double-check on our side)
+    // Filter out posts before the start of the current month (double-check on our side)
     const filteredPosts = (response.data.data || []).filter((post) => {
       const postDate = new Date(post.created_time);
-      const isDecemberOrLater = postDate >= startOfDecember;
+      const isInCurrentMonthWindow = postDate >= startOfMonth;
 
-      if (!isDecemberOrLater) {
+      if (!isInCurrentMonthWindow) {
         console.log(
           `⏭️ Skipping post ${
             post.id
-          } from ${postDate.toISOString()} (before December)`
+          } from ${postDate.toISOString()} (before start of month)`
         );
       }
 
-      return isDecemberOrLater;
+      return isInCurrentMonthWindow;
     });
 
     console.log(
-      `✅ Posts from December onwards: ${filteredPosts.length}/${
+      `✅ Posts from start of month onwards: ${filteredPosts.length}/${
         response.data.data?.length || 0
       }`
     );
@@ -2519,38 +2533,219 @@ async function processPost(
 ): Promise<void> {
   const postId = post.id;
   const originalMessage = post.message || "";
- 
+
   console.log("\n========================================");
   console.log(`🔍 Processing post: ${postId}`);
   console.log("========================================");
- 
+
   const postRef = db.collection("announcements").doc(postId);
   const doc = await postRef.get();
- 
-  // ✅ FIX: Fetch sync settings BEFORE running OCR.
-  // OCR via Google Vision is only needed to enrich category documents
-  // (admissions, scholarships, placements). If auto-create is disabled
-  // globally, skip the Vision API call entirely to avoid unnecessary cost.
+
   const settings = await getAutoCreateSettings();
-  const ocrEnabled = settings.enabled; // mirrors the master toggle in the UI
- 
-  // Extract ALL images
+  const ocrEnabled = settings.enabled;
+
+  // Extract image URLs from the Facebook post
   const allImageUrls = extractAllImagesFromPost(post);
   console.log(`📸 Post has ${allImageUrls.length} image(s)`);
- 
-  // Process OCR for ALL images — only when the master toggle is ON
+
+  // ── EXISTING DOCUMENT PATH ──────────────────────────────────────────────
+  if (doc.exists) {
+    const docData = doc.data()!;
+
+    if (docData?.deleted === true) {
+      console.log(`⏭️ Skipping deleted post ${postId}`);
+      return;
+    }
+
+    // ✅ Check which images are already stored in Firebase Storage
+    const alreadyStoredImages: string[] = (docData?.images || []).filter(
+      (url: string) =>
+        typeof url === "string" &&
+        url.includes("firebasestorage.googleapis.com")
+    );
+
+    const messageUnchanged = originalMessage === (docData?.message || "");
+    const imagesAlreadyStored = alreadyStoredImages.length > 0 &&
+      alreadyStoredImages.length >= allImageUrls.length;
+    const permalinkUnchanged =
+      (post.permalink_url || "") === (docData?.permalink_url || "");
+
+    // ✅ Skip entirely if nothing has changed
+    if (messageUnchanged && imagesAlreadyStored && permalinkUnchanged) {
+      console.log(
+        `⏭️ Post ${postId} unchanged and images already stored — checking category/info bank only`
+      );
+
+      // Still check if category doc or info bank is missing
+      const category = docData?.category?.toLowerCase() || "";
+      if (["admission", "scholarship", "placement"].includes(category)) {
+        const categoryDoc = await db
+          .collection(`${category}s`)
+          .doc(postId)
+          .get();
+        const infoBankId = `${category}_${postId}`;
+        const infoBankDoc = await db
+          .collection("information_bank")
+          .doc(infoBankId)
+          .get();
+
+        if (!categoryDoc.exists || !infoBankDoc.exists) {
+          console.log("   🔧 Category or Info Bank missing — creating...");
+          const messageForAnalysis = docData?.ocr_text
+            ? `${originalMessage}\n\n[Text from images]:\n${docData.ocr_text}`
+            : originalMessage;
+
+          await createCategoryAndInfoBank(
+            postId,
+            category.charAt(0).toUpperCase() + category.slice(1),
+            messageForAnalysis,
+            docData?.deadline || null,
+            cohereKey,
+            docData?.ocr_text || "",
+            allImageUrls.length
+          );
+        } else {
+          console.log(`   ✅ All documents exist for post ${postId}`);
+        }
+      }
+      return;
+    }
+
+    // ✅ Only re-upload images if not yet stored in Firebase Storage
+    let uploadedImageUrls: string[] = alreadyStoredImages;
+
+    if (!imagesAlreadyStored && allImageUrls.length > 0) {
+      console.log(
+        `📥 No Firebase Storage images yet — uploading ${allImageUrls.length}...`
+      );
+      uploadedImageUrls = await downloadAndUploadAllImages(
+        allImageUrls,
+        postId
+      );
+      console.log(
+        `✅ Stored ${uploadedImageUrls.length} images in Firebase Storage`
+      );
+    } else {
+      console.log(
+        `⏭️ Images already in Firebase Storage (${alreadyStoredImages.length}) — skipping re-upload`
+      );
+    }
+
+    // ✅ Run OCR only if images were just uploaded (not re-runs)
+    let combinedOcrText = docData?.ocr_text || "";
+    const ocrResults: string[] = [];
+    
+    if (!imagesAlreadyStored && uploadedImageUrls.length > 0 && ocrEnabled) {
+      console.log(
+        `🔍 Running OCR on ${allImageUrls.length} image(s) (first time)...`
+      );
+      for (let i = 0; i < allImageUrls.length; i++) {
+        try {
+          const ocrText = await extractTextFromImage(allImageUrls[i]);
+          if (ocrText && ocrText.trim().length > 0) {
+            ocrResults.push(ocrText);
+          }
+        } catch (err: any) {
+          console.error(`  ❌ OCR failed for image ${i + 1}:`, err.message);
+        }
+      }
+      combinedOcrText = combineOcrResults(ocrResults);
+    } else if (!ocrEnabled) {
+      console.log("⏭️ Skipping OCR — auto-create documents is disabled");
+    }
+
+    // ✅ Build update payload — only include changed fields
+    const updatePayload: Record<string, any> = {
+      last_synced_at: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (!messageUnchanged) {
+      updatePayload.message = originalMessage;
+    }
+
+    if (!permalinkUnchanged) {
+      updatePayload.permalink_url = post.permalink_url || "";
+    }
+
+    if (!imagesAlreadyStored && uploadedImageUrls.length > 0) {
+      updatePayload.images = uploadedImageUrls;
+      updatePayload.image_count = uploadedImageUrls.length;
+      updatePayload.full_picture = uploadedImageUrls[0] || "";
+      updatePayload.stored_in_storage = true;
+
+      if (ocrResults.length > 0) {
+        updatePayload.ocr_text = combinedOcrText;
+        updatePayload.has_image_text = true;
+        updatePayload.ocr_processed_count = ocrResults.length;
+        updatePayload.ocr_skipped_by_settings = false;
+      } else if (!ocrEnabled) {
+        updatePayload.ocr_skipped_by_settings = true;
+      }
+    }
+
+    await postRef.update(updatePayload);
+    console.log("✅ Updated announcement (changed fields only)");
+
+    // ✅ Check category/info bank for existing document
+    const category = docData?.category?.toLowerCase() || "";
+    if (["admission", "scholarship", "placement"].includes(category)) {
+      const categoryDoc = await db
+        .collection(`${category}s`)
+        .doc(postId)
+        .get();
+      const infoBankId = `${category}_${postId}`;
+      const infoBankDoc = await db
+        .collection("information_bank")
+        .doc(infoBankId)
+        .get();
+
+      const needsCategoryDoc = !categoryDoc.exists;
+      const needsInfoBank = !infoBankDoc.exists;
+
+      console.log(`   📊 Category doc exists: ${categoryDoc.exists}`);
+      console.log(`   📊 Info Bank exists: ${infoBankDoc.exists}`);
+
+      if (needsCategoryDoc || needsInfoBank) {
+        console.log("   🔧 Creating missing documents...");
+
+        const messageForAnalysis =
+          combinedOcrText.length > 0
+            ? `${originalMessage}\n\n[Text from ${ocrResults.length} image(s)]:\n${combinedOcrText}`
+            : originalMessage;
+
+        await createCategoryAndInfoBank(
+          postId,
+          category.charAt(0).toUpperCase() + category.slice(1),
+          messageForAnalysis,
+          docData?.deadline || null,
+          cohereKey,
+          combinedOcrText,
+          allImageUrls.length
+        );
+        console.log("   ✅ Missing documents created");
+      } else {
+        console.log("   ✅ All documents already exist — nothing to do");
+      }
+    }
+
+    console.log(`✅ Post ${postId} update complete\n`);
+    return;
+  }
+
+  // ── NEW DOCUMENT PATH ───────────────────────────────────────────────────
+  console.log("✨ Creating new announcement...");
+
+  // ✅ Run OCR only when enabled
   let combinedOcrText = "";
-  const ocrResults: string[] = [];
- 
+  let ocrResults: string[] = [];
+
   if (allImageUrls.length > 0) {
     if (!ocrEnabled) {
-      // ✅ NEW: skip Vision API when auto-create documents is disabled
       console.log(
-        "⏭️ Skipping Google Vision OCR — auto-create documents is disabled in Sync Settings"
+        "⏭️ Skipping Google Vision OCR — auto-create documents is disabled"
       );
     } else {
       console.log(`🔍 Running OCR on ${allImageUrls.length} image(s)...`);
- 
       for (let i = 0; i < allImageUrls.length; i++) {
         console.log(`  🔍 Processing image ${i + 1}/${allImageUrls.length}...`);
         try {
@@ -2567,30 +2762,29 @@ async function processPost(
           console.error(`  ❌ OCR failed for image ${i + 1}:`, err.message);
         }
       }
- 
       combinedOcrText = combineOcrResults(ocrResults);
       console.log(
         `📝 Total OCR: ${combinedOcrText.length} chars from ${ocrResults.length}/${allImageUrls.length} images`
       );
     }
   }
- 
+
   const hasImageText = ocrResults.length > 0;
- 
-  // Combine message with OCR text (only populated when OCR ran)
+
+  // Combine message with OCR text for analysis
   let messageForAnalysis = originalMessage;
   if (hasImageText) {
     messageForAnalysis = originalMessage
       ? `${originalMessage}\n\n[Text from ${ocrResults.length} image(s)]:\n${combinedOcrText}`
       : combinedOcrText;
   }
- 
+
   if (!messageForAnalysis || messageForAnalysis.trim().length === 0) {
     console.log(`⏭️ Skipping post ${postId} - no content`);
     return;
   }
- 
-  // Upload ALL images to storage (always runs regardless of OCR setting)
+
+  // ✅ Upload images with proper Firebase Storage URLs
   let uploadedImageUrls: string[] = [];
   if (allImageUrls.length > 0) {
     uploadedImageUrls = await downloadAndUploadAllImages(allImageUrls, postId);
@@ -2598,137 +2792,51 @@ async function processPost(
       `✅ Stored ${uploadedImageUrls.length} images in Firebase Storage`
     );
   }
- 
-  // ── NEW DOCUMENT PATH ─────────────────────────────────────────────────────
-  if (!doc.exists) {
-    console.log("✨ Creating new announcement...");
- 
-    const cohereResult = await analyzeAnnouncement(messageForAnalysis, cohereKey);
-    const deadlineTimestamp = parseDeadlineToTimestamp(cohereResult.deadline);
- 
-    const newData = {
-      announcementId: postId,
-      message: originalMessage,
-      created_time: post.created_time,
-      images: uploadedImageUrls,
-      image_count: uploadedImageUrls.length,
-      full_picture: uploadedImageUrls[0] || "",
-      original_image_urls: allImageUrls,
-      permalink_url: post.permalink_url || "",
-      category: cohereResult.category || "General",
-      deadline: deadlineTimestamp || null,
-      deleted: false,
-      fetched_at: admin.firestore.FieldValue.serverTimestamp(),
-      processed_by_cohere: true,
-      stored_in_storage: uploadedImageUrls.length > 0,
-      notification_sent: false,
-      ocr_text: combinedOcrText || "",
-      has_image_text: hasImageText,
-      ocr_processed_count: ocrResults.length,
-      ocr_success_count: ocrResults.length,
-      total_image_count: allImageUrls.length,
-      // ✅ Record whether OCR was skipped due to settings
-      ocr_skipped_by_settings: allImageUrls.length > 0 && !ocrEnabled,
-    };
- 
-    await postRef.set(newData);
-    console.log("✅ Created announcement document");
- 
-    // createCategoryAndInfoBank already checks settings internally,
-    // but passing the pre-fetched settings avoids a second Firestore read.
-    await createCategoryAndInfoBank(
-      postId,
-      cohereResult.category,
-      messageForAnalysis,
-      deadlineTimestamp,
-      cohereKey,
-      combinedOcrText,  // empty string when OCR was skipped
-      allImageUrls.length
-    );
- 
-    console.log(`✅ Post ${postId} processing complete\n`);
- 
-  // ── EXISTING DOCUMENT PATH ────────────────────────────────────────────────
-  } else {
-    const docData = doc.data();
- 
-    if (docData?.deleted === true) {
-      console.log(`⏭️ Skipping deleted post ${postId}`);
-      return;
-    }
- 
-    console.log("🔄 Updating existing announcement...");
- 
-    await postRef.update({
-      message: originalMessage,
-      images:
-        uploadedImageUrls.length > 0
-          ? uploadedImageUrls
-          : docData?.images || [],
-      image_count: uploadedImageUrls.length || docData?.image_count || 0,
-      full_picture: uploadedImageUrls[0] || docData?.full_picture || "",
-      permalink_url: post.permalink_url || "",
-      last_synced_at: admin.firestore.FieldValue.serverTimestamp(),
-      stored_in_storage:
-        uploadedImageUrls.length > 0 || docData?.stored_in_storage,
-      // Only overwrite OCR fields when OCR actually ran this cycle
-      ...(ocrEnabled && {
-        ocr_text: combinedOcrText || docData?.ocr_text || "",
-        has_image_text: hasImageText || docData?.has_image_text,
-        ocr_processed_count:
-          ocrResults.length || docData?.ocr_processed_count || 0,
-        ocr_skipped_by_settings: false,
-      }),
-      // When OCR is disabled, just note it was skipped without wiping stored data
-      ...(!ocrEnabled && allImageUrls.length > 0 && {
-        ocr_skipped_by_settings: true,
-      }),
-      total_image_count: allImageUrls.length,
-    });
- 
-    console.log("✅ Updated announcement document");
- 
-    const category = docData?.category?.toLowerCase() || "";
- 
-    if (["admission", "scholarship", "placement"].includes(category)) {
-      console.log("\n🔄 Checking category document and Information Bank...");
- 
-      const categoryDoc = await db.collection(`${category}s`).doc(postId).get();
-      const infoBankId = `${category}_${postId}`;
-      const infoBankDoc = await db
-        .collection("information_bank")
-        .doc(infoBankId)
-        .get();
- 
-      const needsCategoryDoc = !categoryDoc.exists;
-      const needsInfoBank = !infoBankDoc.exists;
- 
-      console.log(`   📊 Category doc exists: ${categoryDoc.exists}`);
-      console.log(`   📊 Info Bank exists: ${infoBankDoc.exists}`);
- 
-      if (needsCategoryDoc || needsInfoBank) {
-        console.log("   🔧 Creating missing documents...");
- 
-        const deadlineTimestamp = docData?.deadline || null;
- 
-        await createCategoryAndInfoBank(
-          postId,
-          category.charAt(0).toUpperCase() + category.slice(1),
-          messageForAnalysis,
-          deadlineTimestamp,
-          cohereKey,
-          combinedOcrText,  // empty string when OCR was skipped
-          allImageUrls.length
-        );
- 
-        console.log("   ✅ Missing documents created");
-      } else {
-        console.log("   ℹ️ All documents already exist");
-      }
-    }
- 
-    console.log("✅ Update complete\n");
-  }
+
+  const cohereResult = await analyzeAnnouncement(
+    messageForAnalysis,
+    cohereKey
+  );
+  const deadlineTimestamp = parseDeadlineToTimestamp(cohereResult.deadline);
+
+  await postRef.set({
+    announcementId: postId,
+    message: originalMessage,
+    created_time: post.created_time,
+    images: uploadedImageUrls,
+    image_count: uploadedImageUrls.length,
+    // ✅ full_picture always mirrors images[0]
+    full_picture: uploadedImageUrls[0] || "",
+    original_image_urls: allImageUrls,
+    permalink_url: post.permalink_url || "",
+    category: cohereResult.category || "General",
+    deadline: deadlineTimestamp || null,
+    deleted: false,
+    fetched_at: admin.firestore.FieldValue.serverTimestamp(),
+    processed_by_cohere: true,
+    stored_in_storage: uploadedImageUrls.length > 0,
+    notification_sent: false,
+    ocr_text: combinedOcrText || "",
+    has_image_text: hasImageText,
+    ocr_processed_count: ocrResults.length,
+    ocr_success_count: ocrResults.length,
+    total_image_count: allImageUrls.length,
+    ocr_skipped_by_settings: allImageUrls.length > 0 && !ocrEnabled,
+  });
+
+  console.log("✅ Created announcement document");
+
+  await createCategoryAndInfoBank(
+    postId,
+    cohereResult.category,
+    messageForAnalysis,
+    deadlineTimestamp,
+    cohereKey,
+    combinedOcrText,
+    allImageUrls.length
+  );
+
+  console.log(`✅ Post ${postId} processing complete\n`);
 }
 
 async function createCategoryAndInfoBank(
@@ -2900,11 +3008,11 @@ async function syncFacebookPostsLogic(): Promise<any> {
   try {
     console.log("📡 Starting Facebook sync...");
 
-    // ✅ Use the updated function that filters by December
-    console.log("📡 Fetching Facebook posts from December onwards...");
-    const posts = await fetchFacebookPosts(); // Now filters by December
+    // ✅ Use the updated function that filters from the start of the current month
+    console.log("📡 Fetching Facebook posts from the start of the month...");
+    const posts = await fetchFacebookPosts();
 
-    console.log(`✅ Fetched ${posts.length} posts from December onwards`);
+    console.log(`✅ Fetched ${posts.length} posts from the start of the month`);
 
     let processed = 0;
     let failed = 0;
@@ -2944,13 +3052,13 @@ async function syncFacebookPostsLogic(): Promise<any> {
     return {
       success: true,
       message:
-        `Successfully synced ${processed} posts from December onwards (${withOCR} with image text extraction)` +
+        `Successfully synced ${processed} posts from the start of the month (${withOCR} with image text extraction)` +
         (failed > 0 ? ` (${failed} failed)` : ""),
       count: processed,
       failed: failed,
       withOCR: withOCR,
       total: posts.length,
-      dateFilter: "December onwards",
+      dateFilter: "Start of current month",
     };
   } catch (error: any) {
     console.error("❌ syncFacebookPostsLogic error:", error);
@@ -3117,6 +3225,14 @@ export const reprocessExistingAnnouncements = onCall(
     }
   }
 );
+
+function generateToken(): string {
+  return (
+    Math.random().toString(36).substring(2) +
+    Math.random().toString(36).substring(2) +
+    Date.now().toString(36)
+  );
+}
 
 async function syncCategoryToInfoBank(
   categoryType: "admission" | "scholarship" | "placement",

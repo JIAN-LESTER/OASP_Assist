@@ -323,6 +323,195 @@ async function createNotificationsForUsers(
   }
 }
 
+export const checkFacebookTokenExpiry = onSchedule(
+  {
+    schedule: "0 8 * * *", // runs daily at 8am Manila time
+    timeZone: "Asia/Manila",
+    region: "us-central1",
+  },
+  async (event) => {
+    console.log("🔍 Checking Facebook token expiry...");
+
+    try {
+      // Get the Facebook token config from Firestore
+      const configDoc = await db.collection("config").doc("facebook").get();
+
+      if (!configDoc.exists) {
+        console.log("ℹ️ No Facebook config found, skipping");
+        return;
+      }
+
+      const configData = configDoc.data();
+      const tokenExpiresAt = configData?.tokenExpiresAt; // Firestore Timestamp
+
+      if (!tokenExpiresAt || typeof tokenExpiresAt.toDate !== "function") {
+        console.log("ℹ️ No token expiry date found, skipping");
+        return;
+      }
+
+      const now = new Date(
+        new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
+      );
+      now.setHours(0, 0, 0, 0);
+
+      const expiryDate = tokenExpiresAt.toDate();
+      const expiryLocal = new Date(
+        expiryDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+      );
+      expiryLocal.setHours(0, 0, 0, 0);
+
+      const diffMs = expiryLocal.getTime() - now.getTime();
+      const daysLeft = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      console.log(`📅 Facebook token expires in: ${daysLeft} days`);
+
+      // Get all admin users (only admins manage the token)
+      const adminSnapshot = await db
+        .collection("users")
+        .where("role", "==", "admin")
+        .where("isActive", "==", true)
+        .get();
+
+      const adminIds = adminSnapshot.docs.map((doc) => doc.id);
+
+      if (adminIds.length === 0) {
+        console.log("ℹ️ No active admins found, skipping");
+        return;
+      }
+
+      const expiryDateKey = expiryLocal.toISOString().substring(0, 10); // e.g. "2026-05-01"
+
+      // ─────────────────────────────────────────────────────────────
+      // CASE 1: EXPIRING SOON — fire ONCE at 5 days left, ONCE at 3 days left
+      // Key includes daysLeft (5 or 3) + expiryDate → never repeats
+      // ─────────────────────────────────────────────────────────────
+      if (daysLeft === 5 || daysLeft === 3) {
+        const reminderKey = `fb_token_expiring_${expiryDateKey}_${daysLeft}d`;
+
+        // Check if this exact warning was already sent
+        const alreadySentDoc = await db
+          .collection("scheduled_runs")
+          .doc(reminderKey)
+          .get();
+
+        if (alreadySentDoc.exists) {
+          console.log(`⚠️ FB token ${daysLeft}-day warning already sent, skipping`);
+          return;
+        }
+
+        // Lock it immediately
+        await db.collection("scheduled_runs").doc(reminderKey).set({
+          type: "fb_token_expiry_warning",
+          daysLeft: daysLeft,
+          expiryDate: expiryDateKey,
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const title = "⚠️ Facebook Token Expiring Soon";
+        const body = `Your Facebook API token will expire in ${daysLeft} days. Please renew it soon to avoid interruption.`;
+
+        await createNotificationsForUsers(
+          adminIds,
+          "admin",
+          title,
+          body,
+          "fb_token_expiration",
+          {
+            status: "expiring",
+            daysLeft: String(daysLeft),
+            expiryDate: expiryDateKey,
+            reminderDate: reminderKey, // unique key → fires only once
+          }
+        );
+
+        await sendFCMNotifications(
+          adminIds,
+          title,
+          body,
+          {
+            type: "fb_token_expiration",
+            status: "expiring",
+            daysLeft: String(daysLeft),
+          },
+          "admin"
+        );
+
+        console.log(`✅ Sent FB token ${daysLeft}-day expiry warning to ${adminIds.length} admins`);
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // CASE 2: EXPIRED — fire every 3 days
+      // Key includes a rolling 3-day bucket → repeats every 3 days
+      // ─────────────────────────────────────────────────────────────
+      if (daysLeft < 0) {
+        // Calculate how many days since expiry
+        const daysSinceExpiry = Math.abs(daysLeft);
+
+        // Only fire on day 0, 3, 6, 9... after expiry
+        if (daysSinceExpiry % 3 !== 0) {
+          console.log(`ℹ️ FB token expired ${daysSinceExpiry} days ago — not a 3-day interval, skipping`);
+          return;
+        }
+
+        const todayKey = now.toISOString().substring(0, 10);
+        const expiredReminderKey = `fb_token_expired_${todayKey}`;
+
+        // Idempotency: prevent double-firing on same calendar day
+        const alreadySentDoc = await db
+          .collection("scheduled_runs")
+          .doc(expiredReminderKey)
+          .get();
+
+        if (alreadySentDoc.exists) {
+          console.log("⚠️ FB token expired reminder already sent today, skipping");
+          return;
+        }
+
+        await db.collection("scheduled_runs").doc(expiredReminderKey).set({
+          type: "fb_token_expired_reminder",
+          daysSinceExpiry: daysSinceExpiry,
+          expiryDate: expiryDateKey,
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const title = "🔴 Facebook Token Expired";
+        const body = "Your Facebook API token has expired! Please renew it immediately to continue syncing posts.";
+
+        // Use today's date in reminderDate so each 3-day reminder is a NEW notification
+        await createNotificationsForUsers(
+          adminIds,
+          "admin",
+          title,
+          body,
+          "fb_token_expiration",
+          {
+            status: "expired",
+            daysLeft: String(daysLeft),
+            expiryDate: expiryDateKey,
+            reminderDate: todayKey, // changes every run → new notification each time
+          }
+        );
+
+        await sendFCMNotifications(
+          adminIds,
+          title,
+          body,
+          {
+            type: "fb_token_expiration",
+            status: "expired",
+            daysLeft: String(daysLeft),
+          },
+          "admin"
+        );
+
+        console.log(`✅ Sent FB token expired reminder (day ${daysSinceExpiry} since expiry) to ${adminIds.length} admins`);
+      }
+    } catch (error) {
+      console.error("❌ Error checking Facebook token expiry:", error);
+    }
+  }
+);
+
 function formatDeadlineForNotification(deadline: admin.firestore.Timestamp | null): string {
   if (!deadline || typeof deadline.toDate !== "function") {
     return "";

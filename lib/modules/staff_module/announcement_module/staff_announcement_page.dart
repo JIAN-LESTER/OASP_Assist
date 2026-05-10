@@ -11,6 +11,44 @@ import 'package:intl/intl.dart';
 
 enum AlertType { success, error, warning, info }
 
+String? _normalizeAnnouncementImageUrl(dynamic value) {
+  if (value == null) return null;
+
+  String rawUrl = '';
+
+  if (value is String) {
+    rawUrl = value;
+  } else if (value is Map && value['url'] != null) {
+    rawUrl = value['url'].toString();
+  }
+
+  if (rawUrl.isEmpty) return null;
+
+  final sanitizedUrl = rawUrl.trim().replaceAll('&amp;', '&');
+  final uri = Uri.tryParse(sanitizedUrl);
+
+  if (uri == null || !uri.hasScheme) return null;
+  if (uri.scheme != 'http' && uri.scheme != 'https') return null;
+
+  return uri.toString();
+}
+
+bool _isFirebaseAnnouncementImageUrl(String url) {
+  return url.contains('firebasestorage.googleapis.com');
+}
+
+List<String> _selectAnnouncementImageUrls(Iterable<dynamic> values) {
+  final normalized =
+      values.map(_normalizeAnnouncementImageUrl).whereType<String>().toList();
+
+  if (normalized.isEmpty) return const [];
+
+  final firebaseUrls =
+      normalized.where(_isFirebaseAnnouncementImageUrl).toList();
+
+  return firebaseUrls.isNotEmpty ? firebaseUrls : normalized;
+}
+
 class StaffAnnouncementPage extends StatefulWidget {
   const StaffAnnouncementPage({super.key});
 
@@ -823,26 +861,16 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
     final category = data['category'] ?? 'General';
     final deadline = data['deadline'];
 
-    List<String> images = [];
+    List<String> images = _selectAnnouncementImageUrls(
+      (data['images'] as List?) ?? const [],
+    );
 
-    if (data['images'] != null && data['images'] is List) {
-      images =
-          (data['images'] as List)
-              .map((item) {
-                if (item is String) return item;
-                if (item is Map && item.containsKey('url'))
-                  return item['url'].toString();
-                return '';
-              })
-              .where((url) => url.isNotEmpty && url.startsWith('http'))
-              .toList();
+    if (images.isEmpty) {
+      images = _selectAnnouncementImageUrls([data['full_picture']]);
     }
 
-    if (images.isEmpty &&
-        data['full_picture'] != null &&
-        (data['full_picture'] as String).isNotEmpty &&
-        (data['full_picture'] as String).startsWith('http')) {
-      images = [data['full_picture'] as String];
+    if (images.isEmpty && data['original_image_urls'] is List) {
+      images = _selectAnnouncementImageUrls(data['original_image_urls'] as List);
     }
 
     final hasImages = images.isNotEmpty;
@@ -914,7 +942,7 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
           child: Stack(
             children: [
               Positioned.fill(
-                child: Image.network(
+                child: _buildAnnouncementImage(
                   imageUrl,
                   fit: BoxFit.contain,
                   errorBuilder:
@@ -1091,7 +1119,7 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.network(
+          _buildAnnouncementImage(
             imageUrl,
             fit: BoxFit.cover,
             errorBuilder:
@@ -1600,6 +1628,30 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
           valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
         ),
       ),
+    );
+  }
+
+  Widget _buildAnnouncementImage(
+    String imageUrl, {
+    required BoxFit fit,
+    ImageErrorWidgetBuilder? errorBuilder,
+    ImageLoadingBuilder? loadingBuilder,
+  }) {
+    final normalizedUrl = _normalizeAnnouncementImageUrl(imageUrl);
+
+    if (normalizedUrl == null) {
+      return errorBuilder?.call(context, StateError('Invalid image URL'), null) ??
+          _buildImageError();
+    }
+
+    return Image.network(
+      normalizedUrl,
+      fit: fit,
+      gaplessPlayback: true,
+      filterQuality: FilterQuality.medium,
+      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+      errorBuilder: errorBuilder,
+      loadingBuilder: loadingBuilder,
     );
   }
 
@@ -2147,12 +2199,21 @@ class _TopRightAlertState extends State<TopRightAlert>
 class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
   late PageController _pageController;
   late int _currentIndex;
+  late final List<String> _images;
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
+    _images =
+        widget.images
+            .map(_normalizeAnnouncementImageUrl)
+            .whereType<String>()
+            .toList();
+    _currentIndex =
+        _images.isEmpty
+            ? 0
+            : widget.initialIndex.clamp(0, _images.length - 1);
+    _pageController = PageController(initialPage: _currentIndex);
   }
 
   @override
@@ -2167,9 +2228,14 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
+          if (_images.isEmpty)
+            const Center(
+              child: Icon(Icons.error, color: Colors.white, size: 64),
+            )
+          else
           PageView.builder(
             controller: _pageController,
-            itemCount: widget.images.length,
+            itemCount: _images.length,
             onPageChanged: (index) {
               setState(() {
                 _currentIndex = index;
@@ -2181,8 +2247,11 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
                 maxScale: 4.0,
                 child: Center(
                   child: Image.network(
-                    widget.images[index],
+                    _images[index],
                     fit: BoxFit.contain,
+                    gaplessPlayback: true,
+                    filterQuality: FilterQuality.medium,
+                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                     errorBuilder: (context, error, stackTrace) {
                       return const Icon(
                         Icons.error,
@@ -2197,7 +2266,7 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
           ),
 
           // ✅ NEW: Navigation arrows in fullscreen
-          if (widget.images.length > 1) ...[
+          if (_images.length > 1) ...[
             _buildFullscreenNavigationArrow(
               alignment: Alignment.centerLeft,
               icon: Icons.chevron_left,
@@ -2215,7 +2284,7 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
               alignment: Alignment.centerRight,
               icon: Icons.chevron_right,
               onTap: () {
-                if (_currentIndex < widget.images.length - 1) {
+                if (_currentIndex < _images.length - 1) {
                   _pageController.nextPage(
                     duration: const Duration(milliseconds: 300),
                     curve: Curves.easeInOut,
@@ -2256,7 +2325,7 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
           ),
 
           // Image counter
-          if (widget.images.length > 1)
+          if (_images.length > 1)
             SafeArea(
               child: Align(
                 alignment: Alignment.bottomCenter,
@@ -2272,7 +2341,7 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: Text(
-                      '${_currentIndex + 1} / ${widget.images.length}',
+                      '${_currentIndex + 1} / ${_images.length}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
