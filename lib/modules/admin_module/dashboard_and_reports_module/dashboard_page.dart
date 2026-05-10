@@ -1,6 +1,8 @@
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/admin_dashboard_data.dart';
+
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/chatbot_usage_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/export_button.dart';
+import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/gemini_billing_section.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_charts.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/inquiry_trends_data.dart';
 import 'package:capstone_project/modules/admin_module/dashboard_and_reports_module/paginated_list.dart';
@@ -236,14 +238,14 @@ class _LazyLoadWidgetState extends State<LazyLoadWidget> {
 class DashboardCache {
   final InquiryReportsData? inq;
   final UserDemographicsReportsData? ud;
-  final AdminDashboardData? ad;  // ✅ ADD THIS
+  final AdminDashboardData? ad; // ✅ ADD THIS
   final DateTime timestamp;
   final Map<String, dynamic>? quickStats;
 
   DashboardCache({
     this.inq,
     this.ud,
-    this.ad,  // ✅ ADD THIS
+    this.ad, // ✅ ADD THIS
     required this.timestamp,
     this.quickStats,
   });
@@ -283,7 +285,7 @@ class _DashboardModulestate extends State<DashboardPage> {
   InquiryReportsData? inq;
   ChatbotUsageReportsData? cb;
   UserDemographicsReportsData? ud;
-    AdminDashboardData? ad;  // ✅ ADD THIS
+  AdminDashboardData? ad; // ✅ ADD THIS
   String? userName;
   Map<String, int>? quickStats;
 
@@ -347,102 +349,105 @@ class _DashboardModulestate extends State<DashboardPage> {
     });
   }
 
-Future<void> _loadFullData() async {
-  // Check cache first
-  if (_cache.containsKey(selectedTimeFrame) &&
-      _cache[selectedTimeFrame]!.isValid) {
-    final cached = _cache[selectedTimeFrame]!;
+  Future<void> _loadFullData() async {
+    // Check cache first
+    if (_cache.containsKey(selectedTimeFrame) &&
+        _cache[selectedTimeFrame]!.isValid) {
+      final cached = _cache[selectedTimeFrame]!;
 
-    if (mounted) {
+      if (mounted) {
+        setState(() {
+          inq = cached.inq;
+          ud = cached.ud;
+          ad = cached.ad; // ✅ LOAD FROM CACHE
+          quickStats = cached.quickStats as Map<String, int>?;
+        });
+      }
+
+      // Refresh in background if stale
+      if (cached.isStale) {
+        _refreshInBackground();
+      }
+      return;
+    }
+
+    // Fetch fresh data
+    await _fetchAndCacheData();
+  }
+
+  Future<void> _fetchAndCacheData() async {
+    try {
+      final results = await Future.wait([
+        _firebaseService.getAdminDashboardData(
+          selectedTimeFrame,
+          customDateRange,
+        ),
+        _firebaseService.getUserDemographicsReportsData(
+          selectedTimeFrame,
+          customDateRange,
+        ),
+        // ✅ ADD: Fetch inquiry data separately
+        _firebaseService.getInquiryReportsData(
+          selectedTimeFrame,
+          customDateRange,
+        ),
+      ]);
+
+      if (!mounted) return;
+
+      final adminData = results[0] as AdminDashboardData;
+      final userDemoData = results[1] as UserDemographicsReportsData;
+      final inquiryReportData = results[2] as InquiryReportsData;
+
+      // ✅ FIX: Use inquiryReportData directly instead of creating from adminData
+      final inquiryData = InquiryReportsData(
+        totalMessages: inquiryReportData.totalMessages,
+        userMessages: inquiryReportData.userMessages,
+        botMessages: inquiryReportData.botMessages,
+        escalatedMessages: inquiryReportData.escalatedMessages,
+        escalationRate: inquiryReportData.escalationRate,
+        resolvedMessages: inquiryReportData.resolvedMessages,
+        resolutionRate: inquiryReportData.resolutionRate,
+        inquiryTrend: inquiryReportData.inquiryTrend,
+        categoryDistribution: inquiryReportData.categoryDistribution,
+        topQuestions: inquiryReportData.topQuestions,
+        escalationsOverTime: inquiryReportData.escalationsOverTime,
+        staffPerformance: inquiryReportData.staffPerformance,
+        botVsHumanAnswers: inquiryReportData.botVsHumanAnswers,
+        allEscalations:
+            inquiryReportData
+                .allEscalations, // ✅ This now has the correct value
+        recentLogs: inquiryReportData.recentLogs,
+        msgLogs: inquiryReportData.msgLogs,
+      );
+
+      // ✅ UPDATE CACHE
+      _cache[selectedTimeFrame] = DashboardCache(
+        inq: inquiryData,
+        ud: userDemoData,
+        ad: adminData,
+        timestamp: DateTime.now(),
+      );
+
       setState(() {
-        inq = cached.inq;
-        ud = cached.ud;
-        ad = cached.ad;  // ✅ LOAD FROM CACHE
-        quickStats = cached.quickStats as Map<String, int>?;
+        inq = inquiryData;
+        ud = userDemoData;
+        ad = adminData;
+
+        // ✅ DEBUG PRINTS
+        print('📊 Inquiry Data Updated:');
+        print('   All Escalations: ${inquiryData.allEscalations}');
+        print('   Escalated Messages: ${inquiryData.escalatedMessages}');
+        print('   Admin Pending Escalations: ${adminData.pendingEscalations}');
+        print(
+          '   Top Escalated Messages: ${adminData.topEscalatedMessages.length}',
+        );
       });
+    } catch (e) {
+      print('❌ Error fetching data: $e');
+      rethrow;
     }
-
-    // Refresh in background if stale
-    if (cached.isStale) {
-      _refreshInBackground();
-    }
-    return;
   }
-
-  // Fetch fresh data
-  await _fetchAndCacheData();
-}
-Future<void> _fetchAndCacheData() async {
-  try {
-    final results = await Future.wait([
-      _firebaseService.getAdminDashboardData(
-        selectedTimeFrame,
-        customDateRange,
-      ),
-      _firebaseService.getUserDemographicsReportsData(
-        selectedTimeFrame,
-        customDateRange,
-      ),
-      // ✅ ADD: Fetch inquiry data separately
-      _firebaseService.getInquiryReportsData(
-        selectedTimeFrame,
-        customDateRange,
-      ),
-    ]);
-
-    if (!mounted) return;
-
-    final adminData = results[0] as AdminDashboardData;
-    final userDemoData = results[1] as UserDemographicsReportsData;
-    final inquiryReportData = results[2] as InquiryReportsData;
-
-    // ✅ FIX: Use inquiryReportData directly instead of creating from adminData
-    final inquiryData = InquiryReportsData(
-      totalMessages: inquiryReportData.totalMessages,
-      userMessages: inquiryReportData.userMessages,
-      botMessages: inquiryReportData.botMessages,
-      escalatedMessages: inquiryReportData.escalatedMessages,
-      escalationRate: inquiryReportData.escalationRate,
-      resolvedMessages: inquiryReportData.resolvedMessages,
-      resolutionRate: inquiryReportData.resolutionRate,
-      inquiryTrend: inquiryReportData.inquiryTrend,
-      categoryDistribution: inquiryReportData.categoryDistribution,
-      topQuestions: inquiryReportData.topQuestions,
-      escalationsOverTime: inquiryReportData.escalationsOverTime,
-      staffPerformance: inquiryReportData.staffPerformance,
-      botVsHumanAnswers: inquiryReportData.botVsHumanAnswers,
-      allEscalations: inquiryReportData.allEscalations, // ✅ This now has the correct value
-      recentLogs: inquiryReportData.recentLogs,
-      msgLogs: inquiryReportData.msgLogs,
-    );
-
-    // ✅ UPDATE CACHE
-    _cache[selectedTimeFrame] = DashboardCache(
-      inq: inquiryData,
-      ud: userDemoData,
-      ad: adminData,
-      timestamp: DateTime.now(),
-    );
-
-    setState(() {
-      inq = inquiryData;
-      ud = userDemoData;
-      ad = adminData;
-      
-      // ✅ DEBUG PRINTS
-      print('📊 Inquiry Data Updated:');
-      print('   All Escalations: ${inquiryData.allEscalations}');
-      print('   Escalated Messages: ${inquiryData.escalatedMessages}');
-      print('   Admin Pending Escalations: ${adminData.pendingEscalations}');
-      print('   Top Escalated Messages: ${adminData.topEscalatedMessages.length}');
-    });
-  } catch (e) {
-    print('❌ Error fetching data: $e');
-    rethrow;
-  }
-}
-
-
 
   Future<void> _refreshInBackground() async {
     try {
@@ -519,63 +524,63 @@ Future<void> _fetchAndCacheData() async {
     }
   }
 
-Future<void> _onTimeFrameChanged(String newValue) async {
-  if (newValue == selectedTimeFrame && newValue != 'Custom') return;
+  Future<void> _onTimeFrameChanged(String newValue) async {
+    if (newValue == selectedTimeFrame && newValue != 'Custom') return;
 
-  // ✅ CORRECT: Show modal when Custom is selected
-  if (newValue == 'Custom') {
-    final DateTimeRange? selectedRange = await showDialog<DateTimeRange>(
-      context: context,
-      barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (BuildContext context) {
-        // ✅ IMPORTANT: Import statement needed
-        // Make sure _DateRangePickerDialog is accessible
-        return DateRangePickerDialog(
-          initialDateRange: customDateRange,
-          firstDate: DateTime(2020, 1, 1),
-          lastDate: DateTime.now(),
-        );
-      },
-    );
+    // ✅ CORRECT: Show modal when Custom is selected
+    if (newValue == 'Custom') {
+      final DateTimeRange? selectedRange = await showDialog<DateTimeRange>(
+        context: context,
+        barrierDismissible: true,
+        barrierColor: Colors.black.withOpacity(0.5),
+        builder: (BuildContext context) {
+          // ✅ IMPORTANT: Import statement needed
+          // Make sure _DateRangePickerDialog is accessible
+          return DateRangePickerDialog(
+            initialDateRange: customDateRange,
+            firstDate: DateTime(2020, 1, 1),
+            lastDate: DateTime.now(),
+          );
+        },
+      );
 
-    // If user selected a range, apply it
-    if (selectedRange != null) {
-      _onDateRangeChanged(selectedRange);
+      // If user selected a range, apply it
+      if (selectedRange != null) {
+        _onDateRangeChanged(selectedRange);
+      }
+      // If user cancelled (selectedRange is null), don't change anything
+      return;
     }
-    // If user cancelled (selectedRange is null), don't change anything
-    return;
-  }
 
-  // Normal timeframe selection
-  setState(() {
-    selectedTimeFrame = newValue;
-    customDateRange = null;
-    isLazyLoading = true;
-  });
+    // Normal timeframe selection
+    setState(() {
+      selectedTimeFrame = newValue;
+      customDateRange = null;
+      isLazyLoading = true;
+    });
 
-  try {
-    await Future.wait([
-      _fetchQuickStats().then((stats) {
-        if (mounted) {
-          setState(() {
-            quickStats = stats;
-          });
-        }
-      }),
-      _loadFullData(),
-    ]);
-  } catch (e) {
-    print('Error changing timeframe: $e');
-    _showSnackBar('Failed to load data for $newValue', isError: true);
-  } finally {
-    if (mounted) {
-      setState(() {
-        isLazyLoading = false;
-      });
+    try {
+      await Future.wait([
+        _fetchQuickStats().then((stats) {
+          if (mounted) {
+            setState(() {
+              quickStats = stats;
+            });
+          }
+        }),
+        _loadFullData(),
+      ]);
+    } catch (e) {
+      print('Error changing timeframe: $e');
+      _showSnackBar('Failed to load data for $newValue', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLazyLoading = false;
+        });
+      }
     }
   }
-}
 
   // Add this new method to handle date range changes:
   Future<void> _onDateRangeChanged(DateTimeRange? range) async {
@@ -715,7 +720,7 @@ Future<void> _onTimeFrameChanged(String newValue) async {
             isRefreshing: isRefreshing,
             inq: inq,
             ud: ud,
-            ad:ad,
+            ad: ad,
             userName: userName!,
             quickStats: quickStats,
             customDateRange: customDateRange,
@@ -1101,7 +1106,6 @@ Widget dashboardContents(
                   ],
                 ),
                 const SizedBox(height: 12),
-              
 
                 Row(
                   children: [
@@ -1168,7 +1172,7 @@ Widget dashboardContents(
                   child: buildStatCard(
                     'Escalation and Resolution Rate Ratio ',
                     '${escalationRate.toStringAsFixed(2)}% : ${resolutionRate.toStringAsFixed(2)}%',
-                  
+
                     Colors.red,
                     Icons.analytics,
                   ),
@@ -1260,6 +1264,11 @@ Widget dashboardContents(
                           context, // Add context parameter
                         ),
                   ),
+                ),
+                const SizedBox(height: 20),
+                GeminiBillingSection(
+                  timeFrame: selectedTimeFrame,
+                  customDateRange: customDateRange,
                 ),
               ],
             );
@@ -1361,7 +1370,11 @@ Widget dashboardContents(
                     ],
                   ),
                 ),
-                
+                const SizedBox(height: 20),
+                GeminiBillingSection(
+                  timeFrame: selectedTimeFrame,
+                  customDateRange: customDateRange,
+                ),
               ],
             );
           }
@@ -1380,8 +1393,8 @@ Widget dashboardContents(
                 userName,
                 customDateRange,
                 onDateRangeChanged,
-                inq, 
-                ud, 
+                inq,
+                ud,
                 ad,
               ),
               const SizedBox(height: 32),

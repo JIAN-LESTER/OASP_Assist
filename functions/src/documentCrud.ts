@@ -3,6 +3,7 @@ import {defineSecret} from "firebase-functions/params";
 import axios from "axios";
 import {Pinecone} from "@pinecone-database/pinecone";
 import * as admin from "firebase-admin";
+import {logGeminiUsage} from "./geminiUsage";
 
 const PINECONE_HOST = defineSecret("PINECONE_HOST");
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
@@ -67,6 +68,14 @@ export const generateGeminiEmbedding = onCall(
       );
 
       const embedding = response.data?.embedding?.values;
+
+      await logGeminiUsage({
+        userId: request.auth.uid ?? null,
+        conversationId: null,
+        model: "gemini-embedding-001",
+        inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
+        outputTokens: 0,
+      }).catch(console.error);
 
       if (!Array.isArray(embedding) || embedding.length === 0) {
         console.error("❌ Unexpected Gemini response:", JSON.stringify(response.data));

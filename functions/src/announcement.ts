@@ -4,6 +4,7 @@ import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import axios from "axios";
+import {logGeminiUsage} from "./geminiUsage";
 
 // Define secrets
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
@@ -468,6 +469,14 @@ async function extractTextFromImage(imageUrl: string): Promise<string> {
     );
 
     const visionData = visionResponse.data as any;
+    await logGeminiUsage({
+      userId: null,
+      conversationId: null,
+      model: "cloud-vision",
+      inputTokens: 1,
+      outputTokens: 0,
+    }).catch(console.error);
+
     const annotations = visionData?.responses?.[0]?.textAnnotations;
 
     if (annotations && annotations.length > 0) {
@@ -1990,6 +1999,13 @@ async function createInfoBankFromCategory(
           );
 
           const responseData = embeddingResponse.data as any;
+          await logGeminiUsage({
+            userId: null,
+            conversationId: null,
+            model: "gemini-embedding-001",
+            inputTokens: responseData?.usageMetadata?.promptTokenCount ?? Math.ceil(chunk.text.length / 4),
+            outputTokens: 0,
+          }).catch(console.error);
 
           // Try multiple possible response structures
           if (responseData?.embedding?.values && Array.isArray(responseData.embedding.values)) {
@@ -3300,6 +3316,13 @@ async function syncCategoryToInfoBank(
 
       // ✅ FIX: Handle correct Gemini API response structure
       const responseData = embeddingResponse.data as any;
+      await logGeminiUsage({
+        userId: null,
+        conversationId: null,
+        model: "gemini-embedding-001",
+        inputTokens: responseData?.usageMetadata?.promptTokenCount ?? Math.ceil(chunk.text.length / 4),
+        outputTokens: 0,
+      }).catch(console.error);
       let embedding: number[] | null = null;
 
       if (responseData?.embedding?.values && Array.isArray(responseData.embedding.values)) {
@@ -4001,6 +4024,13 @@ export const fixAnnouncementInfoBankMetadata = onCall(
 
             // ✅ FIX: Handle correct response structure
             const responseData = embeddingResponse.data as any;
+            await logGeminiUsage({
+              userId: null,
+              conversationId: null,
+              model: "gemini-embedding-001",
+              inputTokens: responseData?.usageMetadata?.promptTokenCount ?? Math.ceil(chunk.text.length / 4),
+              outputTokens: 0,
+            }).catch(console.error);
             let embedding: number[] | null = null;
 
             if (responseData?.embedding?.values && Array.isArray(responseData.embedding.values)) {

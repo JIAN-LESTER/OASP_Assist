@@ -16,6 +16,43 @@ const db = admin.firestore();
 // GEMINI FUNCTIONS
 // ============================================================================
 
+// At the top of your existing CF file
+const { Firestore } = require('@google-cloud/firestore');
+const firestore = new Firestore();
+
+// ── Paste this helper anywhere in your existing CF file ──────────
+async function logGeminiUsage({ userId, conversationId, model, inputTokens, outputTokens }) {
+  // Pricing per 1M tokens (USD) — update if Google changes pricing
+  // https://ai.google.dev/pricing
+  const PRICES = {
+    'gemini-2.5-flash':     { input: 0.30,  output: 2.50  },
+    'gemini-embedding-001': { input: 0.15,  output: 0.00  },
+    'gemini-2.0-flash':     { input: 0.10,  output: 0.40  },
+    'gemini-1.5-flash':     { input: 0.075, output: 0.30  },
+    'gemini-1.5-pro':       { input: 1.25,  output: 5.00  },
+    'gemini-pro':           { input: 0.50,  output: 1.50  },
+  };
+
+  const pricing = PRICES[model] ?? PRICES['gemini-2.0-flash'];
+  const inputCostUsd  = (inputTokens  / 1_000_000) * pricing.input;
+  const outputCostUsd = (outputTokens / 1_000_000) * pricing.output;
+  const totalCostUsd  = inputCostUsd + outputCostUsd;
+  const USD_TO_PHP    = parseFloat(process.env.USD_TO_PHP ?? '56');
+
+  await firestore.collection('gemini_usage').add({
+    userId:         userId ?? null,
+    conversationId: conversationId ?? null,
+    model:          model,
+    inputTokens:    inputTokens,
+    outputTokens:   outputTokens,
+    totalTokens:    inputTokens + outputTokens,
+    costUsd:        totalCostUsd,
+    costPhp:        totalCostUsd * USD_TO_PHP,
+    timestamp:      Firestore.FieldValue.serverTimestamp(),
+    date:           new Date().toISOString().substring(0, 10), // "YYYY-MM-DD"
+  });
+}
+
 const GEMINI_MODEL = "gemini-2.5-flash";
 
 export const generateEmbedding = onCall(
@@ -46,6 +83,14 @@ export const generateEmbedding = onCall(
       if (embedding.length !== 768) {
         throw new Error(`Unexpected embedding dimension: ${embedding.length} (expected 768)`);
       }
+
+      await logGeminiUsage({
+        userId: request.auth.uid ?? null,
+        conversationId: null,
+        model: "gemini-embedding-001",
+        inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
+        outputTokens: 0,
+      }).catch(console.error);
 
       return {embedding};
     } catch (error: any) {
@@ -124,6 +169,14 @@ async function generateGeminiEmbedding(
     if (embedding.length !== 768) {
       throw new Error(`Unexpected embedding size: ${embedding.length} (expected 768)`);
     }
+
+    await logGeminiUsage({
+      userId: null,
+      conversationId: null,
+      model: "gemini-embedding-001",
+      inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
+      outputTokens: 0,
+    }).catch(console.error);
 
     return embedding;
   } catch (error: any) {
@@ -540,6 +593,7 @@ export const generateAnswer = onRequest(
         generateGeminiEmbedding(query, geminiKey, "search_query"),
         Promise.resolve(new Pinecone({apiKey: pineconeKey})),
       ]);
+      
 
       console.log(`✅ Embedding generated: ${queryEmbedding.length} dimensions`);
 
@@ -784,6 +838,7 @@ async function generateGeminiResponse(
       }
     );
 
+
     if (response.status !== 200) {
       throw new Error(`Gemini API error: ${response.statusText}`);
     }
@@ -791,16 +846,30 @@ async function generateGeminiResponse(
     const data: any = response.data;
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
+    const usageMetadata = data?.usageMetadata;
+if (usageMetadata) {
+  await logGeminiUsage({
+    userId: null,
+    conversationId: null,
+    model: GEMINI_MODEL,
+    inputTokens: usageMetadata.promptTokenCount ?? 0,
+    outputTokens: usageMetadata.candidatesTokenCount ?? 0,
+  }).catch(console.error);
+}
+
     if (!text) {
       throw new Error("Empty response from Gemini");
     }
 
     return text;
+    
   } catch (error: any) {
     console.error("❌ Gemini response error:", error.message);
     throw error;
   }
 }
+
+
 
 async function* generateGeminiResponseStream(
   prompt: string,
