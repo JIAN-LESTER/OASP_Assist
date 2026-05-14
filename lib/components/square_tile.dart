@@ -111,29 +111,17 @@ class _SquareTileState extends State<SquareTile> {
 
   // Native mobile sign-in using google_sign_in package
   Future<void> _signInWithGoogleNative() async {
-    final GoogleSignIn googleSignIn = GoogleSignIn(
-      scopes: ['email', 'profile'],
-      serverClientId:
-          '1008880584715-q015emqallpopqhpme1gqjrmsi72rocu.apps.googleusercontent.com',
-    );
+    final GoogleSignIn googleSignIn = GoogleSignIn.instance;
 
     // OPTIMIZED: Only disconnect if needed, no unnecessary signOut
     // This prevents delays when user cancels immediately
-    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-
-    // Early return on cancellation - no delay
-    if (googleUser == null) {
-      print("ℹ️ User cancelled sign-in");
-      return;
-    }
-
+    final GoogleSignInAccount googleUser = await googleSignIn.authenticate();
     // 🔑 Auth tokens
     final GoogleSignInAuthentication googleAuth =
         await googleUser.authentication;
 
     // 🔥 Firebase Auth
     final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
       idToken: googleAuth.idToken,
     );
 
@@ -577,3 +565,4 @@ class _SquareTileState extends State<SquareTile> {
     );
   }
 }
+

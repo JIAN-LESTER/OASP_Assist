@@ -270,7 +270,7 @@ Widget buildResponseTimeTrendCard(
                           enabled: true,
                           touchTooltipData: LineTouchTooltipData(
                             getTooltipColor: (group) => const Color(0xff1a1a1a),
-                            tooltipRoundedRadius: 8,
+                            tooltipBorderRadius: BorderRadius.circular(8),
                             tooltipPadding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 8,
@@ -655,7 +655,7 @@ Widget buildConversationsOverTimeCard(
                           enabled: true,
                           touchTooltipData: LineTouchTooltipData(
                             getTooltipColor: (group) => const Color(0xff1a1a1a),
-                            tooltipRoundedRadius: 8,
+                            tooltipBorderRadius: BorderRadius.circular(8),
                             tooltipPadding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 8,
@@ -934,7 +934,7 @@ switch (timeFrame) {
 //                     barTouchData: BarTouchData(
 //                       touchTooltipData: BarTouchTooltipData(
 //                             getTooltipColor: (group) => const Color(0xff1a1a1a),
-//                         tooltipRoundedRadius: 8,
+//                         tooltipBorderRadius: BorderRadius.circular(8),
 //                         tooltipPadding: const EdgeInsets.symmetric(
 //                           horizontal: 12,
 //                           vertical: 8,
@@ -1172,7 +1172,7 @@ Widget buildUsersByCourseCard(Map<String, int> usersByCourse) {
                       barTouchData: BarTouchData(
                         touchTooltipData: BarTouchTooltipData(
                           getTooltipColor: (group) => const Color(0xff1a1a1a),
-                          tooltipRoundedRadius: 8,
+                          tooltipBorderRadius: BorderRadius.circular(8),
                           tooltipPadding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 8,
@@ -1988,7 +1988,7 @@ Widget buildChatLimitReachTrendCard(List<ChartData> trendData) {
               lineTouchData: LineTouchData(
                 touchTooltipData: LineTouchTooltipData(
                   getTooltipColor: (touchedSpot) => const Color(0xff1a1a1a),
-                  tooltipRoundedRadius: 8,
+                  tooltipBorderRadius: BorderRadius.circular(8),
                   getTooltipItems: (touchedSpots) {
                     return touchedSpots.map((spot) {
                       final index = spot.x.toInt();
@@ -2206,7 +2206,7 @@ Widget buildEscalationLimitReachTrendCard(List<ChartData> trendData) {
               lineTouchData: LineTouchData(
                 touchTooltipData: LineTouchTooltipData(
                   getTooltipColor: (touchedSpot) => const Color(0xff1a1a1a),
-                  tooltipRoundedRadius: 8,
+                  tooltipBorderRadius: BorderRadius.circular(8),
                   getTooltipItems: (touchedSpots) {
                     return touchedSpots.map((spot) {
                       final index = spot.x.toInt();
@@ -2834,7 +2834,7 @@ Widget buildPeakUsageHoursCard(
                       barTouchData: BarTouchData(
                         touchTooltipData: BarTouchTooltipData(
                           getTooltipColor: (group) => const Color(0xff1a1a1a),
-                          tooltipRoundedRadius: 8,
+                          tooltipBorderRadius: BorderRadius.circular(8),
                           tooltipPadding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 8,
@@ -3119,7 +3119,7 @@ Widget buildPeakUsageByDayCard(
               barTouchData: BarTouchData(
                 touchTooltipData: BarTouchTooltipData(
                   getTooltipColor: (group) => const Color(0xff1a1a1a),
-                  tooltipRoundedRadius: 8,
+                  tooltipBorderRadius: BorderRadius.circular(8),
                   tooltipPadding: const EdgeInsets.all(8),
                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
                     final day = dayNames[group.x.toInt()];
@@ -3363,7 +3363,7 @@ Widget buildPeakUsageByMonthCard(
               barTouchData: BarTouchData(
                 touchTooltipData: BarTouchTooltipData(
                   getTooltipColor: (group) => const Color(0xff1a1a1a),
-                  tooltipRoundedRadius: 8,
+                  tooltipBorderRadius: BorderRadius.circular(8),
                   tooltipPadding: const EdgeInsets.all(8),
                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
                     if (group.x.toInt() < labels.length) {
@@ -3625,7 +3625,7 @@ Widget buildPeakUsageByYearCard(
               barTouchData: BarTouchData(
                 touchTooltipData: BarTouchTooltipData(
                   getTooltipColor: (group) => const Color(0xff1a1a1a),
-                  tooltipRoundedRadius: 8,
+                  tooltipBorderRadius: BorderRadius.circular(8),
                   tooltipPadding: const EdgeInsets.all(8),
                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
                     final month = monthNames[group.x.toInt()];
@@ -3866,7 +3866,7 @@ Widget buildPeakUsageByAllYearsCard(
               barTouchData: BarTouchData(
                 touchTooltipData: BarTouchTooltipData(
                   getTooltipColor: (group) => const Color(0xff1a1a1a),
-                  tooltipRoundedRadius: 8,
+                  tooltipBorderRadius: BorderRadius.circular(8),
                   tooltipPadding: const EdgeInsets.all(8),
                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
                     final year = years[group.x.toInt()];
@@ -4073,3 +4073,4 @@ Widget _buildEmptyCard(String title, String message) {
     ),
   );
 }
+

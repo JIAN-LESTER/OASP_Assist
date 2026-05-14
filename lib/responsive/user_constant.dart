@@ -73,10 +73,8 @@ class UserConstant {
 
       // Sign out from Google if not on Windows
       if (!Platform.isWindows) {
-        final GoogleSignIn googleSignIn = GoogleSignIn();
-        if (await googleSignIn.isSignedIn()) {
-          await googleSignIn.signOut();
-        }
+        final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+        await googleSignIn.signOut();
       } else {
         print("DEBUG: Skipping Google sign-out on Windows.");
       }

@@ -179,7 +179,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
   Future<void> _pickFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'txt', 'docx', 'doc'],
         withData: true,

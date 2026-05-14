@@ -814,10 +814,10 @@ static Future<String> exportInquiryTrendsToCSV({
 
   static Future<String> _saveCSV(List<List<dynamic>> rows, String filename) async {
     try {
-      final csv = const ListToCsvConverter().convert(rows);
+      final csvContent = csv.encode(rows);
       
       if (kIsWeb) {
-        final bytes = utf8.encode(csv);
+        final bytes = utf8.encode(csvContent);
         final blob = html.Blob([bytes], 'text/csv');
         final url = html.Url.createObjectUrlFromBlob(blob);
         final anchor = html.AnchorElement(href: url)
@@ -852,7 +852,7 @@ static Future<String> exportInquiryTrendsToCSV({
         }
         
         final file = File('${dir.path}/$filename.csv');
-        await file.writeAsString(csv);
+        await file.writeAsString(csvContent);
         
         print('✅ CSV saved to: ${file.path}');
         

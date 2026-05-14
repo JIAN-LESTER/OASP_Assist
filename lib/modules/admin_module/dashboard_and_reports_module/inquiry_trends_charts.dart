@@ -417,7 +417,7 @@ Widget buildHighestFAQCard(Map<String, int> highestFAQ) {
                             horizontal: 16,
                             vertical: 10,
                           ),
-                          tooltipRoundedRadius: 8,
+                          tooltipBorderRadius: BorderRadius.circular(8),
                           getTooltipItem: (group, groupIndex, rod, rodIndex) {
                             if (groupIndex < topFAQ.length) {
                               final entry = topFAQ[groupIndex];
@@ -992,7 +992,7 @@ Widget buildInquiryTrendCard(
                       lineTouchData: LineTouchData(
                         enabled: true,
                         touchTooltipData: LineTouchTooltipData(
-                          tooltipRoundedRadius: 8,
+                          tooltipBorderRadius: BorderRadius.circular(8),
                           tooltipPadding: const EdgeInsets.all(12),
                           tooltipBorder: BorderSide(
                             color: Colors.grey[300]!,
@@ -2014,7 +2014,7 @@ Widget buildEscalationsOverTimeCard(
                       lineTouchData: LineTouchData(
                         enabled: true,
                         touchTooltipData: LineTouchTooltipData(
-                          tooltipRoundedRadius: 8,
+                          tooltipBorderRadius: BorderRadius.circular(8),
                           tooltipPadding: const EdgeInsets.all(12),
                           getTooltipItems: (touchedSpots) {
                             return touchedSpots.map((spot) {
@@ -2455,3 +2455,4 @@ String _formatDateTime(DateTime dateTime) {
     return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
   }
 }
+

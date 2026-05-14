@@ -111,7 +111,7 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
 
   Future<void> _pickFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'txt', 'docx', 'doc'],
         withData: true,

@@ -17,25 +17,24 @@ class AuthPage extends StatefulWidget {
 }
 
 class _AuthPageState extends State<AuthPage> {
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
   /// Attempt silent login with Google
   Future<void> _trySilentGoogleLogin() async {
     try {
-      final googleUser = await _googleSignIn.signInSilently();
+      await _googleSignIn.initialize();
+      final attempt = _googleSignIn.attemptLightweightAuthentication();
+      final googleUser = attempt == null ? null : await attempt;
       if (googleUser != null) {
-        final googleAuth = await googleUser.authentication;
+        final googleAuth = googleUser.authentication;
         final credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
         await FirebaseAuth.instance.signInWithCredential(credential);
-        print("✅ Silent Google login successful: ${googleUser.email}");
       } else {
-        print("ℹ️ No Google account found for silent sign-in");
       }
+    // ignore: empty_catches
     } catch (e) {
-      print("⚠️ Silent Google login failed: $e");
     }
   }
 
@@ -56,7 +55,6 @@ class _AuthPageState extends State<AuthPage> {
 
             // CHECK EMAIL VERIFICATION FIRST
             if (!user.emailVerified) {
-              print('⚠️ Email not verified for ${user.email}');
               return const LoginPage();
             }
 
@@ -98,7 +96,6 @@ class RoleBasedRouter extends StatelessWidget {
         }
 
         if (snapshot.hasError || !snapshot.hasData) {
-          print('❌ Error in RoleBasedRouter: ${snapshot.error}');
 
           return Scaffold(
             body: Center(
@@ -153,10 +150,6 @@ class RoleBasedRouter extends StatelessWidget {
         }
 
         final userData = snapshot.data!;
-        print('✅ Routing user: ${userData.name}');
-        print('📌 Role: ${userData.role}');
-        print('📋 Profile Completed: ${userData.isProfileCompleted}');
-        print('📋 Onboarding Completed: ${userData.isOnboardingCompleted}');
         
         switch (userData.role) {
           case 'admin':
@@ -166,17 +159,14 @@ class RoleBasedRouter extends StatelessWidget {
           case 'user':
             // ✅ FIXED: Check BOTH onboardingCompleted AND profileCompleted
             if (!userData.isOnboardingCompleted || !userData.isProfileCompleted) {
-              print('📝 Onboarding/Profile incomplete - showing onboarding');
               return UserOnboardingScreen(
                 userId: user?.uid ?? '',
                 userName: userData.name,
               );
             } else {
-              print('✅ Onboarding and profile complete - going to main page');
               return UserMainPage();
             }
           default:
-            print('⚠️ Unknown role: ${userData.role}, defaulting to user');
             return UserMainPage();
         }
       },
@@ -190,7 +180,6 @@ class RoleBasedRouter extends StatelessWidget {
       throw Exception('No authenticated user found');
     }
 
-    print('🔍 Fetching user data for: ${user.uid}');
     final doc = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -211,15 +200,6 @@ class RoleBasedRouter extends StatelessWidget {
       onboardingCompleted = data['onboardingCompleted'] ?? false;
 
       // ✅ DETAILED DEBUG OUTPUT
-      print('📊 User document EXISTS:');
-      print('   - Document ID: ${doc.id}');
-      print('   - Role: $role');
-      print('   - Name: $name');
-      print('   - profileCompleted (read): $profileCompleted');
-      print('   - onboardingCompleted (read): $onboardingCompleted');
-      print('   - RAW profileCompleted: ${data['profileCompleted']}');
-      print('   - RAW onboardingCompleted: ${data['onboardingCompleted']}');
-      print('   - Document has fields: ${data.keys.toList()}');
 
       // ✅ UPDATE LAST LOGIN (with error handling)
       try {
@@ -228,10 +208,8 @@ class RoleBasedRouter extends StatelessWidget {
             .doc(user.uid)
             .update({'lastLoginAt': FieldValue.serverTimestamp()});
       } catch (e) {
-        print('⚠️ Failed to update last login: $e');
       }
     } else {
-      print('⚠️ User document DOES NOT EXIST - creating new one');
 
       // ✅ CREATE NEW DOCUMENT (only if it doesn't exist)
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
@@ -252,22 +230,15 @@ class RoleBasedRouter extends StatelessWidget {
         'lastMessageResetDate': FieldValue.serverTimestamp(),
       });
 
-      print('✅ New user document created');
     }
 
     // ✅ LOG LOGIN EVENT
     try {
       await _logLogin(user.uid, name);
     } catch (e) {
-      print('⚠️ Failed to log login: $e');
     }
 
     // ✅ RETURN USER DATA
-    print('🎯 Returning UserData:');
-    print('   - role: $role');
-    print('   - name: $name');
-    print('   - isProfileCompleted: $profileCompleted');
-    print('   - isOnboardingCompleted: $onboardingCompleted');
 
     return UserData(
       role: role,
@@ -276,7 +247,6 @@ class RoleBasedRouter extends StatelessWidget {
       isOnboardingCompleted: onboardingCompleted,
     );
   } catch (e) {
-    print('❌ Error getting user data: $e');
     rethrow;
   }
 }
@@ -291,9 +261,7 @@ class RoleBasedRouter extends StatelessWidget {
         'time': Timestamp.now(),
         'userId': userId,
       });
-      print('📝 Login event logged');
     } catch (e) {
-      print('⚠️ Failed to log login event: $e');
     }
   }
 }

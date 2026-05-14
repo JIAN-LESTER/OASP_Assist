@@ -112,7 +112,7 @@ Widget buildUsersByYearCard(Map<String, int> yearData) {
                               barTouchData: BarTouchData(
                                 enabled: true,
                                 touchTooltipData: BarTouchTooltipData(
-                                  tooltipRoundedRadius: 8,
+                                  tooltipBorderRadius: BorderRadius.circular(8),
                                   tooltipPadding: const EdgeInsets.all(8),
                                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
                                     String year = yearData.keys.elementAt(group.x.toInt());
@@ -643,7 +643,7 @@ Widget buildScholarshipTypesCard(Map<String, int> scholarshipTypes) {
                         barTouchData: BarTouchData(
                           enabled: true,
                           touchTooltipData: BarTouchTooltipData(
-                            tooltipRoundedRadius: 8,
+                            tooltipBorderRadius: BorderRadius.circular(8),
                             tooltipPadding: const EdgeInsets.all(8),
                             getTooltipItem: (group, groupIndex, rod, rodIndex) {
                               final type = filteredEntries[group.x.toInt()].key;
@@ -1562,7 +1562,7 @@ Widget buildUserGrowthCard(
                       lineTouchData: LineTouchData(
                         enabled: true,
                         touchTooltipData: LineTouchTooltipData(
-                          tooltipRoundedRadius: 8,
+                          tooltipBorderRadius: BorderRadius.circular(8),
                           tooltipPadding: const EdgeInsets.all(12),
                           tooltipBorder: BorderSide(color: Colors.grey[300]!, width: 1.5),
                           getTooltipItems: (touchedSpots) {

@@ -360,11 +360,9 @@ class LogoutDialogContentState extends State<LogoutDialogContent> {
       // Sign out from Google if not on Windows
       try {
         if (!Platform.isWindows) {
-          final GoogleSignIn googleSignIn = GoogleSignIn();
-          if (await googleSignIn.isSignedIn()) {
-            await googleSignIn.signOut();
-            print('✅ Google sign-out successful');
-          }
+          final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+          await googleSignIn.signOut();
+          print('Google sign-out successful');
         } else {
           print('ℹ️ Skipping Google sign-out on Windows');
         }
@@ -418,3 +416,8 @@ Future<void> showLogoutDialog(BuildContext context) async {
     },
   );
 }
+
+
+
+
+
