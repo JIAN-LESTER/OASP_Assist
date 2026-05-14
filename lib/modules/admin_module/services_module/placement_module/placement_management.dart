@@ -35,6 +35,7 @@ class _PlacementManagementPageState extends State<PlacementManagementPage>
   int itemsPerPage = 10;
 
   bool isLoading = true;
+  bool _isCleaningDuplicates = false;
   final StatDataManagement statData = StatDataManagement();
   PlacementData? pl;
 
@@ -77,12 +78,57 @@ class _PlacementManagementPageState extends State<PlacementManagementPage>
         .orderBy('createdAt', descending: true)
         .snapshots()
         .listen((snapshot) {
+      _cleanupDuplicatePlacements(snapshot.docs);
       if (mounted) {
         setState(() {
           allPlacements = snapshot.docs;
         });
       }
     });
+  }
+
+  String _placementDuplicateKey(Map<String, dynamic> data) {
+    final company = (data['partnerCompany'] ?? '').toString().trim().toLowerCase();
+    final positions = (data['positions'] as List<dynamic>? ?? const [])
+        .map((e) => e.toString().trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toList()
+      ..sort();
+    return '$company|${positions.join(",")}';
+  }
+
+  Future<void> _cleanupDuplicatePlacements(List<DocumentSnapshot> docs) async {
+    if (_isCleaningDuplicates) {
+      return;
+    }
+
+    final duplicates = <DocumentReference>[];
+    final seenKeys = <String>{};
+
+    for (final doc in docs) {
+      final key = _placementDuplicateKey(doc.data() as Map<String, dynamic>);
+      if (key == '|') {
+        continue;
+      }
+      if (!seenKeys.add(key)) {
+        duplicates.add(doc.reference);
+      }
+    }
+
+    if (duplicates.isEmpty) {
+      return;
+    }
+
+    _isCleaningDuplicates = true;
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      for (final ref in duplicates) {
+        batch.delete(ref);
+      }
+      await batch.commit();
+    } finally {
+      _isCleaningDuplicates = false;
+    }
   }
 
   @override
@@ -626,7 +672,7 @@ List<DocumentSnapshot> _getFilteredPlacements(
   String selectedCompany,
   String searchQuery,
 ) {
-  return docs.where((doc) {
+  final filtered = docs.where((doc) {
     final data = doc.data() as Map<String, dynamic>;
     final company = (data['partnerCompany'] ?? '').toString().toLowerCase().trim();
     final List<String> positionsList =
@@ -648,6 +694,28 @@ List<DocumentSnapshot> _getFilteredPlacements(
 
     return matchesCompany && matchesSearch;
   }).toList();
+
+  final seenKeys = <String>{};
+  final deduplicated = <DocumentSnapshot>[];
+  for (final doc in filtered) {
+    final data = doc.data() as Map<String, dynamic>;
+    final company = (data['partnerCompany'] ?? '').toString().trim().toLowerCase();
+    final positions = (data['positions'] as List<dynamic>? ?? const [])
+        .map((e) => e.toString().trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toList()
+      ..sort();
+    final dedupeKey = '$company|${positions.join(",")}';
+
+    if (dedupeKey == '|' || seenKeys.contains(dedupeKey)) {
+      continue;
+    }
+
+    seenKeys.add(dedupeKey);
+    deduplicated.add(doc);
+  }
+
+  return deduplicated;
 }
 // Part 2 - Widget builders and components
 
@@ -819,21 +887,21 @@ Widget _buildHeader(
             child: isMobile
                 ? Column(
                     children: [
-                      buildStatCard(
+                      buildCompactStatCard(
                         'Total Companies',
                         '${pl?.totalCompanies ?? 0}',
                         Colors.blue,
                         Icons.message,
                       ),
                       const SizedBox(height: 12),
-                      buildStatCard(
+                      buildCompactStatCard(
                         'Companies Looking for Vacancy',
                         '${pl?.vacantCompanies ?? 0}',
                         Colors.green,
                         Icons.check_circle,
                       ),
                       const SizedBox(height: 12),
-                      buildStatCard(
+                      buildCompactStatCard(
                         'Approaching Deadline',
                         pl?.approachingDeadline ?? 'Unknown',
                         Colors.red,
@@ -844,7 +912,7 @@ Widget _buildHeader(
                 : Row(
                     children: [
                       Expanded(
-                        child: buildStatCard(
+                        child: buildCompactStatCard(
                           'Total Companies',
                           '${pl?.totalCompanies ?? 0}',
                           Colors.blue,
@@ -853,7 +921,7 @@ Widget _buildHeader(
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: buildStatCard(
+                        child: buildCompactStatCard(
                           'Companies Looking for Vacancy',
                           '${pl?.vacantCompanies ?? 0}',
                           Colors.green,
@@ -862,7 +930,7 @@ Widget _buildHeader(
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: buildStatCard(
+                        child: buildCompactStatCard(
                           'Approaching Deadline',
                           pl?.approachingDeadline ?? 'Unknown',
                           Colors.red,
@@ -1353,3 +1421,5 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
     );
   }
 }
+
+

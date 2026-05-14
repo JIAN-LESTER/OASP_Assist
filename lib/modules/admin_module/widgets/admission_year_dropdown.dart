@@ -21,17 +21,23 @@ class _AcademicYearDropdownState extends State<AcademicYearDropdown> {
   String selectedValue = 'All Year';
 
   List<String> get yearOptions {
-    final years = <String>{};
-    
+    final yearsByNormalized = <String, String>{};
+
     for (var doc in widget.allAdmissions) {
       final data = doc.data() as Map<String, dynamic>;
-      final year = data['academicYear']?.toString();
-      if (year != null && year.isNotEmpty && year != '-') {
-        years.add(year);
+      final year = data['academicYear']?.toString().trim();
+      final normalizedYear = year?.toLowerCase();
+      if (year != null &&
+          year.isNotEmpty &&
+          year != '-' &&
+          normalizedYear != null &&
+          normalizedYear.isNotEmpty) {
+        yearsByNormalized.putIfAbsent(normalizedYear, () => year);
       }
     }
-    
-    final sortedYears = years.toList()..sort((a, b) => b.compareTo(a));
+
+    final sortedYears =
+        yearsByNormalized.values.toList()..sort((a, b) => b.compareTo(a));
     return ['All Year', ...sortedYears];
   }
 

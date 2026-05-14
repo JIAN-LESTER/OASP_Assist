@@ -31,6 +31,7 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage>
   int itemsPerPage = 10;
 
   bool isLoading = true;
+  bool _isCleaningDuplicates = false;
   final StatDataManagement statData = StatDataManagement();
 
   AdmissionData? ad;
@@ -76,6 +77,7 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage>
         .snapshots()
         .listen(
           (snapshot) {
+            _cleanupDuplicateAdmissions(snapshot.docs);
             if (mounted) {
               setState(() {
                 allAdmissions = snapshot.docs;
@@ -92,6 +94,48 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage>
             }
           },
         );
+  }
+
+  String _admissionDuplicateKey(Map<String, dynamic> data) {
+    final title = (data['title'] ?? '').toString().trim().toLowerCase();
+    final academicYear = _formatAcademicYear(data['academicYear'])
+        .trim()
+        .toLowerCase();
+    return '$title|$academicYear';
+  }
+
+  Future<void> _cleanupDuplicateAdmissions(List<DocumentSnapshot> docs) async {
+    if (_isCleaningDuplicates) {
+      return;
+    }
+
+    final duplicates = <DocumentReference>[];
+    final seenKeys = <String>{};
+
+    for (final doc in docs) {
+      final key = _admissionDuplicateKey(doc.data() as Map<String, dynamic>);
+      if (key == '|') {
+        continue;
+      }
+      if (!seenKeys.add(key)) {
+        duplicates.add(doc.reference);
+      }
+    }
+
+    if (duplicates.isEmpty) {
+      return;
+    }
+
+    _isCleaningDuplicates = true;
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      for (final ref in duplicates) {
+        batch.delete(ref);
+      }
+      await batch.commit();
+    } finally {
+      _isCleaningDuplicates = false;
+    }
   }
 
   @override
@@ -654,7 +698,7 @@ List<DocumentSnapshot> _getFilteredAdmissions(
   String selectedYear,
   String searchQuery,
 ) {
-  return docs.where((doc) {
+  final filtered = docs.where((doc) {
     final data = doc.data() as Map<String, dynamic>;
     final title = (data['title'] ?? '').toString().toLowerCase().trim();
     final academicYearData = data['academicYear'];
@@ -675,6 +719,26 @@ List<DocumentSnapshot> _getFilteredAdmissions(
 
     return matchesYear && matchesSearch;
   }).toList();
+
+  final seenKeys = <String>{};
+  final deduplicated = <DocumentSnapshot>[];
+  for (final doc in filtered) {
+    final data = doc.data() as Map<String, dynamic>;
+    final title = (data['title'] ?? '').toString().trim().toLowerCase();
+    final academicYear = _formatAcademicYear(data['academicYear'])
+        .trim()
+        .toLowerCase();
+    final dedupeKey = '$title|$academicYear';
+
+    if (dedupeKey == '|' || seenKeys.contains(dedupeKey)) {
+      continue;
+    }
+
+    seenKeys.add(dedupeKey);
+    deduplicated.add(doc);
+  }
+
+  return deduplicated;
 }
 
 Widget _buildAdmissionList({
@@ -1484,3 +1548,5 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
     );
   }
 }
+
+

@@ -23,18 +23,23 @@ class _PlacementCompanyDropdownState
   String selectedValue = 'All Companies';
 
   List<String> get companyOptions {
-    final companys = <String>{};
+    final companiesByNormalized = <String, String>{};
 
     for (var doc in widget.allPlacements) {
       final data = doc.data() as Map<String, dynamic>;
-      final company = data['partnerCompany']?.toString();
-      if (company != null && company.isNotEmpty && company != '-') {
-        companys.add(company);
+      final company = data['partnerCompany']?.toString().trim();
+      final normalizedCompany = company?.toLowerCase();
+      if (company != null &&
+          company.isNotEmpty &&
+          company != '-' &&
+          normalizedCompany != null &&
+          normalizedCompany.isNotEmpty) {
+        companiesByNormalized.putIfAbsent(normalizedCompany, () => company);
       }
     }
 
-    final sortedcompanys = companys.toList()..sort();
-    return ['All Companies', ...sortedcompanys];
+    final sortedCompanies = companiesByNormalized.values.toList()..sort();
+    return ['All Companies', ...sortedCompanies];
   }
 
   @override

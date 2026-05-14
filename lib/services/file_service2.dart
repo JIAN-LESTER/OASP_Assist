@@ -37,12 +37,144 @@ class FileService {
     return input.replaceAll('/', '-');
   }
 
+  String _normalizedText(String? value) {
+    return (value ?? '').trim().toLowerCase();
+  }
+
+  String _admissionDuplicateKey(String title, Map<String, int>? academicYear) {
+    final start = academicYear?['start'];
+    final end = academicYear?['end'];
+    final yearText = start == null
+        ? ''
+        : end == null
+            ? '$start'
+            : '$start-$end';
+    return '${_normalizedText(title)}|${_normalizedText(yearText)}';
+  }
+
+  String _scholarshipDuplicateKey(String name, String provider) {
+    return '${_normalizedText(name)}|${_normalizedText(provider)}';
+  }
+
+  String _placementDuplicateKey(String company, List<String> positions) {
+    final normalizedPositions = positions
+        .map(_normalizedText)
+        .where((value) => value.isNotEmpty)
+        .toList()
+      ..sort();
+    return '${_normalizedText(company)}|${normalizedPositions.join(",")}';
+  }
+
+  Future<void> _ensureNoAdmissionDuplicate(
+    Admissions admission,
+    String currentId,
+  ) async {
+    final duplicateKey =
+        _admissionDuplicateKey(admission.title, admission.academicYear);
+    if (duplicateKey == '|') {
+      return;
+    }
+
+    final snapshot = await firestore.collection('admissions').get();
+    for (final doc in snapshot.docs) {
+      if (doc.id == currentId) {
+        continue;
+      }
+      final data = doc.data();
+      final existingKey = _admissionDuplicateKey(
+        (data['title'] ?? '').toString(),
+        (data['academicYear'] as Map?)?.cast<String, int>(),
+      );
+      if (existingKey == duplicateKey) {
+        throw Exception('Duplicate admission already exists');
+      }
+    }
+  }
+
+  Future<void> _ensureNoScholarshipDuplicates(
+    List<Scholarship> scholarships,
+  ) async {
+    final existing = await firestore.collection('scholarships').get();
+    final existingById = {
+      for (final doc in existing.docs) doc.id: doc.data(),
+    };
+    final batchKeys = <String>{};
+
+    for (final scholarship in scholarships) {
+      final currentId = sanitizeId(scholarship.scholarshipID);
+      final duplicateKey = _scholarshipDuplicateKey(
+        scholarship.name,
+        scholarship.scholarshipProvider,
+      );
+      if (duplicateKey == '|') {
+        continue;
+      }
+
+      if (!batchKeys.add(duplicateKey)) {
+        throw Exception('Duplicate scholarship already exists');
+      }
+
+      for (final entry in existingById.entries) {
+        if (entry.key == currentId) {
+          continue;
+        }
+        final data = entry.value;
+        final existingKey = _scholarshipDuplicateKey(
+          (data['name'] ?? '').toString(),
+          (data['scholarshipProvider'] ?? '').toString(),
+        );
+        if (existingKey == duplicateKey) {
+          throw Exception('Duplicate scholarship already exists');
+        }
+      }
+    }
+  }
+
+  Future<void> _ensureNoPlacementDuplicates(List<Placement> placements) async {
+    final existing = await firestore.collection('placements').get();
+    final existingById = {
+      for (final doc in existing.docs) doc.id: doc.data(),
+    };
+    final batchKeys = <String>{};
+
+    for (final placement in placements) {
+      final currentId = sanitizeId(placement.placementID);
+      final duplicateKey = _placementDuplicateKey(
+        placement.partnerCompany,
+        placement.positions,
+      );
+      if (duplicateKey == '|') {
+        continue;
+      }
+
+      if (!batchKeys.add(duplicateKey)) {
+        throw Exception('Duplicate placement already exists');
+      }
+
+      for (final entry in existingById.entries) {
+        if (entry.key == currentId) {
+          continue;
+        }
+        final data = entry.value;
+        final existingKey = _placementDuplicateKey(
+          (data['partnerCompany'] ?? '').toString(),
+          (data['positions'] as List<dynamic>? ?? const [])
+              .map((item) => item.toString())
+              .toList(),
+        );
+        if (existingKey == duplicateKey) {
+          throw Exception('Duplicate placement already exists');
+        }
+      }
+    }
+  }
+
   /// Supported file extensions
   static const List<String> supportedExtensions = ['pdf', 'txt', 'docx', 'doc'];
 
   /// Pick and read a file from the device
   Future<String?> pickAndReadFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: supportedExtensions,
     );
@@ -446,6 +578,7 @@ Future<void> updateInformationBankContent({
 Future<void> saveToAdmission(Admissions ad, {String? sourceDocumentId}) async {
   try {
     final sanitizedId = sanitizeId(ad.id);
+    await _ensureNoAdmissionDuplicate(ad, sanitizedId);
 
     final Map<String, dynamic> admissionData = {
       'id': sanitizedId,
@@ -482,6 +615,7 @@ Future<void> saveToAdmission(Admissions ad, {String? sourceDocumentId}) async {
 
 Future<void> saveMultipleScholarships(List<Scholarship> scholarships, {String? sourceDocumentId}) async {
   try {
+    await _ensureNoScholarshipDuplicates(scholarships);
     WriteBatch batch = firestore.batch();
 
     for (Scholarship scholarship in scholarships) {
@@ -554,6 +688,7 @@ Future<void> saveMultipleScholarships(List<Scholarship> scholarships, {String? s
 
 Future<void> saveMultiplePlacements(List<Placement> placements, {String? sourceDocumentId}) async {
   try {
+    await _ensureNoPlacementDuplicates(placements);
     WriteBatch batch = firestore.batch();
 
     for (Placement placement in placements) {

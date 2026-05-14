@@ -36,6 +36,7 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage>
   int itemsPerPage = 10;
 
   bool isLoading = true;
+  bool _isCleaningDuplicates = false;
   final StatDataManagement statData = StatDataManagement();
   ScholarshipData? sc;
 
@@ -78,12 +79,56 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage>
         .orderBy('createdAt', descending: true)
         .snapshots()
         .listen((snapshot) {
+      _cleanupDuplicateScholarships(snapshot.docs);
       if (mounted) {
         setState(() {
           allScholarships = snapshot.docs;
         });
       }
     });
+  }
+
+  String _scholarshipDuplicateKey(Map<String, dynamic> data) {
+    final scholarshipName = (data['name'] ?? '').toString().trim().toLowerCase();
+    final scholarshipProvider =
+        (data['scholarshipProvider'] ?? '').toString().trim().toLowerCase();
+    return '$scholarshipName|$scholarshipProvider';
+  }
+
+  Future<void> _cleanupDuplicateScholarships(
+    List<DocumentSnapshot> docs,
+  ) async {
+    if (_isCleaningDuplicates) {
+      return;
+    }
+
+    final duplicates = <DocumentReference>[];
+    final seenKeys = <String>{};
+
+    for (final doc in docs) {
+      final key = _scholarshipDuplicateKey(doc.data() as Map<String, dynamic>);
+      if (key == '|') {
+        continue;
+      }
+      if (!seenKeys.add(key)) {
+        duplicates.add(doc.reference);
+      }
+    }
+
+    if (duplicates.isEmpty) {
+      return;
+    }
+
+    _isCleaningDuplicates = true;
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      for (final ref in duplicates) {
+        batch.delete(ref);
+      }
+      await batch.commit();
+    } finally {
+      _isCleaningDuplicates = false;
+    }
   }
 
   @override
@@ -625,7 +670,7 @@ List<DocumentSnapshot> _getFilteredScholarships(
   String selectedProvider,
   String searchQuery,
 ) {
-  return docs.where((doc) {
+  final filtered = docs.where((doc) {
     final data = doc.data() as Map<String, dynamic>;
     final scholarshipName =
         (data['name'] ?? '').toString().toLowerCase().trim();
@@ -646,6 +691,25 @@ List<DocumentSnapshot> _getFilteredScholarships(
 
     return matchesProvider && matchesSearch;
   }).toList();
+
+  final seenKeys = <String>{};
+  final deduplicated = <DocumentSnapshot>[];
+  for (final doc in filtered) {
+    final data = doc.data() as Map<String, dynamic>;
+    final scholarshipName = (data['name'] ?? '').toString().trim().toLowerCase();
+    final scholarshipProvider =
+        (data['scholarshipProvider'] ?? '').toString().trim().toLowerCase();
+    final dedupeKey = '$scholarshipName|$scholarshipProvider';
+
+    if (dedupeKey == '|' || seenKeys.contains(dedupeKey)) {
+      continue;
+    }
+
+    seenKeys.add(dedupeKey);
+    deduplicated.add(doc);
+  }
+
+  return deduplicated;
 }
 
 Widget _buildScholarshipList({
@@ -823,7 +887,7 @@ Widget _buildHeader(
             child: Row(
               children: [
                 Expanded(
-                  child: buildStatCard(
+                  child: buildCompactStatCard(
                     'Total Scholarships',
                     '${sc?.totalScholarship}',
                     Colors.blue,
@@ -832,7 +896,7 @@ Widget _buildHeader(
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: buildStatCard(
+                  child: buildCompactStatCard(
                     'New Scholarship',
                     sc?.newScholarship ?? "Unknown",
                     Colors.green,
@@ -841,7 +905,7 @@ Widget _buildHeader(
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: buildStatCard(
+                  child: buildCompactStatCard(
                     'Approaching Deadline',
                     sc?.approachingDeadline ?? "Unknown",
                     const Color.fromARGB(255, 245, 118, 0),
@@ -1474,3 +1538,5 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
     );
   }
 }
+
+

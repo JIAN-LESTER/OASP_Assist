@@ -23,17 +23,22 @@ class _ScholarshipProviderDropdownState
   String selectedValue = 'All Providers';
 
   List<String> get providerOptions {
-    final providers = <String>{};
+    final providersByNormalized = <String, String>{};
 
     for (var doc in widget.allScholarships) {
       final data = doc.data() as Map<String, dynamic>;
-      final provider = data['scholarshipProvider']?.toString();
-      if (provider != null && provider.isNotEmpty && provider != '-') {
-        providers.add(provider);
+      final provider = data['scholarshipProvider']?.toString().trim();
+      final normalizedProvider = provider?.toLowerCase();
+      if (provider != null &&
+          provider.isNotEmpty &&
+          provider != '-' &&
+          normalizedProvider != null &&
+          normalizedProvider.isNotEmpty) {
+        providersByNormalized.putIfAbsent(normalizedProvider, () => provider);
       }
     }
 
-    final sortedProviders = providers.toList()..sort();
+    final sortedProviders = providersByNormalized.values.toList()..sort();
     return ['All Providers', ...sortedProviders];
   }
 

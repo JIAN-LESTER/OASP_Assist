@@ -108,7 +108,7 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
 
   Future<void> _pickFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'txt', 'docx', 'doc'],
         withData: true,
@@ -626,7 +626,15 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
       Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
-        SnackbarUtil.showError(context, 'Error: $e');
+        final message = e.toString();
+        if (message.contains('Duplicate scholarship already exists')) {
+          SnackbarUtil.showWarning(
+            context,
+            'Duplicate scholarship already exists',
+          );
+        } else {
+          SnackbarUtil.showError(context, 'Error: $e');
+        }
       }
     } finally {
       if (mounted) {
