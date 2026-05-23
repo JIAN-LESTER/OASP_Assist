@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 import 'package:capstone_project/modal_pages/programs.modal.dart';
-import 'package:capstone_project/modules/admin_module/program_management.dart';
-import 'package:capstone_project/modules/admin_module/user_management_module/user_info.dart';
+import 'package:capstone_project/modules/admin/program_management.dart';
+import 'package:capstone_project/modules/admin/user_management/user_info.dart';
 
 void showEditAnnouncementModal(
   BuildContext context,

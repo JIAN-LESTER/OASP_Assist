@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:capstone_project/modules/admin_module/services_module/placement_module/pl_info.dart';
+import 'package:capstone_project/modules/admin/services/placement/pl_info.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 
 void showEditPLModal(

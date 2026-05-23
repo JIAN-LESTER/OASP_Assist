@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flutter/material.dart';
-import 'package:capstone_project/modules/admin_module/services_module/scholarship_module/scholarship_info.dart';
+import 'package:capstone_project/modules/admin/services/scholarship/scholarship_info.dart';
 
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 
