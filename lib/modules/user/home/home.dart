@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 class HomeDashboard extends StatefulWidget {
@@ -204,7 +203,6 @@ class _HomeDashboardState extends State<HomeDashboard>
   bool _isMobile(BuildContext context) =>
       MediaQuery.of(context).size.width < 600;
 
-
   bool _isDesktop(BuildContext context) =>
       MediaQuery.of(context).size.width >= 1980;
   double _getMaxWidth(BuildContext context) {
@@ -215,7 +213,7 @@ class _HomeDashboardState extends State<HomeDashboard>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFEDF0F7),
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: SafeArea(
@@ -267,7 +265,11 @@ class _HomeDashboardState extends State<HomeDashboard>
       margin: EdgeInsets.all(isMobile ? 16 : 20),
       padding: EdgeInsets.all(isMobile ? 20 : 24),
       decoration: BoxDecoration(
-        color: const Color(0xFF2E7D32),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1B5E20), Color(0xFF2E7D32), Color(0xFF388E3C)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
       ),
       child: Column(
@@ -310,12 +312,16 @@ class _HomeDashboardState extends State<HomeDashboard>
       margin: EdgeInsets.all(isMobile ? 16 : 20),
       padding: EdgeInsets.all(isMobile ? 20 : 24),
       decoration: BoxDecoration(
-        color: const Color(0xFF2E7D32),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1B5E20), Color(0xFF2E7D32), Color(0xFF388E3C)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2E7D32).withOpacity(0.3),
-            blurRadius: 20,
+            color: const Color(0xFF1B5E20).withOpacity(0.40),
+            blurRadius: 24,
             offset: const Offset(0, 10),
           ),
         ],
@@ -325,7 +331,19 @@ class _HomeDashboardState extends State<HomeDashboard>
         children: [
           Row(
             children: [
-              Icon(Icons.school, color: Colors.white, size: isMobile ? 28 : 32),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.25)),
+                ),
+                child: Icon(
+                  Icons.school,
+                  color: Colors.white,
+                  size: isMobile ? 24 : 28,
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -334,6 +352,7 @@ class _HomeDashboardState extends State<HomeDashboard>
                     color: Colors.white,
                     fontSize: isMobile ? 20 : (isDesktop ? 28 : 24),
                     fontWeight: FontWeight.bold,
+                    letterSpacing: -0.3,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -344,34 +363,52 @@ class _HomeDashboardState extends State<HomeDashboard>
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.30)),
                 ),
-                child: Text(
-                  'Online',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: isMobile ? 11 : 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF69F0AE),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Online',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isMobile ? 11 : 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          SizedBox(height: isMobile ? 12 : 16),
+          SizedBox(height: isMobile ? 14 : 18),
+          Divider(color: Colors.white.withOpacity(0.20), height: 1),
+          SizedBox(height: isMobile ? 14 : 18),
           Text(
-            'Welcome, $name!',
+            'Welcome back, $name!',
             style: TextStyle(
               color: Colors.white,
-              fontSize: isMobile ? 16 : (isDesktop ? 20 : 18),
-              fontWeight: FontWeight.w600,
+              fontSize: isMobile ? 17 : (isDesktop ? 21 : 19),
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
             ),
           ),
-          SizedBox(height: isMobile ? 6 : 8),
+          SizedBox(height: isMobile ? 4 : 6),
           Text(
-            'Access all your academic services in one place',
+            'Access all your academic services in one place.',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withOpacity(0.70),
               fontSize: isMobile ? 13 : (isDesktop ? 15 : 14),
               height: 1.4,
             ),
@@ -402,11 +439,17 @@ class _HomeDashboardState extends State<HomeDashboard>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF2E7D32).withOpacity(0.15),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
+              color: const Color(0xFF2E7D32).withOpacity(0.10),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -418,12 +461,23 @@ class _HomeDashboardState extends State<HomeDashboard>
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32).withOpacity(0.1),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2E7D32).withOpacity(0.30),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
                   child: Icon(
                     Icons.smart_toy,
-                    color: const Color(0xFF2E7D32),
+                    color: Colors.white,
                     size: isMobile ? 24 : 28,
                   ),
                 ),
@@ -696,12 +750,14 @@ class _HomeDashboardState extends State<HomeDashboard>
     );
   }
 
-String cleanStep(String step) {
-  return step
-      .replaceAll(RegExp(r'^\s*[\(\[\d]+\s*[\.\)\]]\s*'), '') // removes "1.", "(1)", "[1]", etc.
-      .trim();
-}
-
+  String cleanStep(String step) {
+    return step
+        .replaceAll(
+          RegExp(r'^\s*[\(\[\d]+\s*[\.\)\]]\s*'),
+          '',
+        ) // removes "1.", "(1)", "[1]", etc.
+        .trim();
+  }
 
   Widget _buildAdmissionCard() {
     final isMobile = _isMobile(context);
@@ -740,7 +796,7 @@ String cleanStep(String step) {
           borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF43A047).withOpacity(0.15),
+              color: const Color(0xFF4CAF50).withOpacity(0.15),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -754,12 +810,23 @@ String cleanStep(String step) {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF43A047).withOpacity(0.1),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF43A047).withOpacity(0.30),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Icon(
                     Icons.school,
-                    color: const Color(0xFF43A047),
+                    color: Colors.white,
                     size: isMobile ? 20 : 24,
                   ),
                 ),
@@ -798,13 +865,13 @@ String cleanStep(String step) {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                     child: Text(
-  cleanStep(step),
-  style: TextStyle(
-    fontSize: isMobile ? 12 : 13,
-    color: Colors.black54,
-  ),
-),
+                      child: Text(
+                        cleanStep(step),
+                        style: TextStyle(
+                          fontSize: isMobile ? 12 : 13,
+                          color: Colors.black54,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -877,12 +944,23 @@ String cleanStep(String step) {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4CAF50).withOpacity(0.1),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF388E3C), Color(0xFF4CAF50)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4CAF50).withOpacity(0.30),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Icon(
                     Icons.card_giftcard,
-                    color: const Color(0xFF4CAF50),
+                    color: Colors.white,
                     size: isMobile ? 20 : 24,
                   ),
                 ),
@@ -989,7 +1067,7 @@ String cleanStep(String step) {
           borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF66BB6A).withOpacity(0.15),
+              color: const Color(0xFF388E3C).withOpacity(0.15),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -1003,12 +1081,23 @@ String cleanStep(String step) {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF66BB6A).withOpacity(0.1),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF43A047), Color(0xFF66BB6A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF66BB6A).withOpacity(0.30),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Icon(
                     Icons.work,
-                    color: const Color(0xFF66BB6A),
+                    color: Colors.white,
                     size: isMobile ? 20 : 24,
                   ),
                 ),
@@ -1211,12 +1300,23 @@ String cleanStep(String step) {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF388E3C).withOpacity(0.1),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1B5E20), Color(0xFF388E3C)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF388E3C).withOpacity(0.30),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Icon(
                     Icons.campaign,
-                    color: const Color(0xFF388E3C),
+                    color: Colors.white,
                     size: isMobile ? 24 : 28,
                   ),
                 ),

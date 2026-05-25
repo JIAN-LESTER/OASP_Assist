@@ -198,23 +198,20 @@ class _PlacementInfoState extends State<PlacementInfo>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF0F4F8),
       body: SafeArea(
         child: Column(
           children: [
             // Enhanced Header
             Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFFFFFFFF), Color(0xFFF8FAFC)],
-                ),
+              decoration: BoxDecoration(
+                color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Color(0x0D000000),
-                    offset: Offset(0, 1),
-                    blurRadius: 3,
+                    color: Colors.black.withOpacity(0.06),
+                    spreadRadius: 0,
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
@@ -415,8 +412,8 @@ class _PlacementInfoState extends State<PlacementInfo>
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0F172A),
-                                borderRadius: BorderRadius.circular(10),
+                                color: const Color(0xFF2E7D32),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Icon(
                                 Icons.tune,
@@ -436,9 +433,10 @@ class _PlacementInfoState extends State<PlacementInfo>
                       decoration: BoxDecoration(
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withOpacity(0.06),
+                            spreadRadius: 0,
+                            blurRadius: 6,
                             offset: const Offset(0, 2),
-                            blurRadius: 8,
                           ),
                         ],
                       ),
@@ -474,7 +472,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                           filled: true,
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: const EdgeInsets.symmetric(
@@ -580,19 +578,26 @@ class _PlacementInfoState extends State<PlacementInfo>
                                 margin: const EdgeInsets.only(bottom: 16),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border(
+                                    left: BorderSide(
+                                      color: _getStatusColor(daysAgo),
+                                      width: 4,
+                                    ),
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      offset: const Offset(0, 2),
-                                      blurRadius: 8,
+                                      color: Colors.black.withOpacity(0.07),
+                                      spreadRadius: 0,
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
                                     ),
                                   ],
                                 ),
                                 child: Material(
                                   color: Colors.transparent,
                                   child: InkWell(
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(12),
                                     onTap:
                                         () => _showPlacementDetails(placement),
                                     child: Padding(
@@ -605,9 +610,9 @@ class _PlacementInfoState extends State<PlacementInfo>
                                             decoration: BoxDecoration(
                                               color: _getStatusColor(
                                                 daysAgo,
-                                              ).withOpacity(0.1),
+                                              ).withOpacity(0.12),
                                               borderRadius:
-                                                  BorderRadius.circular(10),
+                                                  BorderRadius.circular(8),
                                             ),
                                             child: Icon(
                                               _getStatusIcon(daysAgo),
@@ -757,21 +762,35 @@ class _PlacementInfoState extends State<PlacementInfo>
               constraints: const BoxConstraints(maxWidth: 500),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
+                    color: Colors.black.withOpacity(0.12),
+                    spreadRadius: 0,
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
+
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+
                 children: [
+                  Container(
+                    height: 4,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF2E7D32),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                      ),
+                    ),
+                  ),
                   // Header
                   Padding(
                     padding: const EdgeInsets.all(20),
+
                     child: Row(
                       children: [
                         Expanded(
@@ -811,8 +830,8 @@ class _PlacementInfoState extends State<PlacementInfo>
                             width: double.infinity,
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(16),
+                              color: const Color(0xFFF0F4F8),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -822,7 +841,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.grey[500],
+                                    color: const Color(0xFF2E7D32),
                                     letterSpacing: 0.5,
                                   ),
                                 ),
@@ -890,8 +909,8 @@ class _PlacementInfoState extends State<PlacementInfo>
                               width: double.infinity,
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(16),
+                                color: const Color(0xFFF0F4F8),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -901,7 +920,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.grey[500],
+                                      color: const Color(0xFF2E7D32),
                                       letterSpacing: 0.5,
                                     ),
                                   ),
@@ -954,8 +973,8 @@ class _PlacementInfoState extends State<PlacementInfo>
                               width: double.infinity,
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(16),
+                                color: const Color(0xFFF0F4F8),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -965,7 +984,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.grey[500],
+                                      color: const Color(0xFF2E7D32),
                                       letterSpacing: 0.5,
                                     ),
                                   ),
@@ -1019,16 +1038,13 @@ class _PlacementInfoState extends State<PlacementInfo>
                             child: TextButton(
                               onPressed: () => Navigator.pop(context),
                               style: TextButton.styleFrom(
-                                foregroundColor: Colors.grey[700],
+                                foregroundColor: Colors.white,
+                                backgroundColor: const Color(0xFF2E7D32),
                                 padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
+                                  vertical: 14,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(
-                                    color: Colors.grey[300]!,
-                                    width: 1,
-                                  ),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
                               child: const Text(
