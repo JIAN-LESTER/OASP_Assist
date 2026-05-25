@@ -8,7 +8,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:capstone_project/icon_and_color.dart';
 
-
 import 'package:capstone_project/models/message_logs.dart';
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
@@ -359,7 +358,7 @@ Widget _buildHeader(
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
+                  backgroundColor: const Color(0xFF2E7D32),
                   padding: EdgeInsets.symmetric(
                     horizontal: isMobile ? 12 : 16,
                     vertical: isMobile ? 8 : 10,
@@ -435,7 +434,7 @@ Widget mainContent(
   VoidCallback onSearchChanged, // 🔹 new param instead of setState
 ) {
   return Scaffold(
-    backgroundColor: Colors.grey[100],
+    backgroundColor: const Color(0xFFF0F4F8),
     body: SingleChildScrollView(
       padding: EdgeInsets.all(padding),
       child: Column(
@@ -456,13 +455,13 @@ Widget mainContent(
             padding: EdgeInsets.all(padding),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
+                  color: Colors.black.withOpacity(0.07),
+                  spreadRadius: 0,
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -525,7 +524,7 @@ Widget _buildTableHeader() {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
           ),
           child: const Row(
@@ -537,7 +536,7 @@ Widget _buildTableHeader() {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -548,7 +547,7 @@ Widget _buildTableHeader() {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -559,7 +558,7 @@ Widget _buildTableHeader() {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -574,7 +573,7 @@ Widget _buildTableHeader() {
           horizontal: isTablet ? 10 : 12,
         ),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: const Color(0xFF2E7D32),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -587,7 +586,7 @@ Widget _buildTableHeader() {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -598,7 +597,7 @@ Widget _buildTableHeader() {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -609,7 +608,7 @@ Widget _buildTableHeader() {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -774,6 +773,7 @@ Widget _buildLogsList({
                       doc: doc,
                       msglogs: msglogs,
                       messages: messages,
+                      index: index,
                     );
                   },
                 ),
@@ -799,6 +799,7 @@ Widget _buildLogsRow({
   required DocumentSnapshot doc,
   required MessageLogs msglogs,
   required List<Map<String, dynamic>> messages,
+  required int index,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
   bool isMobile = screenWidth < 600;
@@ -806,15 +807,15 @@ Widget _buildLogsRow({
   return Container(
     padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: index.isEven ? Colors.white : const Color(0xFFF8FFFE),
       border: Border.all(color: Colors.grey[200]!),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(6),
       boxShadow: [
         BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
-          spreadRadius: 1,
-          blurRadius: 2,
-          offset: const Offset(0, 1),
+          color: Colors.black.withOpacity(0.07),
+          spreadRadius: 0,
+          blurRadius: 12,
+          offset: const Offset(0, 4),
         ),
       ],
     ),

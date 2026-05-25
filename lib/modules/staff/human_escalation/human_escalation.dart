@@ -283,23 +283,20 @@ class _HumanEscalationState extends State<HumanEscalation>
     final verticalPadding = isDesktop ? 24.0 : (isTablet ? 20.0 : 16.0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF0F4F8),
       body: SafeArea(
         child: Column(
           children: [
             // Enhanced Header with gradient
             Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFFFFFFFF), Color(0xFFF8FAFC)],
-                ),
+              decoration: BoxDecoration(
+                color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Color(0x0D000000),
-                    offset: Offset(0, 1),
-                    blurRadius: 3,
+                    color: Colors.black.withOpacity(0.07),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -326,7 +323,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                                   fontSize:
                                       isDesktop ? 26 : (isTablet ? 24 : 20),
                                   fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF0F172A),
+                                  color: Colors.black87,
                                 ),
                               ),
                               if (isTablet) ...[
@@ -418,7 +415,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                             child: Container(
                               padding: EdgeInsets.all(isTablet ? 12 : 10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0F172A),
+                                color: const Color(0xFF2E7D32),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(
@@ -439,9 +436,10 @@ class _HumanEscalationState extends State<HumanEscalation>
                       decoration: BoxDecoration(
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            offset: const Offset(0, 2),
-                            blurRadius: 8,
+                            color: Colors.black.withOpacity(0.07),
+                            spreadRadius: 0,
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -646,14 +644,17 @@ class _HumanEscalationState extends State<HumanEscalation>
                         margin: EdgeInsets.only(bottom: isTablet ? 10 : 8),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(
-                            isTablet ? 16 : 12,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey[200]!,
+                            width: 1,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              offset: const Offset(0, 2),
-                              blurRadius: 8,
+                              color: Colors.black.withOpacity(0.07),
+                              spreadRadius: 0,
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
@@ -707,7 +708,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                                           style: TextStyle(
                                             fontSize: isTablet ? 14 : 13,
                                             fontWeight: FontWeight.w600,
-                                            color: const Color(0xFF0F172A),
+                                            color: Colors.black87,
                                             height: 1.2,
                                           ),
                                           maxLines: 2,
@@ -866,7 +867,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                                     SizedBox(width: isTablet ? 12 : 8),
                                     Icon(
                                       Icons.arrow_forward_ios,
-                                      color: Colors.grey[400],
+                                      color: const Color(0xFF2E7D32),
                                       size: isTablet ? 16 : 14,
                                     ),
                                   ],
@@ -944,7 +945,7 @@ class _StatCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.all(isCompact ? 8 : 10),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : Colors.white,
+          color: isSelected ? color.withOpacity(0.1) : const Color(0xFFF8FFFE),
           borderRadius: BorderRadius.circular(isCompact ? 10 : 12),
           border: Border.all(
             color: isSelected ? color : Colors.grey[200]!,
@@ -952,9 +953,10 @@ class _StatCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              offset: const Offset(0, 2),
-              blurRadius: 4,
+              color: Colors.black.withOpacity(0.07),
+              spreadRadius: 0,
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -1044,7 +1046,7 @@ class _EmptyState extends StatelessWidget {
               child: Icon(
                 icon,
                 size: isCompact ? 40 : 48,
-                color: Colors.grey[400],
+                color: const Color(0xFF2E7D32),
               ),
             ),
             SizedBox(height: isCompact ? 16 : 24),

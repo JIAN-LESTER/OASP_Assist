@@ -14,6 +14,22 @@ import 'package:capstone_project/modules/admin/dashboard_and_reports/reports.dar
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 
+const _kNavy = Color(0xFF0F172A);
+const _kSlate = Color(0xFF1E293B);
+const _kCardBg = Color(0xFFFFFFFF);
+const _kPageBg = Color(0xFFEDF0F7);
+const _kAccent = Color(0xFF6366F1);
+const _kAccentLight = Color(0xFFEEF2FF);
+const _kGreen = Color(0xFF10B981);
+const _kGreenLight = Color(0xFFD1FAE5);
+const _kOrange = Color(0xFFF59E0B);
+const _kOrangeLight = Color(0xFFFEF3C7);
+const _kRed = Color(0xFFEF4444);
+const _kRedLight = Color(0xFFFEE2E2);
+const _kTextPrimary = Color(0xFF0F172A);
+const _kTextSecondary = Color(0xFF64748B);
+const _kBorder = Color(0xFFE2E8F0);
+
 class SkeletonBox extends StatefulWidget {
   final double? width;
   final double? height;
@@ -662,7 +678,7 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
     // Show skeleton during initial load
     if (showSkeleton || userName == null) {
       return Scaffold(
-        backgroundColor: Colors.grey[100],
+        backgroundColor: const Color(0xFFEDF0F7),
         body: _buildSkeletonDashboard(),
       );
     }
@@ -714,24 +730,42 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
           Positioned.fill(
             child: Container(
               color: Colors.black.withOpacity(0.3),
-              child: const Center(
-                child: Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text(
-                          'Loading data...',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 20,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF6366F1),
                         ),
-                      ],
-                    ),
+                        strokeWidth: 3,
+                      ),
+                      SizedBox(height: 14),
+                      Text(
+                        'Loading data...',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1042,7 +1076,7 @@ Widget dashboardContents(
   final totalUsers = quickStats?['totalUsers'] ?? ud?.totalUsers ?? 0;
 
   return Scaffold(
-    backgroundColor: Colors.grey[100],
+    backgroundColor: _kPageBg,
     body: LayoutBuilder(
       builder: (context, constraints) {
         final screenWidth = MediaQuery.of(context).size.width;
@@ -1339,42 +1373,21 @@ Widget dashboardContents(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF2E7D32).withOpacity(0.12),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                padding: EdgeInsets.all(isMobile ? 16 : 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(
-                      selectedTimeFrame,
-                      onTimeFrameChanged,
-                      onRefresh,
-                      isRefreshing,
-                      userName,
-                      customDateRange,
-                      onDateRangeChanged,
-                      inq,
-                      ud,
-                      ad,
-                    ),
-                    const SizedBox(height: 24),
-                    const Divider(height: 1),
-                    const SizedBox(height: 20),
-                    statCards(),
-                  ],
-                ),
+              _StaffDashboardHeaderCard(
+                selectedTimeFrame: selectedTimeFrame,
+                onTimeFrameChanged: onTimeFrameChanged,
+                isRefreshing: isRefreshing,
+                userName: userName,
+                customDateRange: customDateRange,
+                onDateRangeChanged: onDateRangeChanged,
+                inq: inq,
+                ud: ud,
+                ad: ad,
+                isMobile: isMobile,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 20),
+              statCards(),
+              const SizedBox(height: 20),
               cardsSection(),
             ],
           ),
@@ -1382,6 +1395,189 @@ Widget dashboardContents(
       },
     ),
   );
+}
+
+class _StaffDashboardHeaderCard extends StatelessWidget {
+  final String selectedTimeFrame;
+  final ValueChanged<String> onTimeFrameChanged;
+  final bool isRefreshing;
+  final String userName;
+  final DateTimeRange? customDateRange;
+  final ValueChanged<DateTimeRange?> onDateRangeChanged;
+  final InquiryReportsData? inq;
+  final UserDemographicsReportsData? ud;
+  final AdminDashboardData? ad;
+  final bool isMobile;
+
+  const _StaffDashboardHeaderCard({
+    required this.selectedTimeFrame,
+    required this.onTimeFrameChanged,
+    required this.isRefreshing,
+    required this.userName,
+    required this.customDateRange,
+    required this.onDateRangeChanged,
+    required this.inq,
+    required this.ud,
+    required this.ad,
+    required this.isMobile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hour = DateTime.now().hour;
+    final greeting =
+        hour < 12
+            ? 'Good morning'
+            : hour < 17
+            ? 'Good afternoon'
+            : 'Good evening';
+
+    final subtitle =
+        selectedTimeFrame == 'Custom' && customDateRange != null
+            ? 'Showing data from ${_formatDate(customDateRange!.start)} to ${_formatDate(customDateRange!.end)}'
+            : 'Overview of OASP Assist — $selectedTimeFrame';
+
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 18 : 24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_kNavy, _kSlate],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: _kNavy.withOpacity(0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          isMobile
+              ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _greetingBlock(greeting),
+                  const SizedBox(height: 16),
+                  _controlsRow(context),
+                ],
+              )
+              : Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [_greetingBlock(greeting), _controlsRow(context)],
+              ),
+          const SizedBox(height: 16),
+          Divider(color: Colors.white.withOpacity(0.12), height: 1),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 14,
+                color: Colors.white.withOpacity(0.45),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withOpacity(0.5),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _greetingBlock(String greeting) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$greeting,',
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.white.withOpacity(0.55),
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Row(
+          children: [
+            Text(
+              userName,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                color: _kAccent.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _kAccent.withOpacity(0.45), width: 1),
+              ),
+              child: const Text(
+                'Staff',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFFA5B4FC),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _controlsRow(BuildContext context) {
+    return Row(
+      children: [
+        CustomDropdownButton(
+          items: [
+            'All',
+            'Today',
+            'This Week',
+            'This Month',
+            'This Year',
+            'Custom',
+          ],
+          initialValue: selectedTimeFrame,
+          onChanged: onTimeFrameChanged,
+        ),
+        if (selectedTimeFrame == 'Custom') ...[
+          const SizedBox(width: 8),
+          DateRangeFilter(
+            selectedDateRange: customDateRange,
+            onDateRangeChanged: onDateRangeChanged,
+          ),
+        ],
+        const SizedBox(width: 8),
+        ExportButton(
+          pageType: 'dashboard',
+          timeFrame: selectedTimeFrame,
+          inq: inq,
+          ud: ud,
+          ad: ad,
+        ),
+      ],
+    );
+  }
 }
 
 void _showMessagesDialog(BuildContext context, String timeFrame) {
@@ -1508,136 +1704,6 @@ DateTime _getStartDateForDialog(String timeFrame) {
 String _formatTimestamp(Timestamp timestamp) {
   final date = timestamp.toDate();
   return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-}
-
-Widget _buildHeader(
-  String selectedTimeFrame,
-  ValueChanged<String> onTimeFrameChanged,
-  VoidCallback onRefresh,
-  bool isRefreshing,
-  String userName,
-  DateTimeRange? customDateRange,
-  ValueChanged<DateTimeRange?> onDateRangeChanged,
-  // ✅ ADD THESE PARAMETERS
-  InquiryReportsData? inq,
-  UserDemographicsReportsData? ud,
-  AdminDashboardData? ad,
-) {
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      double screenWidth = MediaQuery.of(context).size.width;
-      bool isMobile = screenWidth < 600;
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          isMobile
-              ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Welcome back, $userName!',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: CustomDropdownButton(
-                          items: [
-                            'All',
-                            'Today',
-                            'This Week',
-                            'This Month',
-                            'This Year',
-                            'Custom',
-                          ],
-                          initialValue: selectedTimeFrame,
-                          onChanged: onTimeFrameChanged,
-                        ),
-                      ),
-                      if (selectedTimeFrame == 'Custom') ...[
-                        const SizedBox(width: 8),
-                        DateRangeFilter(
-                          selectedDateRange: customDateRange,
-                          onDateRangeChanged: onDateRangeChanged,
-                        ),
-                      ],
-                      // ✅ ADD EXPORT BUTTON
-                      const SizedBox(width: 8),
-                      ExportButton(
-                        pageType: 'dashboard',
-                        timeFrame: selectedTimeFrame,
-                        userName: userName,
-                        inq: inq,
-                        ud: ud,
-                        ad: ad,
-                      ),
-                    ],
-                  ),
-                ],
-              )
-              : Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Welcome back, $userName!',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      CustomDropdownButton(
-                        items: [
-                          'All',
-                          'Today',
-                          'This Week',
-                          'This Month',
-                          'This Year',
-                          'Custom',
-                        ],
-                        initialValue: selectedTimeFrame,
-                        onChanged: onTimeFrameChanged,
-                      ),
-                      if (selectedTimeFrame == 'Custom') ...[
-                        const SizedBox(width: 12),
-                        DateRangeFilter(
-                          selectedDateRange: customDateRange,
-                          onDateRangeChanged: onDateRangeChanged,
-                        ),
-                      ],
-                      // ✅ ADD EXPORT BUTTON
-                      const SizedBox(width: 12),
-                      ExportButton(
-                        pageType: 'dashboard',
-                        timeFrame: selectedTimeFrame,
-                        userName: userName,
-                        inq: inq,
-                        ud: ud,
-                        ad: ad,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-          SizedBox(height: isMobile ? 12 : 8),
-          Text(
-            selectedTimeFrame == 'Custom' && customDateRange != null
-                ? "Here's an overview of student inquiries from ${_formatDate(customDateRange.start)} to ${_formatDate(customDateRange.end)}."
-                : "Here's an overview of recent student inquiries for $selectedTimeFrame.",
-            style: TextStyle(fontSize: isMobile ? 13 : 14, color: Colors.grey),
-          ),
-        ],
-      );
-    },
-  );
 }
 
 void _showEscalatedMessagesDialog(BuildContext context, String timeFrame) {

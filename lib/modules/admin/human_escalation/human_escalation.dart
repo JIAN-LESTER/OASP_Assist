@@ -20,7 +20,7 @@ class _HumanEscalationState extends State<HumanEscalation>
     with TickerProviderStateMixin {
   String _selectedFilter = 'all';
   String _selectedCategory = 'all';
-  
+
   final List<String> _categoryOptions = [
     'all',
     'General',
@@ -28,7 +28,7 @@ class _HumanEscalationState extends State<HumanEscalation>
     'Scholarship',
     'Placement',
   ];
-  
+
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   late AnimationController _refreshAnimationController;
@@ -166,18 +166,29 @@ class _HumanEscalationState extends State<HumanEscalation>
   String _formatDateTime(Timestamp? timestamp) {
     if (timestamp == null) return 'N/A';
     final date = timestamp.toDate();
-    
+
     // Month names
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
-    
+
     // Convert to 12-hour format
-    final hour = date.hour == 0 ? 12 : (date.hour > 12 ? date.hour - 12 : date.hour);
+    final hour =
+        date.hour == 0 ? 12 : (date.hour > 12 ? date.hour - 12 : date.hour);
     final period = date.hour >= 12 ? 'PM' : 'AM';
     final minute = date.minute.toString().padLeft(2, '0');
-    
+
     return '${months[date.month - 1]} ${date.day}, ${date.year} ${hour}:${minute} $period';
   }
 
@@ -194,7 +205,9 @@ class _HumanEscalationState extends State<HumanEscalation>
   }
 
   // ✅ Filter escalations by both status and category
-  List<QueryDocumentSnapshot> _filterEscalations(List<QueryDocumentSnapshot> docs) {
+  List<QueryDocumentSnapshot> _filterEscalations(
+    List<QueryDocumentSnapshot> docs,
+  ) {
     return docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
 
@@ -227,22 +240,19 @@ class _HumanEscalationState extends State<HumanEscalation>
     final verticalPadding = isDesktop ? 24.0 : (isTablet ? 20.0 : 16.0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF0F4F8),
       body: SafeArea(
         child: Column(
           children: [
             Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFFFFFFFF), Color(0xFFF8FAFC)],
-                ),
+              decoration: BoxDecoration(
+                color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Color(0x0D000000),
-                    offset: Offset(0, 1),
-                    blurRadius: 3,
+                    color: Colors.black.withOpacity(0.07),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
                   ),
                 ],
               ),
@@ -268,7 +278,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                                   fontSize:
                                       isDesktop ? 26 : (isTablet ? 24 : 20),
                                   fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF0F172A),
+                                  color: Colors.black87,
                                 ),
                               ),
                               if (isTablet) ...[
@@ -362,7 +372,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                             child: Container(
                               padding: EdgeInsets.all(isTablet ? 12 : 10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0F172A),
+                                color: const Color(0xFF2E7D32),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(
@@ -535,12 +545,16 @@ class _HumanEscalationState extends State<HumanEscalation>
 
                         // ✅ Apply category filter to stats
                         final allDocs = snapshot.data!.docs;
-                        final filteredDocs = _selectedCategory == 'all'
-                            ? allDocs
-                            : allDocs.where((doc) {
-                                final category = (doc.data() as Map)['category']?.toString() ?? 'General';
-                                return category == _selectedCategory;
-                              }).toList();
+                        final filteredDocs =
+                            _selectedCategory == 'all'
+                                ? allDocs
+                                : allDocs.where((doc) {
+                                  final category =
+                                      (doc.data() as Map)['category']
+                                          ?.toString() ??
+                                      'General';
+                                  return category == _selectedCategory;
+                                }).toList();
 
                         final total = filteredDocs.length;
                         final pending =
@@ -640,7 +654,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                       isCompact: !isTablet,
                     );
                   }
-                  
+
                   final escalations = _filterEscalations(snapshot.data!.docs);
 
                   if (escalations.isEmpty) {
@@ -668,15 +682,19 @@ class _HumanEscalationState extends State<HumanEscalation>
                       return Container(
                         margin: EdgeInsets.only(bottom: isTablet ? 10 : 8),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color:
+                              index.isEven
+                                  ? Colors.white
+                                  : const Color(0xFFF8FFFE),
                           borderRadius: BorderRadius.circular(
                             isTablet ? 16 : 12,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              offset: const Offset(0, 2),
-                              blurRadius: 8,
+                              color: Colors.black.withOpacity(0.07),
+                              spreadRadius: 0,
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
@@ -806,14 +824,16 @@ class _HumanEscalationState extends State<HumanEscalation>
                                     ),
                                   ),
                                   // ✅ Right side - Show responder details for resolved escalations
-                                  if (isResolved && escalation['respondedBy'] != null) ...[
+                                  if (isResolved &&
+                                      escalation['respondedBy'] != null) ...[
                                     SizedBox(width: isTablet ? 12 : 8),
                                     Container(
                                       constraints: BoxConstraints(
                                         maxWidth: isTablet ? 200 : 140,
                                       ),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           // Staff name
@@ -830,12 +850,16 @@ class _HumanEscalationState extends State<HumanEscalation>
                                                 child: Text(
                                                   escalation['respondedBy'],
                                                   style: TextStyle(
-                                                    fontSize: isTablet ? 12 : 11,
-                                                    color: const Color(0xFF2E7D32),
+                                                    fontSize:
+                                                        isTablet ? 12 : 11,
+                                                    color: const Color(
+                                                      0xFF2E7D32,
+                                                    ),
                                                     fontWeight: FontWeight.w600,
                                                   ),
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                   textAlign: TextAlign.right,
                                                 ),
                                               ),
@@ -855,15 +879,20 @@ class _HumanEscalationState extends State<HumanEscalation>
                                               Flexible(
                                                 child: Text(
                                                   _formatDateTime(
-                                                    escalation['respondedAt'] as Timestamp?,
+                                                    escalation['respondedAt']
+                                                        as Timestamp?,
                                                   ),
                                                   style: TextStyle(
-                                                    fontSize: isTablet ? 11 : 10,
-                                                    color: const Color(0xFF2E7D32),
+                                                    fontSize:
+                                                        isTablet ? 11 : 10,
+                                                    color: const Color(
+                                                      0xFF2E7D32,
+                                                    ),
                                                     fontWeight: FontWeight.w500,
                                                   ),
                                                   maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                   textAlign: TextAlign.right,
                                                 ),
                                               ),
@@ -876,7 +905,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                                     SizedBox(width: isTablet ? 12 : 8),
                                     Icon(
                                       Icons.arrow_forward_ios,
-                                      color: Colors.grey[400],
+                                      color: const Color(0xFF2E7D32),
                                       size: isTablet ? 16 : 14,
                                     ),
                                   ],
@@ -925,7 +954,7 @@ class _StatCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.all(isCompact ? 8 : 10),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : Colors.white,
+          color: isSelected ? color.withOpacity(0.1) : const Color(0xFFF8FFFE),
           borderRadius: BorderRadius.circular(isCompact ? 10 : 12),
           border: Border.all(
             color: isSelected ? color : Colors.grey[200]!,
@@ -1025,7 +1054,7 @@ class _EmptyState extends StatelessWidget {
               child: Icon(
                 icon,
                 size: isCompact ? 40 : 48,
-                color: Colors.grey[400],
+                color: const Color(0xFF2E7D32),
               ),
             ),
             SizedBox(height: isCompact ? 16 : 24),

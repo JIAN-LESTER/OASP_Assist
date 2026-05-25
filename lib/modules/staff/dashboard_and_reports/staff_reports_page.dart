@@ -1,4 +1,3 @@
-
 import 'package:capstone_project/modules/admin/dashboard_and_reports/admin_dashboard_data.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/charts.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/export_button.dart';
@@ -61,80 +60,81 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
   }
 
   Future<void> _loadInquiryData() async {
-  if (!mounted) return;
-
-  setState(() => isLoadingInquiry = true);
-  try {
-    // ✅ Pass customDateRange to both fetchers
-    final results = await Future.wait([
-      _firebaseService.getInquiryReportsData(
-        selectedTimeFrame,
-        customDateRange, // ✅ ADD THIS
-      ),
-      _firebaseService.getAdminDashboardData(
-        selectedTimeFrame,
-        customDateRange, // ✅ ADD THIS
-      ),
-    ]);
-
     if (!mounted) return;
-    
+
+    setState(() => isLoadingInquiry = true);
+    try {
+      // ✅ Pass customDateRange to both fetchers
+      final results = await Future.wait([
+        _firebaseService.getInquiryReportsData(
+          selectedTimeFrame,
+          customDateRange, // ✅ ADD THIS
+        ),
+        _firebaseService.getAdminDashboardData(
+          selectedTimeFrame,
+          customDateRange, // ✅ ADD THIS
+        ),
+      ]);
+
+      if (!mounted) return;
+
+      setState(() {
+        inq = results[0] as InquiryReportsData;
+        ad = results[1] as AdminDashboardData;
+        isLoadingInquiry = false;
+      });
+
+      print('📊 Staff Reports Data Loaded:');
+      print('   Inquiry Data: ${inq?.totalMessages ?? 0} messages');
+      print(
+        '   Admin Data: ${ad?.topEscalatedMessages.length ?? 0} escalations',
+      );
+    } catch (e) {
+      print('❌ Error loading inquiry data: $e');
+      if (!mounted) return;
+      setState(() => isLoadingInquiry = false);
+    }
+  }
+
+  void _onTimeFrameChanged(String newValue) {
+    // If Custom is selected, just update the UI to show the DateRangeFilter
+    if (newValue == 'Custom') {
+      if (mounted) {
+        setState(() {
+          selectedTimeFrame = 'Custom';
+          // Keep existing customDateRange if any
+        });
+      }
+      // Don't load data yet - wait for user to select a date range
+      return;
+    }
+
+    // Normal timeframe selection
     setState(() {
-      inq = results[0] as InquiryReportsData;
-      ad = results[1] as AdminDashboardData;
-      isLoadingInquiry = false;
+      selectedTimeFrame = newValue;
+      customDateRange = null; // Clear custom range when selecting preset
     });
 
-    print('📊 Staff Reports Data Loaded:');
-    print('   Inquiry Data: ${inq?.totalMessages ?? 0} messages');
-    print('   Admin Data: ${ad?.topEscalatedMessages.length ?? 0} escalations');
-    
-  } catch (e) {
-    print('❌ Error loading inquiry data: $e');
-    if (!mounted) return;
-    setState(() => isLoadingInquiry = false);
+    _loadInquiryData();
   }
-}
 
-void _onTimeFrameChanged(String newValue) {
-  // If Custom is selected, just update the UI to show the DateRangeFilter
-  if (newValue == 'Custom') {
-    if (mounted) {
+  void _onDateRangeChanged(DateTimeRange? range) {
+    if (range == null) {
+      // User cleared the date range, revert to "This Month"
       setState(() {
+        customDateRange = null;
+        selectedTimeFrame = 'This Month';
+      });
+    } else {
+      // User selected a custom date range
+      setState(() {
+        customDateRange = range;
         selectedTimeFrame = 'Custom';
-        // Keep existing customDateRange if any
       });
     }
-    // Don't load data yet - wait for user to select a date range
-    return;
+
+    _loadInquiryData();
   }
-
-  // Normal timeframe selection
-  setState(() {
-    selectedTimeFrame = newValue;
-    customDateRange = null; // Clear custom range when selecting preset
-  });
-  
-  _loadInquiryData();
-}
-
-void _onDateRangeChanged(DateTimeRange? range) {
-  if (range == null) {
-    // User cleared the date range, revert to "This Month"
-    setState(() {
-      customDateRange = null;
-      selectedTimeFrame = 'This Month';
-    });
-  } else {
-    // User selected a custom date range
-    setState(() {
-      customDateRange = range;
-      selectedTimeFrame = 'Custom';
-    });
-  }
-
-  _loadInquiryData();
-}
 
   Future<void> _refreshData() async {
     if (!mounted || isRefreshing) return;
@@ -252,7 +252,7 @@ void _onDateRangeChanged(DateTimeRange? range) {
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
-                customDateRange: customDateRange,
+        customDateRange: customDateRange,
         onDateRangeChanged: _onDateRangeChanged,
       ),
       tabletBody: TabletDashboard(
@@ -267,7 +267,7 @@ void _onDateRangeChanged(DateTimeRange? range) {
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
-                customDateRange: customDateRange,
+        customDateRange: customDateRange,
         onDateRangeChanged: _onDateRangeChanged,
       ),
       desktopBody: DesktopDashboard(
@@ -282,7 +282,7 @@ void _onDateRangeChanged(DateTimeRange? range) {
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
-                customDateRange: customDateRange,
+        customDateRange: customDateRange,
         onDateRangeChanged: _onDateRangeChanged,
       ),
     );
@@ -441,7 +441,7 @@ class DesktopDashboard extends StatelessWidget {
   final DateTime startDate;
   final String timeFrame;
   final Map<String, Map<String, int>> timeCategoryCounts;
-    final DateTimeRange? customDateRange;
+  final DateTimeRange? customDateRange;
   final ValueChanged<DateTimeRange?> onDateRangeChanged;
 
   const DesktopDashboard({
@@ -464,51 +464,37 @@ class DesktopDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFEDF0F7),
       body: SingleChildScrollView(
-  padding: const EdgeInsets.all(24.0),
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF2E7D32).withOpacity(0.12),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            buildHeader(
+              selectedTimeFrame,
+              onTimeFrameChanged,
+              onRefresh,
+              isRefreshing,
+              userName,
+              customDateRange,
+              onDateRangeChanged,
+              inq,
+              ad,
             ),
+            const SizedBox(height: 32),
+            if (isLoading)
+              ...buildSkeletonReport(isMobile: false)
+            else
+              ...buildInquiryTrendsReport(
+                inq,
+                ad,
+                selectedTimeFrame: selectedTimeFrame,
+                isMobile: false,
+                context: context,
+              ),
           ],
         ),
-        padding: EdgeInsets.all( 20),
-        child: buildHeader(
-          selectedTimeFrame,
-          onTimeFrameChanged,
-          onRefresh,
-          isRefreshing,
-          userName,
-          customDateRange,
-          onDateRangeChanged,
-          inq,
-          ad,
-        ),
       ),
-      const SizedBox(height: 32),
-      if (isLoading)
-        ...buildSkeletonReport(isMobile: false)
-      else
-        ...buildInquiryTrendsReport(
-          inq,
-          ad,
-          selectedTimeFrame: selectedTimeFrame,
-          isMobile: false,
-          context: context,
-        ),
-    ],
-  ),
-),
     );
   }
 }
@@ -525,7 +511,7 @@ class TabletDashboard extends StatelessWidget {
   final DateTime startDate;
   final String timeFrame;
   final Map<String, Map<String, int>> timeCategoryCounts;
-    final DateTimeRange? customDateRange;
+  final DateTimeRange? customDateRange;
   final ValueChanged<DateTimeRange?> onDateRangeChanged;
 
   const TabletDashboard({
@@ -548,7 +534,7 @@ class TabletDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFEDF0F7),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -560,12 +546,10 @@ class TabletDashboard extends StatelessWidget {
               onRefresh,
               isRefreshing,
               userName,
-                         customDateRange,
+              customDateRange,
               onDateRangeChanged,
-              inq, 
-              ad, 
-   
-              
+              inq,
+              ad,
             ),
             const SizedBox(height: 32),
 
@@ -599,7 +583,7 @@ class MobileDashboard extends StatelessWidget {
   final DateTime startDate;
   final String timeFrame;
   final Map<String, Map<String, int>> timeCategoryCounts;
-    final DateTimeRange? customDateRange;
+  final DateTimeRange? customDateRange;
   final ValueChanged<DateTimeRange?> onDateRangeChanged;
 
   const MobileDashboard({
@@ -622,7 +606,7 @@ class MobileDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFEDF0F7),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -857,77 +841,85 @@ List<Widget> buildInquiryTrendsReport(
   }
 
   // Desktop layout
-return [
-  SizedBox(
-    height: 120,
-    child: Row(
-      children: [
-        Expanded(
-          child: Builder(
-            builder: (context) => buildStatCard(
-              'User Messages',  // Clean title
-              '$userMessages',
-              Colors.blue,
-              Icons.message,
-              onTap: () => _showMessagesDialog(
-                context,
-                selectedTimeFrame ?? 'This Month',
-              ),
+  return [
+    SizedBox(
+      height: 120,
+      child: Row(
+        children: [
+          Expanded(
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'User Messages', // Clean title
+                    '$userMessages',
+                    Colors.blue,
+                    Icons.message,
+                    onTap:
+                        () => _showMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: Builder(
-            builder: (context) => buildStatCard(
-              'Bot Messages',  // Clean title
-              '$botMessages',
-              Colors.green,
-              Icons.check_circle,
-              onTap: () => _showAnsweredMessagesDialog(
-                context,
-                selectedTimeFrame ?? 'This Month',
-              ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Bot Messages', // Clean title
+                    '$botMessages',
+                    Colors.green,
+                    Icons.check_circle,
+                    onTap:
+                        () => _showAnsweredMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                  ),
             ),
           ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: Builder(
-            builder: (context) => buildStatCard(
-              'Pending Escalated Messages',  // ✅ FIXED: Clean title, rate shown separately
-              '$escalatedMessages',
-              Colors.red,
-              Icons.warning_amber_rounded,
-              onTap: () => _showEscalatedMessagesDialog(
-                context,
-                selectedTimeFrame ?? 'This Month',
-              ),
-              rateLabel: 'Rate',     // ✅ FIXED: Pass rate as parameter
-              rateValue: escalationRate,
+          const SizedBox(width: 20),
+          Expanded(
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Pending Escalated Messages', // ✅ FIXED: Clean title, rate shown separately
+                    '$escalatedMessages',
+                    Colors.red,
+                    Icons.warning_amber_rounded,
+                    onTap:
+                        () => _showEscalatedMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                    rateLabel: 'Rate', // ✅ FIXED: Pass rate as parameter
+                    rateValue: escalationRate,
+                  ),
             ),
           ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: Builder(
-            builder: (context) => buildStatCard(
-              'Resolved Messages',  // ✅ FIXED: Clean title, rate shown separately
-              '$resolvedMessages',
-              Colors.orange,
-              Icons.check_circle_outline,
-              onTap: () => _showResolvedMessagesDialog(
-                context,
-                selectedTimeFrame ?? 'This Month',
-              ),
-              rateLabel: 'Rate',     
-              rateValue: resolutionRate,
+          const SizedBox(width: 20),
+          Expanded(
+            child: Builder(
+              builder:
+                  (context) => buildStatCard(
+                    'Resolved Messages', // ✅ FIXED: Clean title, rate shown separately
+                    '$resolvedMessages',
+                    Colors.orange,
+                    Icons.check_circle_outline,
+                    onTap:
+                        () => _showResolvedMessagesDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                        ),
+                    rateLabel: 'Rate',
+                    rateValue: resolutionRate,
+                  ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
-  ),
     const SizedBox(height: 16),
     SizedBox(
       height: 400,
@@ -1023,115 +1015,193 @@ Widget buildHeader(
       double screenWidth = MediaQuery.of(context).size.width;
       bool isMobile = screenWidth < 600;
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          isMobile
-              ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Inquiry Trends Report',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: CustomDropdownButton(
-                          items: [
-                            'All',
-                            'Today',
-                            'This Week',
-                            'This Month',
-                            'This Year',
-                            'Custom',
-                          ],
-                          initialValue: selectedTimeFrame,
-                          onChanged: onTimeFrameChanged,
-                        ),
-                      ),
-                      if (selectedTimeFrame == 'Custom') ...[
-                        const SizedBox(width: 8),
-                        DateRangeFilter(
-                          selectedDateRange: customDateRange,
-                          onDateRangeChanged: onDateRangeChanged,
-                        ),
-                      ],
-                      const SizedBox(width: 8),
-                      ExportButton(
-                        pageType: 'inquiry',
-                        timeFrame: selectedTimeFrame,
-                        userName: userName,
-                        inq: inq,
-                        ad: ad,
-                      ),
-                    ],
-                  ),
-                ],
-              )
-              : Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Inquiry Trends Report',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  Row(
-                    children: [
-                      CustomDropdownButton(
-                        items: [
-                          'All',
-                          'Today',
-                          'This Week',
-                          'This Month',
-                          'This Year',
-                          'Custom',
-                        ],
-                        initialValue: selectedTimeFrame,
-                        onChanged: onTimeFrameChanged,
-                      ),
-                      if (selectedTimeFrame == 'Custom') ...[
-                        const SizedBox(width: 12),
-                        DateRangeFilter(
-                          selectedDateRange: customDateRange,
-                          onDateRangeChanged: onDateRangeChanged,
-                        ),
-                      ],
-                      const SizedBox(width: 12),
-                      ExportButton(
-                        pageType: 'inquiry',
-                        timeFrame: selectedTimeFrame,
-                        userName: userName,
-                        inq: inq,
-                        ad: ad,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-          SizedBox(height: isMobile ? 12 : 8),
-          Text(
-            _getReportDescription(selectedTimeFrame, customDateRange),
-            style: TextStyle(fontSize: isMobile ? 13 : 14, color: Colors.grey),
+      final subtitle =
+          selectedTimeFrame == 'Custom' && customDateRange != null
+              ? 'Showing data from ${_formatDate(customDateRange.start)} to ${_formatDate(customDateRange.end)}'
+              : _getReportDescription(selectedTimeFrame, customDateRange);
+
+      return Container(
+        padding: EdgeInsets.all(isMobile ? 18 : 24),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withOpacity(0.35),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            isMobile
+                ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildGreetingBlock(isMobile: true),
+                    const SizedBox(height: 16),
+                    _buildControlsRow(
+                      context,
+                      selectedTimeFrame,
+                      onTimeFrameChanged,
+                      customDateRange,
+                      onDateRangeChanged,
+                      userName,
+                      inq,
+                      ad,
+                      isMobile: true,
+                    ),
+                  ],
+                )
+                : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildGreetingBlock(isMobile: false),
+                    _buildControlsRow(
+                      context,
+                      selectedTimeFrame,
+                      onTimeFrameChanged,
+                      customDateRange,
+                      onDateRangeChanged,
+                      userName,
+                      inq,
+                      ad,
+                      isMobile: false,
+                    ),
+                  ],
+                ),
+            const SizedBox(height: 16),
+            Divider(color: Colors.white.withOpacity(0.12), height: 1),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 14,
+                  color: Colors.white.withOpacity(0.45),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.50),
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       );
     },
   );
 }
 
-String _getReportDescription(
-  String timeFrame,
+Widget _buildGreetingBlock({required bool isMobile}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFF6366F1).withOpacity(0.25),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: const Color(0xFF6366F1).withOpacity(0.45),
+            width: 1,
+          ),
+        ),
+        child: const Text(
+          'Reports & Analytics',
+          style: TextStyle(
+            fontSize: 11,
+            color: Color(0xFFA5B4FC),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      const SizedBox(height: 10),
+      Text(
+        'Inquiry Trends Report',
+        style: TextStyle(
+          fontSize: isMobile ? 18 : 22,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+          letterSpacing: -0.4,
+        ),
+      ),
+      const SizedBox(height: 3),
+      Text(
+        'Analyze and export inquiry trend reports',
+        style: TextStyle(
+          fontSize: isMobile ? 12 : 13,
+          color: Colors.white.withOpacity(0.55),
+          fontWeight: FontWeight.w400,
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildControlsRow(
+  BuildContext context,
+  String selectedTimeFrame,
+  ValueChanged<String> onTimeFrameChanged,
   DateTimeRange? customDateRange,
-) {
+  ValueChanged<DateTimeRange?> onDateRangeChanged,
+  String userName,
+  InquiryReportsData? inq,
+  AdminDashboardData? ad, {
+  required bool isMobile,
+}) {
+  return Row(
+    children: [
+      CustomDropdownButton(
+        items: [
+          'All',
+          'Today',
+          'This Week',
+          'This Month',
+          'This Year',
+          'Custom',
+        ],
+        initialValue: selectedTimeFrame,
+        onChanged: onTimeFrameChanged,
+      ),
+      if (selectedTimeFrame == 'Custom') ...[
+        const SizedBox(width: 8),
+        DateRangeFilter(
+          selectedDateRange: customDateRange,
+          onDateRangeChanged: onDateRangeChanged,
+        ),
+      ],
+      const SizedBox(width: 8),
+      ExportButton(
+        pageType: 'inquiry',
+        timeFrame: selectedTimeFrame,
+        userName: userName,
+        inq: inq,
+        ad: ad,
+      ),
+    ],
+  );
+}
+
+String _getReportDescription(String timeFrame, DateTimeRange? customDateRange) {
   if (timeFrame == 'Custom' && customDateRange != null) {
     return 'Detailed analysis of inquiry patterns and trends from ${_formatDate(customDateRange.start)} to ${_formatDate(customDateRange.end)}.';
   }
-
-  return 'Detailed analysis of inquiry patterns and trends for $timeFrame.';
+  return 'Detailed analysis of inquiry patterns and trends $timeFrame.';
 }
-
 
 String _formatDate(DateTime date) {
   const months = [
@@ -1198,7 +1268,6 @@ DateTime? _getEndDateForDialog(String timeFrame, [DateTimeRange? customRange]) {
   return null;
 }
 
-
 void _showMessagesDialog(
   BuildContext context,
   String timeFrame, [
@@ -1243,7 +1312,6 @@ void _showMessagesDialog(
   );
 }
 
-
 void _showEscalatedMessagesDialog(BuildContext context, String timeFrame) {
   showDialog(
     context: context,
@@ -1274,7 +1342,6 @@ void _showEscalatedMessagesDialog(BuildContext context, String timeFrame) {
         ),
   );
 }
-
 
 void _showResolvedMessagesDialog(BuildContext context, String timeFrame) {
   showDialog(
