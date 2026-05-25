@@ -39,14 +39,17 @@ Widget buildStatCard(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(borderRadius),
-              border: Border(
-                left: BorderSide(color: color, width: borderWidth),
-              ),
+              border: Border.all(color: color.withOpacity(0.18), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
+                  color: color.withOpacity(0.10),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -66,8 +69,19 @@ Widget buildStatCard(
                           Container(
                             padding: EdgeInsets.all(iconPadding),
                             decoration: BoxDecoration(
-                              color: color.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
+                              gradient: LinearGradient(
+                                colors: [
+                                  color.withOpacity(0.18),
+                                  color.withOpacity(0.08),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: color.withOpacity(0.2),
+                                width: 1,
+                              ),
                             ),
                             child: Icon(icon, color: color, size: iconSize),
                           ),
@@ -75,8 +89,8 @@ Widget buildStatCard(
                           Expanded(
                             child: _buildAdaptiveValueText(
                               value,
-                              valueFontSize,
-                              color,
+                              valueFontSize + 2,
+                              const Color(0xFF0F172A),
                             ),
                           ),
                         ],
@@ -265,11 +279,12 @@ Widget buildSystemLogsCard(
         padding: EdgeInsets.all(isMobile ? 14 : 20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 14,
               offset: const Offset(0, 4),
             ),
           ],
@@ -282,12 +297,20 @@ Widget buildSystemLogsCard(
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFDBEAFE), Color(0xFFEFF6FF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFF93C5FD),
+                      width: 1,
+                    ),
                   ),
                   child: Icon(
-                    Icons.history,
-                    color: Colors.blue[700],
+                    Icons.history_rounded,
+                    color: Color(0xFF1D4ED8),
                     size: isMobile ? 20 : 24,
                   ),
                 ),
@@ -396,11 +419,12 @@ Widget buildMessageLogsCard(
         padding: EdgeInsets.all(isMobile ? 14 : 20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 14,
               offset: const Offset(0, 4),
             ),
           ],
@@ -413,12 +437,20 @@ Widget buildMessageLogsCard(
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    borderRadius: BorderRadius.circular(8),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFDCFCE7), Color(0xFFF0FDF4)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFF86EFAC),
+                      width: 1,
+                    ),
                   ),
                   child: Icon(
-                    Icons.chat_bubble_outline,
-                    color: Colors.green[700],
+                    Icons.chat_bubble_outline_rounded,
+                    color: Color(0xFF15803D),
                     size: isMobile ? 20 : 24,
                   ),
                 ),
@@ -607,9 +639,16 @@ Widget _buildMessageLogItem(MessageLogs log, bool isMobile, bool isTablet) {
     padding: EdgeInsets.all(isMobile ? 12 : 14),
 
     decoration: BoxDecoration(
-      color: Colors.grey[50],
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: Colors.grey[200]!),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.04),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -619,14 +658,18 @@ Widget _buildMessageLogItem(MessageLogs log, bool isMobile, bool isTablet) {
           children: [
             Container(
               padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.green[100],
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF818CF8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.person,
+                Icons.person_rounded,
                 size: isMobile ? 14 : 16,
-                color: Colors.green[700],
+                color: Colors.white,
               ),
             ),
             SizedBox(width: isMobile ? 8 : 10),
@@ -644,15 +687,17 @@ Widget _buildMessageLogItem(MessageLogs log, bool isMobile, bool isTablet) {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFEEF2FF),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFC7D2FE), width: 1),
               ),
               child: Text(
                 _getRelativeTime(log.time),
-                style: TextStyle(
-                  fontSize: isMobile ? 10 : 11,
-                  color: Colors.blue[700],
-                  fontWeight: FontWeight.w500,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF4338CA),
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
                 ),
               ),
             ),

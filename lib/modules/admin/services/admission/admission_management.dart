@@ -98,9 +98,8 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage>
 
   String _admissionDuplicateKey(Map<String, dynamic> data) {
     final title = (data['title'] ?? '').toString().trim().toLowerCase();
-    final academicYear = _formatAcademicYear(data['academicYear'])
-        .trim()
-        .toLowerCase();
+    final academicYear =
+        _formatAcademicYear(data['academicYear']).trim().toLowerCase();
     return '$title|$academicYear';
   }
 
@@ -212,9 +211,7 @@ class _AdmissionManagementPageState extends State<AdmissionManagementPage>
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF2E7D32),
-          ),
+          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
         ),
       );
     }
@@ -470,7 +467,7 @@ class MobileAdmissionManagement extends StatelessWidget {
     final filteredIds = filtered.map((d) => d.id).toList();
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF0F4F8),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -502,20 +499,21 @@ class MobileAdmissionManagement extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
+                      color: Colors.black.withOpacity(0.07),
+                      spreadRadius: 0,
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Column(
                   children: [
                     _buildTableHeader(
-                      selectedIds.length == filtered.length && filtered.isNotEmpty,
+                      selectedIds.length == filtered.length &&
+                          filtered.isNotEmpty,
                       () => onToggleSelectAll(filteredIds),
                       selectedIds,
                       filtered,
@@ -621,7 +619,7 @@ Widget mainContent(
   final filteredIds = filtered.map((d) => d.id).toList();
 
   return Scaffold(
-    backgroundColor: Colors.grey[100],
+    backgroundColor: const Color(0xFFF0F4F8),
     body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
@@ -651,20 +649,21 @@ Widget mainContent(
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
+                    color: Colors.black.withOpacity(0.07),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: Column(
                 children: [
                   _buildTableHeader(
-                    selectedIds.length == filtered.length && filtered.isNotEmpty,
+                    selectedIds.length == filtered.length &&
+                        filtered.isNotEmpty,
                     () => onToggleSelectAll(filteredIds),
                     selectedIds,
                     filtered,
@@ -698,36 +697,36 @@ List<DocumentSnapshot> _getFilteredAdmissions(
   String selectedYear,
   String searchQuery,
 ) {
-  final filtered = docs.where((doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final title = (data['title'] ?? '').toString().toLowerCase().trim();
-    final academicYearData = data['academicYear'];
-    final academicYear =
-        _formatAcademicYear(academicYearData).toLowerCase().trim();
-    final query = searchQuery.toLowerCase().trim();
-    final yearFilter = selectedYear.toLowerCase().trim();
+  final filtered =
+      docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final title = (data['title'] ?? '').toString().toLowerCase().trim();
+        final academicYearData = data['academicYear'];
+        final academicYear =
+            _formatAcademicYear(academicYearData).toLowerCase().trim();
+        final query = searchQuery.toLowerCase().trim();
+        final yearFilter = selectedYear.toLowerCase().trim();
 
-    bool matchesYear =
-        yearFilter == 'all year' ||
-        yearFilter == 'all' ||
-        academicYear == yearFilter;
+        bool matchesYear =
+            yearFilter == 'all year' ||
+            yearFilter == 'all' ||
+            academicYear == yearFilter;
 
-    bool matchesSearch =
-        query.isEmpty ||
-        title.contains(query) ||
-        academicYear.contains(query);
+        bool matchesSearch =
+            query.isEmpty ||
+            title.contains(query) ||
+            academicYear.contains(query);
 
-    return matchesYear && matchesSearch;
-  }).toList();
+        return matchesYear && matchesSearch;
+      }).toList();
 
   final seenKeys = <String>{};
   final deduplicated = <DocumentSnapshot>[];
   for (final doc in filtered) {
     final data = doc.data() as Map<String, dynamic>;
     final title = (data['title'] ?? '').toString().trim().toLowerCase();
-    final academicYear = _formatAcademicYear(data['academicYear'])
-        .trim()
-        .toLowerCase();
+    final academicYear =
+        _formatAcademicYear(data['academicYear']).trim().toLowerCase();
     final dedupeKey = '$title|$academicYear';
 
     if (dedupeKey == '|' || seenKeys.contains(dedupeKey)) {
@@ -772,37 +771,40 @@ Widget _buildAdmissionList({
   return Column(
     children: [
       Expanded(
-        child: currentPageAdmissions.isEmpty
-            ? const Center(
-                child: Text('No admissions match your criteria.'),
-              )
-            : ListView.separated(
-                itemCount: currentPageAdmissions.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 6),
-                itemBuilder: (context, index) {
-                  final doc = currentPageAdmissions[index];
-                  final data = doc.data() as Map<String, dynamic>;
+        child:
+            currentPageAdmissions.isEmpty
+                ? const Center(
+                  child: Text('No admissions match your criteria.'),
+                )
+                : ListView.separated(
+                  itemCount: currentPageAdmissions.length,
+                  separatorBuilder:
+                      (context, index) => const SizedBox(height: 6),
+                  itemBuilder: (context, index) {
+                    final doc = currentPageAdmissions[index];
+                    final data = doc.data() as Map<String, dynamic>;
 
-                  final List<String> contacts =
-                      (data['contact'] as List<dynamic>?)
-                          ?.map((c) => c.toString())
-                          .toList() ??
-                      [];
-                  final isSelected = selectedIds.contains(doc.id);
+                    final List<String> contacts =
+                        (data['contact'] as List<dynamic>?)
+                            ?.map((c) => c.toString())
+                            .toList() ??
+                        [];
+                    final isSelected = selectedIds.contains(doc.id);
 
-                  return _buildAdmissionRow(
-                    context: context,
-                    doc: doc,
-                    title: data['title'] ?? 'N/A',
-                    source: data['source'] ?? 'N/A',
-                    content: data['content'] ?? '',
-                    contacts: contacts,
-                    academicYear: _formatAcademicYear(data['academicYear']),
-                    isSelected: isSelected,
-                    onToggleSelection: () => onToggleSelection(doc.id),
-                  );
-                },
-              ),
+                    return _buildAdmissionRow(
+                      context: context,
+                      doc: doc,
+                      index: index,
+                      title: data['title'] ?? 'N/A',
+                      source: data['source'] ?? 'N/A',
+                      content: data['content'] ?? '',
+                      contacts: contacts,
+                      academicYear: _formatAcademicYear(data['academicYear']),
+                      isSelected: isSelected,
+                      onToggleSelection: () => onToggleSelection(doc.id),
+                    );
+                  },
+                ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -821,6 +823,7 @@ Widget _buildAdmissionList({
 Widget _buildAdmissionRow({
   required BuildContext context,
   required DocumentSnapshot doc,
+  required int index,
   required String title,
   required String content,
   required String source,
@@ -832,6 +835,7 @@ Widget _buildAdmissionRow({
   return _AdmissionRowWidget(
     context: context,
     doc: doc,
+    index: index,
     title: title,
     content: content,
     source: source,
@@ -890,30 +894,30 @@ Widget _buildHeader(
           const SizedBox(height: 40),
           isMobile
               ? Column(
-                  children: [
-                    buildSearchField('title', searchController),
-                    const SizedBox(height: 12),
-                    AcademicYearDropdown(
-                      allAdmissions: allAdmissions,
-                      initialValue: selectedYear,
-                      onChanged: onYearChanged,
-                    ),
-                  ],
-                )
+                children: [
+                  buildSearchField('title', searchController),
+                  const SizedBox(height: 12),
+                  AcademicYearDropdown(
+                    allAdmissions: allAdmissions,
+                    initialValue: selectedYear,
+                    onChanged: onYearChanged,
+                  ),
+                ],
+              )
               : Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: buildSearchField('title', searchController),
-                    ),
-                    const SizedBox(width: 16),
-                    AcademicYearDropdown(
-                      allAdmissions: allAdmissions,
-                      initialValue: selectedYear,
-                      onChanged: onYearChanged,
-                    ),
-                  ],
-                ),
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: buildSearchField('title', searchController),
+                  ),
+                  const SizedBox(width: 16),
+                  AcademicYearDropdown(
+                    allAdmissions: allAdmissions,
+                    initialValue: selectedYear,
+                    onChanged: onYearChanged,
+                  ),
+                ],
+              ),
         ],
       );
     },
@@ -936,7 +940,7 @@ Widget _buildTableHeader(
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
@@ -950,18 +954,21 @@ Widget _buildTableHeader(
                     width: 18,
                     height: 18,
                     decoration: BoxDecoration(
-                      color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                      color: isAllSelected ? Colors.white : Colors.transparent,
                       border: Border.all(
-                        color: isAllSelected
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFFD1D5DB),
+                        color: isAllSelected ? Colors.white : Colors.white70,
                         width: 2,
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: isAllSelected
-                        ? const Icon(Icons.check, size: 14, color: Colors.white)
-                        : null,
+                    child:
+                        isAllSelected
+                            ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Color(0xFF2E7D32),
+                            )
+                            : null,
                   ),
                 ),
               ),
@@ -973,7 +980,7 @@ Widget _buildTableHeader(
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -985,7 +992,7 @@ Widget _buildTableHeader(
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -1002,7 +1009,7 @@ Widget _buildTableHeader(
           horizontal: 12,
         ),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: const Color(0xFF2E7D32),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -1016,18 +1023,21 @@ Widget _buildTableHeader(
                   width: 18,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    color: isAllSelected ? Colors.white : Colors.transparent,
                     border: Border.all(
-                      color: isAllSelected
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFFD1D5DB),
+                      color: isAllSelected ? Colors.white : Colors.white70,
                       width: 2,
                     ),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: isAllSelected
-                      ? const Icon(Icons.check, size: 14, color: Colors.white)
-                      : null,
+                  child:
+                      isAllSelected
+                          ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Color(0xFF2E7D32),
+                          )
+                          : null,
                 ),
               ),
             ),
@@ -1039,7 +1049,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1051,7 +1061,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1063,7 +1073,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1075,7 +1085,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1133,10 +1143,7 @@ Widget _buildExpandableList({
             .map(
               (item) => Container(
                 margin: const EdgeInsets.only(bottom: 3),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.blue[50],
                   border: Border.all(color: Colors.blue[200]!),
@@ -1193,11 +1200,13 @@ class _AdmissionRowWidget extends StatefulWidget {
   final String academicYear;
   final List<String>? contacts;
   final bool isSelected;
+  final int index;
   final VoidCallback onToggleSelection;
 
   const _AdmissionRowWidget({
     required this.context,
     required this.doc,
+    required this.index,
     required this.title,
     required this.content,
     required this.source,
@@ -1247,7 +1256,7 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
         key: ValueKey(widget.doc.id),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: widget.index.isEven ? Colors.white : const Color(0xFFF8FFFE),
           border: Border.all(color: Colors.grey[200]!),
           borderRadius: BorderRadius.circular(6),
         ),
@@ -1265,28 +1274,33 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                     width: 18,
                     height: 18,
                     decoration: BoxDecoration(
-                      color: widget.isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                      color:
+                          widget.isSelected
+                              ? const Color(0xFF2E7D32)
+                              : Colors.white,
                       border: Border.all(
-                        color: widget.isSelected
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFFD1D5DB),
+                        color:
+                            widget.isSelected
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFFD1D5DB),
                         width: 2,
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: widget.isSelected
-                        ? const Icon(
-                            Icons.check,
-                            size: 14,
-                            color: Colors.white,
-                          )
-                        : null,
+                    child:
+                        widget.isSelected
+                            ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Color(0xFF2E7D32),
+                            )
+                            : null,
                   ),
                 ),
               ),
             ),
             const SizedBox(width: 12),
-            
+
             // Rest of the content - wrapped in Expanded and GestureDetector
             Expanded(
               child: GestureDetector(
@@ -1333,7 +1347,8 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                         items: steps,
                         emptyText: 'No steps',
                         isExpanded: stepsExpanded,
-                        onToggle: (value) => setState(() => stepsExpanded = value),
+                        onToggle:
+                            (value) => setState(() => stepsExpanded = value),
                       ),
                     ),
                   ],
@@ -1349,10 +1364,9 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                 if (value == 'edit') {
                   showDialog(
                     context: context,
-                    builder: (context) => AdmissionFormDialog(
-                      doc: widget.doc,
-                      isEdit: true,
-                    ),
+                    builder:
+                        (context) =>
+                            AdmissionFormDialog(doc: widget.doc, isEdit: true),
                   );
                 } else if (value == 'delete') {
                   showDeleteConfirmation(
@@ -1364,28 +1378,29 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                   );
                 }
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
             ),
           ],
         ),
@@ -1397,7 +1412,7 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
       key: ValueKey(widget.doc.id),
       padding: EdgeInsets.all(isTablet ? 9 : 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: widget.index.isEven ? Colors.white : const Color(0xFFF8FFFE),
         border: Border.all(color: Colors.grey[200]!),
         borderRadius: BorderRadius.circular(6),
       ),
@@ -1415,22 +1430,27 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                   width: 18,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: widget.isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    color:
+                        widget.isSelected
+                            ? const Color(0xFF2E7D32)
+                            : Colors.white,
                     border: Border.all(
-                      color: widget.isSelected
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFFD1D5DB),
+                      color:
+                          widget.isSelected
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFD1D5DB),
                       width: 2,
                     ),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: widget.isSelected
-                      ? const Icon(
-                          Icons.check,
-                          size: 14,
-                          color: Colors.white,
-                        )
-                      : null,
+                  child:
+                      widget.isSelected
+                          ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Colors.white,
+                          )
+                          : null,
                 ),
               ),
             ),
@@ -1466,7 +1486,8 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                       items: steps,
                       emptyText: 'No steps',
                       isExpanded: stepsExpanded,
-                      onToggle: (value) => setState(() => stepsExpanded = value),
+                      onToggle:
+                          (value) => setState(() => stepsExpanded = value),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1478,7 +1499,9 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                       items: requirements,
                       emptyText: 'No requirements',
                       isExpanded: requirementsExpanded,
-                      onToggle: (value) => setState(() => requirementsExpanded = value),
+                      onToggle:
+                          (value) =>
+                              setState(() => requirementsExpanded = value),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1490,7 +1513,8 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                       items: processedContacts,
                       emptyText: 'No contacts',
                       isExpanded: contactsExpanded,
-                      onToggle: (value) => setState(() => contactsExpanded = value),
+                      onToggle:
+                          (value) => setState(() => contactsExpanded = value),
                     ),
                   ),
                 ],
@@ -1507,8 +1531,9 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
               if (value == 'edit') {
                 showDialog(
                   context: context,
-                  builder: (context) =>
-                      AdmissionFormDialog(doc: widget.doc, isEdit: true),
+                  builder:
+                      (context) =>
+                          AdmissionFormDialog(doc: widget.doc, isEdit: true),
                 );
               } else if (value == 'delete') {
                 showDeleteConfirmation(
@@ -1520,33 +1545,32 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                 );
               }
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, size: 18),
-                    SizedBox(width: 8),
-                    Text('Edit'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete, size: 18, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Delete', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
           ),
         ],
       ),
     );
   }
 }
-
-

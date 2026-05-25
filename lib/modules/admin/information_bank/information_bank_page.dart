@@ -120,9 +120,7 @@ class _InformationBankPageState extends State<InformationBankPage>
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF2E7D32),
-          ),
+          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
         ),
       );
     }
@@ -342,15 +340,17 @@ class MobileInformationBank extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF0F4F8),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('information_bank')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
+        stream:
+            FirebaseFirestore.instance
+                .collection('information_bank')
+                .orderBy('createdAt', descending: true)
+                .snapshots(),
         builder: (context, snapshot) {
           // Show loading only on first load
-          if (!snapshot.hasData && snapshot.connectionState == ConnectionState.waiting) {
+          if (!snapshot.hasData &&
+              snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -358,7 +358,8 @@ class MobileInformationBank extends StatelessWidget {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          final allDocs = snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
+          final allDocs =
+              snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
           final filtered = _getFilteredDocs(
             allDocs,
             selectedCategory,
@@ -396,13 +397,13 @@ class MobileInformationBank extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          spreadRadius: 1,
-                          blurRadius: 3,
-                          offset: const Offset(0, 1),
+                          color: Colors.black.withOpacity(0.07),
+                          spreadRadius: 0,
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
                         ),
                       ],
                     ),
@@ -417,22 +418,24 @@ class MobileInformationBank extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Expanded(
-                          child: allDocs.isEmpty
-                              ? const Center(
-                                  child: Text('No documents found.'),
-                                )
-                              : _buildIBList(
-                                  context: context,
-                                  getAllDocuments: allDocs,
-                                  selectedCategory: selectedCategory,
-                                  searchQuery: searchController.text,
-                                  currentPage: currentPage,
-                                  itemsPerPage: itemsPerPage,
-                                  onPageChanged: onPageChanged,
-                                  onItemsPerPageChanged: onItemsPerPageChanged,
-                                  selectedIds: selectedIds,
-                                  onToggleSelection: onToggleSelection,
-                                ),
+                          child:
+                              allDocs.isEmpty
+                                  ? const Center(
+                                    child: Text('No documents found.'),
+                                  )
+                                  : _buildIBList(
+                                    context: context,
+                                    getAllDocuments: allDocs,
+                                    selectedCategory: selectedCategory,
+                                    searchQuery: searchController.text,
+                                    currentPage: currentPage,
+                                    itemsPerPage: itemsPerPage,
+                                    onPageChanged: onPageChanged,
+                                    onItemsPerPageChanged:
+                                        onItemsPerPageChanged,
+                                    selectedIds: selectedIds,
+                                    onToggleSelection: onToggleSelection,
+                                  ),
                         ),
                       ],
                     ),
@@ -467,15 +470,17 @@ Widget mainContent(
   final Function(List<String>) isAllSelected,
 ) {
   return Scaffold(
-    backgroundColor: Colors.grey[100],
+    backgroundColor: const Color(0xFFF0F4F8),
     body: StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('information_bank')
-          .orderBy('createdAt', descending: true)
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('information_bank')
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
       builder: (context, snapshot) {
         // Show loading only on first load
-        if (!snapshot.hasData && snapshot.connectionState == ConnectionState.waiting) {
+        if (!snapshot.hasData &&
+            snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -483,7 +488,8 @@ Widget mainContent(
           return Center(child: Text('Error: ${snapshot.error}'));
         }
 
-        final allDocs = snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
+        final allDocs =
+            snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
         final filtered = _getFilteredDocs(
           allDocs,
           selectedCategory,
@@ -519,13 +525,13 @@ Widget mainContent(
                   padding: EdgeInsets.all(padding),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
-                        spreadRadius: 1,
-                        blurRadius: 3,
-                        offset: const Offset(0, 1),
+                        color: Colors.black.withOpacity(0.07),
+                        spreadRadius: 0,
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
@@ -540,22 +546,23 @@ Widget mainContent(
                       ),
                       const SizedBox(height: 6),
                       Expanded(
-                        child: allDocs.isEmpty
-                            ? const Center(
-                                child: Text('No documents found.'),
-                              )
-                            : _buildIBList(
-                                context: context,
-                                getAllDocuments: allDocs,
-                                selectedCategory: selectedCategory,
-                                searchQuery: searchController.text,
-                                currentPage: currentPage,
-                                itemsPerPage: itemsPerPage,
-                                onPageChanged: onPageChanged,
-                                onItemsPerPageChanged: onItemsPerPageChanged,
-                                selectedIds: selectedIds,
-                                onToggleSelection: onToggleSelection,
-                              ),
+                        child:
+                            allDocs.isEmpty
+                                ? const Center(
+                                  child: Text('No documents found.'),
+                                )
+                                : _buildIBList(
+                                  context: context,
+                                  getAllDocuments: allDocs,
+                                  selectedCategory: selectedCategory,
+                                  searchQuery: searchController.text,
+                                  currentPage: currentPage,
+                                  itemsPerPage: itemsPerPage,
+                                  onPageChanged: onPageChanged,
+                                  onItemsPerPageChanged: onItemsPerPageChanged,
+                                  selectedIds: selectedIds,
+                                  onToggleSelection: onToggleSelection,
+                                ),
                       ),
                     ],
                   ),
@@ -742,7 +749,7 @@ Widget buildTableHeader(
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
@@ -756,18 +763,21 @@ Widget buildTableHeader(
                     width: 18,
                     height: 18,
                     decoration: BoxDecoration(
-                      color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                      color: isAllSelected ? Colors.white : Colors.transparent,
                       border: Border.all(
-                        color: isAllSelected
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFFD1D5DB),
+                        color: isAllSelected ? Colors.white : Colors.white70,
                         width: 2,
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: isAllSelected
-                        ? const Icon(Icons.check, size: 14, color: Colors.white)
-                        : null,
+                    child:
+                        isAllSelected
+                            ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Color(0xFF2E7D32),
+                            )
+                            : null,
                   ),
                 ),
               ),
@@ -779,7 +789,7 @@ Widget buildTableHeader(
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -791,7 +801,7 @@ Widget buildTableHeader(
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -808,7 +818,7 @@ Widget buildTableHeader(
           horizontal: 10,
         ),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: const Color(0xFF2E7D32),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -822,18 +832,21 @@ Widget buildTableHeader(
                   width: 18,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    color: isAllSelected ? Colors.white : Colors.transparent,
                     border: Border.all(
-                      color: isAllSelected
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFFD1D5DB),
+                      color: isAllSelected ? Colors.white : Colors.white70,
                       width: 2,
                     ),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: isAllSelected
-                      ? const Icon(Icons.check, size: 14, color: Colors.white)
-                      : null,
+                  child:
+                      isAllSelected
+                          ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Color(0xFF2E7D32),
+                          )
+                          : null,
                 ),
               ),
             ),
@@ -845,7 +858,7 @@ Widget buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -856,7 +869,7 @@ Widget buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -868,7 +881,7 @@ Widget buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -880,7 +893,6 @@ Widget buildTableHeader(
     },
   );
 }
-
 
 Widget _buildIBList({
   required BuildContext context,
@@ -914,49 +926,51 @@ Widget _buildIBList({
   return Column(
     children: [
       Expanded(
-        child: currentPageIB.isEmpty
-            ? const Center(
-                child: Text('No documents match your search criteria.'),
-              )
-            : ListView.builder(
-                shrinkWrap: false,
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: currentPageIB.length,
-                itemBuilder: (context, index) {
-                  final doc = currentPageIB[index];
-                  final data = doc.data() as Map<String, dynamic>;
-                  final Timestamp timeStamp =
-                      data['createdAt'] ?? Timestamp.now();
-                  final DateTime date = timeStamp.toDate();
-                  final String formattedDate = DateFormat(
-                    "MMMM d, yyyy 'at' hh:mm a",
-                  ).format(date);
+        child:
+            currentPageIB.isEmpty
+                ? const Center(
+                  child: Text('No documents match your search criteria.'),
+                )
+                : ListView.builder(
+                  shrinkWrap: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: currentPageIB.length,
+                  itemBuilder: (context, index) {
+                    final doc = currentPageIB[index];
+                    final data = doc.data() as Map<String, dynamic>;
+                    final Timestamp timeStamp =
+                        data['createdAt'] ?? Timestamp.now();
+                    final DateTime date = timeStamp.toDate();
+                    final String formattedDate = DateFormat(
+                      "MMMM d, yyyy 'at' hh:mm a",
+                    ).format(date);
 
-                  final contentStr = data['content'] as String;
-                  final source = data['source'] ?? 'Unknown';
+                    final contentStr = data['content'] as String;
+                    final source = data['source'] ?? 'Unknown';
 
-                  final preview = ContentFormatter.getPreviewText(
-                    contentStr,
-                    source,
-                    maxLength: 50,
-                  );
+                    final preview = ContentFormatter.getPreviewText(
+                      contentStr,
+                      source,
+                      maxLength: 50,
+                    );
 
-                  return Padding(
-                    key: ValueKey(doc.id),
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: _buildIBRow(
-                      context: context,
-                      doc: doc,
-                      title: data['ib_title'] ?? 'N/A',
-                      source: source,
-                      category: data['category'] ?? 'General',
-                      content: preview,
-                      isSelected: selectedIds.contains(doc.id),
-                      onToggleSelection: () => onToggleSelection(doc.id),
-                    ),
-                  );
-                },
-              ),
+                    return Padding(
+                      key: ValueKey(doc.id),
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _buildIBRow(
+                        context: context,
+                        doc: doc,
+                        title: data['ib_title'] ?? 'N/A',
+                        source: source,
+                        category: data['category'] ?? 'General',
+                        content: preview,
+                        isSelected: selectedIds.contains(doc.id),
+                        onToggleSelection: () => onToggleSelection(doc.id),
+                        index: index,
+                      ),
+                    );
+                  },
+                ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -981,6 +995,7 @@ Widget _buildIBRow({
   required String content,
   required bool isSelected,
   required VoidCallback onToggleSelection,
+  required int index,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
   bool isMobile = screenWidth < 600;
@@ -992,11 +1007,8 @@ Widget _buildIBRow({
     key: ValueKey(doc.id),
     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
     decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(
-        color: Colors.grey[200]!,
-        width: 1,
-      ),
+      color: index.isEven ? Colors.white : const Color(0xFFF8FFFE),
+      border: Border.all(color: Colors.grey[200]!, width: 1),
       borderRadius: BorderRadius.circular(6),
     ),
     child: InkWell(
@@ -1015,20 +1027,18 @@ Widget _buildIBRow({
                 decoration: BoxDecoration(
                   color: isSelected ? const Color(0xFF2E7D32) : Colors.white,
                   border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF2E7D32)
-                        : const Color(0xFFD1D5DB),
+                    color:
+                        isSelected
+                            ? const Color(0xFF2E7D32)
+                            : const Color(0xFFD1D5DB),
                     width: 2,
                   ),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: isSelected
-                    ? const Icon(
-                        Icons.check,
-                        size: 14,
-                        color: Colors.white,
-                      )
-                    : null,
+                child:
+                    isSelected
+                        ? const Icon(Icons.check, size: 14, color: Colors.white)
+                        : null,
               ),
             ),
           ),
@@ -1100,11 +1110,7 @@ Widget _buildIBRow({
           SizedBox(
             width: 40,
             child: PopupMenuButton<String>(
-              icon: Icon(
-                Icons.more_vert,
-                color: Colors.grey[600],
-                size: 20,
-              ),
+              icon: Icon(Icons.more_vert, color: Colors.grey[600], size: 20),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -1121,28 +1127,43 @@ Widget _buildIBRow({
                   );
                 }
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit_outlined, size: 18, color: Color(0xFF6B7280)),
-                      SizedBox(width: 8),
-                      Text('Edit', style: TextStyle(color: Color(0xFF1F2937))),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
-                    ],
-                  ),
-                ),
-              ],
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.edit_outlined,
+                            size: 18,
+                            color: Color(0xFF6B7280),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Edit',
+                            style: TextStyle(color: Color(0xFF1F2937)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: Color(0xFFEF4444),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Delete',
+                            style: TextStyle(color: Color(0xFFEF4444)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
             ),
           ),
         ],

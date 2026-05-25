@@ -78,17 +78,18 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage>
         .orderBy('createdAt', descending: true)
         .snapshots()
         .listen((snapshot) {
-      _cleanupDuplicateScholarships(snapshot.docs);
-      if (mounted) {
-        setState(() {
-          allScholarships = snapshot.docs;
+          _cleanupDuplicateScholarships(snapshot.docs);
+          if (mounted) {
+            setState(() {
+              allScholarships = snapshot.docs;
+            });
+          }
         });
-      }
-    });
   }
 
   String _scholarshipDuplicateKey(Map<String, dynamic> data) {
-    final scholarshipName = (data['name'] ?? '').toString().trim().toLowerCase();
+    final scholarshipName =
+        (data['name'] ?? '').toString().trim().toLowerCase();
     final scholarshipProvider =
         (data['scholarshipProvider'] ?? '').toString().trim().toLowerCase();
     return '$scholarshipName|$scholarshipProvider';
@@ -204,9 +205,7 @@ class _ScholarshipManagementPageState extends State<ScholarshipManagementPage>
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF2E7D32),
-          ),
+          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
         ),
       );
     }
@@ -443,7 +442,7 @@ class MobileScholarshipManagement extends StatelessWidget {
     final filteredIds = filtered.map((d) => d.id).toList();
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF0F4F8),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -475,20 +474,21 @@ class MobileScholarshipManagement extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
+                      color: Colors.black.withOpacity(0.07),
+                      spreadRadius: 0,
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Column(
                   children: [
                     _buildTableHeader(
-                      selectedIds.length == filtered.length && filtered.isNotEmpty,
+                      selectedIds.length == filtered.length &&
+                          filtered.isNotEmpty,
                       () => onToggleSelectAll(filteredIds),
                       selectedIds,
                       filtered,
@@ -546,7 +546,7 @@ Widget mainContent(
   final filteredIds = filtered.map((d) => d.id).toList();
 
   return Scaffold(
-    backgroundColor: Colors.grey[100],
+    backgroundColor: const Color(0xFFF0F4F8),
     body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
@@ -576,20 +576,21 @@ Widget mainContent(
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
+                    color: Colors.black.withOpacity(0.07),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: Column(
                 children: [
                   _buildTableHeader(
-                    selectedIds.length == filtered.length && filtered.isNotEmpty,
+                    selectedIds.length == filtered.length &&
+                        filtered.isNotEmpty,
                     () => onToggleSelectAll(filteredIds),
                     selectedIds,
                     filtered,
@@ -669,33 +670,35 @@ List<DocumentSnapshot> _getFilteredScholarships(
   String selectedProvider,
   String searchQuery,
 ) {
-  final filtered = docs.where((doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final scholarshipName =
-        (data['name'] ?? '').toString().toLowerCase().trim();
-    final scholarshipProvider =
-        (data['scholarshipProvider'] ?? '').toString().toLowerCase().trim();
-    final query = searchQuery.toLowerCase().trim();
-    final providerFilter = selectedProvider.toLowerCase().trim();
+  final filtered =
+      docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final scholarshipName =
+            (data['name'] ?? '').toString().toLowerCase().trim();
+        final scholarshipProvider =
+            (data['scholarshipProvider'] ?? '').toString().toLowerCase().trim();
+        final query = searchQuery.toLowerCase().trim();
+        final providerFilter = selectedProvider.toLowerCase().trim();
 
-    bool matchesProvider =
-        providerFilter == 'all' ||
-        providerFilter == 'all providers' ||
-        scholarshipProvider == providerFilter;
+        bool matchesProvider =
+            providerFilter == 'all' ||
+            providerFilter == 'all providers' ||
+            scholarshipProvider == providerFilter;
 
-    bool matchesSearch =
-        query.isEmpty ||
-        scholarshipName.contains(query) ||
-        scholarshipProvider.contains(query);
+        bool matchesSearch =
+            query.isEmpty ||
+            scholarshipName.contains(query) ||
+            scholarshipProvider.contains(query);
 
-    return matchesProvider && matchesSearch;
-  }).toList();
+        return matchesProvider && matchesSearch;
+      }).toList();
 
   final seenKeys = <String>{};
   final deduplicated = <DocumentSnapshot>[];
   for (final doc in filtered) {
     final data = doc.data() as Map<String, dynamic>;
-    final scholarshipName = (data['name'] ?? '').toString().trim().toLowerCase();
+    final scholarshipName =
+        (data['name'] ?? '').toString().trim().toLowerCase();
     final scholarshipProvider =
         (data['scholarshipProvider'] ?? '').toString().trim().toLowerCase();
     final dedupeKey = '$scholarshipName|$scholarshipProvider';
@@ -742,65 +745,69 @@ Widget _buildScholarshipList({
   return Column(
     children: [
       Expanded(
-        child: currentPageScholarships.isEmpty
-            ? const Center(
-                child: Text('No scholarships match your criteria.'),
-              )
-            : ListView.builder(
-                shrinkWrap: false,
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: currentPageScholarships.length,
-                itemBuilder: (context, index) {
-                  final doc = currentPageScholarships[index];
-                  final data = doc.data() as Map<String, dynamic>;
+        child:
+            currentPageScholarships.isEmpty
+                ? const Center(
+                  child: Text('No scholarships match your criteria.'),
+                )
+                : ListView.builder(
+                  shrinkWrap: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: currentPageScholarships.length,
+                  itemBuilder: (context, index) {
+                    final doc = currentPageScholarships[index];
+                    final data = doc.data() as Map<String, dynamic>;
 
-                  List<String> eligibilityRequirements = [];
-                  if (data['eligibilityRequirements'] != null) {
-                    final reqs =
-                        (data['eligibilityRequirements'] as List<dynamic>?)
-                            ?.map((c) => c.toString().trim())
-                            .where((c) => c.isNotEmpty)
+                    List<String> eligibilityRequirements = [];
+                    if (data['eligibilityRequirements'] != null) {
+                      final reqs =
+                          (data['eligibilityRequirements'] as List<dynamic>?)
+                              ?.map((c) => c.toString().trim())
+                              .where((c) => c.isNotEmpty)
+                              .toList() ??
+                          [];
+                      eligibilityRequirements.addAll(reqs);
+                    }
+
+                    final List<String> privileges =
+                        (data['privileges'] as List<dynamic>?)
+                            ?.map((c) => c.toString())
                             .toList() ??
                         [];
-                    eligibilityRequirements.addAll(reqs);
-                  }
 
-                  final List<String> privileges =
-                      (data['privileges'] as List<dynamic>?)
-                          ?.map((c) => c.toString())
-                          .toList() ??
-                      [];
-
-                  String deadline = '-';
-                  if (data['deadline'] != null) {
-                    if (data['deadline'] is Timestamp) {
-                      deadline = DateFormat("MMMM d, yyyy")
-                          .format((data['deadline'] as Timestamp).toDate());
-                    } else {
-                      deadline = data['deadline'].toString();
+                    String deadline = '-';
+                    if (data['deadline'] != null) {
+                      if (data['deadline'] is Timestamp) {
+                        deadline = DateFormat(
+                          "MMMM d, yyyy",
+                        ).format((data['deadline'] as Timestamp).toDate());
+                      } else {
+                        deadline = data['deadline'].toString();
+                      }
                     }
-                  }
 
-                  final isSelected = selectedIds.contains(doc.id);
+                    final isSelected = selectedIds.contains(doc.id);
 
-                  return Padding(
-                    key: ValueKey(doc.id),
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: _buildScholarshipRow(
-                      context: context,
-                      doc: doc,
-                      name: data['name'] ?? 'N/A',
-                      description: data['description'] ?? 'N/A',
-                      eligibilityRequirements: eligibilityRequirements,
-                      scholarshipProvider: data['scholarshipProvider'] ?? 'N/A',
-                      privileges: privileges,
-                      deadline: deadline,
-                      isSelected: isSelected,
-                      onToggleSelection: () => onToggleSelection(doc.id),
-                    ),
-                  );
-                },
-              ),
+                    return Padding(
+                      key: ValueKey(doc.id),
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _buildScholarshipRow(
+                        context: context,
+                        index: index,
+                        doc: doc,
+                        name: data['name'] ?? 'N/A',
+                        description: data['description'] ?? 'N/A',
+                        eligibilityRequirements: eligibilityRequirements,
+                        scholarshipProvider:
+                            data['scholarshipProvider'] ?? 'N/A',
+                        privileges: privileges,
+                        deadline: deadline,
+                        isSelected: isSelected,
+                        onToggleSelection: () => onToggleSelection(doc.id),
+                      ),
+                    );
+                  },
+                ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -818,6 +825,7 @@ Widget _buildScholarshipList({
 
 Widget _buildScholarshipRow({
   required BuildContext context,
+  required int index,
   required DocumentSnapshot doc,
   required String name,
   required String scholarshipProvider,
@@ -830,6 +838,7 @@ Widget _buildScholarshipRow({
 }) {
   return _ScholarshipRowWidget(
     context: context,
+    index: index,
     doc: doc,
     name: name,
     scholarshipProvider: scholarshipProvider,
@@ -951,7 +960,7 @@ Widget _buildTableHeader(
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
@@ -965,18 +974,21 @@ Widget _buildTableHeader(
                     width: 18,
                     height: 18,
                     decoration: BoxDecoration(
-                      color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                      color: isAllSelected ? Colors.white : Colors.transparent,
                       border: Border.all(
-                        color: isAllSelected
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFFD1D5DB),
+                        color: isAllSelected ? Colors.white : Colors.white70,
                         width: 2,
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: isAllSelected
-                        ? const Icon(Icons.check, size: 14, color: Colors.white)
-                        : null,
+                    child:
+                        isAllSelected
+                            ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Color(0xFF2E7D32),
+                            )
+                            : null,
                   ),
                 ),
               ),
@@ -988,7 +1000,7 @@ Widget _buildTableHeader(
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -1000,7 +1012,7 @@ Widget _buildTableHeader(
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -1017,7 +1029,7 @@ Widget _buildTableHeader(
           horizontal: isTablet ? 10 : 12,
         ),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: const Color(0xFF2E7D32),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -1031,18 +1043,21 @@ Widget _buildTableHeader(
                   width: 18,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    color: isAllSelected ? Colors.white : Colors.transparent,
                     border: Border.all(
-                      color: isAllSelected
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFFD1D5DB),
+                      color: isAllSelected ? Colors.white : Colors.white70,
                       width: 2,
                     ),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: isAllSelected
-                      ? const Icon(Icons.check, size: 14, color: Colors.white)
-                      : null,
+                  child:
+                      isAllSelected
+                          ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Color(0xFF2E7D32),
+                          )
+                          : null,
                 ),
               ),
             ),
@@ -1054,7 +1069,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1066,7 +1081,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1078,7 +1093,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1090,7 +1105,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1148,10 +1163,7 @@ Widget _buildExpandableList({
             .map(
               (item) => Container(
                 margin: const EdgeInsets.only(bottom: 3),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.purple[50],
                   border: Border.all(color: Colors.purple[200]!),
@@ -1208,11 +1220,13 @@ class _ScholarshipRowWidget extends StatefulWidget {
   final List<String>? eligibilityRequirements;
   final String deadline;
   final List<String>? privileges;
+  final int index;
   final bool isSelected;
   final VoidCallback onToggleSelection;
 
   const _ScholarshipRowWidget({
     required this.context,
+    required this.index,
     required this.doc,
     required this.name,
     required this.scholarshipProvider,
@@ -1243,7 +1257,7 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
         key: ValueKey(widget.doc.id),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: widget.index.isEven ? Colors.white : const Color(0xFFF8FFFE),
           border: Border.all(color: Colors.grey[200]!),
           borderRadius: BorderRadius.circular(6),
         ),
@@ -1262,22 +1276,27 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                     width: 18,
                     height: 18,
                     decoration: BoxDecoration(
-                      color: widget.isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                      color:
+                          widget.isSelected
+                              ? const Color(0xFF2E7D32)
+                              : Colors.white,
                       border: Border.all(
-                        color: widget.isSelected
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFFD1D5DB),
+                        color:
+                            widget.isSelected
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFFD1D5DB),
                         width: 2,
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: widget.isSelected
-                        ? const Icon(
-                            Icons.check,
-                            size: 14,
-                            color: Colors.white,
-                          )
-                        : null,
+                    child:
+                        widget.isSelected
+                            ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Colors.white,
+                            )
+                            : null,
                   ),
                 ),
               ),
@@ -1321,7 +1340,8 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                   items: widget.eligibilityRequirements ?? [],
                   emptyText: 'No eligibility',
                   isExpanded: eligibilityExpanded,
-                  onToggle: (value) => setState(() => eligibilityExpanded = value),
+                  onToggle:
+                      (value) => setState(() => eligibilityExpanded = value),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1333,10 +1353,11 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                   if (value == 'edit') {
                     showDialog(
                       context: context,
-                      builder: (context) => ScholarshipFormDialog(
-                        doc: widget.doc,
-                        isEdit: true,
-                      ),
+                      builder:
+                          (context) => ScholarshipFormDialog(
+                            doc: widget.doc,
+                            isEdit: true,
+                          ),
                     );
                   } else if (value == 'delete') {
                     showDeleteConfirmation(
@@ -1348,28 +1369,29 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                     );
                   }
                 },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
+                itemBuilder:
+                    (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
               ),
             ],
           ),
@@ -1385,7 +1407,7 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
         horizontal: isTablet ? 10 : 12,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: widget.index.isEven ? Colors.white : const Color(0xFFF8FFFE),
         border: Border.all(color: Colors.grey[200]!),
         borderRadius: BorderRadius.circular(6),
       ),
@@ -1404,22 +1426,27 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                   width: 18,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: widget.isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    color:
+                        widget.isSelected
+                            ? const Color(0xFF2E7D32)
+                            : Colors.white,
                     border: Border.all(
-                      color: widget.isSelected
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFFD1D5DB),
+                      color:
+                          widget.isSelected
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFD1D5DB),
                       width: 2,
                     ),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: widget.isSelected
-                      ? const Icon(
-                          Icons.check,
-                          size: 14,
-                          color: Colors.white,
-                        )
-                      : null,
+                  child:
+                      widget.isSelected
+                          ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Colors.white,
+                          )
+                          : null,
                 ),
               ),
             ),
@@ -1460,7 +1487,8 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                 items: widget.eligibilityRequirements ?? [],
                 emptyText: 'No eligibility/requirements',
                 isExpanded: eligibilityExpanded,
-                onToggle: (value) => setState(() => eligibilityExpanded = value),
+                onToggle:
+                    (value) => setState(() => eligibilityExpanded = value),
               ),
             ),
             const SizedBox(width: 85),
@@ -1493,10 +1521,11 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                 if (value == 'edit') {
                   showDialog(
                     context: context,
-                    builder: (context) => ScholarshipFormDialog(
-                      doc: widget.doc,
-                      isEdit: true,
-                    ),
+                    builder:
+                        (context) => ScholarshipFormDialog(
+                          doc: widget.doc,
+                          isEdit: true,
+                        ),
                   );
                 } else if (value == 'delete') {
                   showDeleteConfirmation(
@@ -1508,28 +1537,29 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                   );
                 }
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
             ),
           ],
         ),
@@ -1537,5 +1567,3 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
     );
   }
 }
-
-

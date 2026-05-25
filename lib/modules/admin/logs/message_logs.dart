@@ -435,7 +435,7 @@ Widget mainContent(
   VoidCallback onSearchChanged, // 🔹 new param instead of setState
 ) {
   return Scaffold(
-    backgroundColor: Colors.grey[100],
+    backgroundColor: const Color(0xFFF0F4F8),
     body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
@@ -456,13 +456,13 @@ Widget mainContent(
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
+                    color: Colors.black.withOpacity(0.07),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -535,7 +535,7 @@ Widget _buildTableHeader() {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
           ),
           child: const Row(
@@ -547,7 +547,7 @@ Widget _buildTableHeader() {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -558,7 +558,7 @@ Widget _buildTableHeader() {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -569,7 +569,7 @@ Widget _buildTableHeader() {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -585,7 +585,7 @@ Widget _buildTableHeader() {
           horizontal: isTablet ? 10 : 12,
         ),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: const Color(0xFF2E7D32),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -597,7 +597,7 @@ Widget _buildTableHeader() {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -608,7 +608,7 @@ Widget _buildTableHeader() {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -619,7 +619,7 @@ Widget _buildTableHeader() {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -783,6 +783,7 @@ Widget _buildLogsList({
                     return _buildLogsRow(
                       context: context,
                       doc: doc,
+                      index: index,
                       msglogs: msglogs,
                       messages: messages,
                     );
@@ -808,6 +809,7 @@ Widget _buildLogsList({
 Widget _buildLogsRow({
   required BuildContext context,
   required DocumentSnapshot doc,
+  required int index,
   required MessageLogs msglogs,
   required List<Map<String, dynamic>> messages,
 }) {
@@ -817,17 +819,9 @@ Widget _buildLogsRow({
   return Container(
     padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: index.isEven ? Colors.white : const Color(0xFFF8FFFE),
       border: Border.all(color: Colors.grey[200]!),
-      borderRadius: BorderRadius.circular(8),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
-          spreadRadius: 1,
-          blurRadius: 2,
-          offset: const Offset(0, 1),
-        ),
-      ],
+      borderRadius: BorderRadius.circular(6),
     ),
     child: InkWell(
       onTap:

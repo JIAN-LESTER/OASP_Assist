@@ -77,22 +77,24 @@ class _PlacementManagementPageState extends State<PlacementManagementPage>
         .orderBy('createdAt', descending: true)
         .snapshots()
         .listen((snapshot) {
-      _cleanupDuplicatePlacements(snapshot.docs);
-      if (mounted) {
-        setState(() {
-          allPlacements = snapshot.docs;
+          _cleanupDuplicatePlacements(snapshot.docs);
+          if (mounted) {
+            setState(() {
+              allPlacements = snapshot.docs;
+            });
+          }
         });
-      }
-    });
   }
 
   String _placementDuplicateKey(Map<String, dynamic> data) {
-    final company = (data['partnerCompany'] ?? '').toString().trim().toLowerCase();
-    final positions = (data['positions'] as List<dynamic>? ?? const [])
-        .map((e) => e.toString().trim().toLowerCase())
-        .where((e) => e.isNotEmpty)
-        .toList()
-      ..sort();
+    final company =
+        (data['partnerCompany'] ?? '').toString().trim().toLowerCase();
+    final positions =
+        (data['positions'] as List<dynamic>? ?? const [])
+            .map((e) => e.toString().trim().toLowerCase())
+            .where((e) => e.isNotEmpty)
+            .toList()
+          ..sort();
     return '$company|${positions.join(",")}';
   }
 
@@ -204,9 +206,7 @@ class _PlacementManagementPageState extends State<PlacementManagementPage>
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF2E7D32),
-          ),
+          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
         ),
       );
     }
@@ -443,7 +443,7 @@ class MobilePlacementManagement extends StatelessWidget {
     final filteredIds = filtered.map((d) => d.id).toList();
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF0F4F8),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -475,20 +475,21 @@ class MobilePlacementManagement extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
+                      color: Colors.black.withOpacity(0.07),
+                      spreadRadius: 0,
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Column(
                   children: [
                     _buildTableHeader(
-                      selectedIds.length == filtered.length && filtered.isNotEmpty,
+                      selectedIds.length == filtered.length &&
+                          filtered.isNotEmpty,
                       () => onToggleSelectAll(filteredIds),
                       selectedIds,
                       filtered,
@@ -594,7 +595,7 @@ Widget mainContent(
   final filteredIds = filtered.map((d) => d.id).toList();
 
   return Scaffold(
-    backgroundColor: Colors.grey[100],
+    backgroundColor: const Color(0xFFF0F4F8),
     body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
@@ -624,20 +625,21 @@ Widget mainContent(
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
+                    color: Colors.black.withOpacity(0.07),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: Column(
                 children: [
                   _buildTableHeader(
-                    selectedIds.length == filtered.length && filtered.isNotEmpty,
+                    selectedIds.length == filtered.length &&
+                        filtered.isNotEmpty,
                     () => onToggleSelectAll(filteredIds),
                     selectedIds,
                     filtered,
@@ -671,39 +673,43 @@ List<DocumentSnapshot> _getFilteredPlacements(
   String selectedCompany,
   String searchQuery,
 ) {
-  final filtered = docs.where((doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final company = (data['partnerCompany'] ?? '').toString().toLowerCase().trim();
-    final List<String> positionsList =
-        (data['positions'] is List)
-            ? List<String>.from(data['positions'].map((e) => e.toString()))
-            : <String>[];
-    final query = searchQuery.toLowerCase().trim();
-    final companyFilter = selectedCompany.toLowerCase().trim();
+  final filtered =
+      docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final company =
+            (data['partnerCompany'] ?? '').toString().toLowerCase().trim();
+        final List<String> positionsList =
+            (data['positions'] is List)
+                ? List<String>.from(data['positions'].map((e) => e.toString()))
+                : <String>[];
+        final query = searchQuery.toLowerCase().trim();
+        final companyFilter = selectedCompany.toLowerCase().trim();
 
-    bool matchesCompany =
-        companyFilter == 'all company' ||
-        companyFilter == 'all' ||
-        company == companyFilter;
+        bool matchesCompany =
+            companyFilter == 'all company' ||
+            companyFilter == 'all' ||
+            company == companyFilter;
 
-    bool matchesSearch =
-        query.isEmpty ||
-        company.contains(query) ||
-        positionsList.any((pos) => pos.toLowerCase().contains(query));
+        bool matchesSearch =
+            query.isEmpty ||
+            company.contains(query) ||
+            positionsList.any((pos) => pos.toLowerCase().contains(query));
 
-    return matchesCompany && matchesSearch;
-  }).toList();
+        return matchesCompany && matchesSearch;
+      }).toList();
 
   final seenKeys = <String>{};
   final deduplicated = <DocumentSnapshot>[];
   for (final doc in filtered) {
     final data = doc.data() as Map<String, dynamic>;
-    final company = (data['partnerCompany'] ?? '').toString().trim().toLowerCase();
-    final positions = (data['positions'] as List<dynamic>? ?? const [])
-        .map((e) => e.toString().trim().toLowerCase())
-        .where((e) => e.isNotEmpty)
-        .toList()
-      ..sort();
+    final company =
+        (data['partnerCompany'] ?? '').toString().trim().toLowerCase();
+    final positions =
+        (data['positions'] as List<dynamic>? ?? const [])
+            .map((e) => e.toString().trim().toLowerCase())
+            .where((e) => e.isNotEmpty)
+            .toList()
+          ..sort();
     final dedupeKey = '$company|${positions.join(",")}';
 
     if (dedupeKey == '|' || seenKeys.contains(dedupeKey)) {
@@ -749,56 +755,59 @@ Widget _buildPlacementList({
   return Column(
     children: [
       Expanded(
-        child: currentPagePlacements.isEmpty
-            ? const Center(child: Text('No companies match your criteria.'))
-            : ListView.builder(
-                shrinkWrap: false,
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: currentPagePlacements.length,
-                itemBuilder: (context, index) {
-                  final doc = currentPagePlacements[index];
-                  final data = doc.data() as Map<String, dynamic>;
+        child:
+            currentPagePlacements.isEmpty
+                ? const Center(child: Text('No companies match your criteria.'))
+                : ListView.builder(
+                  shrinkWrap: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: currentPagePlacements.length,
+                  itemBuilder: (context, index) {
+                    final doc = currentPagePlacements[index];
+                    final data = doc.data() as Map<String, dynamic>;
 
-                  final List<String> contacts =
-                      (data['contacts'] as List<dynamic>?)
-                          ?.map((c) => c.toString())
-                          .toList() ??
-                      [];
+                    final List<String> contacts =
+                        (data['contacts'] as List<dynamic>?)
+                            ?.map((c) => c.toString())
+                            .toList() ??
+                        [];
 
-                  final List<String> positions =
-                      (data['positions'] as List<dynamic>?)
-                          ?.map((c) => c.toString())
-                          .toList() ??
-                      [];
+                    final List<String> positions =
+                        (data['positions'] as List<dynamic>?)
+                            ?.map((c) => c.toString())
+                            .toList() ??
+                        [];
 
-                  String deadline = '-';
-                  if (data['deadline'] != null) {
-                    if (data['deadline'] is Timestamp) {
-                      deadline = DateFormat("MMMM d, yyyy")
-                          .format((data['deadline'] as Timestamp).toDate());
-                    } else {
-                      deadline = data['deadline'].toString();
+                    String deadline = '-';
+                    if (data['deadline'] != null) {
+                      if (data['deadline'] is Timestamp) {
+                        deadline = DateFormat(
+                          "MMMM d, yyyy",
+                        ).format((data['deadline'] as Timestamp).toDate());
+                      } else {
+                        deadline = data['deadline'].toString();
+                      }
                     }
-                  }
 
-                  final isSelected = selectedIds.contains(doc.id);
+                    final isSelected = selectedIds.contains(doc.id);
 
-                  return Padding(
-                    key: ValueKey(doc.id),
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: _buildPlacementRow(
-                      context: context,
-                      doc: doc,
-                      partnerCompany: data['partnerCompany'] ?? 'N/A',
-                      contacts: contacts,
-                      positions: positions,
-                      deadline: deadline,
-                      isSelected: isSelected,
-                      onToggleSelection: () => onToggleSelection(doc.id),
-                    ),
-                  );
-                },
-              ),
+                    return Padding(
+                      key: ValueKey(doc.id),
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _buildPlacementRow(
+                        context: context,
+                        doc: doc,
+                        index: index,
+                        partnerCompany: data['partnerCompany'] ?? 'N/A',
+                        contacts: contacts,
+                        positions: positions,
+                        deadline: deadline,
+                        isSelected: isSelected,
+                        onToggleSelection: () => onToggleSelection(doc.id),
+                      ),
+                    );
+                  },
+                ),
       ),
       if (totalItems > 0)
         buildPagination(
@@ -817,6 +826,7 @@ Widget _buildPlacementList({
 Widget _buildPlacementRow({
   required BuildContext context,
   required DocumentSnapshot doc,
+  required int index,
   required String partnerCompany,
   required List<String>? contacts,
   required List<String>? positions,
@@ -827,6 +837,7 @@ Widget _buildPlacementRow({
   return _PlacementRowWidget(
     context: context,
     doc: doc,
+    index: index,
     partnerCompany: partnerCompany,
     contacts: contacts,
     positions: positions,
@@ -883,88 +894,89 @@ Widget _buildHeader(
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
-            child: isMobile
-                ? Column(
-                    children: [
-                      buildCompactStatCard(
-                        'Total Companies',
-                        '${pl?.totalCompanies ?? 0}',
-                        Colors.blue,
-                        Icons.message,
-                      ),
-                      const SizedBox(height: 12),
-                      buildCompactStatCard(
-                        'Companies Looking for Vacancy',
-                        '${pl?.vacantCompanies ?? 0}',
-                        Colors.green,
-                        Icons.check_circle,
-                      ),
-                      const SizedBox(height: 12),
-                      buildCompactStatCard(
-                        'Approaching Deadline',
-                        pl?.approachingDeadline ?? 'Unknown',
-                        Colors.red,
-                        Icons.group,
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: buildCompactStatCard(
+            child:
+                isMobile
+                    ? Column(
+                      children: [
+                        buildCompactStatCard(
                           'Total Companies',
                           '${pl?.totalCompanies ?? 0}',
                           Colors.blue,
                           Icons.message,
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: buildCompactStatCard(
+                        const SizedBox(height: 12),
+                        buildCompactStatCard(
                           'Companies Looking for Vacancy',
                           '${pl?.vacantCompanies ?? 0}',
                           Colors.green,
                           Icons.check_circle,
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: buildCompactStatCard(
+                        const SizedBox(height: 12),
+                        buildCompactStatCard(
                           'Approaching Deadline',
                           pl?.approachingDeadline ?? 'Unknown',
                           Colors.red,
                           Icons.group,
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    )
+                    : Row(
+                      children: [
+                        Expanded(
+                          child: buildCompactStatCard(
+                            'Total Companies',
+                            '${pl?.totalCompanies ?? 0}',
+                            Colors.blue,
+                            Icons.message,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildCompactStatCard(
+                            'Companies Looking for Vacancy',
+                            '${pl?.vacantCompanies ?? 0}',
+                            Colors.green,
+                            Icons.check_circle,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: buildCompactStatCard(
+                            'Approaching Deadline',
+                            pl?.approachingDeadline ?? 'Unknown',
+                            Colors.red,
+                            Icons.group,
+                          ),
+                        ),
+                      ],
+                    ),
           ),
           isMobile
               ? Column(
-                  children: [
-                    buildSearchField('positions', searchController),
-                    const SizedBox(height: 12),
-                    PlacementCompanyDropdown(
-                      allPlacements: allPlacements,
-                      initialValue: selectedCompany,
-                      onChanged: onCompanyChanged,
-                    ),
-                  ],
-                )
+                children: [
+                  buildSearchField('positions', searchController),
+                  const SizedBox(height: 12),
+                  PlacementCompanyDropdown(
+                    allPlacements: allPlacements,
+                    initialValue: selectedCompany,
+                    onChanged: onCompanyChanged,
+                  ),
+                ],
+              )
               : Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: buildSearchField('positions', searchController),
-                    ),
-                    const SizedBox(width: 16),
-                    PlacementCompanyDropdown(
-                      allPlacements: allPlacements,
-                      initialValue: selectedCompany,
-                      onChanged: onCompanyChanged,
-                    ),
-                  ],
-                ),
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: buildSearchField('positions', searchController),
+                  ),
+                  const SizedBox(width: 16),
+                  PlacementCompanyDropdown(
+                    allPlacements: allPlacements,
+                    initialValue: selectedCompany,
+                    onChanged: onCompanyChanged,
+                  ),
+                ],
+              ),
         ],
       );
     },
@@ -987,7 +999,7 @@ Widget _buildTableHeader(
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
@@ -1001,18 +1013,21 @@ Widget _buildTableHeader(
                     width: 18,
                     height: 18,
                     decoration: BoxDecoration(
-                      color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                      color: isAllSelected ? Colors.white : Colors.transparent,
                       border: Border.all(
-                        color: isAllSelected
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFFD1D5DB),
+                        color: isAllSelected ? Colors.white : Colors.white70,
                         width: 2,
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: isAllSelected
-                        ? const Icon(Icons.check, size: 14, color: Colors.white)
-                        : null,
+                    child:
+                        isAllSelected
+                            ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Color(0xFF2E7D32),
+                            )
+                            : null,
                   ),
                 ),
               ),
@@ -1024,7 +1039,7 @@ Widget _buildTableHeader(
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -1036,7 +1051,7 @@ Widget _buildTableHeader(
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -1053,7 +1068,7 @@ Widget _buildTableHeader(
           horizontal: 12,
         ),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: const Color(0xFF2E7D32),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -1067,18 +1082,21 @@ Widget _buildTableHeader(
                   width: 18,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    color: isAllSelected ? Colors.white : Colors.transparent,
                     border: Border.all(
-                      color: isAllSelected
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFFD1D5DB),
+                      color: isAllSelected ? Colors.white : Colors.white70,
                       width: 2,
                     ),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: isAllSelected
-                      ? const Icon(Icons.check, size: 14, color: Colors.white)
-                      : null,
+                  child:
+                      isAllSelected
+                          ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Color(0xFF2E7D32),
+                          )
+                          : null,
                 ),
               ),
             ),
@@ -1090,7 +1108,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1102,7 +1120,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1114,7 +1132,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1126,7 +1144,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1156,14 +1174,15 @@ Widget _buildExpandableListYellow({
     );
   }
 
-  final processedItems = items.map((c) {
-    String displayValue = c;
-    if (c.contains(":")) {
-      final parts = c.split(":");
-      displayValue = parts.sublist(1).join(":").trim();
-    }
-    return displayValue;
-  }).toList();
+  final processedItems =
+      items.map((c) {
+        String displayValue = c;
+        if (c.contains(":")) {
+          final parts = c.split(":");
+          displayValue = parts.sublist(1).join(":").trim();
+        }
+        return displayValue;
+      }).toList();
 
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1193,10 +1212,7 @@ Widget _buildExpandableListYellow({
             .map(
               (item) => Container(
                 margin: const EdgeInsets.only(bottom: 3),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.amber[50],
                   border: Border.all(color: Colors.amber[300]!),
@@ -1229,7 +1245,9 @@ Widget _buildExpandableListYellow({
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  isExpanded ? 'Show less' : '+${processedItems.length - 1} more',
+                  isExpanded
+                      ? 'Show less'
+                      : '+${processedItems.length - 1} more',
                   style: TextStyle(
                     fontSize: 11,
                     color: Colors.amber[800],
@@ -1251,12 +1269,14 @@ class _PlacementRowWidget extends StatefulWidget {
   final List<String>? contacts;
   final List<String>? positions;
   final String deadline;
+  final int index;
   final bool isSelected;
   final VoidCallback onToggleSelection;
 
   const _PlacementRowWidget({
     required this.context,
     required this.doc,
+    required this.index,
     required this.partnerCompany,
     required this.contacts,
     required this.positions,
@@ -1283,7 +1303,7 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
       key: ValueKey(widget.doc.id),
       padding: EdgeInsets.all(isMobile ? 8 : 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: widget.index.isEven ? Colors.white : const Color(0xFFF8FFFE),
         border: Border.all(color: Colors.grey[200]!),
         borderRadius: BorderRadius.circular(6),
       ),
@@ -1302,22 +1322,27 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
                   width: 18,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: widget.isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    color:
+                        widget.isSelected
+                            ? const Color(0xFF2E7D32)
+                            : Colors.white,
                     border: Border.all(
-                      color: widget.isSelected
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFFD1D5DB),
+                      color:
+                          widget.isSelected
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFD1D5DB),
                       width: 2,
                     ),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: widget.isSelected
-                      ? const Icon(
-                          Icons.check,
-                          size: 14,
-                          color: Colors.white,
-                        )
-                      : null,
+                  child:
+                      widget.isSelected
+                          ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Colors.white,
+                          )
+                          : null,
                 ),
               ),
             ),
@@ -1378,8 +1403,9 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
                 if (value == 'edit') {
                   showDialog(
                     context: context,
-                    builder: (context) =>
-                        PlacementFormDialog(doc: widget.doc, isEdit: true),
+                    builder:
+                        (context) =>
+                            PlacementFormDialog(doc: widget.doc, isEdit: true),
                   );
                 } else if (value == 'delete') {
                   showDeleteConfirmation(
@@ -1391,28 +1417,29 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
                   );
                 }
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
             ),
           ],
         ),
@@ -1420,5 +1447,3 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
     );
   }
 }
-
-

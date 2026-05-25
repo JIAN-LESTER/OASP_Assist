@@ -188,7 +188,7 @@ class MobileProgramManagement extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF0F4F8),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -203,13 +203,13 @@ class MobileProgramManagement extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
+                      color: Colors.black.withOpacity(0.07),
+                      spreadRadius: 0,
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
@@ -279,7 +279,7 @@ Widget mainContent(
   ProgramData? program,
 ) {
   return Scaffold(
-    backgroundColor: Colors.grey[100],
+    backgroundColor: const Color(0xFFF0F4F8),
     body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
@@ -292,13 +292,13 @@ Widget mainContent(
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
+                    color: Colors.black.withOpacity(0.07),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -374,7 +374,7 @@ Widget _buildMobileHeader(
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 4),
@@ -437,6 +437,7 @@ Widget _buildProgramList({
                     return _buildProgramRow(
                       context: context,
                       doc: doc,
+                      index: index,
                       name: data['name'] ?? 'N/A',
                       collegeId: data['collegeId'] ?? '',
                     );
@@ -460,6 +461,7 @@ Widget _buildProgramList({
 Widget _buildProgramRow({
   required BuildContext context,
   required DocumentSnapshot doc,
+  required int index,
   required String name,
   required String collegeId,
 }) {
@@ -470,7 +472,7 @@ Widget _buildProgramRow({
   return Container(
     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: index.isEven ? Colors.white : const Color(0xFFF8FFFE),
       border: Border.all(color: Colors.grey[200]!),
       borderRadius: BorderRadius.circular(6),
     ),
@@ -594,7 +596,7 @@ Widget _buildHeader(
                     style: TextStyle(
                       fontSize: isMobile ? 20 : (isTablet ? 22 : 24),
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -631,7 +633,7 @@ Widget _buildTableHeader() {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
           ),
           child: const Row(
@@ -644,7 +646,7 @@ Widget _buildTableHeader() {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -660,17 +662,13 @@ Widget _buildTableHeader() {
           horizontal: 12,
         ),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: const Color(0xFF2E7D32),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
           children: [
             const SizedBox(width: 8),
-            Icon(
-              Icons.school,
-              color: Colors.grey[600],
-              size: isMobile ? 20 : 24,
-            ),
+            Icon(Icons.school, color: Colors.white, size: isMobile ? 20 : 24),
             const SizedBox(width: 20),
             Expanded(
               child: Text(
@@ -678,7 +676,7 @@ Widget _buildTableHeader() {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),

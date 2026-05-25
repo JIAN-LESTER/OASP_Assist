@@ -23,7 +23,8 @@ class UserManagementPage extends StatefulWidget {
   State<UserManagementPage> createState() => _UserManagementPageState();
 }
 
-class _UserManagementPageState extends State<UserManagementPage> with BulkSelectionMixin {
+class _UserManagementPageState extends State<UserManagementPage>
+    with BulkSelectionMixin {
   String selectedRole = 'All Roles';
   final TextEditingController _searchController = TextEditingController();
   int currentPage = 1;
@@ -40,23 +41,28 @@ class _UserManagementPageState extends State<UserManagementPage> with BulkSelect
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    _usersStream = FirebaseFirestore.instance.collection('users').orderBy('createdAt', descending: true).snapshots();
+    _usersStream =
+        FirebaseFirestore.instance
+            .collection('users')
+            .orderBy('createdAt', descending: true)
+            .snapshots();
     loadStatData();
   }
 
-void _handleBulkDelete() async {
-  await handleBulkDelete(
-    context: context,
-    selectedIds: selectedIds,
-    collection: 'users',
-    itemType: 'users',
-    onSuccess: () {
-      clearSelection();
-      _loadStatsAsync();
-    },
-  );
-}
- Future<void> _loadStatsAsync() async {
+  void _handleBulkDelete() async {
+    await handleBulkDelete(
+      context: context,
+      selectedIds: selectedIds,
+      collection: 'users',
+      itemType: 'users',
+      onSuccess: () {
+        clearSelection();
+        _loadStatsAsync();
+      },
+    );
+  }
+
+  Future<void> _loadStatsAsync() async {
     try {
       final data = await statData.getUserData();
       if (mounted) {
@@ -74,8 +80,6 @@ void _handleBulkDelete() async {
       }
     }
   }
-
- 
 
   @override
   void dispose() {
@@ -153,7 +157,7 @@ void _handleBulkDelete() async {
         user: user,
         usersStream: _usersStream,
 
-       selectedIds: selectedIds,
+        selectedIds: selectedIds,
         isSelectionMode: isSelectionMode,
         onToggleSelection: toggleSelection,
         onToggleSelectAll: toggleSelectAll,
@@ -172,7 +176,7 @@ void _handleBulkDelete() async {
         onNavigateToPage: widget.onNavigateToPage,
         user: user,
         usersStream: _usersStream,
-selectedIds: selectedIds,
+        selectedIds: selectedIds,
         isSelectionMode: isSelectionMode,
         onToggleSelection: toggleSelection,
         onToggleSelectAll: toggleSelectAll,
@@ -191,7 +195,7 @@ selectedIds: selectedIds,
         onNavigateToPage: widget.onNavigateToPage,
         user: user,
         usersStream: _usersStream,
-selectedIds: selectedIds,
+        selectedIds: selectedIds,
         isSelectionMode: isSelectionMode,
         onToggleSelection: toggleSelection,
         onToggleSelectAll: toggleSelectAll,
@@ -223,7 +227,6 @@ class DesktopUserManagement extends StatelessWidget {
   final VoidCallback onBulkDelete;
   final Function(List<String>) isAllSelected;
 
-
   const DesktopUserManagement({
     super.key,
     required this.selectedRole,
@@ -236,7 +239,7 @@ class DesktopUserManagement extends StatelessWidget {
     this.onNavigateToPage,
     this.user,
     required this.usersStream,
-   required this.selectedIds,
+    required this.selectedIds,
     required this.isSelectionMode,
     required this.onToggleSelection,
     required this.onToggleSelectAll,
@@ -260,7 +263,7 @@ class DesktopUserManagement extends StatelessWidget {
       24.0,
       user,
       usersStream,
-         
+
       selectedIds,
       isSelectionMode,
       onToggleSelection,
@@ -291,7 +294,6 @@ class TabletUserManagement extends StatelessWidget {
   final VoidCallback onBulkDelete;
   final Function(List<String>) isAllSelected;
 
-
   const TabletUserManagement({
     super.key,
     required this.selectedRole,
@@ -304,7 +306,7 @@ class TabletUserManagement extends StatelessWidget {
     this.onNavigateToPage,
     this.user,
     required this.usersStream,
-   required this.selectedIds,
+    required this.selectedIds,
     required this.isSelectionMode,
     required this.onToggleSelection,
     required this.onToggleSelectAll,
@@ -358,7 +360,6 @@ class MobileUserManagement extends StatelessWidget {
   final VoidCallback onBulkDelete;
   final Function(List<String>) isAllSelected;
 
-
   const MobileUserManagement({
     super.key,
     required this.selectedRole,
@@ -371,7 +372,7 @@ class MobileUserManagement extends StatelessWidget {
     this.onNavigateToPage,
     this.user,
     required this.usersStream,
-   required this.selectedIds,
+    required this.selectedIds,
     required this.isSelectionMode,
     required this.onToggleSelection,
     required this.onToggleSelectAll,
@@ -383,15 +384,17 @@ class MobileUserManagement extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF0F4F8),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
+        stream:
+            FirebaseFirestore.instance
+                .collection('users')
+                .orderBy('createdAt', descending: true)
+                .snapshots(),
         builder: (context, snapshot) {
           // Show loading only on first load
-          if (!snapshot.hasData && snapshot.connectionState == ConnectionState.waiting) {
+          if (!snapshot.hasData &&
+              snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -399,7 +402,8 @@ class MobileUserManagement extends StatelessWidget {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          final allDocs = snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
+          final allDocs =
+              snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
           final filtered = _getFilteredUsers(
             allDocs,
             selectedRole,
@@ -439,13 +443,13 @@ class MobileUserManagement extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          spreadRadius: 1,
-                          blurRadius: 3,
-                          offset: const Offset(0, 1),
+                          color: Colors.black.withOpacity(0.07),
+                          spreadRadius: 0,
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
@@ -460,23 +464,23 @@ class MobileUserManagement extends StatelessWidget {
                         ),
                         const SizedBox(height: 10),
                         Expanded(
-                          child: allDocs.isEmpty
-                              ? const Center(
-                                  child: Text('No users found.'),
-                                )
-                              : _buildUserList(
-                                  allUsers: allDocs,
-                                  selectedRole: selectedRole,
-                                  searchQuery: searchController.text,
-                                  currentPage: currentPage,
-                                  itemsPerPage: itemsPerPage,
-                                  onPageChanged: onPageChanged,
-                                  onItemsPerPageChanged: onItemsPerPageChanged,
-                                  onNavigateToPage: onNavigateToPage,
-                                  selectedIds: selectedIds,
-                                  isSelectionMode: isSelectionMode,
-                                  onToggleSelection: onToggleSelection,
-                                ),
+                          child:
+                              allDocs.isEmpty
+                                  ? const Center(child: Text('No users found.'))
+                                  : _buildUserList(
+                                    allUsers: allDocs,
+                                    selectedRole: selectedRole,
+                                    searchQuery: searchController.text,
+                                    currentPage: currentPage,
+                                    itemsPerPage: itemsPerPage,
+                                    onPageChanged: onPageChanged,
+                                    onItemsPerPageChanged:
+                                        onItemsPerPageChanged,
+                                    onNavigateToPage: onNavigateToPage,
+                                    selectedIds: selectedIds,
+                                    isSelectionMode: isSelectionMode,
+                                    onToggleSelection: onToggleSelection,
+                                  ),
                         ),
                       ],
                     ),
@@ -514,15 +518,17 @@ Widget mainContent(
   final Function(List<String>) isAllSelected,
 ) {
   return Scaffold(
-    backgroundColor: Colors.grey[100],
+    backgroundColor: const Color(0xFFF0F4F8),
     body: StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .orderBy('createdAt', descending: true)
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('users')
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
       builder: (context, snapshot) {
         // Show loading only on first load
-        if (!snapshot.hasData && snapshot.connectionState == ConnectionState.waiting) {
+        if (!snapshot.hasData &&
+            snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -530,7 +536,8 @@ Widget mainContent(
           return Center(child: Text('Error: ${snapshot.error}'));
         }
 
-        final allDocs = snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
+        final allDocs =
+            snapshot.hasData ? snapshot.data!.docs : <DocumentSnapshot>[];
         final filtered = _getFilteredUsers(
           allDocs,
           selectedRole,
@@ -567,13 +574,13 @@ Widget mainContent(
                   padding: EdgeInsets.all(padding),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
-                        spreadRadius: 1,
-                        blurRadius: 3,
-                        offset: const Offset(0, 1),
+                        color: Colors.black.withOpacity(0.07),
+                        spreadRadius: 0,
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
@@ -588,23 +595,22 @@ Widget mainContent(
                       ),
                       const SizedBox(height: 10),
                       Expanded(
-                        child: allDocs.isEmpty
-                            ? const Center(
-                                child: Text('No users found.'),
-                              )
-                            : _buildUserList(
-                                allUsers: allDocs,
-                                selectedRole: selectedRole,
-                                searchQuery: searchController.text,
-                                currentPage: currentPage,
-                                itemsPerPage: itemsPerPage,
-                                onPageChanged: onPageChanged,
-                                onItemsPerPageChanged: onItemsPerPageChanged,
-                                onNavigateToPage: onNavigateToPage,
-                                selectedIds: selectedIds,
-                                isSelectionMode: isSelectionMode,
-                                onToggleSelection: onToggleSelection,
-                              ),
+                        child:
+                            allDocs.isEmpty
+                                ? const Center(child: Text('No users found.'))
+                                : _buildUserList(
+                                  allUsers: allDocs,
+                                  selectedRole: selectedRole,
+                                  searchQuery: searchController.text,
+                                  currentPage: currentPage,
+                                  itemsPerPage: itemsPerPage,
+                                  onPageChanged: onPageChanged,
+                                  onItemsPerPageChanged: onItemsPerPageChanged,
+                                  onNavigateToPage: onNavigateToPage,
+                                  selectedIds: selectedIds,
+                                  isSelectionMode: isSelectionMode,
+                                  onToggleSelection: onToggleSelection,
+                                ),
                       ),
                     ],
                   ),
@@ -643,7 +649,6 @@ List<DocumentSnapshot> _getFilteredUsers(
     return matchesRole && matchesSearch;
   }).toList();
 }
-
 
 Widget _buildMobileHeader(
   String selectedRole,
@@ -692,7 +697,7 @@ Widget _buildUserList({
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
   required Function(int)? onNavigateToPage,
- required Set<String> selectedIds,
+  required Set<String> selectedIds,
   required bool isSelectionMode,
   required Function(String) onToggleSelection,
 }) {
@@ -743,13 +748,14 @@ Widget _buildUserList({
                   itemBuilder: (context, index) {
                     final doc = currentPageUsers[index];
                     final data = doc.data() as Map<String, dynamic>;
-                     final isSelected = selectedIds.contains(doc.id);
+                    final isSelected = selectedIds.contains(doc.id);
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: _buildUserRow(
                         context: context,
                         doc: doc,
+                        index: index,
                         name: data['name'] ?? 'N/A',
                         email: data['email'] ?? 'N/A',
                         role:
@@ -778,9 +784,9 @@ Widget _buildUserList({
                         status:
                             data['isActive'] == true ? 'Active' : 'Inactive',
                         onNavigateToPage: onNavigateToPage,
-                         isSelectionMode: isSelectionMode,
-                      isSelected: isSelected,
-                      onToggleSelection: () => onToggleSelection(doc.id),
+                        isSelectionMode: isSelectionMode,
+                        isSelected: isSelected,
+                        onToggleSelection: () => onToggleSelection(doc.id),
                       ),
                     );
                   },
@@ -803,6 +809,7 @@ Widget _buildUserList({
 Widget _buildUserRow({
   required BuildContext context,
   required DocumentSnapshot doc,
+  required int index,
   required String name,
   required String email,
   required String role,
@@ -818,20 +825,18 @@ Widget _buildUserRow({
   bool isMobile = screenWidth < 600;
   bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
- return Container(
+  return Container(
     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
     decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(
-        color: Colors.grey[200]!,
-        width: 1,
-      ),
+      color: index.isEven ? Colors.white : const Color(0xFFF8FFFE),
+      border: Border.all(color: Colors.grey[200]!, width: 1),
       borderRadius: BorderRadius.circular(6),
     ),
     child: InkWell(
-      onTap: isSelectionMode
-          ? onToggleSelection
-          : () => showUserInfoModal(context, doc),
+      onTap:
+          isSelectionMode
+              ? onToggleSelection
+              : () => showUserInfoModal(context, doc),
       onLongPress: onToggleSelection,
       child: Row(
         children: [
@@ -847,20 +852,18 @@ Widget _buildUserRow({
                 decoration: BoxDecoration(
                   color: isSelected ? const Color(0xFF2E7D32) : Colors.white,
                   border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF2E7D32)
-                        : const Color(0xFFD1D5DB),
+                    color:
+                        isSelected
+                            ? const Color(0xFF2E7D32)
+                            : const Color(0xFFD1D5DB),
                     width: 2,
                   ),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: isSelected
-                    ? const Icon(
-                        Icons.check,
-                        size: 14,
-                        color: Colors.white,
-                      )
-                    : null,
+                child:
+                    isSelected
+                        ? const Icon(Icons.check, size: 14, color: Colors.white)
+                        : null,
               ),
             ),
           ),
@@ -1160,7 +1163,7 @@ Widget _buildTableHeader(
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
@@ -1174,22 +1177,21 @@ Widget _buildTableHeader(
                     width: 18,
                     height: 18,
                     decoration: BoxDecoration(
-                      color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                      color: isAllSelected ? Colors.white : Colors.transparent,
                       border: Border.all(
-                        color: isAllSelected
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFFD1D5DB),
+                        color: isAllSelected ? Colors.white : Colors.white70,
                         width: 2,
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: isAllSelected
-                        ? const Icon(
-                            Icons.check,
-                            size: 14,
-                            color: Colors.white,
-                          )
-                        : null,
+                    child:
+                        isAllSelected
+                            ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Color(0xFF2E7D32),
+                            )
+                            : null,
                   ),
                 ),
               ),
@@ -1201,7 +1203,7 @@ Widget _buildTableHeader(
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -1212,7 +1214,7 @@ Widget _buildTableHeader(
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -1223,7 +1225,7 @@ Widget _buildTableHeader(
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -1240,7 +1242,7 @@ Widget _buildTableHeader(
           horizontal: 10,
         ),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: const Color(0xFF2E7D32),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -1254,22 +1256,21 @@ Widget _buildTableHeader(
                   width: 18,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: isAllSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    color: isAllSelected ? Colors.white : Colors.transparent,
                     border: Border.all(
-                      color: isAllSelected
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFFD1D5DB),
+                      color: isAllSelected ? Colors.white : Colors.white70,
                       width: 2,
                     ),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: isAllSelected
-                      ? const Icon(
-                          Icons.check,
-                          size: 14,
-                          color: Colors.white,
-                        )
-                      : null,
+                  child:
+                      isAllSelected
+                          ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Color(0xFF2E7D32),
+                          )
+                          : null,
                 ),
               ),
             ),
@@ -1281,7 +1282,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1292,7 +1293,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1303,7 +1304,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1314,7 +1315,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1325,7 +1326,7 @@ Widget _buildTableHeader(
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),

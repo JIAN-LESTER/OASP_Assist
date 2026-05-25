@@ -187,7 +187,7 @@ class MobileCollegeManagement extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF0F4F8),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -202,13 +202,13 @@ class MobileCollegeManagement extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
+                      color: Colors.black.withOpacity(0.07),
+                      spreadRadius: 0,
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
@@ -278,7 +278,7 @@ Widget mainContent(
   ProgramData? program,
 ) {
   return Scaffold(
-    backgroundColor: Colors.grey[100],
+    backgroundColor: const Color(0xFFF0F4F8),
     body: Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
@@ -291,13 +291,13 @@ Widget mainContent(
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
+                    color: Colors.black.withOpacity(0.07),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -436,6 +436,7 @@ Widget _buildCollegeList({
                     return _buildCollegeRow(
                       context: context,
                       doc: doc,
+                      index: index,
                       name: data['name'] ?? 'N/A',
                     );
                   },
@@ -458,6 +459,7 @@ Widget _buildCollegeList({
 Widget _buildCollegeRow({
   required BuildContext context,
   required DocumentSnapshot doc,
+  required int index,
   required String name,
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
@@ -467,7 +469,7 @@ Widget _buildCollegeRow({
   return Container(
     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: index.isEven ? Colors.white : const Color(0xFFF8FFFE),
       border: Border.all(color: Colors.grey[200]!),
       borderRadius: BorderRadius.circular(6),
     ),
@@ -597,7 +599,7 @@ Widget _buildTableHeader() {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
           ),
           child: const Row(
@@ -610,7 +612,7 @@ Widget _buildTableHeader() {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -626,7 +628,7 @@ Widget _buildTableHeader() {
           horizontal: 12,
         ),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: const Color(0xFF2E7D32),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -634,7 +636,7 @@ Widget _buildTableHeader() {
             const SizedBox(width: 8),
             Icon(
               Icons.account_balance,
-              color: Colors.grey[600],
+              color: Colors.white,
               size: isMobile ? 20 : 24,
             ),
             const SizedBox(width: 20),
@@ -644,7 +646,7 @@ Widget _buildTableHeader() {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: isTablet ? 13 : 14,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ),

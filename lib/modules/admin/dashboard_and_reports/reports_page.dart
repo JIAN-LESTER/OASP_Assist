@@ -650,40 +650,26 @@ class DesktopDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFEDF0F7),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF2E7D32).withOpacity(0.12),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              padding: EdgeInsets.all( 20),
-              child: buildHeader(
-                selectedTimeFrame,
-                selectedReportType,
-                onTimeFrameChanged,
-                onReportTypeChanged,
-                onRefresh,
-                isRefreshing,
-                userName,
-                customDateRange,
-                onDateRangeChanged,
-                inq,
-                cb,
-                ud,
-                ad,
-              ),
+            buildHeader(
+              selectedTimeFrame,
+              selectedReportType,
+              onTimeFrameChanged,
+              onReportTypeChanged,
+              onRefresh,
+              isRefreshing,
+              userName,
+              customDateRange,
+              onDateRangeChanged,
+              inq,
+              cb,
+              ud,
+              ad,
             ),
             const SizedBox(height: 32),
             if (isLoading)
@@ -753,7 +739,7 @@ class TabletDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFEDF0F7),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -843,7 +829,7 @@ class MobileDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFEDF0F7),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -2323,7 +2309,6 @@ Widget buildHeader(
   String userName,
   DateTimeRange? customDateRange,
   ValueChanged<DateTimeRange?> onDateRangeChanged,
-  // ✅ ADD THESE PARAMETERS FOR EXPORT
   InquiryReportsData? inq,
   ChatbotUsageReportsData? cb,
   UserDemographicsReportsData? ud,
@@ -2334,7 +2319,8 @@ Widget buildHeader(
       double screenWidth = MediaQuery.of(context).size.width;
       bool isMobile = screenWidth < 600;
 
-      // ✅ Determine page type based on selected report
+      const greeting = '';
+
       String pageType =
           selectedReportType == 'Inquiry Trends'
               ? 'inquiry'
@@ -2342,138 +2328,215 @@ Widget buildHeader(
               ? 'chatbot'
               : 'demographics';
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          isMobile
-              ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Reports and Analytics',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: CustomDropdownButton(
-                          items: [
-                            'Inquiry Trends',
-                            'Chatbot Usage',
-                            'User Demographics',
-                          ],
-                          initialValue: selectedReportType,
-                          onChanged: onReportTypeChanged,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: CustomDropdownButton(
-                          items: [
-                            'All',
-                            'Today',
-                            'This Week',
-                            'This Month',
-                            'This Year',
-                            'Custom',
-                          ],
-                          initialValue: selectedTimeFrame,
-                          onChanged: onTimeFrameChanged,
-                        ),
-                      ),
-                      if (selectedTimeFrame == 'Custom') ...[
-                        const SizedBox(width: 8),
-                        DateRangeFilter(
-                          selectedDateRange: customDateRange,
-                          onDateRangeChanged: onDateRangeChanged,
-                        ),
-                      ],
-                      // ✅ ADD EXPORT BUTTON
-                      const SizedBox(width: 8),
-                      ExportButton(
-                        pageType: pageType,
-                        timeFrame: selectedTimeFrame,
-                        userName: userName,
-                        inq: inq,
-                        cb: cb,
-                        ud: ud,
-                        ad: ad,
-                      ),
-                    ],
-                  ),
-                ],
-              )
-              : Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Reports and Analytics',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      CustomDropdownButton(
-                        items: [
-                          'Inquiry Trends',
-                          'Chatbot Usage',
-                          'User Demographics',
-                        ],
-                        initialValue: selectedReportType,
-                        onChanged: onReportTypeChanged,
-                      ),
-                      const SizedBox(width: 12),
-                      CustomDropdownButton(
-                        items: [
-                          'All',
-                          'Today',
-                          'This Week',
-                          'This Month',
-                          'This Year',
-                          'Custom',
-                        ],
-                        initialValue: selectedTimeFrame,
-                        onChanged: onTimeFrameChanged,
-                      ),
-                      if (selectedTimeFrame == 'Custom') ...[
-                        const SizedBox(width: 12),
-                        DateRangeFilter(
-                          selectedDateRange: customDateRange,
-                          onDateRangeChanged: onDateRangeChanged,
-                        ),
-                      ],
-                      // ✅ ADD EXPORT BUTTON
-                      const SizedBox(width: 12),
-                      ExportButton(
-                        pageType: pageType,
-                        timeFrame: selectedTimeFrame,
-                        userName: userName,
-                        inq: inq,
-                        cb: cb,
-                        ud: ud,
-                        ad: ad,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-          SizedBox(height: isMobile ? 12 : 8),
-          Text(
-            _getReportDescription(
-              selectedReportType,
-              selectedTimeFrame,
-              customDateRange,
-            ),
-            style: TextStyle(fontSize: isMobile ? 13 : 14, color: Colors.grey),
+      final subtitle =
+          selectedTimeFrame == 'Custom' && customDateRange != null
+              ? 'Showing data from ${_formatDate(customDateRange.start)} to ${_formatDate(customDateRange.end)}'
+              : _getReportDescription(
+                selectedReportType,
+                selectedTimeFrame,
+                customDateRange,
+              );
+
+      return Container(
+        padding: EdgeInsets.all(isMobile ? 18 : 24),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withOpacity(0.35),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            isMobile
+                ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildGreetingBlock(greeting, userName, isMobile: true),
+                    const SizedBox(height: 16),
+                    _buildControlsRow(
+                      context,
+                      selectedTimeFrame,
+                      selectedReportType,
+                      onTimeFrameChanged,
+                      onReportTypeChanged,
+                      customDateRange,
+                      onDateRangeChanged,
+                      pageType,
+                      userName,
+                      inq,
+                      cb,
+                      ud,
+                      ad,
+                      isMobile: true,
+                    ),
+                  ],
+                )
+                : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildGreetingBlock(greeting, userName, isMobile: false),
+                    _buildControlsRow(
+                      context,
+                      selectedTimeFrame,
+                      selectedReportType,
+                      onTimeFrameChanged,
+                      onReportTypeChanged,
+                      customDateRange,
+                      onDateRangeChanged,
+                      pageType,
+                      userName,
+                      inq,
+                      cb,
+                      ud,
+                      ad,
+                      isMobile: false,
+                    ),
+                  ],
+                ),
+            const SizedBox(height: 16),
+            Divider(color: Colors.white.withOpacity(0.12), height: 1),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 14,
+                  color: Colors.white.withOpacity(0.45),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.50),
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       );
     },
+  );
+}
+
+Widget _buildGreetingBlock(
+  String greeting,
+  String userName, {
+  required bool isMobile,
+}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFF6366F1).withOpacity(0.25),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: const Color(0xFF6366F1).withOpacity(0.45),
+            width: 1,
+          ),
+        ),
+        child: const Text(
+          'Reports & Analytics',
+          style: TextStyle(
+            fontSize: 11,
+            color: Color(0xFFA5B4FC),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      const SizedBox(height: 10),
+      Text(
+        'Data Overview',
+        style: TextStyle(
+          fontSize: isMobile ? 18 : 22,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+          letterSpacing: -0.4,
+        ),
+      ),
+      const SizedBox(height: 3),
+      Text(
+        'Analyze and export system reports',
+        style: TextStyle(
+          fontSize: isMobile ? 12 : 13,
+          color: Colors.white.withOpacity(0.55),
+          fontWeight: FontWeight.w400,
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildControlsRow(
+  BuildContext context,
+  String selectedTimeFrame,
+  String selectedReportType,
+  ValueChanged<String> onTimeFrameChanged,
+  ValueChanged<String> onReportTypeChanged,
+  DateTimeRange? customDateRange,
+  ValueChanged<DateTimeRange?> onDateRangeChanged,
+  String pageType,
+  String userName,
+  InquiryReportsData? inq,
+  ChatbotUsageReportsData? cb,
+  UserDemographicsReportsData? ud,
+  AdminDashboardData? ad, {
+  required bool isMobile,
+}) {
+  return Row(
+    children: [
+      CustomDropdownButton(
+        items: ['Inquiry Trends', 'Chatbot Usage', 'User Demographics'],
+        initialValue: selectedReportType,
+        onChanged: onReportTypeChanged,
+      ),
+      const SizedBox(width: 8),
+      CustomDropdownButton(
+        items: [
+          'All',
+          'Today',
+          'This Week',
+          'This Month',
+          'This Year',
+          'Custom',
+        ],
+        initialValue: selectedTimeFrame,
+        onChanged: onTimeFrameChanged,
+      ),
+      if (selectedTimeFrame == 'Custom') ...[
+        const SizedBox(width: 8),
+        DateRangeFilter(
+          selectedDateRange: customDateRange,
+          onDateRangeChanged: onDateRangeChanged,
+        ),
+      ],
+      const SizedBox(width: 8),
+      ExportButton(
+        pageType: pageType,
+        timeFrame: selectedTimeFrame,
+        userName: userName,
+        inq: inq,
+        cb: cb,
+        ud: ud,
+        ad: ad,
+      ),
+    ],
   );
 }
 
