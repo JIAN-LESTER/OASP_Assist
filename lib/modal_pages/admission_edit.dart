@@ -1,8 +1,10 @@
-import 'package:capstone_project/modules/admin/services/admission/add_edit_admission.dart';
+
+import 'package:capstone_project/modules/admin/service_information/admission/add_edit_admission.dart';
+import 'package:capstone_project/modules/admin/service_information/admission/admission_info.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:capstone_project/modules/admin/services/admission/admission_info.dart';
+
 
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 

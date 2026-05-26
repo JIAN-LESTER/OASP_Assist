@@ -1,17 +1,18 @@
+import 'package:capstone_project/buttons/bulk.dart' show BulkSelectionMixin, handleBulkDelete, BulkDeleteBar;
+import 'package:capstone_project/buttons/upload_document_button.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
-import 'package:capstone_project/modules/admin/services/scholarship/add_edit_scholarship.dart';
-import 'package:capstone_project/modules/admin/buttons/bulk.dart';
-import 'package:capstone_project/modules/admin/buttons/upload_document_button.dart';
-import 'package:capstone_project/modules/admin/widgets/pagination.dart';
-import 'package:capstone_project/modules/admin/widgets/provider_dropdown.dart';
-import 'package:capstone_project/modules/admin/widgets/search_field.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_management.dart';
+import 'package:capstone_project/modules/admin/service_information/scholarship/add_edit_scholarship.dart';
+import 'package:capstone_project/modules/admin/service_information/scholarship/scholarship_info.dart';
+import 'package:capstone_project/widgets/pagination.dart';
+import 'package:capstone_project/widgets/provider_dropdown.dart';
+import 'package:capstone_project/widgets/search_field.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:intl/intl.dart';
 
-import 'package:capstone_project/modules/admin/services/scholarship/scholarship_info.dart';
+
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
 

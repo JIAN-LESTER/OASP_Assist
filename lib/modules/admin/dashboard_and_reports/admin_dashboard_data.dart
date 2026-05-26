@@ -1,9 +1,4 @@
-// ============================================================================
-// Make sure your AdminDashboardData class is defined correctly
-// ============================================================================
-
 import 'package:capstone_project/modules/admin/dashboard_and_reports/escalation_data.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/reports.dart';
 
 class AdminDashboardData {
@@ -49,8 +44,3 @@ AdminDashboardData getEmptyAdminDashboardData() {
     messageLogs: [],
   );
 }
-
-// ============================================================================
-// EscalatedMessage Class (add to escalation_data.dart or admin_dashboard_data.dart)
-// ============================================================================
-

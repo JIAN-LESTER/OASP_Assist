@@ -1,15 +1,15 @@
+import 'package:capstone_project/buttons/bulk.dart';
+import 'package:capstone_project/buttons/upload_document_button.dart';
 import 'package:capstone_project/crud/delete/delete.dart';
-import 'package:capstone_project/modules/admin/services/placement/add_edit_placement.dart';
-import 'package:capstone_project/modules/admin/buttons/bulk.dart';
-import 'package:capstone_project/modules/admin/buttons/upload_document_button.dart';
-import 'package:capstone_project/modules/admin/widgets/company_dropdown.dart';
-import 'package:capstone_project/modules/admin/widgets/pagination.dart';
-import 'package:capstone_project/modules/admin/widgets/search_field.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_management.dart';
+import 'package:capstone_project/modules/admin/service_information/placement/add_edit_placement.dart';
+import 'package:capstone_project/modules/admin/service_information/placement/pl_info.dart';
+import 'package:capstone_project/widgets/company_dropdown.dart';
+import 'package:capstone_project/widgets/pagination.dart';
+import 'package:capstone_project/widgets/search_field.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:capstone_project/modules/admin/services/placement/pl_info.dart';
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
 

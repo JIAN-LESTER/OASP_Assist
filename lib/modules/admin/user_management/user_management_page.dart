@@ -1,9 +1,9 @@
-import 'package:capstone_project/modules/admin/buttons/add_user_button.dart';
-import 'package:capstone_project/modules/admin/buttons/bulk.dart';
-import 'package:capstone_project/modules/admin/widgets/pagination.dart';
-import 'package:capstone_project/modules/admin/widgets/role_dropdown_button.dart';
-import 'package:capstone_project/modules/admin/widgets/search_field.dart';
+import 'package:capstone_project/buttons/add_user_button.dart';
+import 'package:capstone_project/buttons/bulk.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_management.dart';
+import 'package:capstone_project/widgets/pagination.dart';
+import 'package:capstone_project/widgets/role_dropdown_button.dart';
+import 'package:capstone_project/widgets/search_field.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:capstone_project/crud/delete/delete.dart';

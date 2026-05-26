@@ -1,9 +1,9 @@
-import 'package:capstone_project/modules/admin/widgets/empty_state.dart';
-import 'package:capstone_project/modules/admin/widgets/pagination.dart';
-import 'package:capstone_project/modules/admin/widgets/search_field.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_management.dart';
 
 import 'package:capstone_project/utils/snackbar_util.dart';
+import 'package:capstone_project/widgets/empty_state.dart';
+import 'package:capstone_project/widgets/pagination.dart';
+import 'package:capstone_project/widgets/search_field.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 

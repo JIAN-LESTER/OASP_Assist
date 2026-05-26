@@ -1,7 +1,8 @@
-import 'package:capstone_project/modules/admin/widgets/date_range_filter.dart';
-import 'package:capstone_project/modules/admin/widgets/empty_state.dart';
-import 'package:capstone_project/modules/admin/widgets/pagination.dart';
-import 'package:capstone_project/modules/admin/widgets/search_field.dart';
+
+import 'package:capstone_project/widgets/date_range_filter.dart';
+import 'package:capstone_project/widgets/empty_state.dart';
+import 'package:capstone_project/widgets/pagination.dart';
+import 'package:capstone_project/widgets/search_field.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:intl/intl.dart';

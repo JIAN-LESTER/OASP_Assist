@@ -1,14 +1,15 @@
-import 'package:capstone_project/modules/admin/services/admission/add_edit_admission.dart';
-import 'package:capstone_project/modules/admin/buttons/bulk.dart';
-import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_management.dart';
-import 'package:capstone_project/utils/snackbar_util.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:capstone_project/modules/admin/services/admission/admission_info.dart';
 
-import 'package:capstone_project/modules/admin/buttons/upload_document_button.dart';
-import 'package:capstone_project/modules/admin/widgets/admission_year_dropdown.dart';
-import 'package:capstone_project/modules/admin/widgets/pagination.dart';
-import 'package:capstone_project/modules/admin/widgets/search_field.dart';
+import 'package:capstone_project/buttons/bulk.dart';
+import 'package:capstone_project/buttons/upload_document_button.dart';
+import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_management.dart';
+import 'package:capstone_project/modules/admin/service_information/admission/add_edit_admission.dart';
+import 'package:capstone_project/modules/admin/service_information/admission/admission_info.dart';
+import 'package:capstone_project/utils/snackbar_util.dart';
+import 'package:capstone_project/widgets/admission_year_dropdown.dart';
+import 'package:capstone_project/widgets/pagination.dart';
+import 'package:capstone_project/widgets/search_field.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 import '../../../../crud/delete/delete.dart';

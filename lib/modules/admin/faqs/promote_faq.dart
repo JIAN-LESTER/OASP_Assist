@@ -46,9 +46,10 @@ class _PromoteFAQModalState extends State<_PromoteFAQModal> {
     super.initState();
     _questionCtrl = TextEditingController(text: widget.candidate.question);
     _answerCtrl = TextEditingController(text: widget.candidate.answer);
-    _selectedCategory = _categories.contains(widget.candidate.category)
-        ? widget.candidate.category
-        : 'General';
+    _selectedCategory =
+        _categories.contains(widget.candidate.category)
+            ? widget.candidate.category
+            : 'General';
   }
 
   @override
@@ -63,8 +64,18 @@ class _PromoteFAQModalState extends State<_PromoteFAQModal> {
   String _formatDate(Timestamp ts) {
     final d = ts.toDate();
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[d.month - 1]} ${d.day}, ${d.year}';
   }
@@ -99,7 +110,9 @@ class _PromoteFAQModalState extends State<_PromoteFAQModal> {
       });
 
       // 2. Mark candidate as promoted
-      final candidateRef = db.collection('faq_candidates').doc(widget.candidate.id);
+      final candidateRef = db
+          .collection('faq_candidates')
+          .doc(widget.candidate.id);
       batch.update(candidateRef, {
         'status': 'promoted',
         'promotedAt': Timestamp.now(),
@@ -142,12 +155,15 @@ class _PromoteFAQModalState extends State<_PromoteFAQModal> {
 
   void _showSnack(String msg, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: isError ? const Color(0xFFD32F2F) : const Color(0xFF2E7D32),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor:
+            isError ? const Color(0xFFD32F2F) : const Color(0xFF2E7D32),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
 
   // ---- build ----
@@ -179,7 +195,10 @@ class _PromoteFAQModalState extends State<_PromoteFAQModal> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _StatsRow(candidate: widget.candidate, formatDate: _formatDate),
+                    _StatsRow(
+                      candidate: widget.candidate,
+                      formatDate: _formatDate,
+                    ),
                     const SizedBox(height: 20),
                     _SectionLabel(icon: Icons.help_outline, label: 'Question'),
                     const SizedBox(height: 8),
@@ -190,7 +209,10 @@ class _PromoteFAQModalState extends State<_PromoteFAQModal> {
                       hint: 'Enter the FAQ question…',
                     ),
                     const SizedBox(height: 20),
-                    _SectionLabel(icon: Icons.chat_bubble_outline, label: 'Answer'),
+                    _SectionLabel(
+                      icon: Icons.chat_bubble_outline,
+                      label: 'Answer',
+                    ),
                     const SizedBox(height: 8),
                     _EditableField(
                       controller: _answerCtrl,
@@ -240,24 +262,28 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE5E7EB), width: 0.5),
         ),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              shape: BoxShape.circle,
+              color: const Color(0xFFEAF3DE),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+            child: const Icon(
+              Icons.auto_awesome_outlined,
+              color: Color(0xFF2E7D32),
+              size: 18,
+            ),
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -265,32 +291,33 @@ class _Header extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Promote FAQ Candidate',
+                  'Review FAQ candidate',
                   style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: -0.3,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF111827),
                     height: 1.2,
                   ),
                 ),
-                SizedBox(height: 3),
+                SizedBox(height: 2),
                 Text(
-                  'Review and edit before publishing',
+                  'Edit before publishing to the FAQ list',
                   style: TextStyle(
-                    fontSize: 12.5,
-                    color: Colors.white70,
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
                     height: 1.3,
                   ),
                 ),
               ],
             ),
           ),
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close, color: Colors.white70, size: 22),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
+          InkWell(
+            onTap: () => Navigator.of(context).pop(),
+            borderRadius: BorderRadius.circular(6),
+            child: const Padding(
+              padding: EdgeInsets.all(6),
+              child: Icon(Icons.close, color: Color(0xFF9CA3AF), size: 18),
+            ),
           ),
         ],
       ),
@@ -306,38 +333,45 @@ class _StatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F9F0),
+        color: const Color(0xFFF9FAFB),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFC8E6C9)),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 0.5),
       ),
       child: Row(
         children: [
           _StatChip(
             icon: Icons.repeat_rounded,
             label: 'Occurrences',
-            value: '${candidate.occurrenceCount}',
+            value: '${candidate.occurrenceCount}×',
             color: const Color(0xFF2E7D32),
           ),
-          const SizedBox(width: 16),
+          _divider(),
           _StatChip(
             icon: Icons.calendar_today_outlined,
             label: 'First seen',
             value: formatDate(candidate.firstSeen),
-            color: Colors.blueGrey,
+            color: const Color(0xFF374151),
           ),
-          const SizedBox(width: 16),
+          _divider(),
           _StatChip(
             icon: Icons.schedule_outlined,
             label: 'Last seen',
             value: formatDate(candidate.lastSeen),
-            color: Colors.blueGrey,
+            color: const Color(0xFF374151),
           ),
         ],
       ),
     );
   }
+
+  Widget _divider() => Container(
+    width: 0.5,
+    height: 32,
+    color: const Color(0xFFE5E7EB),
+    margin: const EdgeInsets.symmetric(horizontal: 14),
+  );
 }
 
 class _StatChip extends StatelessWidget {
@@ -358,29 +392,31 @@ class _StatChip extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10.5,
+              color: Color(0xFF9CA3AF),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 3),
           Row(
             children: [
-              Icon(icon, size: 13, color: color),
+              Icon(icon, size: 12, color: color),
               const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
+              Expanded(
+                child: Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -430,11 +466,7 @@ class _EditableField extends StatelessWidget {
       controller: controller,
       maxLines: maxLines,
       enabled: enabled,
-      style: TextStyle(
-        fontSize: 14,
-        color: Colors.grey.shade800,
-        height: 1.5,
-      ),
+      style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.5),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(fontSize: 13.5, color: Colors.grey.shade400),
@@ -492,15 +524,16 @@ class _CategoryDropdown extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 13),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 13,
+            vertical: 13,
+          ),
         ),
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.grey.shade800,
-        ),
-        items: categories
-            .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-            .toList(),
+        style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+        items:
+            categories
+                .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                .toList(),
       ),
     );
   }
@@ -522,75 +555,70 @@ class _Footer extends StatelessWidget {
   Widget build(BuildContext context) {
     final isBusy = isPromoting || isDismissing;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFE5E7EB), width: 0.5)),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
       ),
       child: Row(
         children: [
-          // Dismiss button
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: isBusy ? null : onDismiss,
-              icon: isDismissing
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFFD32F2F),
-                      ),
-                    )
-                  : const Icon(Icons.block_outlined, size: 18),
-              label: Text(isDismissing ? 'Dismissing…' : 'Dismiss'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFD32F2F),
-                side: BorderSide(
-                  color: isBusy
-                      ? Colors.grey.shade200
-                      : const Color(0xFFD32F2F).withOpacity(0.5),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                textStyle: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14.5,
-                ),
+          TextButton(
+            onPressed: isBusy ? null : onDismiss,
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF6B7280),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // Promote button
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: isBusy ? null : onPromote,
-              icon: isPromoting
-                  ? const SizedBox(
+            child:
+                isDismissing
+                    ? const SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: Color(0xFF6B7280),
                       ),
                     )
-                  : const Icon(Icons.arrow_upward_rounded, size: 18),
+                    : const Text(
+                      'Dismiss',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+          ),
+          const Spacer(),
+          SizedBox(
+            height: 44,
+            child: ElevatedButton.icon(
+              onPressed: isBusy ? null : onPromote,
+              icon:
+                  isPromoting
+                      ? const SizedBox(
+                        width: 15,
+                        height: 15,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                      : const Icon(Icons.arrow_upward_rounded, size: 16),
               label: Text(isPromoting ? 'Promoting…' : 'Promote to FAQ'),
               style: ElevatedButton.styleFrom(
                 backgroundColor:
-                    isBusy ? Colors.grey.shade400 : const Color(0xFF2E7D32),
+                    isBusy ? const Color(0xFFD1D5DB) : const Color(0xFF2E7D32),
                 foregroundColor: Colors.white,
-                elevation: isBusy ? 0 : 2,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 textStyle: const TextStyle(
                   fontWeight: FontWeight.w600,
-                  fontSize: 14.5,
+                  fontSize: 14,
                 ),
               ),
             ),

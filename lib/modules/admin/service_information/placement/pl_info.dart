@@ -1,4 +1,5 @@
-import 'package:capstone_project/modules/admin/services/placement/add_edit_placement.dart';
+
+import 'package:capstone_project/modules/admin/service_information/placement/add_edit_placement.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';

@@ -1,16 +1,15 @@
-import 'package:capstone_project/modules/admin/affiliation_management.dart';
+import 'package:capstone_project/modules/admin/information_bank/ib_add.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:capstone_project/modal_pages/affiliations_modal.dart';
+import 'package:capstone_project/modal_pages/programs.modal.dart';
 
 
-import '../information_bank/ib_add.dart';
 
-class ManageAffiliationsButton extends StatelessWidget {
+class ManageProgramsButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final VoidCallback? onUploadComplete;
 
-  const ManageAffiliationsButton({Key? key, this.onPressed, this.onUploadComplete})
+  const ManageProgramsButton({Key? key, this.onPressed, this.onUploadComplete})
     : super(key: key);
 
   @override
@@ -31,12 +30,12 @@ class ManageAffiliationsButton extends StatelessWidget {
         double borderRadius = 8;
 
         // Text for different screen sizes
-        String buttonText = isMobile ? 'Affiliations' : 'Manage Affiliations';
+        String buttonText = isMobile ? 'Programs' : 'Manage Programs';
 
         return Container(
           height: height,
           decoration: BoxDecoration(
-           color: Color(0xFF2E7D32),
+            color: Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(borderRadius),
             boxShadow: [
               BoxShadow(
@@ -51,7 +50,7 @@ class ManageAffiliationsButton extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(borderRadius),
-              onTap: onPressed ?? () => showAffiliationModal(context),
+              onTap: onPressed ?? () => showProgramsDialog(context),
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                 child: Row(
@@ -81,6 +80,25 @@ class ManageAffiliationsButton extends StatelessWidget {
       },
     );
   }
+
+  void showProgramsDialog(BuildContext context) {
+    HapticFeedback.mediumImpact();
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        // Use UploadDocumentModal instead of UploadDocumentContent
+        return const ManageProgramsDialog();
+      },
+    ).then((result) {
+      // Call the callback if upload was successful
+      if (result == true && onUploadComplete != null) {
+        onUploadComplete!();
+      }
+    });
+  }
 }
 
 // Alternative compact version for tight spaces
@@ -98,7 +116,7 @@ class CompactUploadButton extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.green.shade400, Colors.green.shade600],
+          colors: [Color(0xFF2E7D32), Color(0xFF2E7D32)],
         ),
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
@@ -114,7 +132,7 @@ class CompactUploadButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: onPressed ?? () => showAffiliationsDialog(context),
+          onTap: onPressed ?? () => showProgramsDialog(context),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Icon(
@@ -128,7 +146,7 @@ class CompactUploadButton extends StatelessWidget {
     );
   }
 
-  void showAffiliationsDialog(BuildContext context) {
+  void showProgramsDialog(BuildContext context) {
     HapticFeedback.mediumImpact();
 
     showDialog(
@@ -137,7 +155,7 @@ class CompactUploadButton extends StatelessWidget {
       barrierColor: Colors.black.withOpacity(0.5),
       builder: (BuildContext context) {
         // Use UploadDocumentModal instead of UploadDocumentContent
-        return const ManageAffiliationDialog();
+        return const UploadDocumentModal();
       },
     ).then((result) {
       // Call the callback if upload was successful
@@ -159,7 +177,7 @@ class UploadDocumentFAB extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FloatingActionButton.extended(
-      onPressed: onPressed ?? () => showAffiliationsDialog(context),
+      onPressed: onPressed ?? () => showProgramsDialog(context),
       backgroundColor: Colors.green,
       foregroundColor: Colors.white,
       icon: Icon(Icons.cloud_upload_outlined),
@@ -172,7 +190,7 @@ class UploadDocumentFAB extends StatelessWidget {
     );
   }
 
-  void showAffiliationsDialog(BuildContext context) {
+  void showProgramsDialog(BuildContext context) {
     HapticFeedback.mediumImpact();
 
     showDialog(
