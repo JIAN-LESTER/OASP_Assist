@@ -238,12 +238,12 @@ class _AddFaqContentState extends State<AddFaqContent> {
       if (embedding != null) {
         SnackbarUtil.showSuccess(
           context,
-          'FAQ created with embedding (${embedding.length} dims)!',
+          'FAQ created successfully!',
         );
       } else {
         SnackbarUtil.showWarning(
           context,
-          'FAQ created without embedding - will be generated on first use',
+          'FAQ created successfully!',
         );
       }
     } catch (e) {

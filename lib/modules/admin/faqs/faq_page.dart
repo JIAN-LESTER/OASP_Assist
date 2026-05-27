@@ -1,10 +1,11 @@
-import 'package:capstone_project/modules/admin/buttons/add_faq_button.dart';
-import 'package:capstone_project/modules/admin/buttons/bulk.dart';
+import 'package:capstone_project/buttons/add_faq_button.dart';
+import 'package:capstone_project/buttons/bulk.dart';
 import 'package:capstone_project/modules/admin/faqs/faq_candidate_tab.dart';
-import 'package:capstone_project/modules/admin/widgets/faq_category_dropdown_button.dart';
-import 'package:capstone_project/modules/admin/widgets/pagination.dart';
-import 'package:capstone_project/modules/admin/widgets/search_field.dart';
+
 import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_management.dart';
+import 'package:capstone_project/widgets/faq_category_dropdown_button.dart';
+import 'package:capstone_project/widgets/pagination.dart';
+import 'package:capstone_project/widgets/search_field.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -181,35 +182,53 @@ class _FaqManagementPageState extends State<FaqManagementPage>
   // ── Tab bar ──────────────────────────────────────────────────────────────
   Widget _buildTabBar() {
     return Container(
-      height: 44,
-      color: Colors.white,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+        ),
+      ),
       child: TabBar(
         controller: _tabController,
-        labelColor: const Color(0xFF2E7D32),
-        unselectedLabelColor: Colors.grey.shade600,
-        indicatorColor: const Color(0xFF2E7D32),
-        indicatorWeight: 2.5,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        labelColor: const Color(0xFF1B5E20),
+        unselectedLabelColor: Colors.grey.shade500,
+        indicator: const UnderlineTabIndicator(
+          borderSide: BorderSide(color: Color(0xFF2E7D32), width: 2.5),
+          insets: EdgeInsets.zero,
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        labelPadding: EdgeInsets.zero,
+        labelStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+          letterSpacing: 0.1,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w400,
+          fontSize: 13,
+        ),
         tabs: [
           const Tab(
+            height: 46,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.quiz_outlined, size: 16),
-                SizedBox(width: 6),
+                Icon(Icons.quiz_outlined, size: 15),
+                SizedBox(width: 7),
                 Text('All FAQs'),
               ],
             ),
           ),
           Tab(
+            height: 46,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.auto_awesome_outlined, size: 16),
-                const SizedBox(width: 6),
+                const Icon(Icons.auto_awesome_outlined, size: 15),
+                const SizedBox(width: 7),
                 const Text('Candidates'),
                 if (_pendingCandidateCount > 0) ...[
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 7),
                   _PendingBadge(count: _pendingCandidateCount),
                 ],
               ],
@@ -350,22 +369,20 @@ class _PendingBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
         color: const Color(0xFF2E7D32),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         count > 99 ? '99+' : '$count',
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
-        ),
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white, height: 1.2),
       ),
     );
   }
 }
+
+
 
 // ============================================================================
 // The rest of the file is UNCHANGED from the original faq_management.dart

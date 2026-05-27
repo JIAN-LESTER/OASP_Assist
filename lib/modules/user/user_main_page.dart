@@ -5,9 +5,9 @@ import 'package:capstone_project/modules/user/announcement/user_announcement.dar
 import 'package:capstone_project/modules/user/chat/chat_page.dart';
 
 import 'package:capstone_project/modules/user/home/home.dart';
-import 'package:capstone_project/modules/user/services/admission_info.dart';
-import 'package:capstone_project/modules/user/services/placement_info.dart';
-import 'package:capstone_project/modules/user/services/scholarship_list.dart';
+import 'package:capstone_project/modules/user/service_information/admission_info.dart';
+import 'package:capstone_project/modules/user/service_information/placement_info.dart';
+import 'package:capstone_project/modules/user/service_information/scholarship_list.dart';
 import 'package:capstone_project/modules/authentication/onboarding/onBoardingGuide.dart';
 import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';

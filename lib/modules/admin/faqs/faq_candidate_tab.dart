@@ -40,30 +40,30 @@ class _FaqCandidatesTabState extends State<FaqCandidatesTab> {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: filters.map((f) {
-          final isSelected = _statusFilter == f.$1;
-          return Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: FilterChip(
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              label: Text(f.$2),
-              selected: isSelected,
-              selectedColor: f.$3.withOpacity(0.15),
-              checkmarkColor: f.$3,
-              labelStyle: TextStyle(
-                color: isSelected ? f.$3 : Colors.grey.shade700,
-                fontWeight:
-                    isSelected ? FontWeight.w600 : FontWeight.w400,
-                fontSize: 12,
-              ),
-              side: BorderSide(
-                color: isSelected ? f.$3 : Colors.grey.shade300,
-              ),
-              onSelected: (_) => setState(() => _statusFilter = f.$1),
-            ),
-          );
-        }).toList(),
+        children:
+            filters.map((f) {
+              final isSelected = _statusFilter == f.$1;
+              return Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: FilterChip(
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  label: Text(f.$2),
+                  selected: isSelected,
+                  selectedColor: f.$3.withOpacity(0.15),
+                  checkmarkColor: f.$3,
+                  labelStyle: TextStyle(
+                    color: isSelected ? f.$3 : Colors.grey.shade700,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    fontSize: 12,
+                  ),
+                  side: BorderSide(
+                    color: isSelected ? f.$3 : Colors.grey.shade300,
+                  ),
+                  onSelected: (_) => setState(() => _statusFilter = f.$1),
+                ),
+              );
+            }).toList(),
       ),
     );
   }
@@ -95,8 +95,7 @@ class _FaqCandidatesTabState extends State<FaqCandidatesTab> {
           itemCount: docs.length,
           separatorBuilder: (_, __) => const SizedBox(height: 6),
           itemBuilder: (context, index) {
-            final candidate =
-                FAQCandidate.fromFirestore(docs[index]);
+            final candidate = FAQCandidate.fromFirestore(docs[index]);
             return _CandidateCard(
               candidate: candidate,
               onTap: () => showPromoteFAQModal(context, candidate),
@@ -139,8 +138,9 @@ class _FaqCandidatesTabState extends State<FaqCandidatesTab> {
       debugPrint('[FAQ Candidates] Firebase message: ${error.message}');
 
       final message = error.message ?? error.toString();
-      final match = RegExp(r'https://console\.firebase\.google\.com/\S+')
-          .firstMatch(message);
+      final match = RegExp(
+        r'https://console\.firebase\.google\.com/\S+',
+      ).firstMatch(message);
 
       if (match != null) {
         debugPrint('[FAQ Candidates] Create index URL: ${match.group(0)}');
@@ -207,8 +207,18 @@ class _CandidateCard extends StatelessWidget {
   String _formatDate(Timestamp ts) {
     final d = ts.toDate();
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[d.month - 1]} ${d.day}';
   }
@@ -235,55 +245,56 @@ class _CandidateCard extends StatelessWidget {
 
     return InkWell(
       onTap: isPending ? onTap : null,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isPending
-                ? const Color(0xFFC8E6C9)
-                : Colors.grey.shade200,
+            color: isPending ? const Color(0xFFBBDEBB) : Colors.grey.shade200,
+            width: isPending ? 1 : 0.5,
           ),
-          boxShadow: [
-            if (isPending)
-              BoxShadow(
-                color: const Color(0xFF2E7D32).withOpacity(0.06),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-          ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Occurrence badge
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: _statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Text(
-                  '${candidate.occurrenceCount}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: _statusColor,
+            // Count column
+            Column(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: _statusColor.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${candidate.occurrenceCount}',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: _statusColor,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  'asked',
+                  style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Text(
@@ -291,8 +302,8 @@ class _CandidateCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF1F2937),
-                            height: 1.2,
+                            color: Color(0xFF1A1A1A),
+                            height: 1.35,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -302,41 +313,27 @@ class _CandidateCard extends StatelessWidget {
                       _CategoryBadge(category: candidate.category),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 5),
                   Text(
                     candidate.answer,
                     style: TextStyle(
                       fontSize: 12.5,
                       color: Colors.grey.shade600,
-                      height: 1.2,
+                      height: 1.3,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 8),
+                  // Footer row
                   Row(
                     children: [
                       Icon(
-                        Icons.repeat_rounded,
+                        Icons.access_time_rounded,
                         size: 12,
-                        color: _statusColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _statusLabel,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: _statusColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.calendar_today_outlined,
-                        size: 11,
                         color: Colors.grey.shade400,
                       ),
-                      const SizedBox(width: 3),
+                      const SizedBox(width: 4),
                       Text(
                         '${_formatDate(candidate.firstSeen)} – ${_formatDate(candidate.lastSeen)}',
                         style: TextStyle(
@@ -344,17 +341,45 @@ class _CandidateCard extends StatelessWidget {
                           color: Colors.grey.shade400,
                         ),
                       ),
-                      if (isPending) ...[
-                        const Spacer(),
-                        Text(
-                          'Review →',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF2E7D32),
+                      const Spacer(),
+                      if (candidate.status != 'pending')
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
                           ),
+                          decoration: BoxDecoration(
+                            color: _statusColor.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            _statusLabel,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: _statusColor,
+                            ),
+                          ),
+                        )
+                      else
+                        Row(
+                          children: [
+                            Text(
+                              'Review',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF2E7D32),
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 13,
+                              color: Color(0xFF2E7D32),
+                            ),
+                          ],
                         ),
-                      ],
                     ],
                   ),
                 ],

@@ -1,6 +1,6 @@
 import 'package:capstone_project/modules/admin/colleges_programs_managament/college.dart';
 import 'package:capstone_project/modules/admin/colleges_programs_managament/programs.dart';
-import 'package:capstone_project/modules/admin/services/admission/admission_management.dart';
+
 
 import 'package:capstone_project/modules/admin/announcement/announcement_page.dart';
 
@@ -9,11 +9,14 @@ import 'package:capstone_project/modules/admin/faqs/faq_page.dart';
 import 'package:capstone_project/modules/admin/human_escalation/human_escalation.dart';
 import 'package:capstone_project/modules/admin/information_bank/information_bank_page.dart';
 import 'package:capstone_project/modules/admin/logs/message_logs.dart';
-import 'package:capstone_project/modules/admin/services/placement/placement_management.dart';
+
 
 import 'package:capstone_project/modules/admin/dashboard_and_reports/reports_page.dart';
-import 'package:capstone_project/modules/admin/services/scholarship/scholarship_management.dart';
+
 import 'package:capstone_project/modules/admin/logs/system_logs_page.dart';
+import 'package:capstone_project/modules/admin/service_information/admission/admission_management.dart' show AdmissionManagementPage;
+import 'package:capstone_project/modules/admin/service_information/placement/placement_management.dart';
+import 'package:capstone_project/modules/admin/service_information/scholarship/scholarship_management.dart';
 import 'package:capstone_project/modules/admin/user_management/user_management_page.dart';
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
