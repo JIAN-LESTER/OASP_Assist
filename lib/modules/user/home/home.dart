@@ -225,9 +225,6 @@ class _HomeDashboardState extends State<HomeDashboard>
                   // Welcome Header
                   SliverToBoxAdapter(child: _buildWelcomeHeader()),
 
-                  // AI Chat Assistant
-                  SliverToBoxAdapter(child: _buildChatPreviewSection()),
-
                   // Service Grid
                   SliverPadding(
                     padding: EdgeInsets.symmetric(
@@ -236,6 +233,9 @@ class _HomeDashboardState extends State<HomeDashboard>
                     ),
                     sliver: _buildServicesGrid(),
                   ),
+
+                  // AI Chat Assistant
+                  SliverToBoxAdapter(child: _buildChatPreviewSection()),
 
                   // Bottom spacing
                   SliverToBoxAdapter(

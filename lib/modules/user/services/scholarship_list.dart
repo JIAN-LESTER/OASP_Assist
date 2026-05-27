@@ -803,7 +803,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.grey[500],
+                                    color: const Color(0xFF2E7D32),
                                     letterSpacing: 0.5,
                                   ),
                                 ),
@@ -892,7 +892,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
-                                        color: Colors.grey[500],
+                                        color: const Color(0xFF2E7D32),
                                         letterSpacing: 0.5,
                                       ),
                                     ),
@@ -940,7 +940,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
-                                        color: Colors.grey[500],
+                                        color: const Color(0xFF2E7D32),
                                         letterSpacing: 0.5,
                                       ),
                                     ),
@@ -1004,7 +1004,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.grey[500],
+                                      color: const Color(0xFF2E7D32),
                                       letterSpacing: 0.5,
                                     ),
                                   ),
@@ -1064,7 +1064,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.grey[500],
+                                      color: const Color(0xFF2E7D32),
                                       letterSpacing: 0.5,
                                     ),
                                   ),
@@ -1132,7 +1132,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.grey[500],
+                                      color: const Color(0xFF2E7D32),
                                       letterSpacing: 0.5,
                                     ),
                                   ),
