@@ -10,7 +10,7 @@ void showLogsInfoModal(
   DocumentSnapshot doc,
   List<Map<String, dynamic>> messages,
   bool isMessage, {
-  bool showDeleteButton = false, // 🔹 NEW: Optional parameter for delete access
+  bool showDeleteButton = false, // 🔹  Optional parameter for delete access
 }) {
   final data = doc.data() as Map<String, dynamic>;
 

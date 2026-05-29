@@ -724,7 +724,7 @@ async function retrieveRelevantDocuments(
 
     console.log(` Found ${similarChunks.matches.length} similar chunks`);
 
-    //  NEW: Log first match details for debugging
+    //   Log first match details for debugging
     if (similarChunks.matches.length > 0) {
       const firstMatch = similarChunks.matches[0];
       console.log("First match details:");
@@ -756,7 +756,7 @@ async function retrieveRelevantDocuments(
       return [];
     }
 
-    //  CRITICAL FIX: Better document grouping
+    //  CRITICAL  Better document grouping
     const documentChunks: { [key: string]: any[] } = {};
 
     for (const chunk of filteredChunks) {

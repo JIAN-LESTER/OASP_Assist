@@ -417,7 +417,7 @@ class _DashboardModulestate extends State<DashboardPage> {
       final userDemoData = results[1] as UserDemographicsReportsData;
       final inquiryReportData = results[2] as InquiryReportsData;
 
-      //  FIX: Use inquiryReportData directly instead of creating from adminData
+      //   Use inquiryReportData directly instead of creating from adminData
       final inquiryData = InquiryReportsData(
         totalMessages: inquiryReportData.totalMessages,
         userMessages: inquiryReportData.userMessages,

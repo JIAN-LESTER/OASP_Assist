@@ -248,7 +248,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   void registerUser() async {
     _clearErrors();
-    print('🟢 Starting registration process...');
+    print(' Starting registration process...');
 
     bool isEmailValid = await _validateEmail(emailController.text);
     bool isPasswordValid = _validatePassword(passwordController.text);
@@ -340,7 +340,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (mounted) {
         setState(() => _isLoading = false);
-        print('🟢 Registration complete');
+        print(' Registration complete');
         _showVerificationDialog(user);
       }
     } on FirebaseAuthException catch (e) {

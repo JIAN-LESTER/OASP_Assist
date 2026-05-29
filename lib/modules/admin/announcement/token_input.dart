@@ -927,7 +927,7 @@ Future<void> showTokenInputModal(
     pageIdController.text = helper.tokenStatus!.pageId!;
   }
 
-  //  FIX: Create a ValueNotifier to manage isExchanging state properly
+  //   Create a ValueNotifier to manage isExchanging state properly
   final ValueNotifier<bool> isExchangingNotifier = ValueNotifier(false);
 
   showDialog(
@@ -1291,7 +1291,7 @@ Future<void> _handleTokenExchange(
     return;
   }
 
-  //  FIX: Update the notifier to trigger UI rebuild
+  //   Update the notifier to trigger UI rebuild
   isExchangingNotifier.value = true;
 
   try {
@@ -1340,7 +1340,7 @@ Future<void> _handleTokenExchange(
     final errorMessage = FacebookSyncService.parseErrorMessage(e);
     SnackbarUtil.showError(context, 'Failed to save: $errorMessage');
   } finally {
-    //  FIX: Reset the notifier
+    //   Reset the notifier
     if (isExchangingNotifier.value) {
       isExchangingNotifier.value = false;
     }

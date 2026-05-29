@@ -1397,7 +1397,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
   late TextEditingController _nameController;
   bool _isSubmitting = false;
   String? _selectedCollegeId;
-  String? _selectedCategory; // NEW: Category field
+  String? _selectedCategory; //  Category field
   List<DocumentSnapshot> _colleges = [];
   bool _loadingColleges = true;
   String? _nameError;
@@ -1416,14 +1416,14 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     if (widget.programDoc != null) {
       final data = widget.programDoc!.data() as Map<String, dynamic>;
       final fullName = data['name'] ?? '';
-      _selectedCategory = data['category']; // NEW: Load existing category
+      _selectedCategory = data['category']; //  Load existing category
       _selectedCollegeId = data['collegeId'];
 
       // Load colleges first, then strip prefix
       _loadColleges().then((_) {
         if (!mounted) return;
 
-        // NEW: Strip the prefix when editing to show only the user input part
+        //  Strip the prefix when editing to show only the user input part
         String nameWithoutPrefix = fullName;
 
         // Check if we should strip the prefix based on college
@@ -1495,7 +1495,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     super.dispose();
   }
 
-  // NEW: Helper method to format program name based on category
+  //  Helper method to format program name based on category
   String _formatProgramName(String input) {
     // Check if college is "Others" or "Veterinary Medicine" - don't add prefix
     if (_selectedCategory == 'Bachelor' && _selectedCollegeId != null) {
@@ -1563,16 +1563,16 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     setState(() => _isSubmitting = true);
 
     try {
-      // NEW: Format the program name based on category
+      //  Format the program name based on category
       final formattedName = _formatProgramName(_nameController.text.trim());
 
       final programData = {
         'name': formattedName,
-        'category': _selectedCategory, // NEW: Save category
+        'category': _selectedCategory, //  Save category
         'updatedAt': Timestamp.now(),
       };
 
-      // NEW: Only add collegeId for Bachelor programs
+      //  Only add collegeId for Bachelor programs
       if (_selectedCategory == 'Bachelor') {
         programData['collegeId'] = _selectedCollegeId;
       } else {
@@ -1772,10 +1772,10 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
                         Icons.school_outlined,
                       ),
                       const SizedBox(height: 16),
-                      // NEW: Category dropdown at the top
+                      //  Category dropdown at the top
                       _buildCategoryDropdown(isMobile),
                       const SizedBox(height: 16),
-                      // NEW: Only show college dropdown for Bachelor programs
+                      //  Only show college dropdown for Bachelor programs
                       if (_selectedCategory == 'Bachelor') ...[
                         _buildCollegeDropdown(isMobile),
                         const SizedBox(height: 16),
@@ -1895,7 +1895,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     );
   }
 
-  // NEW: Category radio buttons widget
+  //  Category radio buttons widget
   Widget _buildCategoryDropdown(bool isMobile) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2076,7 +2076,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
     );
   }
 
-  // NEW: Modified program name field with dynamic hint
+  //  Modified program name field with dynamic hint
   Widget _buildProgramNameField(bool isMobile) {
     String prefix = '';
     String example = '';

@@ -10,7 +10,7 @@ import {logGeminiUsage} from "./geminiUsage";
 // Define secrets
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
-const GOOGLE_VISION_API_KEY = defineSecret("GOOGLE_VISION_API_KEY");
+const GOOGLE_VISION_API_KEY = defineSecret("GOOGLE_VISION_API_KEY"); //   For OCR
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
 const PINECONE_HOST = defineSecret("PINECONE_HOST");
 
@@ -70,6 +70,8 @@ async function getAutoCreateSettings(): Promise<{
 function extractAllImagesFromPost(post: FacebookPost): string[] {
   const images: string[] = [];
 
+  //   Simple extraction without deduplication
+  console.log(" Extracting images from post...");
 
   // Extract from attachments FIRST (higher quality)
   if (post.attachments?.data) {
@@ -188,7 +190,6 @@ function extractSchedulesFromOCR(ocrText: string): ScheduleEntry[] {
     /^(SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY)$/i;
   const yearPattern = /^(20\d{2})$/;
   const timePattern = /(\d{1,2}(?::\d{2})?\s*(?:am|pm))/gi;
-
 
   const headerKeywords = [
     "central mindanao university",
@@ -1649,7 +1650,6 @@ async function createPlacementFromAnnouncement(
     const placementRef = db.collection("placements").doc(postId);
     const existingDoc = await placementRef.get();
 
-
     if (existingDoc.exists) {
       const existingData = existingDoc.data();
       if (existingData?.deleted === true) {
@@ -2019,7 +2019,6 @@ async function createInfoBankFromCategory(
       "uploadedViaFlutter": false,
       "createdAt": admin.firestore.FieldValue.serverTimestamp(),
       "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-
 
       ...(categoryType === "admission" && extractedData.type && {
         "admissionType": extractedData.type,
@@ -2840,7 +2839,7 @@ async function syncCategoryToInfoBank(
         }
       );
 
-
+      //   Handle correct Gemini API response structure
       const responseData = embeddingResponse.data as any;
       await logGeminiUsage({
         userId: null,
@@ -3451,7 +3450,6 @@ export const fixAnnouncementInfoBankMetadata = onCall(
                 },
               }
             );
-
 
             const responseData = embeddingResponse.data as any;
             await logGeminiUsage({

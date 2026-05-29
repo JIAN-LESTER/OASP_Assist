@@ -16,7 +16,7 @@ class Message {
   final int? count;
   final int? similarityCount;
 
-  //  NEW: Escalation fields
+  //   Escalation fields
   final bool? escalationResolved;
   final String? escalationResponse;
   final String? escalationRespondedBy;
@@ -38,7 +38,7 @@ class Message {
     this.rating,
     this.count,
     this.similarityCount,
-    //  NEW: Escalation parameters
+    //   Escalation parameters
     this.escalationResolved,
     this.escalationResponse,
     this.escalationRespondedBy,
@@ -63,7 +63,7 @@ class Message {
       rating: json['rating'] as String?,
       count: json['count'] as int?,
       similarityCount: json['similarityCount'] as int?,
-      //  NEW: Parse escalation fields
+      //   Parse escalation fields
       escalationResolved: json['escalationResolved'] as bool?,
       escalationResponse: json['escalationResponse'] as String?,
       escalationRespondedBy: json['escalationRespondedBy'] as String?,
@@ -91,7 +91,7 @@ class Message {
       'rating': rating,
       'count': count,
       'similarityCount': similarityCount ?? 0,
-      //  NEW: Include escalation fields
+      //   Include escalation fields
       'escalationResolved': escalationResolved,
       'escalationResponse': escalationResponse,
       'escalationRespondedBy': escalationRespondedBy,

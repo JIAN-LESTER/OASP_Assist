@@ -5,7 +5,7 @@ import axios from "axios";
 const db = admin.firestore();
 const FB_API_VERSION = "v24.0";
 
-//  NEW: Get app credentials from Firestore instead of secrets
+//   Get app credentials from Firestore instead of secrets
 async function getAppCredentials(appId?: string): Promise<{appId: string, appSecret: string}[]> {
   try {
     const doc = await db.collection("fb_app_credentials").doc("apps").get();
@@ -67,7 +67,7 @@ async function verifyAuthToken(
   }
 }
 
-//  UPDATED: Detect which app the token belongs to
+//   Detect which app the token belongs to
 async function detectAppFromToken(shortToken: string): Promise<{appId: string, appSecret: string} | null> {
   try {
     const apps = await getAppCredentials();
@@ -110,7 +110,7 @@ async function detectAppFromToken(shortToken: string): Promise<{appId: string, a
   }
 }
 
-//  UPDATED: Try to exchange with detected or all available apps
+//   Try to exchange with detected or all available apps
 async function exchangeShortForLong(
   shortToken: string,
   appId?: string,
@@ -420,7 +420,7 @@ export const exchangeToken = onCall(
   }
 );
 
-//  NEW: Function to manage app credentials via API
+//   Function to manage app credentials via API
 export const manageAppCredentials = onCall(
   {
     cors: true,

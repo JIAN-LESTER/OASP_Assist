@@ -952,11 +952,11 @@ class _EditProfileModalState extends State<EditProfileModal> {
     required String hint,
     required IconData icon,
   }) {
-    //  FIX: Remove duplicates and empty values
+    //   Remove duplicates and empty values
     final uniqueItems =
         items.where((item) => item.trim().isNotEmpty).toSet().toList();
 
-    //  FIX: Validate the current value
+    //   Validate the current value
     final validValue =
         (value != null &&
                 value.trim().isNotEmpty &&

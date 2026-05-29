@@ -1038,7 +1038,7 @@ class _NotificationModalState extends State<NotificationModal>
         _navigateToAnnouncements(announcementId);
         break;
 
-      //  NEW: Handle Facebook token expiration
+      //   Handle Facebook token expiration
       case 'fb_token_expiration':
         _handleFacebookTokenExpiration(data);
         break;
@@ -2164,7 +2164,7 @@ class _NotificationModalState extends State<NotificationModal>
         final isRead = _isRead(data);
         final notificationType = data['type'] as String?;
 
-        //  NEW: Special styling for FB token notifications
+        //   Special styling for FB token notifications
         final isFbTokenNotification = notificationType == 'fb_token_expiration';
         final isExpired =
             data['status'] == 'expired' ||

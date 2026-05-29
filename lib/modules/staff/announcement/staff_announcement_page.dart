@@ -845,7 +845,7 @@ class AnnouncementCard extends StatefulWidget {
 class _AnnouncementCardState extends State<AnnouncementCard> {
   // int _currentImageIndex = 0;
   final PageController _pageController = PageController();
-  bool _isMessageExpanded = false; //  NEW: Track message expansion state
+  bool _isMessageExpanded = false; //   Track message expansion state
 
   @override
   void dispose() {
@@ -1502,7 +1502,7 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
     );
   }
 
-  //  NEW: Message widget with See More/Less functionality
+  //   Message widget with See More/Less functionality
   Widget _buildMessage(String message) {
     // Count the number of lines
     final textPainter = TextPainter(
@@ -1785,7 +1785,7 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
 }
 
 // ============================================================================
-//  UPDATED: Full Screen Image Gallery with Navigation Arrows
+//   Full Screen Image Gallery with Navigation Arrows
 // ============================================================================
 
 class FullScreenImageGallery extends StatefulWidget {
@@ -2268,7 +2268,7 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
               },
             ),
 
-          //  NEW: Navigation arrows in fullscreen
+          //   Navigation arrows in fullscreen
           if (_images.length > 1) ...[
             _buildFullscreenNavigationArrow(
               alignment: Alignment.centerLeft,
@@ -2360,7 +2360,7 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
     );
   }
 
-  //  NEW: Navigation arrow for fullscreen mode
+  //   Navigation arrow for fullscreen mode
   Widget _buildFullscreenNavigationArrow({
     required AlignmentGeometry alignment,
     required IconData icon,

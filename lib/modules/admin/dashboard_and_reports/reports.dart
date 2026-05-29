@@ -870,13 +870,13 @@ class FirebaseService {
     final totalEscalations =
         allEscalations.length; //  TOTAL escalations (pending + resolved)
 
-    //  FIX: Calculate rates based on correct denominators
+    //   Calculate rates based on correct denominators
     final escalationRate =
         userMessageCount > 0
             ? (totalEscalations / userMessageCount) * 100
             : 0.0;
 
-    //  FIX: Resolution rate = resolved / total escalations (not pending)
+    //   Resolution rate = resolved / total escalations (not pending)
     final resolutionRate =
         totalEscalations > 0 ? (resolvedCount / totalEscalations) * 100 : 0.0;
 
@@ -1057,7 +1057,7 @@ class FirebaseService {
             ? conversations.length / userConversationCounts.length.toDouble()
             : 0.0;
 
-    // NEW: Calculate limit reach rates
+    //  Calculate limit reach rates
     final limitData = _calculateLimitReachRates(
       users,
       startDate,
@@ -1091,7 +1091,7 @@ class FirebaseService {
       timeFrame,
     );
 
-    // NEW: Add year and all-time peak usage
+    //  Add year and all-time peak usage
     final peakUsageByYear = _generatePeakUsageByYear(
       conversations,
       startDate,
@@ -2326,7 +2326,7 @@ List<ChartData> _generateConversationsTrend(
   return _generateSimpleTrendData(startDate, endDate, interval, timeCounts);
 }
 
-// 5. FIX: _buildResponseTimeTrend - Ensure proper data structure
+// 5.  _buildResponseTimeTrend - Ensure proper data structure
 List<ChartData> _buildResponseTimeTrend(
   Map<String, List<double>> responseTimeByDate,
   String interval,
@@ -2485,7 +2485,7 @@ List<ChartData> _generateUserGrowthTrend(
 
     final date = timestamp.toDate();
 
-    //  FIX: Only count users within the date range
+    //   Only count users within the date range
     if (date.isBefore(startDate) || date.isAfter(actualEndDate)) continue;
 
     cumulativeCount++;
@@ -2651,7 +2651,7 @@ Map<int, int> _generatePeakUsageByHour(
   return hourCounts;
 }
 
-// UPDATED: Generate peak usage by day - filtered by date range
+//  Generate peak usage by day - filtered by date range
 Map<String, int> _generatePeakUsageByDay(
   List<QueryDocumentSnapshot> conversations,
   DateTime startDate,
@@ -2770,7 +2770,7 @@ Map<String, int> _generatePeakUsageByAllYears(
   return sortedCounts;
 }
 
-// UPDATED: Generate peak usage by month - filtered by date range
+//  Generate peak usage by month - filtered by date range
 Map<String, int> _generatePeakUsageByMonth(
   List<QueryDocumentSnapshot> conversations,
   DateTime startDate,
@@ -2896,7 +2896,7 @@ List<ChartData> _generateTrendData(
 
     case 'daily':
     case 'This Week':
-      //  CRITICAL FIX: Properly map dates to day names
+      //  CRITICAL  Properly map dates to day names
       final startOfWeek = _getStartOfWeek(
         actualEndDate,
       ); // Use current date's week
@@ -2949,7 +2949,7 @@ List<ChartData> _generateTrendData(
 
     case 'monthly':
     case 'This Year':
-      //  CRITICAL FIX: Generate all 12 months and map data correctly
+      //  CRITICAL  Generate all 12 months and map data correctly
       final monthNames = [
         'Jan',
         'Feb',
@@ -3228,7 +3228,7 @@ List<String> _generateAllTimeKeys(
         'Nov',
         'Dec',
       ];
-      //  FIX: Always generate all 12 months for "This Year"
+      //   Always generate all 12 months for "This Year"
       for (int month = 1; month <= 12; month++) {
         keys.add(monthNames[month - 1]);
       }

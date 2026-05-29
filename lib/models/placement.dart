@@ -56,7 +56,7 @@ class Placement {
       'isRecruiting': isRecruiting,
       'contacts': contacts,
       'positions': positions,
-      //  FIX: Store as Firestore Timestamp instead of ISO string
+      //   Store as Firestore Timestamp instead of ISO string
       'deadline': deadline != null ? Timestamp.fromDate(deadline!) : null,
       'createdAt': Timestamp.fromDate(createdAt),
     };

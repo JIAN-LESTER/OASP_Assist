@@ -85,7 +85,7 @@ async function sendFCMNotifications(
     console.log(`   Type: ${data.type}`);
     console.log(`   Title: ${title}`);
 
-    //  FIX: Only get tokens for the SPECIFIC userIds provided
+    //   Only get tokens for the SPECIFIC userIds provided
     // This is the critical fix - we were getting tokens for all users before
     const userTokensMap = await getUserFCMTokens(userIds);
 
@@ -100,7 +100,7 @@ async function sendFCMNotifications(
       console.log(`   User ${userId}: ${tokens.length} tokens`);
     });
 
-    //  ADDITIONAL FIX: Verify tokens belong to intended users
+    //  ADDITIONAL  Verify tokens belong to intended users
     const allTokens: string[] = [];
     const seenTokens = new Set<string>();
 
@@ -796,7 +796,7 @@ export const checkUpcomingDeadlines = onSchedule(
             notificationsSent: notificationsCreated,
           });
 
-          //  FIX: Don't pass targetUserId for deadline reminders (they're for all users)
+          //   Don't pass targetUserId for deadline reminders (they're for all users)
           if (notificationsCreated > 0) {
             await sendFCMNotifications(
               allUserIds,
@@ -1338,7 +1338,7 @@ export const onEscalationCreated = onDocumentCreated(
 
         if (staffNotifications > 0) {
           console.log(` Sending FCM to ONLY ${staffIds.length} filtered staff members`);
-          //  FIX: Only send to the filtered staffIds
+          //   Only send to the filtered staffIds
           await sendFCMNotifications(
             staffIds, // This now contains ONLY filtered staff
             notificationTitle,
@@ -1568,7 +1568,7 @@ export const onEscalationReplied = onDocumentUpdated(
       if (notificationsCreated > 0) {
         console.log(` Sending FCM to ONLY user ${userId}`);
 
-        //  CRITICAL FIX: Pass targetUserId as 6th parameter
+        //  CRITICAL  Pass targetUserId as 6th parameter
         await sendFCMNotifications(
           [userId],
           notificationTitle,

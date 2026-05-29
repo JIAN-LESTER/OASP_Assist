@@ -1251,7 +1251,7 @@ $question
       for (var entry in FAQCache.cache.entries) {
         final data = entry.value;
 
-        // FIX: Accept both 'embedding' (auto-promoted) and 'geminiEmbedding'
+        //  Accept both 'embedding' (auto-promoted) and 'geminiEmbedding'
         // (predefined/server-generated) so no FAQ is silently skipped.
         final rawEmbedding = data['embedding'] ?? data['geminiEmbedding'];
 
@@ -1279,7 +1279,7 @@ $question
           continue;
         }
 
-        // FIX: Strict dimension check - only compare 768-dim embeddings.
+        //  Strict dimension check - only compare 768-dim embeddings.
         // Mixing different embedding models produces nonsense similarity scores.
         if (faqEmbedding.length != 768 || questionEmbedding.length != 768) {
 <<<<<<< HEAD
@@ -1429,7 +1429,7 @@ $question
             continue;
           }
 
-          // FIX: Accept both field names; normalise to 'embedding' in cache
+          //  Accept both field names; normalise to 'embedding' in cache
           // so _findBestFAQMatch always finds it under 'embedding'.
           final rawEmbedding = data['embedding'] ?? data['geminiEmbedding'];
 
@@ -1448,7 +1448,7 @@ $question
             continue;
           }
 
-          // FIX: Enforce 768 dimensions - reject wrong-model embeddings.
+          //  Enforce 768 dimensions - reject wrong-model embeddings.
           if ((rawEmbedding as List).length != 768) {
 <<<<<<< HEAD
 =======
