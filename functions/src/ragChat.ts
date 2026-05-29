@@ -1,9 +1,14 @@
+/* eslint-disable no-empty */
+/* eslint-disable no-useless-catch */
 import {onCall, onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import {Pinecone} from "@pinecone-database/pinecone";
 import axios from "axios";
 import {onSchedule} from "firebase-functions/scheduler";
+import {Firestore, FieldValue} from "@google-cloud/firestore";
+
+type JsonResponse = Record<string, any>;
 
 // Secrets
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
@@ -16,45 +21,50 @@ const db = admin.firestore();
 // GEMINI FUNCTIONS
 // ============================================================================
 
-// At the top of your existing CF file
-const { Firestore } = require('@google-cloud/firestore');
 const firestore = new Firestore();
 
-// ── Paste this helper anywhere in your existing CF file ──────────
-async function logGeminiUsage({ userId, conversationId, model, inputTokens, outputTokens }) {
-  // Pricing per 1M tokens (USD) — update if Google changes pricing
+async function logGeminiUsage({userId, conversationId, model, inputTokens, outputTokens}: {
+  userId: string | null;
+  conversationId: string | null;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+}) {
+  // Pricing per 1M tokens (USD) - update if Google changes pricing
   // https://ai.google.dev/pricing
-  const PRICES = {
-    'gemini-2.5-flash':     { input: 0.30,  output: 2.50  },
-    'gemini-embedding-001': { input: 0.15,  output: 0.00  },
-    'gemini-2.0-flash':     { input: 0.10,  output: 0.40  },
-    'gemini-1.5-flash':     { input: 0.075, output: 0.30  },
-    'gemini-1.5-pro':       { input: 1.25,  output: 5.00  },
-    'gemini-pro':           { input: 0.50,  output: 1.50  },
+  const PRICES: Record<string, {input: number; output: number}> = {
+    "gemini-2.5-flash": {input: 0.30, output: 2.50},
+    "gemini-embedding-001": {input: 0.15, output: 0.00},
+    "gemini-2.0-flash": {input: 0.10, output: 0.40},
+    "gemini-1.5-flash": {input: 0.075, output: 0.30},
+    "gemini-1.5-pro": {input: 1.25, output: 5.00},
+    "gemini-pro": {input: 0.50, output: 1.50},
   };
 
-  const pricing = PRICES[model] ?? PRICES['gemini-2.0-flash'];
-  const inputCostUsd  = (inputTokens  / 1_000_000) * pricing.input;
+  const pricing = PRICES[model] ?? PRICES["gemini-2.0-flash"];
+  const inputCostUsd = (inputTokens / 1_000_000) * pricing.input;
   const outputCostUsd = (outputTokens / 1_000_000) * pricing.output;
-  const totalCostUsd  = inputCostUsd + outputCostUsd;
-  const USD_TO_PHP    = parseFloat(process.env.USD_TO_PHP ?? '56');
+  const totalCostUsd = inputCostUsd + outputCostUsd;
+  const USD_TO_PHP = parseFloat(process.env.USD_TO_PHP ?? "56");
 
-  await firestore.collection('gemini_usage').add({
-    userId:         userId ?? null,
+  await firestore.collection("gemini_usage").add({
+    userId: userId ?? null,
     conversationId: conversationId ?? null,
-    model:          model,
-    inputTokens:    inputTokens,
-    outputTokens:   outputTokens,
-    totalTokens:    inputTokens + outputTokens,
-    costUsd:        totalCostUsd,
-    costPhp:        totalCostUsd * USD_TO_PHP,
-    timestamp:      Firestore.FieldValue.serverTimestamp(),
-    date:           new Date().toISOString().substring(0, 10), // "YYYY-MM-DD"
+    model: model,
+    inputTokens: inputTokens,
+    outputTokens: outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    costUsd: totalCostUsd,
+    costPhp: totalCostUsd * USD_TO_PHP,
+    timestamp: FieldValue.serverTimestamp(),
+    date: new Date().toISOString().substring(0, 10), // "YYYY-MM-DD"
   });
 }
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 
+<<<<<<< HEAD
+=======
 export const generateEmbedding = onCall(
   {secrets: [GEMINI_API_KEY]},
   async (request) => {
@@ -106,6 +116,7 @@ export const generateEmbedding = onCall(
 
 // ================= COHERE =================
 
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
 export const generateCohereEmbedding = onCall(
   {secrets: [COHERE_API_KEY]},
   async (request) => {
@@ -114,7 +125,7 @@ export const generateCohereEmbedding = onCall(
     const {text} = request.data;
     if (!text) throw new Error("Text required");
 
-    const response = await axios.post(
+    const response = await axios.post<JsonResponse>(
       "https://api.cohere.ai/v1/embed",
       {
         texts: [text],
@@ -142,30 +153,27 @@ export const generateCohereEmbedding = onCall(
 async function generateGeminiEmbedding(
   text: string,
   apiKey: string,
-  // inputType param kept for API compatibility but gemini-embedding-001
-  // doesn't use taskType — outputDimensionality is what matters.
   _inputType: "search_document" | "search_query" = "search_document"
 ): Promise<number[]> {
-  try {
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
-      {
-        content: {
-          parts: [{text}],
-        },
-        outputDimensionality: 768,
+  const response = await axios.post<JsonResponse>(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
+    {
+      content: {
+        parts: [{text}],
       },
-      {
-        headers: {"Content-Type": "application/json"},
-        timeout: 30000,
-      }
-    );
-
-    const embedding = response.data?.embedding?.values;
-    if (!Array.isArray(embedding) || embedding.length === 0) {
-      throw new Error("Invalid embedding response");
+      outputDimensionality: 768,
+    },
+    {
+      headers: {"Content-Type": "application/json"},
+      timeout: 30000,
     }
+  );
 
+<<<<<<< HEAD
+  const embedding = response.data?.embedding?.values;
+  if (!Array.isArray(embedding) || embedding.length === 0) {
+    throw new Error("Invalid embedding response");
+=======
     if (embedding.length !== 768) {
       throw new Error(`Unexpected embedding size: ${embedding.length} (expected 768)`);
     }
@@ -182,8 +190,64 @@ async function generateGeminiEmbedding(
   } catch (error: any) {
     console.error(" Gemini embedding error:", error.message);
     throw error;
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
   }
+
+  if (embedding.length !== 768) {
+    throw new Error(`Unexpected embedding size: ${embedding.length} (expected 768)`);
+  }
+
+  await logGeminiUsage({
+    userId: null,
+    conversationId: null,
+    model: "gemini-embedding-001",
+    inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
+    outputTokens: 0,
+  }).catch(() => undefined);
+
+  return embedding;
 }
+
+export const generateEmbedding = onCall(
+  {secrets: [GEMINI_API_KEY]},
+  async (request) => {
+    if (!request.auth) throw new Error("Unauthorized");
+    const {text} = request.data;
+    if (!text) throw new Error("Text required");
+
+    try {
+      const response = await axios.post<JsonResponse>(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY.value()}`,
+        {
+          content: {
+            parts: [{text}],
+          },
+          outputDimensionality: 768,
+        },
+        {timeout: 30000}
+      );
+
+      const embedding = response.data?.embedding?.values;
+      if (!Array.isArray(embedding) || embedding.length === 0) {
+        throw new Error("Invalid Gemini embedding response");
+      }
+      if (embedding.length !== 768) {
+        throw new Error(`Unexpected embedding dimension: ${embedding.length} (expected 768)`);
+      }
+      await logGeminiUsage({
+        userId: request.auth.uid ?? null,
+        conversationId: null,
+        model: "gemini-embedding-001",
+        inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
+        outputTokens: 0,
+      }).catch(() => undefined);
+
+      return {embedding};
+    } catch (error: any) {
+      throw new Error(`Embedding failed: ${error.message}`);
+    }
+  }
+);
 
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
   if (vecA.length === 0 || vecB.length === 0 || vecA.length !== vecB.length) {
@@ -204,24 +268,28 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return dotProduct / (Math.sqrt(magnitudeA) * Math.sqrt(magnitudeB));
 }
 
-// FIX: findMatchingFAQ now reads BOTH 'embedding' (auto-promoted / normalised
-// client field) and 'geminiEmbedding' (legacy server-stored field) so no FAQ
-// is ever silently skipped due to a field-name mismatch.
+
 async function findMatchingFAQ(
-  query: string,
+  _query: string,
   queryEmbedding: number[],
   geminiApiKey: string,
   similarityThreshold = 0.75
 ): Promise<{ question: string; answer: string; similarity: number; category: string } | null> {
   try {
+<<<<<<< HEAD
+=======
     console.log(` FAQ MATCHING START for: "${query}"`);
 
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
     const faqSnapshot = await db
       .collection("faqs")
       .where("answer", "!=", "")
       .get();
 
+<<<<<<< HEAD
+=======
     console.log(` Checking ${faqSnapshot.docs.length} FAQs`);
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
 
     let bestMatch: any = null;
     let highestSimilarity = 0;
@@ -233,20 +301,18 @@ async function findMatchingFAQ(
 
       if (!faqQuestion || !faqAnswer) continue;
 
-      // FIX: prefer the already-stored embedding (either field name) to avoid
-      // unnecessary Gemini API calls.  Only fall back to generating a new one
-      // when neither field is present.
       let faqEmbedding: number[];
       const storedEmbedding = data.embedding ?? data.geminiEmbedding;
 
       if (storedEmbedding && Array.isArray(storedEmbedding) && storedEmbedding.length === 768) {
         faqEmbedding = storedEmbedding as number[];
       } else {
+<<<<<<< HEAD
+=======
         console.log(` No valid 768-d embedding for FAQ "${faqQuestion.substring(0, 40)}" — generating…`);
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
         faqEmbedding = await generateGeminiEmbedding(faqQuestion, geminiApiKey, "search_document");
 
-        // FIX: Persist BOTH field names so the next read (client or server)
-        // always finds a valid embedding regardless of which field it checks.
         await doc.ref.update({
           embedding: faqEmbedding,
           geminiEmbedding: faqEmbedding,
@@ -254,9 +320,11 @@ async function findMatchingFAQ(
         });
       }
 
-      // Skip if dimensions still don't match (shouldn't happen after fix above).
       if (faqEmbedding.length !== queryEmbedding.length) {
+<<<<<<< HEAD
+=======
         console.warn(` Skipping FAQ (dim mismatch ${faqEmbedding.length} vs ${queryEmbedding.length}): ${faqQuestion}`);
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
         continue;
       }
 
@@ -273,16 +341,482 @@ async function findMatchingFAQ(
       }
     }
 
+<<<<<<< HEAD
+    return bestMatch;
+  } catch {
+    return null;
+  }
+}
+
+async function retrieveRelevantDocuments(
+  _query: string,
+  queryEmbedding: number[],
+  pineconeIndex: any,
+  topK = 8,
+  minSimilarityScore = 0.30
+): Promise<Array<{
+  ibID: string;
+  ib_title: string;
+  content: string;
+  source: string;
+  categoryID: string;
+  similarity_score: number;
+  chunk_info: any;
+}>> {
+  try {
+    const similarChunks = await pineconeIndex.query({
+      vector: queryEmbedding,
+      topK: topK * 4,
+      includeMetadata: true,
+    });
+
+    if (!similarChunks.matches || similarChunks.matches.length === 0) {
+      return [];
+=======
     if (bestMatch) {
       console.log(` FAQ MATCH: ${bestMatch.question.substring(0, 50)}... (${bestMatch.similarity.toFixed(3)})`);
     } else {
       console.log(` No FAQ match above threshold ${similarityThreshold}`);
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
     }
 
-    return bestMatch;
+    const filteredChunks = similarChunks.matches.filter(
+      (chunk: any) => (chunk.score || 0) >= minSimilarityScore
+    );
+
+    const documentChunks: { [key: string]: any[] } = {};
+
+    for (const chunk of filteredChunks) {
+      const metadata = chunk.metadata || {};
+      const docId = metadata.docId || metadata.originalDocId || chunk.id?.split("_chunk_")[0];
+
+      if (docId) {
+        if (!documentChunks[docId]) {
+          documentChunks[docId] = [];
+        }
+        documentChunks[docId].push({...chunk, metadata});
+      }
+    }
+
+    const results: any[] = [];
+
+    for (const docId of Object.keys(documentChunks)) {
+      const chunks = documentChunks[docId];
+      chunks.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+      const topChunks = chunks.slice(0, 3);
+      const combinedContent = topChunks
+        .map((c) => c.metadata?.text || c.metadata?.content || c.metadata?.chunk_text || "")
+        .filter((text) => text.trim())
+        .join("\n\n");
+
+      if (!combinedContent.trim()) continue;
+
+      results.push({
+        ibID: docId,
+        ib_title: topChunks[0].metadata?.title || "Untitled",
+        content: combinedContent.trim(),
+        source: topChunks[0].metadata?.source || "Unknown",
+        categoryID: topChunks[0].metadata?.category || "General",
+        similarity_score: topChunks[0].score || 0,
+        chunk_info: {
+          total_chunks_found: chunks.length,
+          chunks_used: topChunks.length,
+        },
+      });
+    }
+
+    results.sort((a, b) => b.similarity_score - a.similarity_score);
+    return results.slice(0, topK);
+  } catch {
+    return [];
+  }
+}
+
+export const generateAnswer = onRequest(
+  {
+    secrets: [PINECONE_API_KEY, GEMINI_API_KEY],
+    cors: true,
+    timeoutSeconds: 60,
+    memory: "1GiB",
+  },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({error: "Method not allowed", answer: "Please use POST method"});
+      return;
+    }
+
+    try {
+      const {query, conversationHistory = [], topK = 8, minSimilarityScore = 0.30, stream = true} = req.body;
+
+      if (!query || typeof query !== "string" || query.trim().length === 0) {
+        res.status(400).json({
+          error: "Invalid query",
+          answer: "Please provide a valid question.",
+          source: "error",
+        });
+        return;
+      }
+
+
+      const geminiKey = GEMINI_API_KEY.value();
+      const pineconeKey = PINECONE_API_KEY.value();
+
+
+      const [queryEmbedding, pineconeClient] = await Promise.all([
+        generateGeminiEmbedding(query, geminiKey, "search_query"),
+        Promise.resolve(new Pinecone({apiKey: pineconeKey})),
+      ]);
+
+
+      const [faqMatch, pineconeIndex] = await Promise.all([
+        findMatchingFAQ(query, queryEmbedding, geminiKey),
+        Promise.resolve(pineconeClient.Index("oasp-assist-gemini")),
+      ]);
+
+      // FAQ MATCH
+      if (faqMatch) {
+        if (stream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+
+          const answer = faqMatch.answer;
+          const chunkSize = 40;
+
+          for (let i = 0; i < answer.length; i += chunkSize) {
+            const chunk = answer.substring(i, Math.min(i + chunkSize, answer.length));
+            res.write(`data: ${JSON.stringify({
+              type: "content-delta",
+              delta: {message: {content: {text: chunk}}},
+            })}\n\n`);
+          }
+
+          res.write(`data: ${JSON.stringify({
+            type: "message-end",
+            metadata: {source: "faq", category: faqMatch.category},
+          })}\n\n`);
+          res.write("data: [DONE]\n\n");
+          res.end();
+        } else {
+          res.json({
+            answer: faqMatch.answer,
+            source: "faq",
+            category: faqMatch.category,
+          });
+        }
+        return;
+      }
+
+      // RETRIEVE DOCUMENTS FROM PINECONE
+      const results = await retrieveRelevantDocuments(
+        query,
+        queryEmbedding,
+        pineconeIndex,
+        topK,
+        minSimilarityScore
+      );
+
+      // NO DOCUMENTS FOUND - AI FALLBACK
+      if (results.length === 0) {
+        const conversationContext = buildConversationContext(conversationHistory);
+        const now = new Date();
+        const dateInfo = `Current Date: ${now.toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })}`;
+
+        const fallbackPrompt = `You are OASP Assist for Central Mindanao University.
+
+${dateInfo}
+
+${conversationContext ? `Recent conversation:\n${conversationContext}\n\n` : ""}Question: "${query}"
+
+IMPORTANT: My knowledge base doesn't have specific documents about this topic, but I should still try to help.
+
+Instructions:
+1. Use your general knowledge about universities, admissions, scholarships, and student services
+2. Provide helpful, accurate general information when possible
+3. Use the current date for time-sensitive queries
+4. If this is truly specific to CMU OASP policies I cannot answer, politely suggest contacting OASP staff
+5. Be helpful and professional
+6. Don't say "I don't have information" - try to provide useful guidance first
+
+Answer:`;
+
+        if (stream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+
+          try {
+            for await (const chunk of generateGeminiResponseStream(fallbackPrompt, geminiKey)) {
+              if (chunk && chunk.length > 0) {
+                res.write(`data: ${JSON.stringify({
+                  type: "content-delta",
+                  delta: {message: {content: {text: chunk}}},
+                })}\n\n`);
+              }
+            }
+
+            res.write(`data: ${JSON.stringify({
+              type: "message-end",
+              metadata: {source: "ai_fallback"},
+            })}\n\n`);
+            res.write("data: [DONE]\n\n");
+            res.end();
+          } catch {
+            const errorMsg = "I'm having trouble processing your request. Please contact OASP staff directly for assistance.";
+            res.write(`data: ${JSON.stringify({
+              type: "content-delta",
+              delta: {message: {content: {text: errorMsg}}},
+            })}\n\n`);
+            res.write(`data: ${JSON.stringify({type: "message-end"})}\n\n`);
+            res.write("data: [DONE]\n\n");
+            res.end();
+          }
+        } else {
+          try {
+            const answer = await generateGeminiResponse(fallbackPrompt, geminiKey);
+            res.json({answer: answer.trim(), source: "ai_fallback"});
+          } catch {
+            res.json({
+              answer: "I'm having trouble processing your request. Please contact OASP staff directly for assistance.",
+              source: "error",
+            });
+          }
+        }
+        return;
+      }
+
+      // DOCUMENTS FOUND - GENERATE RAG RESPONSE
+
+      const {contexts, confidence} = filterAndRankContext(results);
+      const conversationContext = buildConversationContext(conversationHistory);
+
+      const prompt = confidence === "low" ?
+        buildPartialInfoPrompt(query, contexts, conversationContext) :
+        buildContextAwarePrompt(query, contexts, conversationContext, confidence);
+
+      // STREAMING RESPONSE
+      if (stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+
+        let streamSucceeded = false;
+
+        try {
+          for await (const chunk of generateGeminiResponseStream(prompt, geminiKey)) {
+            if (chunk && chunk.length > 0) {
+              streamSucceeded = true;
+              res.write(`data: ${JSON.stringify({
+                type: "content-delta",
+                delta: {message: {content: {text: chunk}}},
+              })}\n\n`);
+            }
+          }
+
+          if (streamSucceeded) {
+            res.write(`data: ${JSON.stringify({
+              type: "message-end",
+              metadata: {source: "information_bank", confidence, documentsUsed: contexts.length},
+            })}\n\n`);
+            res.write("data: [DONE]\n\n");
+            res.end();
+            return;
+          }
+        } catch {
+        }
+
+        // FALLBACK IF STREAMING FAILS
+        try {
+          const fullAnswer = await generateGeminiResponse(prompt, geminiKey);
+
+          const chunkSize = 30;
+          for (let i = 0; i < fullAnswer.length; i += chunkSize) {
+            const chunk = fullAnswer.substring(i, Math.min(i + chunkSize, fullAnswer.length));
+            res.write(`data: ${JSON.stringify({
+              type: "content-delta",
+              delta: {message: {content: {text: chunk}}},
+            })}\n\n`);
+            await new Promise((resolve) => setTimeout(resolve, 5));
+          }
+
+          res.write(`data: ${JSON.stringify({
+            type: "message-end",
+            metadata: {source: "information_bank", confidence},
+          })}\n\n`);
+          res.write("data: [DONE]\n\n");
+          res.end();
+        } catch {
+          res.write(`data: ${JSON.stringify({
+            type: "error",
+            error: "Failed to generate response",
+          })}\n\n`);
+          res.end();
+        }
+      } else {
+        const answer = await generateGeminiResponse(prompt, geminiKey);
+        res.json({
+          answer: answer.trim(),
+          source: "information_bank",
+          confidence,
+          documentsFound: results.length,
+        });
+      }
+    } catch (error: any) {
+      res.status(500).json({
+        error: error.message,
+        answer: "I'm having trouble processing your request right now. Please try again or contact OASP staff directly.",
+        source: "error",
+      });
+    }
+  }
+);
+
+async function generateGeminiResponse(
+  prompt: string,
+  apiKey: string
+): Promise<string> {
+  try {
+    const response = await axios.post<JsonResponse>(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 4096,
+          topP: 0.95,
+          topK: 40,
+        },
+      },
+      {
+        headers: {"Content-Type": "application/json"},
+        timeout: 30000,
+      }
+    );
+
+
+    if (response.status !== 200) {
+      throw new Error(`Gemini API error: ${response.statusText}`);
+    }
+
+    const data: any = response.data;
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    const usageMetadata = data?.usageMetadata;
+    if (usageMetadata) {
+      await logGeminiUsage({
+        userId: null,
+        conversationId: null,
+        model: GEMINI_MODEL,
+        inputTokens: usageMetadata.promptTokenCount ?? 0,
+        outputTokens: usageMetadata.candidatesTokenCount ?? 0,
+      }).catch(() => undefined);
+    }
+
+    if (!text) {
+      throw new Error("Empty response from Gemini");
+    }
+
+    return text;
   } catch (error) {
+<<<<<<< HEAD
+    throw error;
+  }
+}
+
+
+async function* generateGeminiResponseStream(
+  prompt: string,
+  apiKey: string
+): AsyncGenerator<string, void, unknown> {
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`,
+      {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          contents: [{parts: [{text: prompt}]}],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 4096,
+            topP: 0.95,
+            topK: 40,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gemini Stream API error: ${response.status} ${response.statusText}`);
+    }
+
+    if (!response.body) {
+      throw new Error("Response body is null");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, {stream: true});
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+
+        if (!trimmedLine || trimmedLine.startsWith("event:") || trimmedLine === "data: [DONE]") {
+          continue;
+        }
+
+        const jsonStr = trimmedLine.startsWith("data: ") ?
+          trimmedLine.substring(6) :
+          trimmedLine;
+
+        if (!jsonStr || jsonStr === "[DONE]") continue;
+
+        try {
+          const data = JSON.parse(jsonStr);
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+          if (text) {
+            yield text;
+          }
+
+          const finishReason = data?.candidates?.[0]?.finishReason;
+          if (finishReason === "STOP") {
+            return;
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+  } catch (error) {
+    throw error;
+=======
     console.error(" Error in findMatchingFAQ:", error);
     return null;
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
   }
 }
 
@@ -293,7 +827,6 @@ function filterAndRankContext(
     content: string;
     similarity_score: number;
   }>,
-  query: string
 ): {
   contexts: Array<{ content: string; title: string; score: number }>;
   confidence: "high" | "medium" | "low";
@@ -320,7 +853,10 @@ function filterAndRankContext(
       score: doc.similarity_score,
     }));
 
+<<<<<<< HEAD
+=======
   console.log(` Context confidence: ${confidence} (top: ${topScore.toFixed(2)}, avg: ${avgScore.toFixed(2)})`);
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
 
   return {contexts, confidence};
 }
@@ -461,6 +997,8 @@ Instructions:
 Answer:`;
 }
 
+<<<<<<< HEAD
+=======
 async function retrieveRelevantDocuments(
   query: string,
   queryEmbedding: number[],
@@ -954,6 +1492,7 @@ async function* generateGeminiResponseStream(
     throw error;
   }
 }
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
 
 export const resetDailyMessageCounts = onSchedule(
   {
@@ -961,10 +1500,13 @@ export const resetDailyMessageCounts = onSchedule(
     timeZone: "Asia/Manila",
     memory: "256MiB",
   },
-  async (event) => {
+  async () => {
     try {
       const now = new Date();
+<<<<<<< HEAD
+=======
       console.log(` Starting daily message count reset at ${now.toISOString()}`);
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
 
       const phNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
       const resetTime = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate(), 8, 0, 0);
@@ -973,9 +1515,6 @@ export const resetDailyMessageCounts = onSchedule(
       const usersSnapshot = await db.collection("users").get();
 
       const batchSize = 500;
-      let processedCount = 0;
-      let resetCount = 0;
-
       for (let i = 0; i < usersSnapshot.docs.length; i += batchSize) {
         const batch = db.batch();
         const batchDocs = usersSnapshot.docs.slice(i, i + batchSize);
@@ -1000,17 +1539,19 @@ export const resetDailyMessageCounts = onSchedule(
               "dailyMessageCount": 0,
               "lastMessageResetDate": resetTimestamp,
             });
-            resetCount++;
           }
-          processedCount++;
         }
 
         await batch.commit();
       }
+<<<<<<< HEAD
+    } catch (error: unknown) {
+=======
 
       console.log(` Daily reset complete: ${resetCount}/${processedCount} users reset`);
     } catch (error: any) {
       console.error(" Error in daily reset:", error);
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
       throw error;
     }
   }
@@ -1053,9 +1594,14 @@ export const manualResetMessageCounts = onRequest(
         reset: resetCount,
         timestamp: now.toISOString(),
       });
+<<<<<<< HEAD
+    } catch (error: unknown) {
+      throw error;
+=======
     } catch (error: any) {
       console.error(" Error in manual reset:", error);
       res.status(500).json({error: error.message});
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
     }
   }
 );
@@ -1102,9 +1648,14 @@ export const checkResetStatus = onRequest(
         nextResetTime: nextResetTime.toISOString(),
         sampleUsers: userStatus,
       });
+<<<<<<< HEAD
+    } catch (error: unknown) {
+      throw error;
+=======
     } catch (error: any) {
       console.error(" Error checking status:", error);
       res.status(500).json({error: error.message});
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
     }
   }
 );

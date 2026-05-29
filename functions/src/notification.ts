@@ -1615,39 +1615,6 @@ export const onEscalationReplied = onDocumentUpdated(
   }
 );
 
-// async function getUsersByRoleAndCategory(
-//   role: string,
-//   category?: string
-// ): Promise<string[]> {
-//   try {
-//     console.log(` Fetching ${role} users${category ? ` with category: ${category}` : ''}`);
-
-//     let query = db
-//       .collection("users")
-//       .where("role", "==", role)
-//       .where("isActive", "==", true);
-
-//     //  For staff, filter by serviceUnit matching the category
-//     if (role === "staff" && category) {
-//       // Normalize category to match serviceUnit field
-//       const serviceUnit = normalizeCategory(category);
-//       query = query.where("serviceUnit", "==", serviceUnit);
-//       console.log(` Filtering staff by serviceUnit: ${serviceUnit}`);
-//     }
-
-//     const usersSnapshot = await query.get();
-//     const userIds = usersSnapshot.docs.map((doc) => doc.id);
-
-//     console.log(` Found ${userIds.length} active ${role} users${category ? ` in ${category}` : ''}`);
-
-//     return userIds;
-//   } catch (error) {
-//     console.error(` Error fetching ${role} users:`, error);
-//     return [];
-//   }
-// }
-
-
 function normalizeCategory(category: string): string {
   const normalized = category.toLowerCase().trim();
 

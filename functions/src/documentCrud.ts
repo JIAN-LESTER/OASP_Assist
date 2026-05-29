@@ -1,18 +1,16 @@
-import {HttpsError, onCall} from "firebase-functions/v2/https";
+﻿import {HttpsError, onCall} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import axios from "axios";
 import {Pinecone} from "@pinecone-database/pinecone";
 import * as admin from "firebase-admin";
 import {logGeminiUsage} from "./geminiUsage";
 
+type JsonResponse = Record<string, any>;
+
 const PINECONE_HOST = defineSecret("PINECONE_HOST");
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
-
-// ============================================================================
-// PINECONE HEALTH CHECK - CRITICAL: ADD THIS FUNCTION
-// ============================================================================
 
 export const checkPineconeHealth = onCall(
   {
@@ -43,10 +41,6 @@ export const checkPineconeHealth = onCall(
   }
 );
 
-// ============================================================================
-// GEMINI EMBEDDING & RESPONSE FUNCTIONS
-// ============================================================================
-
 export const generateGeminiEmbedding = onCall(
   { secrets: [GEMINI_API_KEY], timeoutSeconds: 60 },
   async (request) => {
@@ -56,6 +50,9 @@ export const generateGeminiEmbedding = onCall(
     if (!text) throw new HttpsError("invalid-argument", "Text required");
 
     try {
+<<<<<<< HEAD
+      const response = await axios.post<JsonResponse>(
+=======
       const response = await axios.post(
 
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY.value()}`,
@@ -75,7 +72,7 @@ export const generateGeminiEmbedding = onCall(
         model: "gemini-embedding-001",
         inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
         outputTokens: 0,
-      }).catch(console.error);
+      }).catch(() => undefined);
 
       if (!Array.isArray(embedding) || embedding.length === 0) {
         console.error(" Unexpected Gemini response:", JSON.stringify(response.data));
@@ -84,7 +81,6 @@ export const generateGeminiEmbedding = onCall(
 
       console.log(` Embedding generated: ${embedding.length} dimensions`);
       return { embedding };
-
     } catch (error: any) {
       if (error instanceof HttpsError) throw error;
 
@@ -105,7 +101,7 @@ export const generateGeminiResponse = onCall(
     if (!prompt) throw new Error("Prompt required");
 
     try {
-      const response = await axios.post(
+      const response = await axios.post<JsonResponse>(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY.value()}`,
         {
           contents: [{parts: [{text: prompt}]}],
@@ -128,9 +124,6 @@ export const generateGeminiResponse = onCall(
   }
 );
 
-// ============================================================================
-// COHERE FUNCTIONS
-// ============================================================================
 
 export const generateCohereEmbedding = onCall(
   {secrets: [COHERE_API_KEY]},
@@ -141,7 +134,7 @@ export const generateCohereEmbedding = onCall(
     if (!text) throw new Error("Text required");
 
     try {
-      const response = await axios.post(
+      const response = await axios.post<JsonResponse>(
         "https://api.cohere.ai/v1/embed",
         {
           texts: [text],
@@ -179,7 +172,7 @@ export const generateCohereResponse = onCall(
     if (!prompt) throw new Error("Prompt required");
 
     try {
-      const response = await axios.post(
+      const response = await axios.post<JsonResponse>(
         "https://api.cohere.ai/v1/chat",
         {
           model: "command-r-08-2024",
@@ -263,7 +256,7 @@ Return valid JSON only in this exact format:
 `;
 
     try {
-      const response = await axios.post(
+      const response = await axios.post<JsonResponse>(
         "https://api.cohere.ai/v1/chat",
         {
           model: "command-r-08-2024",
@@ -345,7 +338,7 @@ Respond in valid JSON format only:
 `;
 
     try {
-      const response = await axios.post(
+      const response = await axios.post<JsonResponse>(
         "https://api.cohere.ai/v1/chat",
         {
           model: "command-r-08-2024",
@@ -425,7 +418,7 @@ Respond in valid JSON format only:
 `;
 
     try {
-      const response = await axios.post(
+      const response = await axios.post<JsonResponse>(
         "https://api.cohere.ai/v1/chat",
         {
           model: "command-r-08-2024",
@@ -627,6 +620,80 @@ export const deletePineconeDocuments = onCall(
   }
 );
 
+export const fetchPineconeVectors = onCall(
+  {
+    secrets: [PINECONE_API_KEY],
+    timeoutSeconds: 30,
+  },
+  async (request) => {
+    if (!request.auth) throw new Error("Unauthorized");
+
+    const {ids} = request.data;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      throw new Error("IDs array required");
+    }
+
+    try {
+      const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
+      const index = pinecone.Index("oasp-assist-gemini");
+
+      const results = await index.fetch(ids);
+
+      return {
+        success: true,
+        vectors: results.records || {},
+        count: Object.keys(results.records || {}).length,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+);
+
+export const deleteFromPinecone = onCall(
+  {secrets: [PINECONE_API_KEY, PINECONE_HOST]},
+  async (request) => {
+    if (!request.auth) {
+      throw new Error("Unauthorized");
+    }
+
+    const {chunkIds, namespace} = request.data;
+
+    if (!Array.isArray(chunkIds) || chunkIds.length === 0) {
+      throw new Error("chunkIds must be a non-empty array");
+    }
+
+    try {
+      const response = await axios.post<JsonResponse>(
+        `${PINECONE_HOST.value()}/vectors/delete`,
+        {
+          ids: chunkIds,
+          ...(namespace ? {namespace} : {}),
+        },
+        {
+          headers: {
+            "Api-Key": PINECONE_API_KEY.value(),
+            "Content-Type": "application/json",
+          },
+          timeout: 30000,
+        }
+      );
+
+      return {
+        success: true,
+        deleted: chunkIds.length,
+        pineconeStatus: response.status,
+      };
+    } catch (error: any) {
+      throw new Error("Failed to delete vectors from Pinecone");
+    }
+  }
+);
+
 export const getPineconeStats = onCall(
   {
     secrets: [PINECONE_API_KEY],
@@ -669,6 +736,8 @@ export const getPineconeStats = onCall(
   }
 );
 
+<<<<<<< HEAD
+=======
 export const fetchPineconeVectors = onCall(
   {
     secrets: [PINECONE_API_KEY],
@@ -696,6 +765,7 @@ export const fetchPineconeVectors = onCall(
       };
     } catch (error: any) {
       console.error(" Pinecone fetch error:", error.message);
+      console.error(" Pinecone fetch error:", error.message);
       return {
         success: false,
         error: error.message,
@@ -703,6 +773,7 @@ export const fetchPineconeVectors = onCall(
     }
   }
 );
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
 
 export const deleteAllPineconeVectors = onCall(
   {
@@ -746,6 +817,8 @@ export const deleteAllPineconeVectors = onCall(
     }
   }
 );
+<<<<<<< HEAD
+=======
 
 export const deleteFromPinecone = onCall(
   {secrets: [PINECONE_API_KEY, PINECONE_HOST]},
@@ -783,7 +856,9 @@ export const deleteFromPinecone = onCall(
       };
     } catch (error: any) {
       console.error(" Pinecone delete error:", error.response?.data || error.message);
+      console.error(" Pinecone delete error:", error.response?.data || error.message);
       throw new Error("Failed to delete vectors from Pinecone");
     }
   }
 );
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66

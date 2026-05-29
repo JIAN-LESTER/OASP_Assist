@@ -1,10 +1,10 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:capstone_project/models/message.dart';
 
 class AnswerRetrievalService {
-  // FIX: The Cloud Run URL for an onRequest function already IS the endpoint.
+  //  The Cloud Run URL for an onRequest function already IS the endpoint.
   // Do NOT append '/generateAnswer' — that would 404.
   // This URL is the full address exported as `generateAnswer` in index.ts.
   final String cloudFunctionUrl =
@@ -34,7 +34,7 @@ class AnswerRetrievalService {
             [],
       };
 
-      // FIX: POST directly to cloudFunctionUrl — the function IS the endpoint.
+      //  POST directly to cloudFunctionUrl — the function IS the endpoint.
       final request = http.Request('POST', Uri.parse(cloudFunctionUrl));
       request.headers['Content-Type'] = 'application/json';
       request.body = json.encode(requestBody);
@@ -145,7 +145,7 @@ class AnswerRetrievalService {
         'minSimilarityScore': minSimilarityScore,
       };
 
-      // FIX: POST directly to cloudFunctionUrl (same as streaming path).
+      //  POST directly to cloudFunctionUrl (same as streaming path).
       final response = await http
           .post(
             Uri.parse(cloudFunctionUrl),

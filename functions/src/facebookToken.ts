@@ -11,24 +11,24 @@ async function getAppCredentials(appId?: string): Promise<{appId: string, appSec
     const doc = await db.collection("fb_app_credentials").doc("apps").get();
 
     if (!doc.exists) {
-      throw new Error("No Facebook app credentials configured. Please add them in Firestore at fb_app_credentials/apps");
+      throw new Error(
+        "No Facebook app credentials configured. Please add them in Firestore at fb_app_credentials/apps"
+      );
     }
 
     const data = doc.data()!;
-    const apps: {appId: string, appSecret: string}[] = [];
+    const apps: {appId: string; appSecret: string}[] = [];
 
-    // If specific appId requested, return only that one
     if (appId) {
       if (data[appId] && data[appId].appSecret) {
         return [{
-          appId: appId,
+          appId,
           appSecret: data[appId].appSecret,
         }];
       }
       throw new Error(`App ID ${appId} not found in credentials`);
     }
 
-    // Otherwise return all configured apps
     for (const [id, config] of Object.entries(data)) {
       if (typeof config === "object" && (config as any).appSecret) {
         apps.push({
@@ -50,7 +50,9 @@ async function getAppCredentials(appId?: string): Promise<{appId: string, appSec
   }
 }
 
-async function verifyAuthToken(authHeader: string | undefined): Promise<string | null> {
+async function verifyAuthToken(
+  authHeader: string | undefined
+): Promise<string | null> {
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return null;
   }
@@ -61,7 +63,6 @@ async function verifyAuthToken(authHeader: string | undefined): Promise<string |
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     return decodedToken.uid;
   } catch (error) {
-    console.error("Token verification failed:", error);
     return null;
   }
 }
@@ -88,18 +89,22 @@ async function detectAppFromToken(shortToken: string): Promise<{appId: string, a
     const tokenAppId = data?.app_id;
 
     console.log(` Token belongs to app: ${tokenAppId}`);
+    console.log(` Token belongs to app: ${tokenAppId}`);
 
     // Find matching app in our credentials
     const matchingApp = apps.find((app) => app.appId === tokenAppId);
 
     if (matchingApp) {
       console.log(` Found matching app credentials for ${tokenAppId}`);
+      console.log(` Found matching app credentials for ${tokenAppId}`);
       return matchingApp;
     }
 
     console.warn(` Token app ID ${tokenAppId} not in our configured apps`);
+    console.warn(` Token app ID ${tokenAppId} not in our configured apps`);
     return null;
   } catch (error: any) {
+    console.error(" Error detecting app from token:", error.message);
     console.error(" Error detecting app from token:", error.message);
     return null;
   }
@@ -110,16 +115,14 @@ async function exchangeShortForLong(
   shortToken: string,
   appId?: string,
   appSecret?: string
-): Promise<{ access_token: string; expires_in?: number; app_used?: string }> {
+): Promise<{access_token: string; expires_in?: number; app_used?: string}> {
   const url = `https://graph.facebook.com/${FB_API_VERSION}/oauth/access_token`;
 
-  // If specific app credentials provided, use them
   if (appId && appSecret) {
     console.log(` Trying exchange with provided app: ${appId}`);
     return await attemptExchange(url, shortToken, appId, appSecret);
   }
 
-  // Otherwise, try detecting which app the token belongs to
   const detected = await detectAppFromToken(shortToken);
 
   if (detected) {
@@ -129,6 +132,7 @@ async function exchangeShortForLong(
   }
 
   // If detection failed, try all configured apps sequentially
+  console.log(" Detection failed, trying all configured apps...");
   console.log(" Detection failed, trying all configured apps...");
 
   const apps = await getAppCredentials();
@@ -140,6 +144,7 @@ async function exchangeShortForLong(
       console.log(` Trying app ${i + 1}/${apps.length} (${app.appId})...`);
       const result = await attemptExchange(url, shortToken, app.appId, app.appSecret);
       console.log(` Success with app ${app.appId}`);
+      console.log(` Success with app ${app.appId}`);
       return {...result, app_used: app.appId};
     } catch (error: any) {
       console.log(` Failed with ${app.appId}: ${error.message}`);
@@ -147,8 +152,9 @@ async function exchangeShortForLong(
     }
   }
 
-  // All apps failed
-  throw new Error(`Token exchange failed with all ${apps.length} configured app(s):\n${errors.join("\n")}`);
+  throw new Error(
+    `Token exchange failed with all ${apps.length} configured app(s):\n${errors.join("\n")}`
+  );
 }
 
 async function attemptExchange(
@@ -156,7 +162,7 @@ async function attemptExchange(
   shortToken: string,
   appId: string,
   appSecret: string
-): Promise<{ access_token: string; expires_in?: number }> {
+): Promise<{access_token: string; expires_in?: number}> {
   const params = {
     grant_type: "fb_exchange_token",
     client_id: appId,
@@ -164,13 +170,14 @@ async function attemptExchange(
     fb_exchange_token: shortToken,
   };
 
-  const resp = await axios.get<{ access_token: string; expires_in?: number; token_type?: string }>(
-    url,
-    {
-      params,
-      timeout: 30000,
-    }
-  );
+  const resp = await axios.get<{
+    access_token: string;
+    expires_in?: number;
+    token_type?: string;
+  }>(url, {
+    params,
+    timeout: 30000,
+  });
 
   if (resp.status !== 200 || !resp.data.access_token) {
     throw new Error(`Exchange failed with app ${appId}`);
@@ -179,6 +186,7 @@ async function attemptExchange(
   console.log(` Token exchanged successfully with app ${appId}`);
   if (resp.data.expires_in) {
     const days = Math.round(resp.data.expires_in / 86400);
+    console.log(` Token valid for ${resp.data.expires_in} seconds (~${days} days)`);
     console.log(` Token valid for ${resp.data.expires_in} seconds (~${days} days)`);
   }
 
@@ -201,8 +209,10 @@ async function exchangeTokenLogic(
     console.log(` Exchanging token for uid: ${uid}`);
     if (pageId) {
       console.log(` Page ID provided: ${pageId}`);
+      console.log(` Page ID provided: ${pageId}`);
     }
     if (appId) {
+      console.log(` Specific app requested: ${appId}`);
       console.log(` Specific app requested: ${appId}`);
     }
 
@@ -235,7 +245,6 @@ async function exchangeTokenLogic(
 
     const fbUserId = me.data.id;
     const now = Date.now();
-
     let expiresAt: number | null = null;
 
     if (expiresIn !== undefined && expiresIn !== null) {
@@ -246,7 +255,7 @@ async function exchangeTokenLogic(
       expiresAt = now + (60 * 24 * 60 * 60 * 1000);
     }
 
-    const pagesObj: { [key: string]: any } = {};
+    const pagesObj: {[key: string]: any} = {};
     try {
       const pagesResp = await getUserPages(longToken);
       const pages = pagesResp.data || [];
@@ -282,6 +291,7 @@ async function exchangeTokenLogic(
     await docRef.set(saveData, {merge: true});
 
     console.log(` Token saved to fb_tokens/${uid}`);
+    console.log(` Token saved to fb_tokens/${uid}`);
 
     const daysValid = expiresIn ?
       Math.round(Number(expiresIn) / 86400) :
@@ -310,10 +320,6 @@ async function exchangeTokenLogic(
   }
 }
 
-// ============================================================================
-// EXPORTED FUNCTIONS
-// ============================================================================
-
 export const exchangeTokenHttp = onRequest(
   {
     cors: true,
@@ -331,6 +337,7 @@ export const exchangeTokenHttp = onRequest(
 
     try {
       console.log("========================================");
+      console.log(" exchangeToken (HTTP) called");
       console.log(" exchangeToken (HTTP) called");
       console.log("========================================");
 
@@ -359,12 +366,8 @@ export const exchangeTokenHttp = onRequest(
       }
 
       const result = await exchangeTokenLogic(uid, short_token, pageId, appId);
-
-      console.log(" Token exchange successful");
       res.json({result});
     } catch (error: any) {
-      console.error(" exchangeToken HTTP error:", error);
-
       res.status(500).json({
         error: "internal",
         message: error.message || "Internal server error",
@@ -382,6 +385,7 @@ export const exchangeToken = onCall(
   async (request) => {
     console.log("========================================");
     console.log(" exchangeToken (callable) called");
+    console.log(" exchangeToken (callable) called");
     console.log("========================================");
 
     try {
@@ -398,8 +402,10 @@ export const exchangeToken = onCall(
       const result = await exchangeTokenLogic(uid, short_token, pageId, appId);
 
       console.log(" Token exchange successful");
+      console.log(" Token exchange successful");
       return result;
     } catch (error: any) {
+      console.error(" exchangeToken error:", error);
       console.error(" exchangeToken error:", error);
 
       if (error instanceof HttpsError) {
@@ -434,7 +440,10 @@ export const manageAppCredentials = onCall(
         }
 
         await db.collection("fb_app_credentials").doc("apps").set({
-          [appId]: {appSecret, addedAt: admin.firestore.FieldValue.serverTimestamp()},
+          [appId]: {
+            appSecret,
+            addedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
         }, {merge: true});
 
         return {success: true, message: `App ${appId} added successfully`};

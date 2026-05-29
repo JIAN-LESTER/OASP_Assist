@@ -1,16 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:capstone_project/modules/admin/announcement/fb_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ============================================================================
-// CONFIGURATION
-// ============================================================================
 class FbSyncConfig {
   static const String projectId = 'capstone-project-1703b';
   static const String region = 'us-central1';
@@ -25,9 +23,6 @@ class FbSyncConfig {
       'https://testfacebookconnectionhttp-kt3rxdstza-uc.a.run.app';
 }
 
-// ============================================================================
-//  NEW: Token Status Model
-// ============================================================================
 class TokenStatus {
   final bool configured;
   final int? expiresAt;
@@ -63,52 +58,33 @@ class TokenStatus {
   }
 }
 
-// ============================================================================
-// FACEBOOK SYNC SERVICE
-// ============================================================================
 class FacebookSyncService {
-  // Determine which method to use based on platform
   static bool get _shouldUseHttp {
-    if (!kIsWeb && Platform.isWindows) {
-      return true;
-    }
-    if (kIsWeb) {
-      return true;
-    }
+    if (kIsWeb) return true;
+    if (!kIsWeb && Platform.isWindows) return true;
     return false;
   }
 
-  // Get authentication token
   static Future<String?> _getAuthToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        return await user.getIdToken();
+        return user.getIdToken();
       }
     } catch (e) {
-      print(' Error getting auth token: $e');
+      print('Error getting auth token: $e');
     }
     return null;
   }
 
-  // ============================================================================
-  //  UPDATED: Exchange Token with Page ID
-  // ============================================================================
-
   static Future<Map<String, dynamic>> exchangeToken(
     String shortToken, {
     String? pageId,
-    String? appId, //  NEW: Optional appId parameter
+    String? appId,
   }) async {
-    print(' Exchanging Facebook token...');
-    if (pageId != null) {
-      print(' With Page ID: $pageId');
-    }
-    if (appId != null) {
-      print(' With App ID: $appId');
-    }
-    print(' Platform: ${_getPlatformName()}');
-    print(' Using: ${_shouldUseHttp ? "HTTP" : "Cloud Functions SDK"}');
+    print('Exchanging Facebook token...');
+    print('Platform: ${_getPlatformName()}');
+    print('Using: ${_shouldUseHttp ? "HTTP" : "Cloud Functions SDK"}');
 
     try {
       if (_shouldUseHttp) {
@@ -117,15 +93,15 @@ class FacebookSyncService {
           pageId: pageId,
           appId: appId,
         );
-      } else {
-        return await _exchangeTokenViaCloudFunctions(
-          shortToken,
-          pageId: pageId,
-          appId: appId,
-        );
       }
+
+      return await _exchangeTokenViaCloudFunctions(
+        shortToken,
+        pageId: pageId,
+        appId: appId,
+      );
     } catch (e) {
-      print(' Token exchange failed: $e');
+      print('Token exchange failed: $e');
       rethrow;
     }
   }
@@ -135,8 +111,6 @@ class FacebookSyncService {
     String? pageId,
     String? appId,
   }) async {
-    print(' Using HTTP endpoint...');
-
     final authToken = await _getAuthToken();
     if (authToken == null) {
       throw Exception('Not authenticated. Please log in first.');
@@ -155,47 +129,15 @@ class FacebookSyncService {
                 'uid': 'facebook_admin',
                 'short_token': shortToken,
                 if (pageId != null) 'pageId': pageId,
-                if (appId != null) 'appId': appId, //  Include appId
+                if (appId != null) 'appId': appId,
               },
             }),
           )
-          .timeout(Duration(seconds: 30));
+          .timeout(const Duration(seconds: 30));
 
-      print(' Response: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final result = data['result'] ?? data;
-
-        if (result['success'] == true || result['ok'] == true) {
-          print(' Token exchanged successfully');
-          if (pageId != null) {
-            print(' Page ID saved: $pageId');
-          }
-          if (appId != null) {
-            print(' App ID saved: $appId');
-          }
-          return result;
-        }
-
-        throw Exception(
-          result['message'] ?? result['error'] ?? 'Token exchange failed',
-        );
-      } else if (response.statusCode == 401) {
-        throw Exception('Authentication failed. Please log in again.');
-      } else if (response.statusCode == 403) {
-        throw Exception('Permission denied. Admin access required.');
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(
-          errorData['message'] ?? 'Server error (${response.statusCode})',
-        );
-      }
-    } catch (e) {
-      if (e is TimeoutException) {
-        throw Exception('Request timed out. Please try again.');
-      }
-      rethrow;
+      return _parseHttpResponse(response, action: 'Token exchange');
+    } on TimeoutException {
+      throw Exception('Request timed out. Please try again.');
     }
   }
 
@@ -204,58 +146,32 @@ class FacebookSyncService {
     String? pageId,
     String? appId,
   }) async {
-    print('📞 Using Cloud Functions SDK...');
-
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'exchangeToken',
-      );
-
+      final callable = FirebaseFunctions.instance.httpsCallable('exchangeToken');
       final result = await callable
           .call(<String, dynamic>{
             'uid': 'facebook_admin',
             'short_token': shortToken,
             if (pageId != null) 'pageId': pageId,
-            if (appId != null) 'appId': appId, //  Include appId
+            if (appId != null) 'appId': appId,
           })
-          .timeout(Duration(seconds: 30));
+          .timeout(const Duration(seconds: 30));
 
-      final data = result.data as Map<String, dynamic>;
-
-      if (data['success'] == true || data['ok'] == true) {
-        print(' Token exchanged successfully');
-        return data;
-      }
-
-      throw Exception(
-        data['message'] ?? data['error'] ?? 'Token exchange failed',
-      );
+      return _parseCallableData(result.data, fallbackMessage: 'Token exchange failed');
     } catch (e) {
-      print(' Cloud Functions call failed: $e');
-      print(' Falling back to HTTP...');
-      return await _exchangeTokenViaHttp(
-        shortToken,
-        pageId: pageId,
-        appId: appId,
-      );
+      print('Cloud Functions call failed: $e');
+      print('Falling back to HTTP...');
+      return _exchangeTokenViaHttp(shortToken, pageId: pageId, appId: appId);
     }
   }
 
-  // ============================================================================
-  //  NEW: Get Token Status
-  // ============================================================================
-
   static Future<TokenStatus> getTokenStatus() async {
-    print(' Checking token status...');
-
     try {
       if (_shouldUseHttp) {
-        // Use direct Firestore access for HTTP platforms
-        final doc =
-            await FirebaseFirestore.instance
-                .collection('fb_tokens')
-                .doc('facebook_admin')
-                .get();
+        final doc = await FirebaseFirestore.instance
+            .collection('fb_tokens')
+            .doc('facebook_admin')
+            .get();
 
         if (!doc.exists) {
           return TokenStatus(
@@ -267,10 +183,9 @@ class FacebookSyncService {
         final data = doc.data()!;
         final expiresAt = data['expires_at'] as int?;
         final now = DateTime.now().millisecondsSinceEpoch;
-        final daysLeft =
-            expiresAt != null
-                ? ((expiresAt - now) / (1000 * 60 * 60 * 24)).round()
-                : null;
+        final daysLeft = expiresAt != null
+            ? ((expiresAt - now) / (1000 * 60 * 60 * 24)).round()
+            : null;
 
         return TokenStatus(
           configured: true,
@@ -281,16 +196,13 @@ class FacebookSyncService {
           pageId: data['pageId'],
           needsRenewal: daysLeft != null && daysLeft <= 60 && daysLeft > 0,
         );
-      } else {
-        // Use Cloud Functions for mobile
-        final callable = FirebaseFunctions.instance.httpsCallable(
-          'getTokenStatus',
-        );
-        final result = await callable.call();
-        return TokenStatus.fromMap(result.data as Map<String, dynamic>);
       }
+
+      final callable = FirebaseFunctions.instance.httpsCallable('getTokenStatus');
+      final result = await callable.call();
+      return TokenStatus.fromMap(result.data as Map<String, dynamic>);
     } catch (e) {
-      print(' Error getting token status: $e');
+      print('Error getting token status: $e');
       return TokenStatus(
         configured: false,
         message: 'Error checking token status',
@@ -298,30 +210,24 @@ class FacebookSyncService {
     }
   }
 
-  // ============================================================================
-  // SYNC POSTS (unchanged)
-  // ============================================================================
-
   static Future<Map<String, dynamic>> syncPosts() async {
-    print(' Starting Facebook sync...');
-    print(' Platform: ${_getPlatformName()}');
-    print(' Using: ${_shouldUseHttp ? "HTTP" : "Cloud Functions SDK"}');
+    print('Starting Facebook sync...');
+    print('Platform: ${_getPlatformName()}');
+    print('Using: ${_shouldUseHttp ? "HTTP" : "Cloud Functions SDK"}');
 
     try {
       if (_shouldUseHttp) {
         return await _syncViaHttp();
-      } else {
-        return await _syncViaCloudFunctions();
       }
+
+      return await _syncViaCloudFunctions();
     } catch (e) {
-      print(' Sync failed: $e');
+      print('Sync failed: $e');
       rethrow;
     }
   }
 
   static Future<Map<String, dynamic>> _syncViaHttp() async {
-    print(' Using HTTP endpoint...');
-
     final authToken = await _getAuthToken();
     if (authToken == null) {
       throw Exception('Not authenticated. Please log in first.');
@@ -337,43 +243,17 @@ class FacebookSyncService {
             },
             body: json.encode({'data': {}}),
           )
-          .timeout(Duration(seconds: 60));
+          .timeout(const Duration(seconds: 60));
 
-      print(' Response: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final result = data['result'] ?? data;
-
-        if (result['success'] == true) {
-          print(' Sync completed successfully');
-          return result;
-        }
-
-        throw Exception(result['message'] ?? result['error'] ?? 'Sync failed');
-      } else if (response.statusCode == 401) {
-        throw Exception('Authentication failed. Please log in again.');
-      } else if (response.statusCode == 403) {
-        throw Exception('Permission denied. Admin access required.');
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(
-          errorData['message'] ?? 'Server error (${response.statusCode})',
-        );
-      }
-    } catch (e) {
-      if (e is TimeoutException) {
-        throw Exception(
-          'Request timed out. The sync may still be running in the background.',
-        );
-      }
-      rethrow;
+      return _parseHttpResponse(response, action: 'Sync');
+    } on TimeoutException {
+      throw Exception(
+        'Request timed out. The sync may still be running in the background.',
+      );
     }
   }
 
   static Future<Map<String, dynamic>> _syncViaCloudFunctions() async {
-    print('📞 Using Cloud Functions SDK...');
-
     try {
       final callable = FirebaseFunctions.instance.httpsCallable(
         'manualSyncFacebookPosts',
@@ -381,118 +261,59 @@ class FacebookSyncService {
 
       final result = await callable
           .call(<String, dynamic>{})
-          .timeout(Duration(seconds: 60));
+          .timeout(const Duration(seconds: 60));
 
-      final data = result.data as Map<String, dynamic>;
-
-      if (data['success'] == true) {
-        print(' Sync completed successfully');
-        return data;
-      }
-
-      throw Exception(data['message'] ?? data['error'] ?? 'Sync failed');
+      return _parseCallableData(result.data, fallbackMessage: 'Sync failed');
     } catch (e) {
-      print(' Cloud Functions call failed: $e');
-      print(' Falling back to HTTP...');
-      return await _syncViaHttp();
+      print('Cloud Functions call failed: $e');
+      print('Falling back to HTTP...');
+      return _syncViaHttp();
     }
   }
 
-  // ============================================================================
-  // TEST CONNECTION (unchanged)
-  // ============================================================================
-
   static Future<Map<String, dynamic>> syncPostsWithStorage() async {
     try {
-      print(' Starting Facebook sync with Firebase Storage upload...');
-
-      // First, do the regular sync
       final syncResult = await syncPosts();
-
       if (syncResult['success'] != true) {
         return syncResult;
       }
 
-      // Get the synced posts
-      final posts = syncResult['posts'] as List<dynamic>? ?? [];
+      final posts = syncResult['posts'] as List<dynamic>? ?? const [];
+      var imagesProcessed = 0;
+      var imagesFailed = 0;
 
-      int imagesProcessed = 0;
-      int imagesFailed = 0;
-
-      for (var post in posts) {
-        final postId = post['id'];
-        List<String> imageUrls = [];
-
-        // Extract image URLs from the post
-        if (post['attachments'] != null) {
-          final attachments = post['attachments']['data'] as List<dynamic>?;
-          if (attachments != null) {
-            for (var attachment in attachments) {
-              if (attachment['type'] == 'photo' ||
-                  attachment['type'] == 'album') {
-                if (attachment['media'] != null) {
-                  final media = attachment['media'];
-                  if (media['image'] != null && media['image']['src'] != null) {
-                    imageUrls.add(media['image']['src']);
-                  }
-                }
-
-                // Handle subattachments (multiple images)
-                if (attachment['subattachments'] != null) {
-                  final subAttachments =
-                      attachment['subattachments']['data'] as List<dynamic>?;
-                  if (subAttachments != null) {
-                    for (var subAttachment in subAttachments) {
-                      if (subAttachment['media'] != null &&
-                          subAttachment['media']['image'] != null) {
-                        imageUrls.add(subAttachment['media']['image']['src']);
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+      for (final post in posts) {
+        final postId = post['id']?.toString();
+        if (postId == null || postId.isEmpty) {
+          continue;
         }
 
-        // Also check full_picture
-        if (post['full_picture'] != null &&
-            !imageUrls.contains(post['full_picture'])) {
-          imageUrls.add(post['full_picture']);
+        final imageUrls = _extractImageUrls(post);
+        if (imageUrls.isEmpty) {
+          continue;
         }
 
-        // Upload images to Firebase Storage
-        if (imageUrls.isNotEmpty) {
-          print(' Processing ${imageUrls.length} images for post $postId');
+        final uploadResult =
+            await FacebookImageStorageService.processPostImages(
+              postId: postId,
+              facebookImageUrls: imageUrls,
+            );
 
-          final uploadResult =
-              await FacebookImageStorageService.processPostImages(
-                postId: postId,
-                facebookImageUrls: imageUrls,
-              );
+        if (uploadResult['success'] == true) {
+          imagesProcessed += (uploadResult['successCount'] as int?) ?? 0;
+          imagesFailed += (uploadResult['failedCount'] as int?) ?? 0;
 
-          if (uploadResult['success'] == true) {
-            imagesProcessed += uploadResult['successCount'] as int;
-            imagesFailed += uploadResult['failedCount'] as int;
-
-            // Update the post document with Firebase Storage URLs
-            final firebaseUrls = uploadResult['firebaseUrls'] as List<String>;
-            await FirebaseFirestore.instance
-                .collection('announcements')
-                .doc(postId)
-                .update({
-                  'images': firebaseUrls,
-                  'original_fb_urls': imageUrls,
-                  'images_migrated': true,
-                  'migration_date': FieldValue.serverTimestamp(),
-                });
-          }
+          await FirebaseFirestore.instance
+              .collection('announcements')
+              .doc(postId)
+              .update({
+                'images': uploadResult['firebaseUrls'],
+                'original_fb_urls': imageUrls,
+                'images_migrated': true,
+                'migration_date': FieldValue.serverTimestamp(),
+              });
         }
       }
-
-      print(
-        ' Sync complete! Images processed: $imagesProcessed, failed: $imagesFailed',
-      );
 
       return {
         'success': true,
@@ -502,14 +323,87 @@ class FacebookSyncService {
         'imagesFailed': imagesFailed,
       };
     } catch (e) {
-      print(' Error in sync with storage: $e');
+      print('Error in sync with storage: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
 
-  // ============================================================================
-  // UTILITY METHODS
-  // ============================================================================
+  static List<String> _extractImageUrls(Map<String, dynamic> post) {
+    final imageUrls = <String>[];
+    final attachments = post['attachments']?['data'] as List<dynamic>?;
+
+    if (attachments != null) {
+      for (final attachment in attachments) {
+        final type = attachment['type'];
+        if (type == 'photo' || type == 'album') {
+          final image = attachment['media']?['image']?['src'];
+          if (image is String && image.isNotEmpty) {
+            imageUrls.add(image);
+          }
+
+          final subAttachments =
+              attachment['subattachments']?['data'] as List<dynamic>?;
+          if (subAttachments != null) {
+            for (final subAttachment in subAttachments) {
+              final subImage = subAttachment['media']?['image']?['src'];
+              if (subImage is String && subImage.isNotEmpty) {
+                imageUrls.add(subImage);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    final fullPicture = post['full_picture'];
+    if (fullPicture is String &&
+        fullPicture.isNotEmpty &&
+        !imageUrls.contains(fullPicture)) {
+      imageUrls.add(fullPicture);
+    }
+
+    return imageUrls;
+  }
+
+  static Map<String, dynamic> _parseHttpResponse(
+    http.Response response, {
+    required String action,
+  }) {
+    print('$action response: ${response.statusCode}');
+
+    final body = response.body.isNotEmpty ? json.decode(response.body) : {};
+    final result = body is Map<String, dynamic>
+        ? (body['result'] is Map<String, dynamic> ? body['result'] : body)
+        : <String, dynamic>{};
+
+    if (response.statusCode == 200) {
+      return _parseCallableData(result, fallbackMessage: '$action failed');
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Authentication failed. Please log in again.');
+    }
+    if (response.statusCode == 403) {
+      throw Exception('Permission denied. Admin access required.');
+    }
+
+    throw Exception(
+      (result['message'] ?? result['error'] ?? 'Server error (${response.statusCode})')
+          .toString(),
+    );
+  }
+
+  static Map<String, dynamic> _parseCallableData(
+    dynamic rawData, {
+    required String fallbackMessage,
+  }) {
+    final data = Map<String, dynamic>.from(rawData as Map);
+    if (data['success'] == true || data['ok'] == true) {
+      return data;
+    }
+
+    throw Exception(data['message'] ?? data['error'] ?? fallbackMessage);
+  }
 
   static String _getPlatformName() {
     if (kIsWeb) return 'Web';
@@ -522,9 +416,7 @@ class FacebookSyncService {
   }
 
   static String parseErrorMessage(dynamic error) {
-    String errorMessage = error.toString();
-
-    errorMessage = errorMessage.replaceFirst('Exception: ', '');
+    var errorMessage = error.toString().replaceFirst('Exception: ', '');
 
     if (errorMessage.contains('[firebase_functions/')) {
       final match = RegExp(r'\] (.+)$').firstMatch(errorMessage);
@@ -535,24 +427,32 @@ class FacebookSyncService {
 
     if (errorMessage.contains('unauthenticated')) {
       return 'Please log in to continue.';
-    } else if (errorMessage.contains('permission-denied')) {
+    }
+    if (errorMessage.contains('permission-denied')) {
       return 'Permission denied. Only admins can perform this action.';
-    } else if (errorMessage.contains('No Facebook token configured')) {
+    }
+    if (errorMessage.contains('No Facebook token configured')) {
       return 'Please configure Facebook token using the key () button';
-    } else if (errorMessage.contains('token expired')) {
+    }
+    if (errorMessage.contains('token expired')) {
       return 'Facebook token expired. Please refresh using the key () button';
-    } else if (errorMessage.contains('DEADLINE_EXCEEDED') ||
+    }
+    if (errorMessage.contains('DEADLINE_EXCEEDED') ||
         errorMessage.contains('timeout') ||
         errorMessage.contains('timed out')) {
       return 'Request timed out. Please try again.';
-    } else if (errorMessage.contains('UNAVAILABLE')) {
+    }
+    if (errorMessage.contains('UNAVAILABLE')) {
       return 'Service temporarily unavailable. Please try again.';
-    } else if (errorMessage.contains('ClientException') ||
+    }
+    if (errorMessage.contains('ClientException') ||
         errorMessage.contains('SocketException')) {
       return 'Network error. Please check your internet connection.';
-    } else if (errorMessage.contains('Facebook API Error')) {
+    }
+    if (errorMessage.contains('Facebook API Error')) {
       return errorMessage;
-    } else if (errorMessage.contains('Unable to establish connection')) {
+    }
+    if (errorMessage.contains('Unable to establish connection')) {
       return 'Connection error. Please try again.';
     }
 

@@ -696,7 +696,7 @@ class _DashboardModulestate extends State<DashboardPage> {
     // Show skeleton during initial load
     if (showSkeleton || userName == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFFEDF0F7),
+        backgroundColor: const Color.fromARGB(255, 1, 124, 17),
         body: _buildSkeletonDashboard(),
       );
     }
@@ -1089,7 +1089,7 @@ Widget dashboardContents(
   ValueChanged<DateTimeRange?> onDateRangeChanged,
 ) {
   return Scaffold(
-    backgroundColor: _kPageBg,
+    backgroundColor: const Color.fromARGB(255, 239, 247, 237),
     body: LayoutBuilder(
       builder: (context, constraints) {
         final screenWidth = MediaQuery.of(context).size.width;

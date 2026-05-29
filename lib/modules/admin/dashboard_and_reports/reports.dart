@@ -142,16 +142,12 @@ class FirebaseService {
             : 'inquiry_$timeFrame';
 
     if (_inquiryCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
-      print(' Using cached data for $cacheKey');
       return _inquiryCache[cacheKey]!;
     }
 
     try {
       final startDate = _getStartDate(timeFrame, customRange);
       final endDate = _getEndDate(timeFrame, customRange);
-
-      print(' Fetching inquiry data: timeFrame=$timeFrame');
-      print(' Date range: $startDate to $endDate');
 
       final results = await Future.wait([
         _getTotalMessages(startDate, endDate),
@@ -169,15 +165,8 @@ class FirebaseService {
       // Check if FAQs are empty, if so fetch top FAQs without time filter
       List<QueryDocumentSnapshot> faqs = results[5];
       if (faqs.isEmpty) {
-        print(
-          ' No FAQs found in selected timeframe, fetching top FAQs from all time',
-        );
         faqs = await _getTopFAQsAllTime();
       }
-
-      print(' Fetched ${results[1].length} user messages');
-      print(' Fetched ${faqs.length} FAQs');
-
       final data = _processInquiryReportsData(
         totalMessages: results[0],
         userMessages: results[1],
@@ -199,7 +188,6 @@ class FirebaseService {
 
       return data;
     } catch (e) {
-      print(' Error fetching inquiry data: $e');
       return getEmptyInquiryReportsData();
     }
   }
@@ -243,7 +231,6 @@ class FirebaseService {
 
       return data;
     } catch (e) {
-      print('Error fetching chatbot usage data: $e');
       return getEmptyChatbotUsageReportsData();
     }
   }
@@ -290,7 +277,6 @@ class FirebaseService {
 
       return data;
     } catch (e) {
-      print('Error fetching user demographics data: $e');
       return getEmptyUserDemographicsReportsData();
     }
   }
@@ -342,7 +328,6 @@ class FirebaseService {
 
       return data;
     } catch (e) {
-      print('Error fetching admin dashboard data: $e');
       return getEmptyAdminDashboardData();
     }
   }
@@ -393,7 +378,6 @@ class FirebaseService {
 
       return data;
     } catch (e) {
-      print('Error fetching staff dashboard data: $e');
       return getEmptyStaffDashboardData();
     }
   }
@@ -923,8 +907,6 @@ class FirebaseService {
 
     final finalTopQuestions = Map<String, int>.fromEntries(sortedTopQuestions);
 
-    print(' Top Questions: ${finalTopQuestions.length} questions');
-
     // Inquiry trend
     final inquiryTrend = _generateInquiryTrend(
       userMessages,
@@ -1226,10 +1208,6 @@ class FirebaseService {
 
         // Process scholarship - THIS IS THE KEY FIX
         final scholarship = data['scholarship'];
-        print(
-          'DEBUG: User ${data['name']}: scholarship = $scholarship',
-        ); // Debug log
-
         if (scholarship != null &&
             scholarship.toString().trim().isNotEmpty &&
             scholarship.toString().toLowerCase() != 'null' &&
@@ -1238,9 +1216,6 @@ class FirebaseService {
           scholarshipDistribution[scholarshipStr] =
               (scholarshipDistribution[scholarshipStr] ?? 0) + 1;
           usersWithScholarship++;
-          print(
-            'DEBUG: Added scholarship: $scholarshipStr, count: ${scholarshipDistribution[scholarshipStr]}',
-          ); // Debug log
         } else {
           usersWithoutScholarship++;
         }
@@ -1252,13 +1227,6 @@ class FirebaseService {
         }
       }
     }
-
-    print(
-      'DEBUG: Final scholarshipDistribution: $scholarshipDistribution',
-    ); // Debug log
-    print(
-      'DEBUG: usersWithScholarship: $usersWithScholarship, usersWithoutScholarship: $usersWithoutScholarship',
-    ); // Debug log
 
     // User growth over time
     final userGrowthOverTime = _generateUserGrowthTrend(
@@ -1475,10 +1443,6 @@ class FirebaseService {
       0,
     ).subtract(Duration(days: daysFromMonday));
 
-    print(
-      '🗓️ Start of week for $date: $startOfWeek (weekday: ${date.weekday})',
-    );
-
     return startOfWeek;
   }
 
@@ -1539,7 +1503,6 @@ class FirebaseService {
         'totalUsers': usersSnapshot.count ?? 0,
       };
     } catch (e) {
-      print('Error getting quick stats: $e');
       return {'totalMessages': 0, 'answered': 0, 'totalUsers': 0};
     }
   }
@@ -1828,7 +1791,6 @@ class FirebaseService {
         );
       });
     } catch (e) {
-      print('Error generating hourly usage trend: $e');
       return [];
     }
   }
@@ -1988,7 +1950,6 @@ class FirebaseService {
           });
       }
     } catch (e) {
-      print('Error generating daily session trend: $e');
       return [];
     }
   }
@@ -2165,7 +2126,6 @@ class FirebaseService {
           });
       }
     } catch (e) {
-      print('Error generating weekly session trend: $e');
       return [];
     }
   }
@@ -2228,7 +2188,6 @@ class FirebaseService {
         );
       });
     } catch (e) {
-      print('Error generating monthly session trend: $e');
       return [];
     }
   }
@@ -2303,9 +2262,6 @@ List<ChartData> _generateInquiryTrend(
         (timeCategoryCounts[timeKey]![category] ?? 0) + 1;
   }
 
-  print(' Processed: $processedCount, Filtered out: $filteredCount');
-  print(' Time keys with data: ${timeCategoryCounts.keys.toList()}');
-
   return _generateTrendData(
     startDate,
     actualEndDate,
@@ -2379,9 +2335,6 @@ List<ChartData> _buildResponseTimeTrend(
 ) {
   final trendData = <ChartData>[];
 
-  print('📈 _buildResponseTimeTrend: interval=$interval');
-  print('📈 Response time data keys: ${responseTimeByDate.keys.toList()}');
-
   switch (interval) {
     case 'hourly':
     case 'Today':
@@ -2416,10 +2369,6 @@ List<ChartData> _buildResponseTimeTrend(
             times.isNotEmpty
                 ? (times.reduce((a, b) => a + b) / times.length) * 100
                 : 0.0;
-
-        print(
-          '📈 $dayName ($dateKey): ${times.length} samples, avg=${avgTime / 100}s',
-        );
 
         trendData.add(ChartData(date: dayName, count: avgTime.round()));
       }
@@ -2469,10 +2418,6 @@ List<ChartData> _buildResponseTimeTrend(
                 ? (times.reduce((a, b) => a + b) / times.length) * 100
                 : 0.0;
 
-        print(
-          '📈 $monthName ($monthKey): ${times.length} samples, avg=${avgTime / 100}s',
-        );
-
         trendData.add(ChartData(date: monthName, count: avgTime.round()));
       }
       break;
@@ -2495,7 +2440,6 @@ List<ChartData> _buildResponseTimeTrend(
       break;
   }
 
-  print('📈 Generated ${trendData.length} response time data points');
   return trendData;
 }
 
@@ -2782,7 +2726,6 @@ Map<String, int> _generatePeakUsageByYear(
     }
   }
 
-  print(' Peak Usage by Year (${startDate.year}): $monthCounts');
   return monthCounts;
 }
 
@@ -2824,7 +2767,6 @@ Map<String, int> _generatePeakUsageByAllYears(
     sortedCounts[year] = yearCounts[year]!;
   }
 
-  print(' Peak Usage by All Years: $sortedCounts');
   return sortedCounts;
 }
 
@@ -2960,8 +2902,6 @@ List<ChartData> _generateTrendData(
       ); // Use current date's week
       final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-      print(' Week start: $startOfWeek');
-
       for (int i = 0; i < 7; i++) {
         final date = startOfWeek.add(Duration(days: i));
         final dateKey =
@@ -2974,8 +2914,6 @@ List<ChartData> _generateTrendData(
           0,
           (sum, count) => sum + count,
         );
-
-        print(' Day $dayName ($dateKey): count=$totalCount');
 
         trendData.add(
           ChartData(
@@ -3028,8 +2966,6 @@ List<ChartData> _generateTrendData(
       ];
       final currentYear = actualEndDate.year;
 
-      print(' Generating months for year: $currentYear');
-
       for (int month = 1; month <= 12; month++) {
         final monthKey = "$currentYear-${month.toString().padLeft(2, '0')}";
         final monthName = monthNames[month - 1];
@@ -3039,10 +2975,6 @@ List<ChartData> _generateTrendData(
         final totalCount = categoryBreakdown.values.fold(
           0,
           (sum, count) => sum + count,
-        );
-
-        print(
-          ' Month $monthName ($monthKey): count=$totalCount, data=${categoryBreakdown}',
         );
 
         trendData.add(
@@ -3080,7 +3012,6 @@ List<ChartData> _generateTrendData(
       break;
   }
 
-  print(' Generated ${trendData.length} data points');
   return trendData;
 }
 
@@ -3092,9 +3023,6 @@ List<ChartData> _generateSimpleTrendData(
 ) {
   final actualEndDate = endDate ?? DateTime.now();
   final trendData = <ChartData>[];
-
-  print('📈 _generateSimpleTrendData: interval=$interval');
-  print('📈 Data keys: ${timeCounts.keys.toList()}');
 
   switch (interval) {
     case 'hourly':
@@ -3119,8 +3047,6 @@ List<ChartData> _generateSimpleTrendData(
         final dayName = dayNames[i];
 
         final count = timeCounts[dateKey] ?? 0;
-        print('📈 $dayName ($dateKey): $count');
-
         trendData.add(ChartData(date: dayName, count: count));
       }
       break;
@@ -3157,8 +3083,6 @@ List<ChartData> _generateSimpleTrendData(
         final monthKey = "$currentYear-${month.toString().padLeft(2, '0')}";
         final monthName = monthNames[month - 1];
         final count = timeCounts[monthKey] ?? 0;
-
-        print('📈 $monthName ($monthKey): $count');
 
         trendData.add(ChartData(date: monthName, count: count));
       }

@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -200,7 +200,7 @@ class FileService {
         throw Exception('Pinecone service is not available');
       }
 
-      //  FIX: Use category-prefixed ID for category documents
+      //   Use category-prefixed ID for category documents
       String finalDocId = ib.id;
 
       // If this is a category document, use the prefixed format
@@ -217,7 +217,7 @@ class FileService {
 
       final sanitizedId = sanitizeId(finalDocId);
 
-      //  FIX: Check if entry already exists
+      //   Check if entry already exists
       final existingDoc =
           await firestore.collection('information_bank').doc(sanitizedId).get();
 
@@ -1191,7 +1191,7 @@ class FileService {
           'createdAt': DateTime.now().toIso8601String(),
           'syncedFromCategory': true,
 
-          //  NEW: Add type to metadata
+          //   Add type to metadata
           'admissionType': admission.type ?? 'general',
           'testType': admission.type ?? 'general',
 

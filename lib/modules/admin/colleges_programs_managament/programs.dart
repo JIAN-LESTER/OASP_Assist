@@ -374,7 +374,7 @@ Widget _buildMobileHeader(
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: Colors.black,
                 ),
               ),
               const SizedBox(height: 4),
@@ -596,7 +596,7 @@ Widget _buildHeader(
                     style: TextStyle(
                       fontSize: isMobile ? 20 : (isTablet ? 22 : 24),
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: Colors.black,
                     ),
                   ),
                   const SizedBox(height: 4),

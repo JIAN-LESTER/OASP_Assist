@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -111,7 +111,13 @@ class ChatProvider extends ChangeNotifier {
                 _userDailyMessageCount = newCount;
                 _userLastResetDate = newResetDate;
 
+<<<<<<< HEAD
+                notifyListeners();
+              }
+            } else {
+=======
                 print(
+                  ' Real-time update: User message count = $_userDailyMessageCount',
                   ' Real-time update: User message count = $_userDailyMessageCount',
                 );
                 notifyListeners();
@@ -119,55 +125,15 @@ class ChatProvider extends ChangeNotifier {
             } else {
               print(
                 ' User document not found - will be created on first message',
+                ' User document not found - will be created on first message',
               );
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
               _userDailyMessageCount = 0;
               _userLastResetDate = null;
               notifyListeners();
             }
           },
-          onError: (error) {
-            print(' Error in message count listener: $error');
-          },
-        );
-  }
-
-  void setScrollCallback(VoidCallback callback) {
-    _onMessageAdded = callback;
-  }
-
-  void clearScrollCallback() {
-    _onMessageAdded = null;
-  }
-
-  bool get canSendMessage {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return false;
-
-    final now = DateTime.now();
-
-    if (_userDailyMessageCount == 0 && _userLastResetDate == null) {
-      print(' New user detected - allowing first message');
-      return true;
-    }
-
-    if (_userLastResetDate != null) {
-      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
-
-      final shouldReset =
-          now.isAfter(resetTime) && _userLastResetDate!.isBefore(resetTime);
-
-      if (shouldReset) {
-        print(' Reset time reached - allowing message');
-        return true;
-      }
-    }
-
-    final canSend = _userDailyMessageCount < MAX_DAILY_MESSAGES;
-
-    print(' Message limit check:');
-    print('   Current count: $_userDailyMessageCount');
-    print('   Max allowed: $MAX_DAILY_MESSAGES');
-    print('   Can send: $canSend');
+          onError: (_) {
 
     return canSend;
   }
@@ -212,6 +178,7 @@ class ChatProvider extends ChangeNotifier {
     print('   Current count: $_userDailyEscalationCount');
     print('   Max allowed: $MAX_DAILY_ESCALATIONS');
     print('   Can escalate: $canEsc');
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
 
     return canEsc;
   }
@@ -327,9 +294,6 @@ class ChatProvider extends ChangeNotifier {
                 _userDailyEscalationCount = newCount;
                 _userLastEscalationResetDate = newResetDate;
 
-                print(
-                  ' Real-time update: Escalation count = $_userDailyEscalationCount',
-                );
                 notifyListeners();
               }
             } else {
@@ -338,6 +302,7 @@ class ChatProvider extends ChangeNotifier {
               notifyListeners();
             }
           },
+          onError: (_) {
           onError: (error) {
             print(' Error in escalation count listener: $error');
           },
@@ -357,9 +322,13 @@ class ChatProvider extends ChangeNotifier {
         _userLastEscalationResetDate =
             (data['lastEscalationResetDate'] as Timestamp?)?.toDate();
 
+<<<<<<< HEAD
+=======
         print(
           ' Loaded escalation count: $_userDailyEscalationCount/$MAX_DAILY_ESCALATIONS',
+          ' Loaded escalation count: $_userDailyEscalationCount/$MAX_DAILY_ESCALATIONS',
         );
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
       } else {
         _userDailyEscalationCount = 0;
         _userLastEscalationResetDate = null;
@@ -369,7 +338,14 @@ class ChatProvider extends ChangeNotifier {
           'lastEscalationResetDate': Timestamp.now(),
         }, SetOptions(merge: true));
 
+<<<<<<< HEAD
+      }
+
+      notifyListeners();
+    } catch (_) {
+=======
         print(
+          ' Initialized new user escalation count: 0/$MAX_DAILY_ESCALATIONS',
           ' Initialized new user escalation count: 0/$MAX_DAILY_ESCALATIONS',
         );
       }
@@ -451,6 +427,9 @@ class ChatProvider extends ChangeNotifier {
         _userLastResetDate = now;
         notifyListeners();
       }
+<<<<<<< HEAD
+    } catch (_) {
+=======
     } catch (e) {
       print(' Error in manual reset: $e');
     }
@@ -469,9 +448,13 @@ class ChatProvider extends ChangeNotifier {
         _userLastResetDate =
             (data['lastMessageResetDate'] as Timestamp?)?.toDate();
 
+<<<<<<< HEAD
+=======
         print(
           ' Loaded user message count: $_userDailyMessageCount/$MAX_DAILY_MESSAGES',
+          ' Loaded user message count: $_userDailyMessageCount/$MAX_DAILY_MESSAGES',
         );
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
       } else {
         _userDailyMessageCount = 0;
         _userLastResetDate = null;
@@ -481,7 +464,14 @@ class ChatProvider extends ChangeNotifier {
           'lastMessageResetDate': Timestamp.now(),
         }, SetOptions(merge: true));
 
+<<<<<<< HEAD
+      }
+
+      notifyListeners();
+    } catch (_) {
+=======
         print(
+          ' Initialized new user with message count: 0/$MAX_DAILY_MESSAGES',
           ' Initialized new user with message count: 0/$MAX_DAILY_MESSAGES',
         );
       }
@@ -615,6 +605,7 @@ class ChatProvider extends ChangeNotifier {
       print(' ChatProvider setup complete');
       print('   - Conversation ID: $conversationId');
       print('   - Messages: ${_messages.length}');
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
     } finally {
       _isSettingConversation = false;
     }
@@ -649,6 +640,9 @@ class ChatProvider extends ChangeNotifier {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifyListeners();
       });
+<<<<<<< HEAD
+    } catch (_) {
+=======
     } catch (e) {
       print(' Error loading conversation info: $e');
     }
@@ -685,8 +679,7 @@ class ChatProvider extends ChangeNotifier {
           .collection('messages');
 
       await messagesRef.doc(message.id).set(_messageToMap(message));
-    } catch (e) {
-      print('Error saving message to Firebase: $e');
+    } catch (_) {
       rethrow;
     }
   }
@@ -720,8 +713,7 @@ class ChatProvider extends ChangeNotifier {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifyListeners();
       });
-    } catch (e) {
-      print('Error loading existing messages: $e');
+    } catch (_) {
     }
   }
 
@@ -730,7 +722,6 @@ class ChatProvider extends ChangeNotifier {
   void listenToEscalationResponses() {
     if (conversationId == null) return;
 
-    print('👂 Starting escalation response listener for: $conversationId');
 
     _escalationSubscription?.cancel();
 
@@ -797,6 +788,9 @@ class ChatProvider extends ChangeNotifier {
               }
             }
           },
+<<<<<<< HEAD
+          onError: (_) {
+=======
           onError: (error) {
             print(' Error in escalation listener: $error');
           },
@@ -806,7 +800,6 @@ class ChatProvider extends ChangeNotifier {
   void listenToMessages() {
     if (conversationId == null) return;
 
-    print('👂 Starting message listener for conversation: $conversationId');
 
     _messagesSubscription = _firestore
         .collection('conversations')
@@ -863,6 +856,9 @@ class ChatProvider extends ChangeNotifier {
               });
             }
           },
+<<<<<<< HEAD
+          onError: (_) {
+=======
           onError: (error) {
             print(' Error listening to messages: $error');
           },
@@ -898,6 +894,9 @@ class ChatProvider extends ChangeNotifier {
           userId,
         );
         await setConversationId(newConversationId);
+<<<<<<< HEAD
+      } catch (_) {
+=======
       } catch (e) {
         print(' Error creating conversation: $e');
         return;
@@ -946,7 +945,14 @@ class ChatProvider extends ChangeNotifier {
       notifyListeners();
       _onMessageAdded?.call();
 
+<<<<<<< HEAD
+      userMessageRef.set(_messageToMap(userMsg)).catchError((_) {
+      });
+
+      _updateUserMessageCount().catchError((_) {
+=======
       userMessageRef.set(_messageToMap(userMsg)).catchError((e) {
+        print(' Background save error: $e');
         print(' Background save error: $e');
       });
 
@@ -968,6 +974,9 @@ class ChatProvider extends ChangeNotifier {
         questionCategory = await _classifyQuestionCategoryFast(question);
       }
 
+<<<<<<< HEAD
+      userMessageRef.update({'category': questionCategory}).catchError((_) {
+=======
       userMessageRef.update({'category': questionCategory}).catchError((e) {
         print(' Background category update error: $e');
       });
@@ -981,6 +990,9 @@ class ChatProvider extends ChangeNotifier {
             _messages.where((m) => m.sender == 'user').length <= 1;
 
         if (shouldUpdateTitle) {
+<<<<<<< HEAD
+          _updateConversationTitleNow(question).catchError((_) {
+=======
           _updateConversationTitleNow(question).catchError((e) {
             print(' Background title update error: $e');
           });
@@ -1039,7 +1051,7 @@ class ChatProvider extends ChangeNotifier {
         finalAnswer = answer;
 
         _incrementFAQSimilarityCountAsync(existingFAQ["question"]).catchError((
-          e,
+          _,
         ) {
           print(' Background FAQ count error: $e');
         });
@@ -1077,7 +1089,6 @@ class ChatProvider extends ChangeNotifier {
       _onMessageAdded?.call();
 
       final totalMs = DateTime.now().difference(startTime).inMilliseconds;
-      print("⚡ Total response time: ${totalMs}ms");
 
       Future(() async {
         final batch = _firestore.batch();
@@ -1097,6 +1108,9 @@ class ChatProvider extends ChangeNotifier {
         });
 
         await batch.commit();
+<<<<<<< HEAD
+      }).catchError((_) {
+=======
       }).catchError((e) {
         print(' Background batch save error: $e');
       });
@@ -1108,6 +1122,9 @@ class ChatProvider extends ChangeNotifier {
         currentEmbedding,
         questionCategory,
         userId,
+<<<<<<< HEAD
+      ).catchError((_) {
+=======
       ).catchError((e) {
         print(' Background post-response error: $e');
       });
@@ -1171,6 +1188,9 @@ $question
 
         notifyListeners();
       }
+<<<<<<< HEAD
+    } catch (_) {
+=======
     } catch (titleError) {
       print(' Error updating conversation title: $titleError');
     }
@@ -1251,6 +1271,9 @@ $question
           faqEmbedding = List<double>.from(
             (rawEmbedding as List).map((e) => (e as num).toDouble()),
           );
+<<<<<<< HEAD
+        } catch (_) {
+=======
         } catch (e) {
           print(' Invalid embedding format for: ${data['question']}');
           continue;
@@ -1259,22 +1282,30 @@ $question
         // FIX: Strict dimension check - only compare 768-dim embeddings.
         // Mixing different embedding models produces nonsense similarity scores.
         if (faqEmbedding.length != 768 || questionEmbedding.length != 768) {
+<<<<<<< HEAD
+=======
           print(
+            ' Embedding dimension mismatch or wrong model: '
             ' Embedding dimension mismatch or wrong model: '
             'FAQ=${faqEmbedding.length}, Query=${questionEmbedding.length} '
             '(expected 768). Skipping.',
           );
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
           continue;
         }
 
         final similarity = cosineSimilarity(questionEmbedding, faqEmbedding);
 
+<<<<<<< HEAD
+=======
         print(
+          ' FAQ: "${(data['question'] as String).substring(0, min(50, (data['question'] as String).length))}..."',
           ' FAQ: "${(data['question'] as String).substring(0, min(50, (data['question'] as String).length))}..."',
         );
         print('   Answer length: ${answer.length} chars');
         print('   Category: ${data['category'] ?? 'N/A'}');
         print('   Similarity: ${similarity.toStringAsFixed(4)}');
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
 
         if (similarity > 0.75 && similarity > highestSimilarity) {
           highestSimilarity = similarity;
@@ -1290,11 +1321,13 @@ $question
 
       if (bestMatch != null) {
         print(' Found FAQ match:');
+        print(' Found FAQ match:');
         print('   Question: ${bestMatch['question']}');
         print('   Category: ${bestMatch['category']}');
         print('   Similarity: ${highestSimilarity.toStringAsFixed(4)}');
       } else {
         print(
+          ' No FAQ match found (best similarity: ${highestSimilarity.toStringAsFixed(4)})',
           ' No FAQ match found (best similarity: ${highestSimilarity.toStringAsFixed(4)})',
         );
       }
@@ -1351,6 +1384,9 @@ $question
           return 'Scholarship';
         if (normalized.toLowerCase().contains('placement')) return 'Placement';
       }
+<<<<<<< HEAD
+    } catch (_) {
+=======
     } catch (e) {
       print(' Classification error: $e');
     }
@@ -1400,21 +1436,29 @@ $question
           if (rawEmbedding == null ||
               rawEmbedding is! List ||
               (rawEmbedding as List).isEmpty) {
+<<<<<<< HEAD
+=======
             print(
+              ' Skipping FAQ ${doc.id}: No embedding - '
               ' Skipping FAQ ${doc.id}: No embedding - '
               '"${question.substring(0, min(50, question.length))}"',
             );
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
             skippedCount++;
             continue;
           }
 
           // FIX: Enforce 768 dimensions - reject wrong-model embeddings.
           if ((rawEmbedding as List).length != 768) {
+<<<<<<< HEAD
+=======
             print(
+              ' Skipping FAQ ${doc.id}: Wrong embedding size '
               ' Skipping FAQ ${doc.id}: Wrong embedding size '
               '${rawEmbedding.length} (expected 768) - '
               '"${question.substring(0, min(50, question.length))}"',
             );
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
             skippedCount++;
             continue;
           }
@@ -1425,10 +1469,14 @@ $question
           normalisedData.remove('geminiEmbedding');
 
           validFAQs[doc.id] = normalisedData;
+<<<<<<< HEAD
+=======
           print(
+            ' Cached FAQ: "${question.substring(0, min(50, question.length))}" '
             ' Cached FAQ: "${question.substring(0, min(50, question.length))}" '
             '(${answer.length} chars, ${rawEmbedding.length}d)',
           );
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
         }
 
         FAQCache.cache.clear();
@@ -1439,6 +1487,7 @@ $question
         print('   Valid FAQs: ${validFAQs.length}');
         print('   Skipped: $skippedCount');
       } catch (e) {
+        print(' Error loading FAQ cache: $e');
         print(' Error loading FAQ cache: $e');
       }
     } else {
@@ -1477,8 +1526,7 @@ $question
         ),
         _updateConversationTitleIfNeeded(question),
       ]);
-    } catch (e) {
-      print('Error in post-response tasks: $e');
+    } catch (_) {
     }
   }
 
@@ -2051,6 +2099,9 @@ $question
       if (context.mounted) {
         await _showEscalationSuccessDialog(context);
       }
+<<<<<<< HEAD
+    } catch (_) {
+=======
     } catch (e) {
       print(' Error creating auto-escalation: $e');
     }
@@ -2261,6 +2312,9 @@ $question
       };
 
       await escalationRef.set(escalatedData);
+<<<<<<< HEAD
+    } catch (_) {
+=======
     } catch (e) {
       print(' Error creating auto-escalation: $e');
     }
@@ -2321,7 +2375,7 @@ $question
               similarity,
             );
           }
-        } catch (e) {
+        } catch (_) {
           continue;
         }
       }
@@ -2331,7 +2385,7 @@ $question
         if (group.questionCount >= 10 && group.averageSimilarity > 0.90) {
           final representativeQuestion = group.getMostRepresentativeQuestion();
 
-          // ── Duplicate guard: skip if a live FAQ already covers this ──
+          // -- Duplicate guard: skip if a live FAQ already covers this --
           final exactFAQMatch =
               await _firestore
                   .collection('faqs')
@@ -2357,11 +2411,15 @@ $question
               if (existingEmb.length != 768) continue;
               final sim = cosineSimilarity(currentEmbedding, existingEmb);
               if (sim > 0.92) {
+<<<<<<< HEAD
+=======
                 print(
+                  ' Semantic duplicate found in live FAQs '
                   ' Semantic duplicate found in live FAQs '
                   '(sim=${sim.toStringAsFixed(3)}): '
                   '${cacheEntry['question']}',
                 );
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
                 semanticDuplicateFound = true;
                 break;
               }
@@ -2371,7 +2429,7 @@ $question
           }
           if (semanticDuplicateFound) continue;
 
-          // ── Duplicate guard: skip if a pending candidate already exists ──
+          // -- Duplicate guard: skip if a pending candidate already exists --
           final existingCandidate =
               await _firestore
                   .collection('faq_candidates')
@@ -2390,14 +2448,10 @@ $question
               'lastSeen': now,
               'averageSimilarity': group.averageSimilarity,
             });
-            print(
-              '📈 Updated existing candidate occurrences to '
-              '${group.questionCount}: $representativeQuestion',
-            );
             continue;
           }
 
-          // ── New candidate ──
+          // -- New candidate --
           // Also do a semantic duplicate check against existing pending
           // candidates to prevent near-duplicate entries.
           final pendingCandidates =
@@ -2424,10 +2478,14 @@ $question
                   'occurrenceCount': FieldValue.increment(group.questionCount),
                   'lastSeen': now,
                 });
+<<<<<<< HEAD
+=======
                 print(
+                  ' Merged into existing candidate '
                   ' Merged into existing candidate '
                   '(sim=${sim.toStringAsFixed(3)}): ${cdData['question']}',
                 );
+>>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
                 candidateDuplicateFound = true;
                 break;
               }
@@ -2450,7 +2508,13 @@ $question
             'status': 'pending',
           });
 
+<<<<<<< HEAD
+        }
+      }
+    } catch (_) {
+=======
           print(
+            ' New FAQ candidate queued for admin review: '
             ' New FAQ candidate queued for admin review: '
             '$representativeQuestion',
           );
@@ -2462,6 +2526,7 @@ $question
           print('   Category    : $category');
         } else if (group.questionCount >= 5) {
           print(
+            ' Group approaching threshold: ${group.questionCount}/10 '
             ' Group approaching threshold: ${group.questionCount}/10 '
             '(avg sim: ${group.averageSimilarity.toStringAsFixed(3)})',
           );
@@ -2617,14 +2682,12 @@ $question
           'lastAsked': Timestamp.now(),
         });
       }
-    } catch (e) {
-      print('Error incrementing FAQ similarity count: $e');
+    } catch (_) {
     }
   }
 
   void unawaited(Future<void> future) {
-    future.catchError((error) {
-      print('Unawaited future error: $error');
+    future.catchError((_) {
     });
   }
 
@@ -2656,8 +2719,7 @@ $question
         'reply': reply,
         'time': Timestamp.now(),
       });
-    } catch (e) {
-      print('Failed to log message: $e');
+    } catch (_) {
     }
   }
 
@@ -2719,8 +2781,7 @@ $question
             notifyListeners();
           });
         }
-      } catch (titleError) {
-        print('Error updating conversation title: $titleError');
+      } catch (_) {
       }
     }
   }
@@ -2737,7 +2798,6 @@ $question
 
   Future<List<double>> _generateEmbeddingDirect(String question) async {
     try {
-      print('🪟 Windows: Generating Gemini embedding via Direct HTTP');
 
       if (_geminiApiKey.isEmpty) {
         throw Exception('GEMINI_API_KEY is not defined.');
@@ -2778,6 +2838,9 @@ $question
       }
 
       return embedding;
+<<<<<<< HEAD
+    } catch (_) {
+=======
     } catch (e) {
       print(' Direct Embedding Error: $e');
       rethrow;
@@ -2807,6 +2870,9 @@ $question
       }
 
       return embedding;
+<<<<<<< HEAD
+    } catch (_) {
+=======
     } catch (e) {
       print(' Firebase Functions Error: $e');
       rethrow;
@@ -2830,9 +2896,7 @@ $question
           .doc(messageId)
           .update({'rating': rating, 'rated_at': Timestamp.now()});
 
-      print('Message $messageId rated successfully');
-    } catch (e) {
-      print('Error rating message: $e');
+    } catch (_) {
       _pendingRatingsCache.remove(messageId);
       rethrow;
     }
@@ -2909,7 +2973,7 @@ $question
       notifyListeners();
     });
 
-    print(' ChatProvider cleared');
+    print('✅ ChatProvider cleared');
   }
 
   @override
