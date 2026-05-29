@@ -120,7 +120,7 @@ class _UserMainPageState extends State<UserMainPage>
       }
     });
 
-    //  FIX: Only load conversation if passed, don't create new one
+    //   Only load conversation if passed, don't create new one
     if (widget.conversationId != null &&
         widget.conversationId!.isNotEmpty &&
         widget.conversationId != 'null') {
@@ -921,7 +921,7 @@ class _UserMainPageState extends State<UserMainPage>
             onConversationSelected: _onConversationSelected,
             onNewChat: _onNewChatPressed,
           ),
-          //  FIX: Wrap only the page content in Stack
+          //   Wrap only the page content in Stack
           Expanded(
             child: Stack(
               children: [

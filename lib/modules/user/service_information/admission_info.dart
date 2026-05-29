@@ -138,7 +138,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
 
   Widget _buildContent() {
     if (_isLoading) {
-      //  NEW: Show loading state
+      //   Show loading state
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

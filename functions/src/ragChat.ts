@@ -204,7 +204,7 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return dotProduct / (Math.sqrt(magnitudeA) * Math.sqrt(magnitudeB));
 }
 
-// FIX: findMatchingFAQ now reads BOTH 'embedding' (auto-promoted / normalised
+//  findMatchingFAQ now reads BOTH 'embedding' (auto-promoted / normalised
 // client field) and 'geminiEmbedding' (legacy server-stored field) so no FAQ
 // is ever silently skipped due to a field-name mismatch.
 async function findMatchingFAQ(
@@ -233,7 +233,7 @@ async function findMatchingFAQ(
 
       if (!faqQuestion || !faqAnswer) continue;
 
-      // FIX: prefer the already-stored embedding (either field name) to avoid
+      //  prefer the already-stored embedding (either field name) to avoid
       // unnecessary Gemini API calls.  Only fall back to generating a new one
       // when neither field is present.
       let faqEmbedding: number[];
@@ -245,7 +245,7 @@ async function findMatchingFAQ(
         console.log(` No valid 768-d embedding for FAQ "${faqQuestion.substring(0, 40)}" — generating…`);
         faqEmbedding = await generateGeminiEmbedding(faqQuestion, geminiApiKey, "search_document");
 
-        // FIX: Persist BOTH field names so the next read (client or server)
+        //  Persist BOTH field names so the next read (client or server)
         // always finds a valid embedding regardless of which field it checks.
         await doc.ref.update({
           embedding: faqEmbedding,

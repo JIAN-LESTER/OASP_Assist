@@ -518,7 +518,7 @@ Future<void> initializeServices() async {
   }
 }
 
-//  CRITICAL FIX: Properly configure Firebase Functions for production
+//  CRITICAL  Properly configure Firebase Functions for production
 void configureFirebaseFunctions() {
   try {
     // Get the default Functions instance

@@ -41,14 +41,14 @@ void showADInfoModal(
           .toList() ??
       [];
 
-  //  NEW: Parse schedules list
+  //   Parse schedules list
   final List<Map<String, dynamic>> schedules =
       (data['schedules'] as List<dynamic>?)
           ?.map((s) => Map<String, dynamic>.from(s as Map))
           .toList() ??
       [];
 
-  //  NEW: Parse requirements list
+  //   Parse requirements list
   final List<String> requirements =
       (data['requirements'] as List<dynamic>?)
           ?.map((r) => r.toString().trim())
@@ -56,7 +56,7 @@ void showADInfoModal(
           .toList() ??
       [];
 
-  //  NEW: Parse links list
+  //   Parse links list
   final List<String> links =
       (data['links'] as List<dynamic>?)
           ?.map((l) => l.toString().trim())
@@ -268,7 +268,7 @@ void showADInfoModal(
 
                         const SizedBox(height: 24),
 
-                        //  NEW: Schedules Section
+                        //   Schedules Section
                         if (schedules.isNotEmpty) ...[
                           buildSectionHeader('Exam Schedule', Icons.event_note),
                           const SizedBox(height: 12),
@@ -498,7 +498,7 @@ void showADInfoModal(
                           const SizedBox(height: 24),
                         ],
 
-                        //  NEW: Requirements Section
+                        //   Requirements Section
                         if (requirements.isNotEmpty) ...[
                           buildSectionHeader(
                             'Requirements',
@@ -557,7 +557,7 @@ void showADInfoModal(
                           const SizedBox(height: 24),
                         ],
 
-                        //  NEW: Links Section
+                        //   Links Section
                         if (links.isNotEmpty) ...[
                           buildSectionHeader(
                             'Related Links',
@@ -705,7 +705,7 @@ void showADInfoModal(
   );
 }
 
-//  NEW: Helper function to format academic year
+//   Helper function to format academic year
 String _formatAcademicYear(dynamic academicYear) {
   if (academicYear == null) return 'Not specified';
 

@@ -222,7 +222,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
         chatProvider.loadUserMessageCount();
         chatProvider.listenToUserMessageCount();
 
-        //  NEW: Load and listen to escalation counts
+        //   Load and listen to escalation counts
         chatProvider.loadUserEscalationCount();
         chatProvider.listenToUserEscalationCount();
 
@@ -1175,7 +1175,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     });
   }
 
-  //  NEW: Simpler typing cursor widget
+  //   Simpler typing cursor widget
   Widget _buildTypingCursor() {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -3185,7 +3185,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
         final bool isUser = message.sender == 'user';
         final bool isLastMessage = index == messages.length - 1;
 
-        //  FIX: Better streaming detection
+        //   Better streaming detection
         final streamingContent = chatProvider.getStreamingContent(message.id);
         final isStreaming = streamingContent != null;
         final hasContent =
@@ -3193,7 +3193,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                 ? streamingContent.trim().isNotEmpty
                 : message.content.trim().isNotEmpty;
 
-        //  FIX: For bot messages that are streaming without content yet
+        //   For bot messages that are streaming without content yet
         // Show typing bubble WITHIN the message list item (not as separate item)
         if (!isUser && isStreaming && !hasContent) {
           return Center(
@@ -3455,7 +3455,7 @@ Widget _buildTypingDot(int index) {
   return _AnimatedTypingDot(index: index);
 }
 
-//  NEW: Stateful widget for continuous animation
+//   Stateful widget for continuous animation
 class _AnimatedTypingDot extends StatefulWidget {
   final int index;
 

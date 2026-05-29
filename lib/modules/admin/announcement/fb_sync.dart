@@ -26,7 +26,7 @@ class FbSyncConfig {
 }
 
 // ============================================================================
-//  NEW: Token Status Model
+//   Token Status Model
 // ============================================================================
 class TokenStatus {
   final bool configured;
@@ -92,13 +92,13 @@ class FacebookSyncService {
   }
 
   // ============================================================================
-  //  UPDATED: Exchange Token with Page ID
+  //   Exchange Token with Page ID
   // ============================================================================
 
   static Future<Map<String, dynamic>> exchangeToken(
     String shortToken, {
     String? pageId,
-    String? appId, //  NEW: Optional appId parameter
+    String? appId, //   Optional appId parameter
   }) async {
     print(' Exchanging Facebook token...');
     if (pageId != null) {
@@ -242,7 +242,7 @@ class FacebookSyncService {
   }
 
   // ============================================================================
-  //  NEW: Get Token Status
+  //   Get Token Status
   // ============================================================================
 
   static Future<TokenStatus> getTokenStatus() async {

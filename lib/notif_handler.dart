@@ -142,7 +142,7 @@ class NotificationNavigationHandler {
       case 'announcements_list':
         _navigateToAnnouncementsList(context);
         break;
-      //  NEW: Handle Facebook token expiration notifications
+      //   Handle Facebook token expiration notifications
       case 'fb_token_expiration':
         _handleFacebookTokenExpiration(context, data);
         break;

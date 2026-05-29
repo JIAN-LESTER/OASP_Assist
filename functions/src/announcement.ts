@@ -9,7 +9,7 @@ import {logGeminiUsage} from "./geminiUsage";
 // Define secrets
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
-const GOOGLE_VISION_API_KEY = defineSecret("GOOGLE_VISION_API_KEY"); //  NEW: For OCR
+const GOOGLE_VISION_API_KEY = defineSecret("GOOGLE_VISION_API_KEY"); //   For OCR
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
 const PINECONE_HOST = defineSecret("PINECONE_HOST");
 
@@ -114,7 +114,7 @@ async function getPageId(): Promise<string> {
 function extractAllImagesFromPost(post: FacebookPost): string[] {
   const images: string[] = [];
 
-  //  FIX: Simple extraction without deduplication
+  //   Simple extraction without deduplication
   console.log(" Extracting images from post...");
 
   // Extract from attachments FIRST (higher quality)
@@ -266,7 +266,7 @@ function extractSchedulesFromOCR(ocrText: string): ScheduleEntry[] {
   const yearPattern = /^(20\d{2})$/;
   const timePattern = /(\d{1,2}(?::\d{2})?\s*(?:am|pm))/gi;
 
-  //  NEW: Filter out header/common text that appears on all images
+  //   Filter out header/common text that appears on all images
   const headerKeywords = [
     "central mindanao university",
     "academic paradise",
@@ -1085,7 +1085,7 @@ function extractDeadlines(message: string): string | null {
 // ============================================================================
 
 interface ExtractedAdmissionData {
-  type: string | null; //  NEW: "CMUCAT" | "GSAT" | "ULHSAT" | null
+  type: string | null; //   "CMUCAT" | "GSAT" | "ULHSAT" | null
   title: string;
   content: string;
   steps: string[];
@@ -1682,7 +1682,7 @@ async function createPlacementFromAnnouncement(
     const placementRef = db.collection("placements").doc(postId);
     const existingDoc = await placementRef.get();
 
-    //  NEW: Check if placement exists
+    //   Check if placement exists
     if (existingDoc.exists) {
       const existingData = existingDoc.data();
       if (existingData?.deleted === true) {
@@ -1692,7 +1692,7 @@ async function createPlacementFromAnnouncement(
 
       console.log(` Placement already exists for post ${postId}`);
 
-      //  NEW: Check if Information Bank exists
+      //   Check if Information Bank exists
       const infoBankId = `placement_${postId}`;
       const infoBankDoc = await db
         .collection("information_bank")
@@ -1704,7 +1704,7 @@ async function createPlacementFromAnnouncement(
         return;
       }
 
-      //  NEW: Placement exists but Info Bank missing - create it
+      //   Placement exists but Info Bank missing - create it
       console.log(" Creating Information Bank for existing placement...");
 
       const extractedData = await extractPlacementData(
@@ -1798,7 +1798,7 @@ async function createInfoBankFromCategory(
 
     const categoryData = categoryDoc.data()!;
 
-    //  CRITICAL CHECK: Skip if extracted from document upload
+    //   Skip if extracted from document upload
     if (categoryData.extractedFromDocument === true) {
       const sourceDocId = categoryData.sourceDocumentId;
       console.log(`    SKIPPING: This ${categoryType} was extracted from document: ${sourceDocId}`);
@@ -2128,7 +2128,7 @@ async function createInfoBankFromCategory(
     const firestoreData = {
       "ibID": infoBankId,
       "id": infoBankId,
-      "originalId": documentId, //  NEW: Store original document ID
+      "originalId": documentId, //   Store original document ID
       "ib_title": title,
       "title": title,
       "content": textContent,
@@ -2150,7 +2150,7 @@ async function createInfoBankFromCategory(
       "createdAt": admin.firestore.FieldValue.serverTimestamp(),
       "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
 
-      //  NEW: Add category-specific fields to root
+      //   Add category-specific fields to root
       ...(categoryType === "admission" && extractedData.type && {
         "admissionType": extractedData.type,
         "testType": extractedData.type,
@@ -2864,7 +2864,7 @@ async function createCategoryAndInfoBank(
   ocrText: string,
   imageCount: number
 ): Promise<void> {
-  //  NEW: Check setting before doing anything
+  //   Check setting before doing anything
   const settings = await getAutoCreateSettings();
   const categoryLower = category.toLowerCase() as "admission" | "scholarship" | "placement";
 
@@ -3314,7 +3314,7 @@ async function syncCategoryToInfoBank(
         }
       );
 
-      //  FIX: Handle correct Gemini API response structure
+      //   Handle correct Gemini API response structure
       const responseData = embeddingResponse.data as any;
       await logGeminiUsage({
         userId: null,
@@ -4022,7 +4022,7 @@ export const fixAnnouncementInfoBankMetadata = onCall(
               }
             );
 
-            //  FIX: Handle correct response structure
+            //   Handle correct response structure
             const responseData = embeddingResponse.data as any;
             await logGeminiUsage({
               userId: null,

@@ -601,7 +601,7 @@ class UserConstant {
       print(' Step 5: Updating static variables...');
       _selectedConversationId = newConversationId;
 
-      //  FIX: Force refresh the conversation list
+      //   Force refresh the conversation list
       print(' Step 6: Refreshing conversation list...');
       // The listener should pick this up automatically, but we can force a check
       await Future.delayed(Duration(milliseconds: 500));
@@ -689,7 +689,7 @@ class UserConstant {
     }
   }
 
-  // NEW: Navigate to chat page without creating conversation
+  //  Navigate to chat page without creating conversation
   // FIXED: Navigate to chat without auto-creating
   static Future<void> navigateToChatPage(
     BuildContext context, {
@@ -904,7 +904,7 @@ class UserConstant {
     );
   }
 
-  // NEW: Debug method to check conversations manually
+  //  Debug method to check conversations manually
   static Future<void> debugCheckConversations() async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) {
@@ -937,7 +937,7 @@ class UserConstant {
     }
   }
 
-  // NEW: Cancel subscription method
+  //  Cancel subscription method
   static void cancelConversationSubscription() {
     print('DEBUG: Cancelling conversation subscription');
     _conversationsSubscription?.cancel();

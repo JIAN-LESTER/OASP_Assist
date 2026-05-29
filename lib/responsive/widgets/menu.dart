@@ -450,7 +450,7 @@ class UniversalUIComponents {
                   HapticFeedback.mediumImpact();
                   Navigator.of(context).pop(); // Close drawer first
 
-                  //  FIX: Wait for drawer to close
+                  //   Wait for drawer to close
                   await Future.delayed(Duration(milliseconds: 300));
 
                   //  Then call the callback
@@ -568,7 +568,7 @@ class UniversalUIComponents {
       }
     }
 
-    //  CRITICAL FIX: Wrap in SingleChildScrollView to prevent overflow
+    //  CRITICAL  Wrap in SingleChildScrollView to prevent overflow
     return SingleChildScrollView(
       physics: BouncingScrollPhysics(),
       child: Column(children: menuItems),
@@ -1719,7 +1719,7 @@ class UniversalUIComponents {
                     onPressed: () async {
                       HapticFeedback.mediumImpact();
 
-                      //  FIX: Call the callback with proper async handling
+                      //   Call the callback with proper async handling
                       if (onNewChat != null && context.mounted) {
                         onNewChat();
                       }
@@ -1834,7 +1834,7 @@ class UniversalUIComponents {
                       onTap: () async {
                         HapticFeedback.mediumImpact();
 
-                        //  FIX: Use callback for collapsed state
+                        //   Use callback for collapsed state
                         if (onNewChat != null && context.mounted) {
                           onNewChat();
                         }

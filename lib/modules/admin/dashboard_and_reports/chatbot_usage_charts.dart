@@ -790,7 +790,7 @@ double _getGridInterval(List<ChartData> trendData) {
   return (maxCount / 5).ceil().toDouble();
 }
 
-//  NEW: Specific interval calculation for conversation bottom titles
+//   Specific interval calculation for conversation bottom titles
 double _getConversationBottomInterval(int dataLength, String timeFrame) {
   switch (timeFrame) {
     case 'All':

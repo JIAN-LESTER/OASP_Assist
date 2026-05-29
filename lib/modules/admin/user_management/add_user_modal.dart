@@ -620,7 +620,7 @@ class _AddUserContentState extends State<AddUserContent> {
       final functionsService = FirebaseFunctionsService();
       String uid;
 
-      //  FIX: Don't include timestamps in userData - Cloud Function handles them
+      //   Don't include timestamps in userData - Cloud Function handles them
       Map<String, dynamic> userData = {
         'name': fullName.trim(),
         'email': email.trim().toLowerCase(),

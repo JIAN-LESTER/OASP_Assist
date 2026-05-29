@@ -2,7 +2,7 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    //  NEW: Announcement images — public read, Cloud Functions write via Admin SDK
+    //   Announcement images — public read, Cloud Functions write via Admin SDK
     match /announcements/{allPaths=**} {
       allow read: if true;   // public, no auth needed
       allow write: if false; // Cloud Functions use Admin SDK (bypasses these rules)
