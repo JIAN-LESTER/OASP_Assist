@@ -138,22 +138,20 @@ class _AddFaqContentState extends State<AddFaqContent> {
   String _selectedCategory = 'Admission';
   bool _isSubmitting = false;
 
-   String? _questionError;
+  String? _questionError;
   String? _answerError;
 
- Future<List<double>> _generateEmbedding(String question) async {
-  final callable =
-      FirebaseFunctions.instance.httpsCallable('generateCohereEmbedding');
+  Future<List<double>> _generateEmbedding(String question) async {
+    final callable = FirebaseFunctions.instance.httpsCallable(
+      'generateCohereEmbedding',
+    );
 
-  final result = await callable.call({
-    'text': question,
-  });
+    final result = await callable.call({'text': question});
 
-  return (result.data['embedding'] as List)
-      .map((e) => (e as num).toDouble())
-      .toList();
-}
-  
+    return (result.data['embedding'] as List)
+        .map((e) => (e as num).toDouble())
+        .toList();
+  }
 
   final List<String> _categories = ['Admission', 'Scholarship', 'Placement'];
 
@@ -198,16 +196,16 @@ class _AddFaqContentState extends State<AddFaqContent> {
       final question = _questionController.text.trim();
       final answer = _answerController.text.trim();
 
-      // ✅ Generate embedding for the FAQ question
+      //  Generate embedding for the FAQ question
       List<double>? embedding;
       try {
         embedding = await _generateEmbedding(question);
       } catch (e) {
-        print('⚠️ Failed to generate embedding: $e');
+        print(' Failed to generate embedding: $e');
         // Show warning but continue - embedding can be generated later by Cloud Function
       }
 
-      // ✅ Include embedding in FAQ data
+      //  Include embedding in FAQ data
       final Map<String, dynamic> faqData = {
         'question': question,
         'answer': answer,
@@ -217,7 +215,7 @@ class _AddFaqContentState extends State<AddFaqContent> {
         'similarityCount': 0,
       };
 
-      // ✅ Add embedding fields if generated successfully
+      //  Add embedding fields if generated successfully
       if (embedding != null) {
         faqData['embedding'] = embedding;
         faqData['embeddingModel'] = 'embed-multilingual-v3.0';
@@ -236,15 +234,9 @@ class _AddFaqContentState extends State<AddFaqContent> {
 
       // Show success message using SnackbarUtil
       if (embedding != null) {
-        SnackbarUtil.showSuccess(
-          context,
-          'FAQ created successfully!',
-        );
+        SnackbarUtil.showSuccess(context, 'FAQ created successfully!');
       } else {
-        SnackbarUtil.showWarning(
-          context,
-          'FAQ created successfully!',
-        );
+        SnackbarUtil.showWarning(context, 'FAQ created successfully!');
       }
     } catch (e) {
       SnackbarUtil.showError(context, 'Failed to create FAQ: $e');
@@ -478,7 +470,7 @@ class _AddFaqContentState extends State<AddFaqContent> {
                       ),
                       const SizedBox(height: 16),
 
-                      // ✅ REPLACE WITH CUSTOM TEXTFIELD WITH ERROR HANDLING
+                      //  REPLACE WITH CUSTOM TEXTFIELD WITH ERROR HANDLING
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

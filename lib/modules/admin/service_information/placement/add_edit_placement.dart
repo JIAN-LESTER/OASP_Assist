@@ -609,7 +609,6 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
     );
   }
 
-
   Widget _buildUploadOption({
     required IconData icon,
     required String title,
@@ -781,7 +780,7 @@ Status: ${_isRecruiting ? 'Currently Vacant' : 'Not Vacant'}
         'time': Timestamp.now(),
       });
     } catch (e) {
-      print('⚠️ Failed to log action: $e');
+      print(' Failed to log action: $e');
     }
   }
 

@@ -89,7 +89,7 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
       text: widget.userData['ib_title'] ?? widget.userData['title'] ?? '',
     );
 
-    // ✅ Use formatForEditing to preserve structure for editing
+    //  Use formatForEditing to preserve structure for editing
     final source = widget.userData['source'] ?? 'Unknown';
     final originalContent = widget.userData['content'] ?? '';
 
@@ -793,7 +793,7 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
                           color: Color(0xFF334155),
                         ),
                         decoration: InputDecoration(
-                          // ✅ ADD ERROR STYLING
+                          //  ADD ERROR STYLING
                           errorText: _categoryError,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -856,7 +856,7 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
                           if (newValue != null) {
                             setState(() {
                               selectedCategory = newValue;
-                              // ✅ ADD THIS
+                              //  ADD THIS
                               _categoryError = null;
                             });
                           }
@@ -933,7 +933,7 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
                   _isProcessingFile
                       ? null
                       : () {
-                        // ✅ ADD VALIDATION BEFORE SAVING
+                        //  ADD VALIDATION BEFORE SAVING
                         setState(() {
                           _titleError = null;
                           _contentError = null;
@@ -1038,7 +1038,7 @@ Future<void> _handleSaveChanges(
     final userData = userDoc.data() as Map<String, dynamic>;
     final source = userData['source'] ?? 'Unknown';
 
-    // ✅ Format both for fair comparison
+    //  Format both for fair comparison
     final originalContent = ContentFormatter.formatForEditing(
       userData['content'] ?? '',
       source,
@@ -1049,7 +1049,7 @@ Future<void> _handleSaveChanges(
     final contentChanged = newContent.trim() != originalContent.trim();
 
     if (contentChanged) {
-      print('🔄 Content changed - updating Pinecone vectors...');
+      print(' Content changed - updating Pinecone vectors...');
 
       final fileService = FileService();
       await fileService.updateInformationBankContent(
@@ -1059,9 +1059,9 @@ Future<void> _handleSaveChanges(
         newCategory: category,
       );
 
-      print('✅ Content and vectors updated successfully');
+      print(' Content and vectors updated successfully');
     } else {
-      print('ℹ️ Only metadata changed - updating Firestore only...');
+      print(' Only metadata changed - updating Firestore only...');
 
       Map<String, dynamic> updateData = {
         'ib_title': title,
@@ -1110,8 +1110,8 @@ Future<void> _handleSaveChanges(
     await logRef.set(logData);
 
     if (context.mounted) {
-      Navigator.of(context).pop(); 
-      Navigator.of(context).pop(); 
+      Navigator.of(context).pop();
+      Navigator.of(context).pop();
 
       Future.delayed(const Duration(milliseconds: 200), () {
         if (previousModal == 'info') {

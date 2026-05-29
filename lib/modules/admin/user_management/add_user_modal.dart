@@ -64,7 +64,7 @@ class AddUserModal extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: Container(
-          // ✅ UPDATED DIMENSIONS TO MATCH EDIT MODAL
+          //  UPDATED DIMENSIONS TO MATCH EDIT MODAL
           constraints: const BoxConstraints(maxWidth: 600, maxHeight: 750),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -620,7 +620,7 @@ class _AddUserContentState extends State<AddUserContent> {
       final functionsService = FirebaseFunctionsService();
       String uid;
 
-      // ✅ FIX: Don't include timestamps in userData - Cloud Function handles them
+      //  FIX: Don't include timestamps in userData - Cloud Function handles them
       Map<String, dynamic> userData = {
         'name': fullName.trim(),
         'email': email.trim().toLowerCase(),
@@ -750,7 +750,7 @@ class _AddUserContentState extends State<AddUserContent> {
         userData['serviceUnit'] = _selectedServiceUnit;
       }
 
-      // ✅ Call Cloud Function with complete userData
+      //  Call Cloud Function with complete userData
       try {
         uid = await functionsService.createUserAuth(
           email: email,
@@ -769,7 +769,7 @@ class _AddUserContentState extends State<AddUserContent> {
         return;
       }
 
-      // ✅ The Cloud Function already created the Firestore document
+      //  The Cloud Function already created the Firestore document
       // No need to create it again here
 
       await _logCreateAction(fullName);

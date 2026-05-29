@@ -21,11 +21,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print('📬 Target User: ${message.data['targetUserId']}');
   print('📬 ===============================');
 
-  // ✅ CRITICAL: Check if notification is for current user
+  //  CRITICAL: Check if notification is for current user
   try {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      print('⚠️ No user logged in in background, ignoring notification');
+      print(' No user logged in in background, ignoring notification');
       return;
     }
 
@@ -39,7 +39,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         print('🚫 Background: Escalation reply not for this user, ignoring');
         return;
       }
-      print('✅ Background: Escalation reply is for this user');
+      print(' Background: Escalation reply is for this user');
     }
 
     // For new escalations, check role
@@ -58,13 +58,13 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         );
         return;
       }
-      print('✅ Background: New escalation for staff/admin');
+      print(' Background: New escalation for staff/admin');
     }
 
     // Announcements and deadlines are for everyone, so allow them
-    print('✅ Background notification will be shown');
+    print(' Background notification will be shown');
   } catch (e) {
-    print('❌ Error filtering background notification: $e');
+    print(' Error filtering background notification: $e');
     // Fail closed - don't show on error
     return;
   }
@@ -93,47 +93,47 @@ class NotificationService {
     Function(String notificationType, Map<String, dynamic> data) handler,
   ) {
     _onNotificationTap = handler;
-    print('✅ Navigation handler registered');
+    print(' Navigation handler registered');
   }
 
   Future<void> initialize() async {
     if (_initialized) {
-      print('⚠️ Notification service already initialized');
+      print(' Notification service already initialized');
       return;
     }
 
     print('🔔 Initializing notification service...');
-    print('📱 Platform: $_platformName');
+    print(' Platform: $_platformName');
 
     try {
       if (_isAndroidOrIOS) {
         await _initializeMobileNotifications();
       } else {
         await _saveWebToken();
-        print('✅ Web notifications initialized (in-app only)');
+        print(' Web notifications initialized (in-app only)');
       }
 
       _initialized = true;
-      print('✅ Notification service initialized successfully');
+      print(' Notification service initialized successfully');
     } catch (e, stackTrace) {
-      print('❌ Error initializing notification service: $e');
+      print(' Error initializing notification service: $e');
       print('Stack trace: $stackTrace');
     }
   }
 
   Future<void> _initializeMobileNotifications() async {
-    print('📱 Initializing mobile notifications (FCM)...');
+    print(' Initializing mobile notifications (FCM)...');
 
     await _initializeLocalNotifications();
 
     final settings = await _requestPermissions();
 
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
-      print('❌ Notification permission denied');
+      print(' Notification permission denied');
       return;
     }
 
-    print('✅ Notification permission granted: ${settings.authorizationStatus}');
+    print(' Notification permission granted: ${settings.authorizationStatus}');
 
     if (_isIOS) {
       await _firebaseMessaging.setForegroundNotificationPresentationOptions(
@@ -141,7 +141,7 @@ class NotificationService {
         badge: true,
         sound: true,
       );
-      print('✅ iOS foreground notification presentation configured');
+      print(' iOS foreground notification presentation configured');
     }
 
     await _saveFCMToken();
@@ -160,7 +160,7 @@ class NotificationService {
       _handleMessageTap(initialMessage);
     }
 
-    print('✅ Mobile FCM listeners active');
+    print(' Mobile FCM listeners active');
   }
 
   Future<NotificationSettings> _requestPermissions() async {
@@ -173,12 +173,12 @@ class NotificationService {
       criticalAlert: false,
     );
 
-    print('📋 Permission status: ${settings.authorizationStatus}');
+    print(' Permission status: ${settings.authorizationStatus}');
     return settings;
   }
 
   Future<void> _initializeLocalNotifications() async {
-    print('🔧 Setting up local notifications...');
+    print(' Setting up local notifications...');
 
     final androidImplementation =
         _localNotifications
@@ -226,7 +226,7 @@ class NotificationService {
         ),
       );
 
-      print('✅ Android notification channels created with MAX importance');
+      print(' Android notification channels created with MAX importance');
     }
 
     final iosImplementation =
@@ -240,7 +240,7 @@ class NotificationService {
         badge: true,
         sound: true,
       );
-      print('✅ iOS notification permissions requested');
+      print(' iOS notification permissions requested');
     }
 
     const AndroidInitializationSettings androidSettings =
@@ -266,37 +266,37 @@ class NotificationService {
       onDidReceiveNotificationResponse: _onLocalNotificationTapped,
     );
 
-    print('✅ Local notifications initialized');
+    print(' Local notifications initialized');
   }
 
   Future<void> _saveFCMToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        print('⚠️ No user logged in, skipping token save');
+        print(' No user logged in, skipping token save');
         return;
       }
 
       if (_isIOS) {
         final apnsToken = await _firebaseMessaging.getAPNSToken();
         if (apnsToken == null) {
-          print('⚠️ APNS token not available yet, waiting...');
+          print(' APNS token not available yet, waiting...');
           await Future.delayed(const Duration(seconds: 3));
           final retryApnsToken = await _firebaseMessaging.getAPNSToken();
           if (retryApnsToken == null) {
-            print('⚠️ APNS token still not available after retry');
+            print(' APNS token still not available after retry');
           }
         }
       }
 
       final token = await _firebaseMessaging.getToken();
       if (token == null) {
-        print('⚠️ No FCM token available');
+        print(' No FCM token available');
         return;
       }
 
-      print('💾 Saving FCM token for user ${user.uid}');
-      print('💾 Token: ${token.substring(0, 30)}...');
+      print(' Saving FCM token for user ${user.uid}');
+      print(' Token: ${token.substring(0, 30)}...');
 
       final userDoc =
           await FirebaseFirestore.instance
@@ -318,14 +318,14 @@ class NotificationService {
             'createdAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
 
-      print('✅ FCM token saved to user document with role: $role');
+      print(' FCM token saved to user document with role: $role');
     } catch (e) {
-      print('❌ Error saving FCM token: $e');
+      print(' Error saving FCM token: $e');
     }
   }
 
   Future<void> _onTokenRefresh(String token) async {
-    print('🔄 FCM token refreshed: ${token.substring(0, 30)}...');
+    print(' FCM token refreshed: ${token.substring(0, 30)}...');
     await _saveFCMToken();
   }
 
@@ -339,7 +339,7 @@ class NotificationService {
     print('📬 Target User: ${message.data['targetUserId']}');
     print('📬 ===============================');
 
-    // ✅ CRITICAL: Filter notifications before showing
+    //  CRITICAL: Filter notifications before showing
     final shouldShow = await _shouldShowNotification(message);
 
     if (!shouldShow) {
@@ -347,7 +347,7 @@ class NotificationService {
       return;
     }
 
-    print('✅ Notification passed filter - showing');
+    print(' Notification passed filter - showing');
     await _showLocalNotification(message);
   }
 
@@ -424,10 +424,10 @@ class NotificationService {
         notificationDetails: details,
         payload: payload,
       );
-      print('✅ Local notification shown with ID: $notificationId');
-      print('✅ Payload: $payload');
+      print(' Local notification shown with ID: $notificationId');
+      print(' Payload: $payload');
     } catch (e) {
-      print('❌ Error showing notification: $e');
+      print(' Error showing notification: $e');
     }
   }
 
@@ -458,7 +458,7 @@ class NotificationService {
     print('👆 =======================================');
 
     if (response.payload == null || response.payload!.isEmpty) {
-      print('⚠️ No payload in notification');
+      print(' No payload in notification');
       return;
     }
 
@@ -487,21 +487,21 @@ class NotificationService {
     String type,
     Map<String, dynamic> data,
   ) async {
-    print('🔍 ===== NAVIGATION DEBUG =====');
+    print(' ===== NAVIGATION DEBUG =====');
     print('Type: $type');
     print('Data: $data');
     print('Handler registered: ${_onNotificationTap != null}');
     print('=============================');
 
     if (_onNotificationTap == null) {
-      print('⚠️ No navigation handler registered');
+      print(' No navigation handler registered');
       return;
     }
 
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        print('⚠️ No user logged in');
+        print(' No user logged in');
         return;
       }
 
@@ -523,10 +523,10 @@ class NotificationService {
       } else if (type == 'announcement' || type == 'deadline_reminder') {
         _onNotificationTap!('announcement', data);
       } else {
-        print('⚠️ No matching navigation handler for type=$type, role=$role');
+        print(' No matching navigation handler for type=$type, role=$role');
       }
     } catch (e) {
-      print('❌ Error handling notification navigation: $e');
+      print(' Error handling notification navigation: $e');
     }
   }
 
@@ -558,9 +558,9 @@ class NotificationService {
             'createdAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
 
-      print('✅ Web session token saved');
+      print(' Web session token saved');
     } catch (e) {
-      print('❌ Error saving web token: $e');
+      print(' Error saving web token: $e');
     }
   }
 
@@ -622,26 +622,26 @@ class NotificationService {
 
       _initialized = false;
       _onNotificationTap = null;
-      print('✅ Notification service cleaned up');
+      print(' Notification service cleaned up');
     } catch (e) {
-      print('❌ Error during cleanup: $e');
+      print(' Error during cleanup: $e');
     }
   }
 }
 
 Future<bool> _shouldShowNotification(RemoteMessage message) async {
   try {
-    print('🔍 ===== NOTIFICATION FILTER CHECK =====');
+    print(' ===== NOTIFICATION FILTER CHECK =====');
     print('   Message data: ${message.data}');
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      print('❌ No user logged in, blocking notification');
+      print(' No user logged in, blocking notification');
       return false;
     }
 
     final currentUserId = user.uid;
-    print('✅ Current user: $currentUserId');
+    print(' Current user: $currentUserId');
 
     // Get current user's role
     final userDoc =
@@ -653,8 +653,8 @@ Future<bool> _shouldShowNotification(RemoteMessage message) async {
     final currentUserRole = userDoc.data()?['role'] ?? 'user';
     final currentUserServiceUnit = userDoc.data()?['serviceUnit'];
 
-    print('✅ Current user role: $currentUserRole');
-    print('✅ Current user serviceUnit: $currentUserServiceUnit');
+    print(' Current user role: $currentUserRole');
+    print(' Current user serviceUnit: $currentUserServiceUnit');
 
     // Extract notification metadata
     final targetRole = message.data['targetRole'] ?? 'any';
@@ -662,32 +662,32 @@ Future<bool> _shouldShowNotification(RemoteMessage message) async {
     final notificationType = message.data['type'];
     final notificationCategory = message.data['category'];
 
-    print('📋 Notification metadata:');
+    print(' Notification metadata:');
     print('   - targetRole: $targetRole');
     print('   - targetUserId: $targetUserId');
     print('   - type: $notificationType');
     print('   - category: $notificationCategory');
 
-    // ✅ CASE 1: Specific user target (escalation replies)
+    //  CASE 1: Specific user target (escalation replies)
     if (targetUserId != null && targetUserId.isNotEmpty) {
       final matches = targetUserId == currentUserId;
-      print('📌 Case 1: Specific user target');
+      print(' Case 1: Specific user target');
       print('   Result: ${matches ? "ALLOW" : "BLOCK"}');
       return matches;
     }
 
-    // ✅ CASE 2: Role-based with serviceUnit filtering for staff
+    //  CASE 2: Role-based with serviceUnit filtering for staff
     if (targetRole != 'any') {
       if (targetRole != currentUserRole) {
-        print('📌 Case 2: Role mismatch');
+        print(' Case 2: Role mismatch');
         print('   Result: BLOCK (target: $targetRole, user: $currentUserRole)');
         return false;
       }
 
-      // ✅ For staff escalations, check serviceUnit match
+      //  For staff escalations, check serviceUnit match
       if (currentUserRole == 'staff' && notificationType == 'new_escalation') {
         if (currentUserServiceUnit == null) {
-          print('⚠️ Staff has no serviceUnit, allowing by default');
+          print(' Staff has no serviceUnit, allowing by default');
           return true;
         }
 
@@ -695,7 +695,7 @@ Future<bool> _shouldShowNotification(RemoteMessage message) async {
         final escalationServiceUnit =
             message.data['serviceUnit'] ?? notificationCategory ?? 'N/A';
 
-        print('🔍 ServiceUnit check:');
+        print(' ServiceUnit check:');
         print('   - Staff serviceUnit: $currentUserServiceUnit');
         print('   - Escalation serviceUnit: $escalationServiceUnit');
 
@@ -710,24 +710,24 @@ Future<bool> _shouldShowNotification(RemoteMessage message) async {
         return false;
       }
 
-      print('📌 Case 2: Role match');
+      print(' Case 2: Role match');
       print('   Result: ALLOW');
       return true;
     }
 
-    // ✅ CASE 3: General notifications (announcements, deadlines)
+    //  CASE 3: General notifications (announcements, deadlines)
     if (notificationType == 'announcement' ||
         notificationType == 'deadline_reminder') {
-      print('📌 Case 3: General notification');
+      print(' Case 3: General notification');
       print('   Result: ALLOW');
       return true;
     }
 
     // Default: block unknown types
-    print('⚠️ Unknown notification type, blocking by default');
+    print(' Unknown notification type, blocking by default');
     return false;
   } catch (e) {
-    print('❌ Error in notification filter: $e');
+    print(' Error in notification filter: $e');
     return false; // Fail closed
   }
 }

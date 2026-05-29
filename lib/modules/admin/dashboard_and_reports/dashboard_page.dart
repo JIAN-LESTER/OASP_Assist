@@ -256,14 +256,14 @@ class _LazyLoadWidgetState extends State<LazyLoadWidget> {
 class DashboardCache {
   final InquiryReportsData? inq;
   final UserDemographicsReportsData? ud;
-  final AdminDashboardData? ad; // ✅ ADD THIS
+  final AdminDashboardData? ad; //  ADD THIS
   final DateTime timestamp;
   final Map<String, dynamic>? quickStats;
 
   DashboardCache({
     this.inq,
     this.ud,
-    this.ad, // ✅ ADD THIS
+    this.ad, //  ADD THIS
     required this.timestamp,
     this.quickStats,
   });
@@ -303,7 +303,7 @@ class _DashboardModulestate extends State<DashboardPage> {
   InquiryReportsData? inq;
   ChatbotUsageReportsData? cb;
   UserDemographicsReportsData? ud;
-  AdminDashboardData? ad; // ✅ ADD THIS
+  AdminDashboardData? ad; //  ADD THIS
   String? userName;
   Map<String, int>? quickStats;
 
@@ -377,7 +377,7 @@ class _DashboardModulestate extends State<DashboardPage> {
         setState(() {
           inq = cached.inq;
           ud = cached.ud;
-          ad = cached.ad; // ✅ LOAD FROM CACHE
+          ad = cached.ad; //  LOAD FROM CACHE
           quickStats = cached.quickStats as Map<String, int>?;
         });
       }
@@ -404,7 +404,7 @@ class _DashboardModulestate extends State<DashboardPage> {
           selectedTimeFrame,
           customDateRange,
         ),
-        // ✅ ADD: Fetch inquiry data separately
+        //  ADD: Fetch inquiry data separately
         _firebaseService.getInquiryReportsData(
           selectedTimeFrame,
           customDateRange,
@@ -417,7 +417,7 @@ class _DashboardModulestate extends State<DashboardPage> {
       final userDemoData = results[1] as UserDemographicsReportsData;
       final inquiryReportData = results[2] as InquiryReportsData;
 
-      // ✅ FIX: Use inquiryReportData directly instead of creating from adminData
+      //  FIX: Use inquiryReportData directly instead of creating from adminData
       final inquiryData = InquiryReportsData(
         totalMessages: inquiryReportData.totalMessages,
         userMessages: inquiryReportData.userMessages,
@@ -433,13 +433,12 @@ class _DashboardModulestate extends State<DashboardPage> {
         staffPerformance: inquiryReportData.staffPerformance,
         botVsHumanAnswers: inquiryReportData.botVsHumanAnswers,
         allEscalations:
-            inquiryReportData
-                .allEscalations, // ✅ This now has the correct value
+            inquiryReportData.allEscalations, //  This now has the correct value
         recentLogs: inquiryReportData.recentLogs,
         msgLogs: inquiryReportData.msgLogs,
       );
 
-      // ✅ UPDATE CACHE
+      //  UPDATE CACHE
       _cache[selectedTimeFrame] = DashboardCache(
         inq: inquiryData,
         ud: userDemoData,
@@ -452,8 +451,8 @@ class _DashboardModulestate extends State<DashboardPage> {
         ud = userDemoData;
         ad = adminData;
 
-        // ✅ DEBUG PRINTS
-        print('📊 Inquiry Data Updated:');
+        //  DEBUG PRINTS
+        print(' Inquiry Data Updated:');
         print('   All Escalations: ${inquiryData.allEscalations}');
         print('   Escalated Messages: ${inquiryData.escalatedMessages}');
         print('   Admin Pending Escalations: ${adminData.pendingEscalations}');
@@ -462,7 +461,7 @@ class _DashboardModulestate extends State<DashboardPage> {
         );
       });
     } catch (e) {
-      print('❌ Error fetching data: $e');
+      print(' Error fetching data: $e');
       rethrow;
     }
   }
@@ -545,14 +544,14 @@ class _DashboardModulestate extends State<DashboardPage> {
   Future<void> _onTimeFrameChanged(String newValue) async {
     if (newValue == selectedTimeFrame && newValue != 'Custom') return;
 
-    // ✅ CORRECT: Show modal when Custom is selected
+    //  CORRECT: Show modal when Custom is selected
     if (newValue == 'Custom') {
       final DateTimeRange? selectedRange = await showDialog<DateTimeRange>(
         context: context,
         barrierDismissible: true,
         barrierColor: Colors.black.withOpacity(0.5),
         builder: (BuildContext context) {
-          // ✅ IMPORTANT: Import statement needed
+          //  IMPORTANT: Import statement needed
           // Make sure _DateRangePickerDialog is accessible
           return DateRangePickerDialog(
             initialDateRange: customDateRange,
@@ -866,7 +865,7 @@ class _DashboardModulestate extends State<DashboardPage> {
     final isMobile = screenWidth < 600;
 
     if (isMobile) {
-      // 📱 MOBILE LAYOUT: Dropdown on the left, smaller arrangement
+      //  MOBILE LAYOUT: Dropdown on the left, smaller arrangement
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1575,7 +1574,7 @@ Widget _buildHeader(
   String userName,
   DateTimeRange? customDateRange,
   ValueChanged<DateTimeRange?> onDateRangeChanged,
-  // ✅ ADD THESE PARAMETERS
+  //  ADD THESE PARAMETERS
   InquiryReportsData? inq,
   UserDemographicsReportsData? ud,
   AdminDashboardData? ad,
@@ -1624,7 +1623,7 @@ Widget _buildHeader(
                           onDateRangeChanged: onDateRangeChanged,
                         ),
                       ],
-                      // ✅ ADD EXPORT BUTTON
+                      //  ADD EXPORT BUTTON
                       const SizedBox(width: 8),
                       ExportButton(
                         pageType: 'dashboard',
@@ -1670,7 +1669,7 @@ Widget _buildHeader(
                           onDateRangeChanged: onDateRangeChanged,
                         ),
                       ],
-                      // ✅ ADD EXPORT BUTTON
+                      //  ADD EXPORT BUTTON
                       const SizedBox(width: 12),
                       ExportButton(
                         pageType: 'dashboard',

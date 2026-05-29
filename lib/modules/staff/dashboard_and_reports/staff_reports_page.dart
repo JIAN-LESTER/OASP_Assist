@@ -30,7 +30,7 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
   AdminDashboardData? ad;
   String? userName;
 
-  // ✅ ADD THESE MISSING VARIABLES
+  //  ADD THESE MISSING VARIABLES
   DateTimeRange? customDateRange;
 
   bool isLoadingUser = true;
@@ -65,15 +65,15 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
 
     setState(() => isLoadingInquiry = true);
     try {
-      // ✅ Pass customDateRange to both fetchers
+      //  Pass customDateRange to both fetchers
       final results = await Future.wait([
         _firebaseService.getInquiryReportsData(
           selectedTimeFrame,
-          customDateRange, // ✅ ADD THIS
+          customDateRange, //  ADD THIS
         ),
         _firebaseService.getAdminDashboardData(
           selectedTimeFrame,
-          customDateRange, // ✅ ADD THIS
+          customDateRange, //  ADD THIS
         ),
       ]);
 
@@ -85,13 +85,13 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
         isLoadingInquiry = false;
       });
 
-      print('📊 Staff Reports Data Loaded:');
+      print(' Staff Reports Data Loaded:');
       print('   Inquiry Data: ${inq?.totalMessages ?? 0} messages');
       print(
         '   Admin Data: ${ad?.topEscalatedMessages.length ?? 0} escalations',
       );
     } catch (e) {
-      print('❌ Error loading inquiry data: $e');
+      print(' Error loading inquiry data: $e');
       if (!mounted) return;
       setState(() => isLoadingInquiry = false);
     }
@@ -885,7 +885,7 @@ List<Widget> buildInquiryTrendsReport(
             child: Builder(
               builder:
                   (context) => buildStatCard(
-                    'Pending Escalated Messages', // ✅ FIXED: Clean title, rate shown separately
+                    'Pending Escalated Messages', //  FIXED: Clean title, rate shown separately
                     '$escalatedMessages',
                     Colors.red,
                     Icons.warning_amber_rounded,
@@ -894,7 +894,7 @@ List<Widget> buildInquiryTrendsReport(
                           context,
                           selectedTimeFrame ?? 'This Month',
                         ),
-                    rateLabel: 'Rate', // ✅ FIXED: Pass rate as parameter
+                    rateLabel: 'Rate', //  FIXED: Pass rate as parameter
                     rateValue: escalationRate,
                   ),
             ),
@@ -904,7 +904,7 @@ List<Widget> buildInquiryTrendsReport(
             child: Builder(
               builder:
                   (context) => buildStatCard(
-                    'Resolved Messages', // ✅ FIXED: Clean title, rate shown separately
+                    'Resolved Messages', //  FIXED: Clean title, rate shown separately
                     '$resolvedMessages',
                     Colors.orange,
                     Icons.check_circle_outline,

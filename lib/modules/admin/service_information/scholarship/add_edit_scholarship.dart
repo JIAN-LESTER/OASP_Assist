@@ -597,7 +597,7 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
         await _fileService.saveToInformationBank(informationBank);
 
         print(
-          '✅ Saved to information bank with ${_extractedContent!.length} characters',
+          ' Saved to information bank with ${_extractedContent!.length} characters',
         );
       } else if (_descriptionController.text.trim().isNotEmpty) {
         // Fallback: If no file was uploaded but description was manually entered
@@ -611,7 +611,7 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
         );
         await _fileService.saveToInformationBank(informationBank);
 
-        print('✅ Saved to information bank from manual description');
+        print(' Saved to information bank from manual description');
       }
 
       await _logAction(widget.isEdit ? 'Updated' : 'Added');
@@ -668,7 +668,7 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
         'time': Timestamp.now(),
       });
     } catch (e) {
-      print('⚠️ Failed to log action: $e');
+      print(' Failed to log action: $e');
     }
   }
 

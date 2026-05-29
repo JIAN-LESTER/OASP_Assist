@@ -120,7 +120,7 @@ class _EditUserModalState extends State<EditUserModal> {
         programs = fetchedPrograms;
         isLoadingPrograms = false;
 
-        // ✅ Ensure selectedProgram exists, otherwise default to 'N/A'
+        //  Ensure selectedProgram exists, otherwise default to 'N/A'
         if (!programs.contains(selectedProgram)) {
           selectedProgram = 'N/A';
         }
@@ -410,7 +410,7 @@ class _EditUserModalState extends State<EditUserModal> {
                                     ) // Loader
                                     : _buildDropdownField(
                                       label: 'Program',
-                                      // ✅ Ensure value is always valid
+                                      //  Ensure value is always valid
                                       value:
                                           programs.contains(selectedProgram)
                                               ? selectedProgram
@@ -436,7 +436,7 @@ class _EditUserModalState extends State<EditUserModal> {
                                   builder:
                                       (context) => const ManageProgramsDialog(),
                                 );
-                                // ✅ Re-fetch programs after managing
+                                //  Re-fetch programs after managing
                                 await _fetchPrograms();
                               },
                               icon: const Icon(Icons.settings, size: 16),
@@ -714,7 +714,6 @@ class _EditUserModalState extends State<EditUserModal> {
       }
     }
   }
-
 
   Widget _buildDropdownField({
     required String label,

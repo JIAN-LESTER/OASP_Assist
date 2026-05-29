@@ -26,7 +26,7 @@ class Scholarship {
   });
 
   factory Scholarship.fromJson(Map<String, dynamic> json) {
-    print("📥 Scholarship.fromJson input: $json");
+    print(" Scholarship.fromJson input: $json");
 
     try {
       final scholarship = Scholarship(
@@ -44,9 +44,7 @@ class Scholarship {
                 : <String>[],
         privileges:
             json['privileges'] is List
-                ? List<String>.from(
-                  json['privileges'].map((e) => e.toString()),
-                )
+                ? List<String>.from(json['privileges'].map((e) => e.toString()))
                 : <String>[],
         deadline: _parseDate(json['deadline']),
         createdAt:
@@ -58,10 +56,10 @@ class Scholarship {
         applicationLink: json['applicationLink']?.toString() ?? '',
       );
 
-      print("✅ Scholarship.fromJson created: ${scholarship.toJson()}");
+      print(" Scholarship.fromJson created: ${scholarship.toJson()}");
       return scholarship;
     } catch (e) {
-      print("❌ Error in Scholarship.fromJson: $e");
+      print(" Error in Scholarship.fromJson: $e");
       rethrow;
     }
   }
@@ -89,7 +87,7 @@ class Scholarship {
       'scholarshipProvider': scholarshipProvider,
       'eligibilityRequirements': eligibilityRequirements,
       'privileges': privileges,
-      // ✅ FIX: Store as Firestore Timestamp instead of ISO string
+      //  FIX: Store as Firestore Timestamp instead of ISO string
       'deadline': deadline != null ? Timestamp.fromDate(deadline!) : null,
       'applicationLink': applicationLink,
       'createdAt': Timestamp.fromDate(createdAt),

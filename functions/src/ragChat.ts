@@ -94,7 +94,7 @@ export const generateEmbedding = onCall(
 
       return {embedding};
     } catch (error: any) {
-      console.error("❌ generateEmbedding error:", error.message);
+      console.error(" generateEmbedding error:", error.message);
       if (error.response) {
         console.error("   Status:", error.response.status);
         console.error("   Data:", JSON.stringify(error.response.data).substring(0, 500));
@@ -180,7 +180,7 @@ async function generateGeminiEmbedding(
 
     return embedding;
   } catch (error: any) {
-    console.error("❌ Gemini embedding error:", error.message);
+    console.error(" Gemini embedding error:", error.message);
     throw error;
   }
 }
@@ -214,14 +214,14 @@ async function findMatchingFAQ(
   similarityThreshold = 0.75
 ): Promise<{ question: string; answer: string; similarity: number; category: string } | null> {
   try {
-    console.log(`🔍 FAQ MATCHING START for: "${query}"`);
+    console.log(` FAQ MATCHING START for: "${query}"`);
 
     const faqSnapshot = await db
       .collection("faqs")
       .where("answer", "!=", "")
       .get();
 
-    console.log(`📚 Checking ${faqSnapshot.docs.length} FAQs`);
+    console.log(` Checking ${faqSnapshot.docs.length} FAQs`);
 
     let bestMatch: any = null;
     let highestSimilarity = 0;
@@ -242,7 +242,7 @@ async function findMatchingFAQ(
       if (storedEmbedding && Array.isArray(storedEmbedding) && storedEmbedding.length === 768) {
         faqEmbedding = storedEmbedding as number[];
       } else {
-        console.log(`⚠️ No valid 768-d embedding for FAQ "${faqQuestion.substring(0, 40)}" — generating…`);
+        console.log(` No valid 768-d embedding for FAQ "${faqQuestion.substring(0, 40)}" — generating…`);
         faqEmbedding = await generateGeminiEmbedding(faqQuestion, geminiApiKey, "search_document");
 
         // FIX: Persist BOTH field names so the next read (client or server)
@@ -256,7 +256,7 @@ async function findMatchingFAQ(
 
       // Skip if dimensions still don't match (shouldn't happen after fix above).
       if (faqEmbedding.length !== queryEmbedding.length) {
-        console.warn(`⚠️ Skipping FAQ (dim mismatch ${faqEmbedding.length} vs ${queryEmbedding.length}): ${faqQuestion}`);
+        console.warn(` Skipping FAQ (dim mismatch ${faqEmbedding.length} vs ${queryEmbedding.length}): ${faqQuestion}`);
         continue;
       }
 
@@ -274,14 +274,14 @@ async function findMatchingFAQ(
     }
 
     if (bestMatch) {
-      console.log(`✅ FAQ MATCH: ${bestMatch.question.substring(0, 50)}... (${bestMatch.similarity.toFixed(3)})`);
+      console.log(` FAQ MATCH: ${bestMatch.question.substring(0, 50)}... (${bestMatch.similarity.toFixed(3)})`);
     } else {
-      console.log(`❌ No FAQ match above threshold ${similarityThreshold}`);
+      console.log(` No FAQ match above threshold ${similarityThreshold}`);
     }
 
     return bestMatch;
   } catch (error) {
-    console.error("❌ Error in findMatchingFAQ:", error);
+    console.error(" Error in findMatchingFAQ:", error);
     return null;
   }
 }
@@ -320,7 +320,7 @@ function filterAndRankContext(
       score: doc.similarity_score,
     }));
 
-  console.log(`📊 Context confidence: ${confidence} (top: ${topScore.toFixed(2)}, avg: ${avgScore.toFixed(2)})`);
+  console.log(` Context confidence: ${confidence} (top: ${topScore.toFixed(2)}, avg: ${avgScore.toFixed(2)})`);
 
   return {contexts, confidence};
 }
@@ -378,12 +378,12 @@ Knowledge Base Documents:
 ${knowledgeSection}
 
 CRITICAL INSTRUCTIONS:
-1. **Real-time Awareness**: 
+1. **Real-time Awareness**:
    - You know the current date and time shown above
    - Use this information to provide context-aware responses about deadlines, dates, and time-sensitive matters
    - Calculate relative dates (e.g., "in 2 weeks", "next month") based on current date
 
-2. **Context Awareness**: 
+2. **Context Awareness**:
    - If this is a follow-up question (indicated by conversation history), reference previous discussion
    - Use pronouns and context clues from history to understand what "it", "that", "those" refer to
    - Maintain continuity in your responses based on what was discussed before
@@ -407,7 +407,7 @@ CRITICAL INSTRUCTIONS:
 
 7. **Natural Language**: Write as a knowledgeable university assistant would - friendly but professional
 
-8. **NO UNNECESSARY DISCLAIMERS**: 
+8. **NO UNNECESSARY DISCLAIMERS**:
    - Don't say "I don't have information" if you can provide helpful general guidance
    - Don't suggest contacting OASP for information you can reasonably answer
    - Be helpful and resourceful with the information available
@@ -477,7 +477,7 @@ async function retrieveRelevantDocuments(
   chunk_info: any;
 }>> {
   try {
-    console.log(`🔍 Querying Pinecone for: "${query}"`);
+    console.log(` Querying Pinecone for: "${query}"`);
 
     const similarChunks = await pineconeIndex.query({
       vector: queryEmbedding,
@@ -486,7 +486,7 @@ async function retrieveRelevantDocuments(
     });
 
     if (!similarChunks.matches || similarChunks.matches.length === 0) {
-      console.log("❌ No documents found in Pinecone");
+      console.log(" No documents found in Pinecone");
       return [];
     }
 
@@ -539,7 +539,7 @@ async function retrieveRelevantDocuments(
     results.sort((a, b) => b.similarity_score - a.similarity_score);
     return results.slice(0, topK);
   } catch (error) {
-    console.error("❌ Error retrieving documents:", error);
+    console.error(" Error retrieving documents:", error);
     return [];
   }
 }
@@ -582,20 +582,20 @@ export const generateAnswer = onRequest(
         return;
       }
 
-      console.log(`📩 Received query: "${query}"`);
+      console.log(` Received query: "${query}"`);
 
       const geminiKey = GEMINI_API_KEY.value();
       const pineconeKey = PINECONE_API_KEY.value();
 
-      console.log("🔧 Generating query embedding...");
+      console.log(" Generating query embedding...");
 
       const [queryEmbedding, pineconeClient] = await Promise.all([
         generateGeminiEmbedding(query, geminiKey, "search_query"),
         Promise.resolve(new Pinecone({apiKey: pineconeKey})),
       ]);
-      
 
-      console.log(`✅ Embedding generated: ${queryEmbedding.length} dimensions`);
+
+      console.log(` Embedding generated: ${queryEmbedding.length} dimensions`);
 
       const [faqMatch, pineconeIndex] = await Promise.all([
         findMatchingFAQ(query, queryEmbedding, geminiKey),
@@ -604,7 +604,7 @@ export const generateAnswer = onRequest(
 
       // FAQ MATCH
       if (faqMatch) {
-        console.log("✅ Returning FAQ answer");
+        console.log(" Returning FAQ answer");
 
         if (stream) {
           res.setHeader("Content-Type", "text/event-stream");
@@ -639,7 +639,7 @@ export const generateAnswer = onRequest(
       }
 
       // RETRIEVE DOCUMENTS FROM PINECONE
-      console.log("🔧 Querying Pinecone...");
+      console.log(" Querying Pinecone...");
       const results = await retrieveRelevantDocuments(
         query,
         queryEmbedding,
@@ -650,7 +650,7 @@ export const generateAnswer = onRequest(
 
       // NO DOCUMENTS FOUND - AI FALLBACK
       if (results.length === 0) {
-        console.log("⚠️ No documents found - using AI fallback");
+        console.log(" No documents found - using AI fallback");
 
         const conversationContext = buildConversationContext(conversationHistory);
         const now = new Date();
@@ -701,7 +701,7 @@ Answer:`;
             res.write("data: [DONE]\n\n");
             res.end();
           } catch (error) {
-            console.error("❌ AI fallback streaming failed:", error);
+            console.error(" AI fallback streaming failed:", error);
             const errorMsg = "I'm having trouble processing your request. Please contact OASP staff directly for assistance.";
             res.write(`data: ${JSON.stringify({
               type: "content-delta",
@@ -716,7 +716,7 @@ Answer:`;
             const answer = await generateGeminiResponse(fallbackPrompt, geminiKey);
             res.json({answer: answer.trim(), source: "ai_fallback"});
           } catch (error) {
-            console.error("❌ AI fallback failed:", error);
+            console.error(" AI fallback failed:", error);
             res.json({
               answer: "I'm having trouble processing your request. Please contact OASP staff directly for assistance.",
               source: "error",
@@ -727,7 +727,7 @@ Answer:`;
       }
 
       // DOCUMENTS FOUND - GENERATE RAG RESPONSE
-      console.log(`✅ Found ${results.length} relevant documents`);
+      console.log(` Found ${results.length} relevant documents`);
 
       const {contexts, confidence} = filterAndRankContext(results, query);
       const conversationContext = buildConversationContext(conversationHistory);
@@ -765,7 +765,7 @@ Answer:`;
             return;
           }
         } catch (streamError) {
-          console.error("❌ Streaming failed, using fallback:", streamError);
+          console.error(" Streaming failed, using fallback:", streamError);
         }
 
         // FALLBACK IF STREAMING FAILS
@@ -789,7 +789,7 @@ Answer:`;
           res.write("data: [DONE]\n\n");
           res.end();
         } catch (fallbackError) {
-          console.error("❌ Fallback also failed:", fallbackError);
+          console.error(" Fallback also failed:", fallbackError);
           res.write(`data: ${JSON.stringify({
             type: "error",
             error: "Failed to generate response",
@@ -806,7 +806,7 @@ Answer:`;
         });
       }
     } catch (error: any) {
-      console.error("❌ Error:", error);
+      console.error(" Error:", error);
       res.status(500).json({
         error: error.message,
         answer: "I'm having trouble processing your request right now. Please try again or contact OASP staff directly.",
@@ -862,9 +862,9 @@ if (usageMetadata) {
     }
 
     return text;
-    
+
   } catch (error: any) {
-    console.error("❌ Gemini response error:", error.message);
+    console.error(" Gemini response error:", error.message);
     throw error;
   }
 }
@@ -895,7 +895,7 @@ async function* generateGeminiResponseStream(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`❌ Gemini API error response: ${errorText}`);
+      console.error(` Gemini API error response: ${errorText}`);
       throw new Error(`Gemini Stream API error: ${response.status} ${response.statusText}`);
     }
 
@@ -940,17 +940,17 @@ async function* generateGeminiResponseStream(
 
           const finishReason = data?.candidates?.[0]?.finishReason;
           if (finishReason === "STOP") {
-            console.log(`✅ Stream complete: ${chunkCount} chunks`);
+            console.log(` Stream complete: ${chunkCount} chunks`);
             return;
           }
         } catch (parseError) {
-          console.warn("⚠️ Failed to parse streaming chunk");
+          console.warn(" Failed to parse streaming chunk");
           continue;
         }
       }
     }
   } catch (error: any) {
-    console.error("❌ Gemini streaming error:", error);
+    console.error(" Gemini streaming error:", error);
     throw error;
   }
 }
@@ -964,7 +964,7 @@ export const resetDailyMessageCounts = onSchedule(
   async (event) => {
     try {
       const now = new Date();
-      console.log(`🔄 Starting daily message count reset at ${now.toISOString()}`);
+      console.log(` Starting daily message count reset at ${now.toISOString()}`);
 
       const phNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
       const resetTime = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate(), 8, 0, 0);
@@ -1008,9 +1008,9 @@ export const resetDailyMessageCounts = onSchedule(
         await batch.commit();
       }
 
-      console.log(`✅ Daily reset complete: ${resetCount}/${processedCount} users reset`);
+      console.log(` Daily reset complete: ${resetCount}/${processedCount} users reset`);
     } catch (error: any) {
-      console.error("❌ Error in daily reset:", error);
+      console.error(" Error in daily reset:", error);
       throw error;
     }
   }
@@ -1054,7 +1054,7 @@ export const manualResetMessageCounts = onRequest(
         timestamp: now.toISOString(),
       });
     } catch (error: any) {
-      console.error("❌ Error in manual reset:", error);
+      console.error(" Error in manual reset:", error);
       res.status(500).json({error: error.message});
     }
   }
@@ -1103,7 +1103,7 @@ export const checkResetStatus = onRequest(
         sampleUsers: userStatus,
       });
     } catch (error: any) {
-      console.error("❌ Error checking status:", error);
+      console.error(" Error checking status:", error);
       res.status(500).json({error: error.message});
     }
   }

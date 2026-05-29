@@ -1,9 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     
-    <!-- ✅ CRITICAL: Notification permissions for Android 13+ -->
+    <!--  CRITICAL: Notification permissions for Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     
-    <!-- ✅ CRITICAL: FCM permissions -->
+    <!--  CRITICAL: FCM permissions -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
@@ -12,7 +12,7 @@
     <uses-permission android:name="android.permission.CAMERA"/>
 <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     
-    <!-- ✅ CRITICAL: Full screen intent for heads-up notifications (Android 10+) -->
+    <!--  CRITICAL: Full screen intent for heads-up notifications (Android 10+) -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     
     <application
@@ -43,19 +43,19 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
             
-            <!-- ✅ CRITICAL: Handle notification taps -->
+            <!--  CRITICAL: Handle notification taps -->
             <intent-filter>
                 <action android:name="FLUTTER_NOTIFICATION_CLICK" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
         
-        <!-- ✅ CRITICAL: FCM default notification channel -->
+        <!--  CRITICAL: FCM default notification channel -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="announcements" />
         
-        <!-- ✅ CRITICAL: Default notification icon and color -->
+        <!--  CRITICAL: Default notification icon and color -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@mipmap/ic_launcher" />

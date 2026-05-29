@@ -1,4 +1,3 @@
-
 import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/modules/admin/announcement/fb_sync.dart';
 import 'package:capstone_project/widgets/category_dropdown_button.dart';
@@ -127,18 +126,18 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
   // Manual refresh button (keep as is for manual sync)
   Future<void> _refreshFromFacebook() async {
     if (isRefreshing) {
-      print('⚠️ Sync already in progress');
+      print(' Sync already in progress');
       return;
     }
 
     setState(() => isRefreshing = true);
 
     try {
-      print('🔄 Manual Facebook sync triggered...');
+      print(' Manual Facebook sync triggered...');
 
       final result = await FacebookSyncService.syncPosts();
 
-      print('📦 Sync result: $result');
+      print(' Sync result: $result');
 
       if (result['success'] == true) {
         await Future.delayed(Duration(milliseconds: 500));
@@ -157,7 +156,7 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
         throw Exception(errorMsg);
       }
     } catch (e) {
-      print('❌ Sync error: $e');
+      print(' Sync error: $e');
 
       if (mounted) {
         final errorMessage = FacebookSyncService.parseErrorMessage(e);
@@ -846,7 +845,7 @@ class AnnouncementCard extends StatefulWidget {
 class _AnnouncementCardState extends State<AnnouncementCard> {
   // int _currentImageIndex = 0;
   final PageController _pageController = PageController();
-  bool _isMessageExpanded = false; // ✅ NEW: Track message expansion state
+  bool _isMessageExpanded = false; //  NEW: Track message expansion state
 
   @override
   void dispose() {
@@ -870,7 +869,9 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
     }
 
     if (images.isEmpty && data['original_image_urls'] is List) {
-      images = _selectAnnouncementImageUrls(data['original_image_urls'] as List);
+      images = _selectAnnouncementImageUrls(
+        data['original_image_urls'] as List,
+      );
     }
 
     final hasImages = images.isNotEmpty;
@@ -905,7 +906,7 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
           ),
           if (deadline != null) _buildDeadline(deadline),
           if (message.isNotEmpty)
-            _buildMessage(message), // ✅ Updated with See More/Less
+            _buildMessage(message), //  Updated with See More/Less
           if (hasImages) _buildImageGallery(images),
           _buildActionButtons(data),
         ],
@@ -1236,7 +1237,7 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
   //               images[index],
   //               width: double.infinity,
   //               height: double.infinity,
-  //               fit: BoxFit.contain, // ✅ Changed from cover to contain
+  //               fit: BoxFit.contain, //  Changed from cover to contain
   //               errorBuilder:
   //                   (context, error, stackTrace) => _buildImageError(),
   //               loadingBuilder: (context, child, loadingProgress) {
@@ -1501,7 +1502,7 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
     );
   }
 
-  // ✅ NEW: Message widget with See More/Less functionality
+  //  NEW: Message widget with See More/Less functionality
   Widget _buildMessage(String message) {
     // Count the number of lines
     final textPainter = TextPainter(
@@ -1640,7 +1641,11 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
     final normalizedUrl = _normalizeAnnouncementImageUrl(imageUrl);
 
     if (normalizedUrl == null) {
-      return errorBuilder?.call(context, StateError('Invalid image URL'), null) ??
+      return errorBuilder?.call(
+            context,
+            StateError('Invalid image URL'),
+            null,
+          ) ??
           _buildImageError();
     }
 
@@ -2210,9 +2215,7 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
             .whereType<String>()
             .toList();
     _currentIndex =
-        _images.isEmpty
-            ? 0
-            : widget.initialIndex.clamp(0, _images.length - 1);
+        _images.isEmpty ? 0 : widget.initialIndex.clamp(0, _images.length - 1);
     _pageController = PageController(initialPage: _currentIndex);
   }
 
@@ -2233,39 +2236,39 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
               child: Icon(Icons.error, color: Colors.white, size: 64),
             )
           else
-          PageView.builder(
-            controller: _pageController,
-            itemCount: _images.length,
-            onPageChanged: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              return InteractiveViewer(
-                minScale: 0.5,
-                maxScale: 4.0,
-                child: Center(
-                  child: Image.network(
-                    _images[index],
-                    fit: BoxFit.contain,
-                    gaplessPlayback: true,
-                    filterQuality: FilterQuality.medium,
-                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(
-                        Icons.error,
-                        color: Colors.white,
-                        size: 64,
-                      );
-                    },
+            PageView.builder(
+              controller: _pageController,
+              itemCount: _images.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Center(
+                    child: Image.network(
+                      _images[index],
+                      fit: BoxFit.contain,
+                      gaplessPlayback: true,
+                      filterQuality: FilterQuality.medium,
+                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.error,
+                          color: Colors.white,
+                          size: 64,
+                        );
+                      },
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
+                );
+              },
+            ),
 
-          // ✅ NEW: Navigation arrows in fullscreen
+          //  NEW: Navigation arrows in fullscreen
           if (_images.length > 1) ...[
             _buildFullscreenNavigationArrow(
               alignment: Alignment.centerLeft,
@@ -2357,7 +2360,7 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
     );
   }
 
-  // ✅ NEW: Navigation arrow for fullscreen mode
+  //  NEW: Navigation arrow for fullscreen mode
   Widget _buildFullscreenNavigationArrow({
     required AlignmentGeometry alignment,
     required IconData icon,

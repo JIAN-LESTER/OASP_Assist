@@ -26,7 +26,7 @@ class _SquareTileState extends State<SquareTile> {
     });
 
     try {
-      print('🚀 Starting Google Sign-In...');
+      print(' Starting Google Sign-In...');
 
       // Platform-specific implementation
       if (kIsWeb || (!kIsWeb && (Platform.isWindows || Platform.isLinux))) {
@@ -49,7 +49,7 @@ class _SquareTileState extends State<SquareTile> {
                   e.code == 'network_error');
 
       if (!isCancellation) {
-        print('❌ Error during Google sign-in: $e\n$st');
+        print(' Error during Google sign-in: $e\n$st');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -59,7 +59,7 @@ class _SquareTileState extends State<SquareTile> {
           );
         }
       } else {
-        print('ℹ️ Sign-in cancelled by user');
+        print(' Sign-in cancelled by user');
       }
     } finally {
       if (mounted) {
@@ -81,7 +81,7 @@ class _SquareTileState extends State<SquareTile> {
       final UserCredential userCredential = await FirebaseAuth.instance
           .signInWithPopup(googleProvider);
 
-      print('✅ Firebase sign-in successful: ${userCredential.user?.email}');
+      print(' Firebase sign-in successful: ${userCredential.user?.email}');
 
       if (userCredential.user != null) {
         final bool isFirstTime =
@@ -98,7 +98,7 @@ class _SquareTileState extends State<SquareTile> {
       if (e.code == 'popup-closed-by-user' ||
           e.code == 'cancelled' ||
           e.code == 'user-cancelled') {
-        print('ℹ️ User closed the popup');
+        print(' User closed the popup');
         return;
       }
       if (e.code == 'account-exists-with-different-credential') {
@@ -116,11 +116,11 @@ class _SquareTileState extends State<SquareTile> {
     // OPTIMIZED: Only disconnect if needed, no unnecessary signOut
     // This prevents delays when user cancels immediately
     final GoogleSignInAccount googleUser = await googleSignIn.authenticate();
-    // 🔑 Auth tokens
+    //  Auth tokens
     final GoogleSignInAuthentication googleAuth =
         await googleUser.authentication;
 
-    // 🔥 Firebase Auth
+    //  Firebase Auth
     final credential = GoogleAuthProvider.credential(
       idToken: googleAuth.idToken,
     );
@@ -129,7 +129,7 @@ class _SquareTileState extends State<SquareTile> {
       final UserCredential userCredential = await FirebaseAuth.instance
           .signInWithCredential(credential);
 
-      print('✅ Firebase sign-in successful: ${userCredential.user?.email}');
+      print(' Firebase sign-in successful: ${userCredential.user?.email}');
 
       if (userCredential.user != null) {
         final bool isFirstTime =
@@ -155,7 +155,7 @@ class _SquareTileState extends State<SquareTile> {
     FirebaseAuthException e, {
     AuthCredential? pendingCredential,
   }) async {
-    print('⚠️ Account exists with different credential');
+    print(' Account exists with different credential');
 
     final email = e.email;
     if (email == null) {
@@ -181,11 +181,11 @@ class _SquareTileState extends State<SquareTile> {
 
         if (linkedProviders != null && linkedProviders.isNotEmpty) {
           existingMethod = linkedProviders.first.toString();
-          print('🔑 Found existing provider in Firestore: $existingMethod');
+          print(' Found existing provider in Firestore: $existingMethod');
         }
       }
     } catch (firestoreError) {
-      print('⚠️ Could not check Firestore: $firestoreError');
+      print(' Could not check Firestore: $firestoreError');
     }
 
     // Show dialog asking user to sign in with existing method
@@ -345,7 +345,7 @@ class _SquareTileState extends State<SquareTile> {
     );
 
     if (confirmed != true || passwordController.text.isEmpty) {
-      print('ℹ️ User cancelled password entry');
+      print(' User cancelled password entry');
       return;
     }
 
@@ -360,12 +360,12 @@ class _SquareTileState extends State<SquareTile> {
       final UserCredential userCredential = await FirebaseAuth.instance
           .signInWithCredential(emailCredential);
 
-      print('✅ Signed in with email/password');
+      print(' Signed in with email/password');
       print('🔗 Now linking Google credential...');
 
       await userCredential.user!.linkWithCredential(pendingCredential);
 
-      print('✅ Google account linked successfully!');
+      print(' Google account linked successfully!');
 
       await FirebaseFirestore.instance
           .collection('users')
@@ -392,7 +392,7 @@ class _SquareTileState extends State<SquareTile> {
         Navigator.pushReplacementNamed(context, "/home");
       }
     } on FirebaseAuthException catch (e) {
-      print('❌ Linking error: ${e.code} - ${e.message}');
+      print(' Linking error: ${e.code} - ${e.message}');
 
       String errorMessage = 'Failed to link accounts';
       if (e.code == 'wrong-password') {
@@ -409,7 +409,7 @@ class _SquareTileState extends State<SquareTile> {
         );
       }
     } catch (e) {
-      print('❌ Unexpected error: $e');
+      print(' Unexpected error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -489,10 +489,10 @@ class _SquareTileState extends State<SquareTile> {
             });
           }
         }
-        print('🔑 Updated returning user: ${user.email}');
+        print(' Updated returning user: ${user.email}');
       }
     } catch (e) {
-      print('❌ Firestore update error: $e');
+      print(' Firestore update error: $e');
     }
   }
 
@@ -565,4 +565,3 @@ class _SquareTileState extends State<SquareTile> {
     );
   }
 }
-

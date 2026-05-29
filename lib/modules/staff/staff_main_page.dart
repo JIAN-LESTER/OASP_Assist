@@ -1,4 +1,3 @@
-
 import 'package:capstone_project/modules/staff/announcement/staff_announcement_page.dart';
 import 'package:capstone_project/modules/staff/dashboard_and_reports/staff_reports_page.dart';
 import 'package:capstone_project/modules/staff/dashboard_and_reports/staff_dashboard_page.dart';
@@ -32,7 +31,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
   bool _handledInitialArgs = false;
-  
+
   String? _escalationId;
   String? _conversationId;
   bool _shouldAutoOpen = false;
@@ -51,15 +50,15 @@ class _StaffMainPageState extends State<StaffMainPage> {
   @override
   void initState() {
     super.initState();
-    
+
     _selectedIndex = widget.initialTabIndex ?? 0;
     _escalationId = widget.escalationId;
     _conversationId = widget.conversationId;
     _shouldAutoOpen = widget.autoOpen;
 
     _fetchStaffServiceUnit();
-    
-    print('🎯 StaffMainPage initState:');
+
+    print(' StaffMainPage initState:');
     print('   - initialTabIndex: ${widget.initialTabIndex}');
     print('   - escalationId: ${widget.escalationId}');
     print('   - conversationId: ${widget.conversationId}');
@@ -71,45 +70,46 @@ class _StaffMainPageState extends State<StaffMainPage> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        print('⚠️ No user logged in');
+        print(' No user logged in');
         setState(() {
           _isLoadingServiceUnit = false;
         });
         return;
       }
 
-      print('📡 Fetching service unit for user: ${user.uid}');
+      print(' Fetching service unit for user: ${user.uid}');
 
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
 
       if (userDoc.exists) {
         final data = userDoc.data();
         final fetchedServiceUnit = data?['serviceUnit'] as String?;
-        
-        print('📦 User document data: $data');
-        print('📦 Service unit field: $fetchedServiceUnit');
-        
+
+        print(' User document data: $data');
+        print(' Service unit field: $fetchedServiceUnit');
+
         setState(() {
           _serviceUnit = fetchedServiceUnit ?? "";
           _isLoadingServiceUnit = false;
         });
-        
-        print('✅ Staff service unit loaded: "$_serviceUnit"');
-        
+
+        print(' Staff service unit loaded: "$_serviceUnit"');
+
         if (_serviceUnit.isEmpty) {
-          print('⚠️ WARNING: Service unit is empty!');
+          print(' WARNING: Service unit is empty!');
         }
       } else {
-        print('⚠️ User document not found');
+        print(' User document not found');
         setState(() {
           _isLoadingServiceUnit = false;
         });
       }
     } catch (e, stackTrace) {
-      print('❌ Error fetching service unit: $e');
+      print(' Error fetching service unit: $e');
       print('Stack trace: $stackTrace');
       setState(() {
         _isLoadingServiceUnit = false;
@@ -121,27 +121,28 @@ class _StaffMainPageState extends State<StaffMainPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    print('📦 didChangeDependencies called');
+    print(' didChangeDependencies called');
     print('   - _handledInitialArgs: $_handledInitialArgs');
 
     if (!_handledInitialArgs) {
-      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      
-      print('📦 Checking for route arguments...');
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+      print(' Checking for route arguments...');
       print('   - args: $args');
-      
+
       if (args != null) {
-        print('📦 ✅ Received navigation arguments:');
+        print('  Received navigation arguments:');
         args.forEach((key, value) {
           print('     - $key: $value');
         });
-        
+
         final initialTab = args['initialTab'] as int?;
         final escalationId = args['escalationId'] as String?;
         final conversationId = args['conversationId'] as String?;
         final autoOpen = args['autoOpen'] as bool? ?? false;
 
-        print('📦 Processing arguments:');
+        print(' Processing arguments:');
         print('   - initialTab: $initialTab');
         print('   - escalationId: $escalationId');
         print('   - conversationId: $conversationId');
@@ -150,35 +151,35 @@ class _StaffMainPageState extends State<StaffMainPage> {
         setState(() {
           if (initialTab != null) {
             _selectedIndex = initialTab;
-            print('✅ Updated _selectedIndex to: $_selectedIndex');
+            print(' Updated _selectedIndex to: $_selectedIndex');
           }
-          
+
           if (escalationId != null) {
             _escalationId = escalationId;
             _conversationId = conversationId;
             _shouldAutoOpen = autoOpen;
-            print('✅ Updated escalation details:');
+            print(' Updated escalation details:');
             print('   - _escalationId: $_escalationId');
             print('   - _conversationId: $_conversationId');
             print('   - _shouldAutoOpen: $_shouldAutoOpen');
           }
         });
 
-        print('📦 State updated successfully');
+        print(' State updated successfully');
       } else {
-        print('📦 ❌ No navigation arguments found');
+        print('  No navigation arguments found');
       }
-      
+
       _handledInitialArgs = true;
-      print('📦 Set _handledInitialArgs to true');
+      print(' Set _handledInitialArgs to true');
     } else {
-      print('📦 ⏭️ Skipping - already handled initial args');
+      print('  Skipping - already handled initial args');
     }
   }
 
   List<Widget> _getPages() {
     if (_isLoadingServiceUnit) {
-      print('⏳ Service unit still loading...');
+      print(' Service unit still loading...');
       return [
         const Center(child: CircularProgressIndicator()),
         const Center(child: CircularProgressIndicator()),
@@ -203,14 +204,14 @@ class _StaffMainPageState extends State<StaffMainPage> {
       serviceUnit: _serviceUnit,
     );
 
-    print('✅ HumanEscalation widget created with:');
+    print(' HumanEscalation widget created with:');
     print('   - key: escalation_${_escalationId}_${_shouldAutoOpen}');
     print('   - initialEscalationId: $_escalationId');
     print('   - autoOpen: ${_shouldAutoOpen && _selectedIndex == 2}');
     print('   - serviceUnit: "$_serviceUnit"');
 
     return [
-       StaffDashboardPage(),
+      StaffDashboardPage(),
       const StaffReportsPage(),
       humanEscalationWidget,
       const StaffAnnouncementPage(),
@@ -219,12 +220,12 @@ class _StaffMainPageState extends State<StaffMainPage> {
   }
 
   void _onNavigationItemTap(int index) {
-    print('🔄 Navigation item tapped: $index');
+    print(' Navigation item tapped: $index');
     setState(() {
       _selectedIndex = index;
-      
+
       if (index != 2) {
-        print('🔄 Clearing escalation details (not on escalation tab)');
+        print(' Clearing escalation details (not on escalation tab)');
         _escalationId = null;
         _conversationId = null;
         _shouldAutoOpen = false;
@@ -241,7 +242,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
   @override
   Widget build(BuildContext context) {
     print('🎨 Building StaffMainPage - selectedIndex: $_selectedIndex');
-    
+
     return ResponsiveLayout(
       mobileBody: _buildMobileLayout(),
       tabletBody: _buildTabletDesktopLayout(),

@@ -16,25 +16,25 @@ class FacebookImageStorageService {
     required int imageIndex,
   }) async {
     try {
-      print('📥 Downloading image from Facebook...');
-      
+      print(' Downloading image from Facebook...');
+
       // Download the image from Facebook
       final response = await http.get(Uri.parse(facebookImageUrl));
-      
+
       if (response.statusCode != 200) {
-        print('❌ Failed to download image: ${response.statusCode}');
+        print(' Failed to download image: ${response.statusCode}');
         return null;
       }
 
       final imageBytes = response.bodyBytes;
-      print('✅ Downloaded ${imageBytes.length} bytes');
+      print(' Downloaded ${imageBytes.length} bytes');
 
       // Create a unique filename
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'announcement_${postId}_${imageIndex}_$timestamp.jpg';
       final storagePath = 'announcements/$postId/$fileName';
 
-      print('📤 Uploading to Firebase Storage: $storagePath');
+      print(' Uploading to Firebase Storage: $storagePath');
 
       // Upload to Firebase Storage
       final ref = _storage.ref().child(storagePath);
@@ -53,11 +53,11 @@ class FacebookImageStorageService {
 
       // Get the download URL
       final downloadUrl = await uploadTask.ref.getDownloadURL();
-      print('✅ Uploaded successfully: $downloadUrl');
+      print(' Uploaded successfully: $downloadUrl');
 
       return downloadUrl;
     } catch (e) {
-      print('❌ Error uploading image to storage: $e');
+      print(' Error uploading image to storage: $e');
       return null;
     }
   }
@@ -69,7 +69,7 @@ class FacebookImageStorageService {
     required List<String> facebookImageUrls,
   }) async {
     try {
-      print('🔄 Processing ${facebookImageUrls.length} images for post $postId');
+      print(' Processing ${facebookImageUrls.length} images for post $postId');
 
       List<String> firebaseUrls = [];
       List<String> failedUrls = [];
@@ -96,9 +96,9 @@ class FacebookImageStorageService {
         }
       }
 
-      print('✅ Successfully uploaded ${firebaseUrls.length} images');
+      print(' Successfully uploaded ${firebaseUrls.length} images');
       if (failedUrls.isNotEmpty) {
-        print('⚠️ Failed to upload ${failedUrls.length} images');
+        print(' Failed to upload ${failedUrls.length} images');
       }
 
       return {
@@ -110,11 +110,8 @@ class FacebookImageStorageService {
         'failedCount': failedUrls.length,
       };
     } catch (e) {
-      print('❌ Error processing post images: $e');
-      return {
-        'success': false,
-        'error': e.toString(),
-      };
+      print(' Error processing post images: $e');
+      return {'success': false, 'error': e.toString()};
     }
   }
 
@@ -123,13 +120,14 @@ class FacebookImageStorageService {
     String announcementId,
   ) async {
     try {
-      print('🔄 Migrating images for announcement: $announcementId');
+      print(' Migrating images for announcement: $announcementId');
 
       // Get the announcement document
-      final doc = await _firestore
-          .collection('announcements')
-          .doc(announcementId)
-          .get();
+      final doc =
+          await _firestore
+              .collection('announcements')
+              .doc(announcementId)
+              .get();
 
       if (!doc.exists) {
         return {'success': false, 'error': 'Announcement not found'};
@@ -140,16 +138,17 @@ class FacebookImageStorageService {
 
       // Extract Facebook image URLs
       if (data['images'] != null && data['images'] is List) {
-        facebookUrls = (data['images'] as List)
-            .map((item) {
-              if (item is String) return item;
-              if (item is Map && item.containsKey('url')) {
-                return item['url'].toString();
-              }
-              return '';
-            })
-            .where((url) => url.isNotEmpty && url.contains('fbcdn.net'))
-            .toList();
+        facebookUrls =
+            (data['images'] as List)
+                .map((item) {
+                  if (item is String) return item;
+                  if (item is Map && item.containsKey('url')) {
+                    return item['url'].toString();
+                  }
+                  return '';
+                })
+                .where((url) => url.isNotEmpty && url.contains('fbcdn.net'))
+                .toList();
       }
 
       if (data['full_picture'] != null &&
@@ -160,7 +159,7 @@ class FacebookImageStorageService {
       }
 
       if (facebookUrls.isEmpty) {
-        print('ℹ️ No Facebook images to migrate');
+        print(' No Facebook images to migrate');
         return {'success': true, 'message': 'No images to migrate'};
       }
 
@@ -172,20 +171,23 @@ class FacebookImageStorageService {
 
       if (result['success'] == true && result['firebaseUrls'].isNotEmpty) {
         // Update Firestore with new URLs
-        await _firestore.collection('announcements').doc(announcementId).update({
-          'images': result['firebaseUrls'],
-          'original_fb_urls': facebookUrls, // Keep original URLs for reference
-          'images_migrated': true,
-          'migration_date': FieldValue.serverTimestamp(),
-          'image_count': result['firebaseUrls'].length,
-        });
+        await _firestore.collection('announcements').doc(announcementId).update(
+          {
+            'images': result['firebaseUrls'],
+            'original_fb_urls':
+                facebookUrls, // Keep original URLs for reference
+            'images_migrated': true,
+            'migration_date': FieldValue.serverTimestamp(),
+            'image_count': result['firebaseUrls'].length,
+          },
+        );
 
-        print('✅ Migration completed successfully');
+        print(' Migration completed successfully');
       }
 
       return result;
     } catch (e) {
-      print('❌ Error migrating announcement images: $e');
+      print(' Error migrating announcement images: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -193,12 +195,13 @@ class FacebookImageStorageService {
   /// Migrate all announcements with Facebook images
   static Future<Map<String, dynamic>> migrateAllAnnouncements() async {
     try {
-      print('🔄 Starting bulk migration of all announcements...');
+      print(' Starting bulk migration of all announcements...');
 
-      final querySnapshot = await _firestore
-          .collection('announcements')
-          .where('deleted', isEqualTo: false)
-          .get();
+      final querySnapshot =
+          await _firestore
+              .collection('announcements')
+              .where('deleted', isEqualTo: false)
+              .get();
 
       int total = querySnapshot.docs.length;
       int migrated = 0;
@@ -207,31 +210,33 @@ class FacebookImageStorageService {
 
       for (var doc in querySnapshot.docs) {
         final data = doc.data();
-        
+
         // Skip if already migrated
         if (data['images_migrated'] == true) {
-          print('⏭️ Skipping ${doc.id} - already migrated');
+          print(' Skipping ${doc.id} - already migrated');
           skipped++;
           continue;
         }
 
-        print('\n📦 Processing ${doc.id} (${migrated + failed + skipped + 1}/$total)');
+        print(
+          '\n Processing ${doc.id} (${migrated + failed + skipped + 1}/$total)',
+        );
 
         final result = await migrateAnnouncementImages(doc.id);
 
         if (result['success'] == true) {
           migrated++;
-          print('✅ Successfully migrated ${doc.id}');
+          print(' Successfully migrated ${doc.id}');
         } else {
           failed++;
-          print('❌ Failed to migrate ${doc.id}: ${result['error']}');
+          print(' Failed to migrate ${doc.id}: ${result['error']}');
         }
 
         // Delay between migrations to avoid rate limiting
         await Future.delayed(Duration(seconds: 2));
       }
 
-      print('\n📊 Migration Summary:');
+      print('\n Migration Summary:');
       print('Total: $total');
       print('Migrated: $migrated');
       print('Failed: $failed');
@@ -245,7 +250,7 @@ class FacebookImageStorageService {
         'skipped': skipped,
       };
     } catch (e) {
-      print('❌ Error in bulk migration: $e');
+      print(' Error in bulk migration: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -253,19 +258,19 @@ class FacebookImageStorageService {
   /// Delete images from Firebase Storage when announcement is deleted
   static Future<void> deleteAnnouncementImages(String announcementId) async {
     try {
-      print('🗑️ Deleting images for announcement: $announcementId');
+      print(' Deleting images for announcement: $announcementId');
 
       final folderRef = _storage.ref().child('announcements/$announcementId');
       final listResult = await folderRef.listAll();
 
       for (var item in listResult.items) {
         await item.delete();
-        print('✅ Deleted: ${item.name}');
+        print(' Deleted: ${item.name}');
       }
 
-      print('✅ All images deleted for $announcementId');
+      print(' All images deleted for $announcementId');
     } catch (e) {
-      print('❌ Error deleting images: $e');
+      print(' Error deleting images: $e');
     }
   }
 }

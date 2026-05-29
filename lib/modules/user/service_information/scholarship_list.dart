@@ -392,7 +392,7 @@ class _ScholarshipListState extends State<ScholarshipList>
               child: StreamBuilder<QuerySnapshot>(
                 stream: _firestore.collection('scholarships').snapshots(),
                 builder: (context, snapshot) {
-                  // ✅ NEW: Show loading state
+                  //  NEW: Show loading state
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(
                       child: Column(

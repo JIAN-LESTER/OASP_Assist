@@ -26,7 +26,7 @@ class _HumanEscalationState extends State<HumanEscalation>
   String _searchQuery = '';
   late AnimationController _refreshAnimationController;
 
-  // ✅ Updated stream to filter by service unit
+  //  Updated stream to filter by service unit
   late Stream<QuerySnapshot> _escalationsStream;
 
   final List<String> _filterOptions = ['all', 'pending', 'resolved'];
@@ -40,7 +40,7 @@ class _HumanEscalationState extends State<HumanEscalation>
       duration: const Duration(milliseconds: 1000),
     );
 
-    // ✅ Initialize stream with service unit filter
+    //  Initialize stream with service unit filter
     _initializeStream();
 
     _searchController.addListener(() {
@@ -49,7 +49,7 @@ class _HumanEscalationState extends State<HumanEscalation>
       });
     });
 
-    print('📄 HumanEscalation initState:');
+    print(' HumanEscalation initState:');
     print('   - initialEscalationId: ${widget.initialEscalationId}');
     print('   - autoOpen: ${widget.autoOpen}');
     print('   - serviceUnit: ${widget.serviceUnit}');
@@ -59,18 +59,18 @@ class _HumanEscalationState extends State<HumanEscalation>
         widget.initialEscalationId!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         print(
-          '⏰ Post-frame callback: Opening escalation ${widget.initialEscalationId}',
+          ' Post-frame callback: Opening escalation ${widget.initialEscalationId}',
         );
         _openEscalationById(widget.initialEscalationId!);
       });
     }
   }
 
-  // ✅ Initialize stream with service unit filter (including "General")
+  //  Initialize stream with service unit filter (including "General")
   void _initializeStream() {
     // Check if serviceUnit is empty or null
     if (widget.serviceUnit.isEmpty) {
-      print('⚠️ Service unit is empty, loading all escalations');
+      print(' Service unit is empty, loading all escalations');
       _escalationsStream =
           FirebaseFirestore.instance
               .collection('escalations')
@@ -78,14 +78,14 @@ class _HumanEscalationState extends State<HumanEscalation>
               .snapshots();
     } else {
       // Use compound query with OR logic
-      print('🔍 Setting up query for service unit: "${widget.serviceUnit}"');
+      print(' Setting up query for service unit: "${widget.serviceUnit}"');
 
       _escalationsStream = FirebaseFirestore.instance
           .collection('escalations')
           .orderBy('createdAt', descending: true)
           .snapshots()
           .map((snapshot) {
-            print('📊 Raw escalations count: ${snapshot.docs.length}');
+            print(' Raw escalations count: ${snapshot.docs.length}');
 
             // Filter in-memory to include both service unit and General
             final filtered =
@@ -102,21 +102,21 @@ class _HumanEscalationState extends State<HumanEscalation>
 
                   if (matches) {
                     print(
-                      '✅ Including escalation ${doc.id}: category = "$category"',
+                      ' Including escalation ${doc.id}: category = "$category"',
                     );
                   }
 
                   return matches;
                 }).toList();
 
-            print('📊 Filtered escalations count: ${filtered.length}');
+            print(' Filtered escalations count: ${filtered.length}');
 
             // Return a new QuerySnapshot with filtered docs
             return _FilteredQuerySnapshot(filtered, snapshot);
           });
 
       print(
-        '✅ Stream initialized with filter for: "${widget.serviceUnit}" and "General"',
+        ' Stream initialized with filter for: "${widget.serviceUnit}" and "General"',
       );
     }
   }
@@ -125,7 +125,7 @@ class _HumanEscalationState extends State<HumanEscalation>
   void didUpdateWidget(HumanEscalation oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    print('🔄 HumanEscalation didUpdateWidget:');
+    print(' HumanEscalation didUpdateWidget:');
     print('   - old escalationId: ${oldWidget.initialEscalationId}');
     print('   - new escalationId: ${widget.initialEscalationId}');
     print('   - old autoOpen: ${oldWidget.autoOpen}');
@@ -133,9 +133,9 @@ class _HumanEscalationState extends State<HumanEscalation>
     print('   - old serviceUnit: ${oldWidget.serviceUnit}');
     print('   - new serviceUnit: ${widget.serviceUnit}');
 
-    // ✅ Reinitialize stream if service unit changed
+    //  Reinitialize stream if service unit changed
     if (widget.serviceUnit != oldWidget.serviceUnit) {
-      print('🔄 Service unit changed, reinitializing stream');
+      print(' Service unit changed, reinitializing stream');
       _initializeStream();
     }
 
@@ -143,7 +143,7 @@ class _HumanEscalationState extends State<HumanEscalation>
         widget.initialEscalationId != null &&
         widget.initialEscalationId!.isNotEmpty &&
         widget.initialEscalationId != oldWidget.initialEscalationId) {
-      print('🔄 Escalation changed, opening new escalation');
+      print(' Escalation changed, opening new escalation');
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _openEscalationById(widget.initialEscalationId!);
@@ -153,7 +153,7 @@ class _HumanEscalationState extends State<HumanEscalation>
 
   Future<void> _openEscalationById(String escalationId) async {
     try {
-      print('📂 Opening escalation: $escalationId');
+      print(' Opening escalation: $escalationId');
 
       final doc =
           await FirebaseFirestore.instance
@@ -162,21 +162,21 @@ class _HumanEscalationState extends State<HumanEscalation>
               .get();
 
       if (!doc.exists) {
-        print('❌ Escalation not found: $escalationId');
+        print(' Escalation not found: $escalationId');
         if (mounted) {
           SnackbarUtil.showError(context, 'Escalation not found');
         }
         return;
       }
 
-      // ✅ Verify escalation belongs to staff's service unit or is General
+      //  Verify escalation belongs to staff's service unit or is General
       final data = doc.data() as Map<String, dynamic>;
       final escalationCategory = data['category'] as String?;
 
       if (escalationCategory != widget.serviceUnit &&
           escalationCategory != 'General') {
         print(
-          '⚠️ Escalation category mismatch: $escalationCategory not in [${widget.serviceUnit}, General]',
+          ' Escalation category mismatch: $escalationCategory not in [${widget.serviceUnit}, General]',
         );
         if (mounted) {
           SnackbarUtil.showError(
@@ -188,7 +188,7 @@ class _HumanEscalationState extends State<HumanEscalation>
       }
 
       if (mounted) {
-        print('✅ Opening escalation modal');
+        print(' Opening escalation modal');
         await showDialog(
           context: context,
           barrierDismissible: false,
@@ -199,10 +199,10 @@ class _HumanEscalationState extends State<HumanEscalation>
               ),
         );
 
-        print('✅ Escalation modal closed');
+        print(' Escalation modal closed');
       }
     } catch (e, stack) {
-      print('❌ Error opening escalation: $e');
+      print(' Error opening escalation: $e');
       print('Stack: $stack');
 
       if (mounted) {
@@ -785,7 +785,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                                       ],
                                     ),
                                   ),
-                                  // ✅ Right side - Show responder details for resolved escalations
+                                  //  Right side - Show responder details for resolved escalations
                                   if (isResolved &&
                                       escalation['respondedBy'] != null) ...[
                                     SizedBox(width: isTablet ? 12 : 8),
@@ -1075,7 +1075,7 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ✅ Helper class to wrap filtered documents as QuerySnapshot
+//  Helper class to wrap filtered documents as QuerySnapshot
 class _FilteredQuerySnapshot implements QuerySnapshot<Map<String, dynamic>> {
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> _docs;
   final QuerySnapshot<Map<String, dynamic>> _original;

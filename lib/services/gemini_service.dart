@@ -1,4 +1,3 @@
-
 // gemini_service.dart
 import 'dart:convert';
 import 'dart:io';
@@ -11,7 +10,7 @@ import 'package:http/http.dart' as http;
 class GeminiService {
   final FirebaseFunctions functions = FirebaseFunctions.instance;
   final bool _isDesktop;
-  
+
   // Desktop-only fields
   late final String _apiKey;
   late final String _embedUrl;
@@ -19,26 +18,27 @@ class GeminiService {
   GeminiService() : _isDesktop = _checkIfDesktop() {
     if (_isDesktop) {
       _apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-      
+
       if (_apiKey.isEmpty) {
         throw Exception('Gemini API key not found in .env file');
       }
-      
-      _embedUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=$_apiKey";
-      
+
+      _embedUrl =
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=$_apiKey";
+
       if (kDebugMode) {
         print('🖥️ Using desktop Gemini implementation');
       }
     } else {
       if (kDebugMode) {
-        print('📱 Using Cloud Functions Gemini implementation');
+        print(' Using Cloud Functions Gemini implementation');
       }
     }
   }
 
   static bool _checkIfDesktop() {
     if (kIsWeb) return false;
-    
+
     try {
       return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
     } catch (e) {
@@ -72,26 +72,29 @@ class GeminiService {
         body: jsonEncode({
           'model': 'models/gemini-embedding-001',
           'content': {
-            'parts': [{'text': text}]
+            'parts': [
+              {'text': text},
+            ],
           },
           'outputDimensionality': 768,
         }),
       );
 
       if (response.statusCode != 200) {
-        print('❌ Gemini Embed API error: ${response.body}');
+        print(' Gemini Embed API error: ${response.body}');
         throw Exception('Failed to generate embedding: ${response.body}');
       }
 
       final data = jsonDecode(response.body);
       final embedding = data['embedding']['values'] as List;
-      final embeddingList = embedding.map((e) => (e as num).toDouble()).toList();
-      
-      print('✅ Generated ${embeddingList.length}-dimensional embedding');
-      
+      final embeddingList =
+          embedding.map((e) => (e as num).toDouble()).toList();
+
+      print(' Generated ${embeddingList.length}-dimensional embedding');
+
       return embeddingList;
     } catch (e) {
-      print('❌ Error generating Gemini embedding: $e');
+      print(' Error generating Gemini embedding: $e');
       rethrow;
     }
   }
@@ -102,18 +105,16 @@ class GeminiService {
   }) async {
     try {
       final callable = functions.httpsCallable('generateGeminiEmbedding');
-      final result = await callable.call({
-        'text': text,
-        'taskType': taskType,
-      });
+      final result = await callable.call({'text': text, 'taskType': taskType});
 
       final embedding = result.data['embedding'] as List;
-      final embeddingList = embedding.map((e) => (e as num).toDouble()).toList();
-      
-      print('✅ Generated ${embeddingList.length}-dimensional embedding');
+      final embeddingList =
+          embedding.map((e) => (e as num).toDouble()).toList();
+
+      print(' Generated ${embeddingList.length}-dimensional embedding');
       return embeddingList;
     } catch (e) {
-      print('❌ Error generating Gemini embedding: $e');
+      print(' Error generating Gemini embedding: $e');
       rethrow;
     }
   }
@@ -140,35 +141,34 @@ class GeminiService {
 
   Future<String> _generateResponseDesktop(String prompt) async {
     try {
-      final chatUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_apiKey';
-      
+      final chatUrl =
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_apiKey';
+
       final response = await http.post(
         Uri.parse(chatUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'contents': [
             {
-              'parts': [{'text': prompt}]
+              'parts': [
+                {'text': prompt},
+              ],
             },
-        
           ],
           'outputDimensionality': 768,
-          'generationConfig': {
-            'temperature': 0.3,
-            'maxOutputTokens': 1024,
-          }
+          'generationConfig': {'temperature': 0.3, 'maxOutputTokens': 1024},
         }),
       );
 
       if (response.statusCode != 200) {
-        print('❌ Gemini Chat API error: ${response.body}');
+        print(' Gemini Chat API error: ${response.body}');
         throw Exception('Failed to generate response: ${response.body}');
       }
 
       final data = jsonDecode(response.body);
       return data['candidates'][0]['content']['parts'][0]['text'] ?? '';
     } catch (e) {
-      print('❌ Error generating Gemini response: $e');
+      print(' Error generating Gemini response: $e');
       rethrow;
     }
   }
@@ -179,7 +179,7 @@ class GeminiService {
       final result = await callable.call({'prompt': prompt});
       return result.data['text'] ?? '';
     } catch (e) {
-      print('❌ Error generating Gemini response: $e');
+      print(' Error generating Gemini response: $e');
       rethrow;
     }
   }

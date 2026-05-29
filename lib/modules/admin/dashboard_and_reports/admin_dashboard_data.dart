@@ -9,7 +9,8 @@ class AdminDashboardData {
   final double escalationRate;
   final double resolutionRate;
   final List<ChartData> inquiryTrend;
-  final List<EscalatedMessage> topEscalatedMessages;  // ✅ This should be List<EscalatedMessage>
+  final List<EscalatedMessage>
+  topEscalatedMessages; //  This should be List<EscalatedMessage>
   final List<ChartData> escalationsOverTime;
   final List<SystemLog> systemLogs;
   final List<MessageLogs> messageLogs;

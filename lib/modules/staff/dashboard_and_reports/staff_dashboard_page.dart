@@ -398,7 +398,7 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
           selectedTimeFrame,
           customDateRange,
         ),
-        // ✅ ADD: Fetch inquiry data separately
+        //  ADD: Fetch inquiry data separately
         _firebaseService.getInquiryReportsData(
           selectedTimeFrame,
           customDateRange,
@@ -411,7 +411,7 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
       final userDemoData = results[1] as UserDemographicsReportsData;
       final inquiryReportData = results[2] as InquiryReportsData;
 
-      // ✅ FIX: Use inquiryReportData directly instead of creating from adminData
+      //  FIX: Use inquiryReportData directly instead of creating from adminData
       final inquiryData = InquiryReportsData(
         totalMessages: inquiryReportData.totalMessages,
         userMessages: inquiryReportData.userMessages,
@@ -427,13 +427,12 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
         staffPerformance: inquiryReportData.staffPerformance,
         botVsHumanAnswers: inquiryReportData.botVsHumanAnswers,
         allEscalations:
-            inquiryReportData
-                .allEscalations, // ✅ This now has the correct value
+            inquiryReportData.allEscalations, //  This now has the correct value
         recentLogs: inquiryReportData.recentLogs,
         msgLogs: inquiryReportData.msgLogs,
       );
 
-      // ✅ UPDATE CACHE
+      //  UPDATE CACHE
       _cache[selectedTimeFrame] = DashboardCache(
         inq: inquiryData,
         ud: userDemoData,
@@ -446,8 +445,8 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
         ud = userDemoData;
         ad = adminData;
 
-        // ✅ DEBUG PRINTS
-        print('📊 Inquiry Data Updated:');
+        //  DEBUG PRINTS
+        print(' Inquiry Data Updated:');
         print('   All Escalations: ${inquiryData.allEscalations}');
         print('   Escalated Messages: ${inquiryData.escalatedMessages}');
         print('   Admin Pending Escalations: ${adminData.pendingEscalations}');
@@ -456,7 +455,7 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
         );
       });
     } catch (e) {
-      print('❌ Error fetching data: $e');
+      print(' Error fetching data: $e');
       rethrow;
     }
   }
@@ -847,7 +846,7 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
     final isMobile = screenWidth < 600;
 
     if (isMobile) {
-      // 📱 MOBILE LAYOUT: Dropdown on the left, smaller arrangement
+      //  MOBILE LAYOUT: Dropdown on the left, smaller arrangement
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

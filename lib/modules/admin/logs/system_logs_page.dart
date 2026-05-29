@@ -1,4 +1,3 @@
-
 import 'package:capstone_project/widgets/date_range_filter.dart';
 import 'package:capstone_project/widgets/empty_state.dart';
 import 'package:capstone_project/widgets/pagination.dart';
@@ -165,7 +164,7 @@ class _DesktopUserActivityLogsState extends State<DesktopUserActivityLogs> {
       widget.searchController,
       () {
         widget.onRefresh();
-        setState(() {}); // ✅ refresh handled here
+        setState(() {}); //  refresh handled here
       },
       widget.isLoading,
 
@@ -177,7 +176,7 @@ class _DesktopUserActivityLogsState extends State<DesktopUserActivityLogs> {
       context,
       24.0,
 
-      () => setState(() {}), // ✅ search handled here
+      () => setState(() {}), //  search handled here
     );
   }
 }
@@ -223,7 +222,7 @@ class _TabletUserActivityLogsState extends State<TabletUserActivityLogs> {
       widget.searchController,
       () {
         widget.onRefresh();
-        setState(() {}); // ✅ refresh handled here
+        setState(() {}); //  refresh handled here
       },
       widget.isLoading,
 
@@ -235,7 +234,7 @@ class _TabletUserActivityLogsState extends State<TabletUserActivityLogs> {
       context,
       20.0,
 
-      () => setState(() {}), // ✅ search handled here
+      () => setState(() {}), //  search handled here
     );
   }
 }
@@ -282,7 +281,7 @@ class _MobileUserActivityLogsState extends State<MobileUserActivityLogs> {
       widget.searchController,
       () {
         widget.onRefresh();
-        setState(() {}); // ✅ refresh handled here
+        setState(() {}); //  refresh handled here
       },
       widget.isLoading,
 
@@ -294,7 +293,7 @@ class _MobileUserActivityLogsState extends State<MobileUserActivityLogs> {
       context,
       16.0,
 
-      () => setState(() {}), // ✅ search handled here
+      () => setState(() {}), //  search handled here
     );
   }
 }

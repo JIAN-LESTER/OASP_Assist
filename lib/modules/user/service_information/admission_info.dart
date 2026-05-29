@@ -66,7 +66,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
                 )
                 .toList();
 
-        // ✅ Filter out entries without a type
+        //  Filter out entries without a type
         final validAdmissions =
             admissions
                 .where(
@@ -80,7 +80,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
         // Group by type and keep the most recent one per type
         final Map<String, Admissions> typeMap = {};
         for (final admission in validAdmissions) {
-          final type = admission.type!; // ✅ No fallback, type is guaranteed
+          final type = admission.type!; //  No fallback, type is guaranteed
           if (!typeMap.containsKey(type)) {
             typeMap[type] = admission;
           }
@@ -89,13 +89,13 @@ class _AdmissionInfoState extends State<AdmissionInfo>
         // Sort by type name
         final sortedAdmissions =
             typeMap.values.toList()..sort((a, b) {
-              return a.type!.compareTo(b.type!); // ✅ No fallback
+              return a.type!.compareTo(b.type!); //  No fallback
             });
 
         setState(() {
           _admissionsByType = sortedAdmissions;
           if (_admissionsByType.isNotEmpty) {
-            _selectedType = _admissionsByType.first.type; // ✅ No fallback
+            _selectedType = _admissionsByType.first.type; //  No fallback
           }
           _isLoading = false;
         });
@@ -138,7 +138,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
 
   Widget _buildContent() {
     if (_isLoading) {
-      // ✅ NEW: Show loading state
+      //  NEW: Show loading state
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -354,7 +354,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
             children:
                 _admissionsByType.map((admission) {
                   try {
-                    final type = admission.type; // ✅ No fallback
+                    final type = admission.type; //  No fallback
                     if (type == null ||
                         type.isEmpty ||
                         type.toLowerCase() == 'null')

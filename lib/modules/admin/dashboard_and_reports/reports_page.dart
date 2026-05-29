@@ -65,7 +65,7 @@ class _ReportsPageState extends State<ReportsPage> {
     _loadDataForSelectedReport();
   }
 
-  // ✅ Load user name first (always needed)
+  //  Load user name first (always needed)
   Future<void> _loadUserName() async {
     if (!mounted) return;
 
@@ -78,7 +78,7 @@ class _ReportsPageState extends State<ReportsPage> {
     });
   }
 
-  // ✅ LAZY LOADING: Only load data for the selected report type
+  //  LAZY LOADING: Only load data for the selected report type
   Future<void> _loadDataForSelectedReport() async {
     if (!mounted) return;
 
@@ -157,7 +157,7 @@ class _ReportsPageState extends State<ReportsPage> {
     }
   }
 
-  // ✅ When report type changes, load only that data
+  //  When report type changes, load only that data
   void _onReportTypeChanged(String newValue) {
     setState(() {
       selectedReportType = newValue;
@@ -165,9 +165,9 @@ class _ReportsPageState extends State<ReportsPage> {
     _loadDataForSelectedReport();
   }
 
-  // ✅ When timeframe changes, invalidate and reload current report
+  //  When timeframe changes, invalidate and reload current report
   void _onTimeFrameChanged(String newValue) async {
-    // ✅ CORRECT: Show modal when Custom is selected
+    //  CORRECT: Show modal when Custom is selected
     if (newValue == 'Custom') {
       final DateTimeRange? selectedRange = await showDialog<DateTimeRange>(
         context: context,
@@ -256,7 +256,7 @@ class _ReportsPageState extends State<ReportsPage> {
     _loadDataForSelectedReport();
   }
 
-  // ✅ Refresh only the currently visible report
+  //  Refresh only the currently visible report
   Future<void> _refreshData() async {
     if (!mounted || isRefreshing) return;
 
@@ -385,7 +385,7 @@ class _ReportsPageState extends State<ReportsPage> {
     }
   }
 
-  // ✅ Check if current report is loading
+  //  Check if current report is loading
   bool get isCurrentReportLoading {
     switch (selectedReportType) {
       case 'Inquiry Trends':
@@ -467,7 +467,7 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 }
 
-// ✅ Skeleton Loader Widget
+//  Skeleton Loader Widget
 class SkeletonLoader extends StatefulWidget {
   final double height;
   final double? width;
@@ -537,7 +537,7 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
   }
 }
 
-// ✅ Skeleton for Stat Cards
+//  Skeleton for Stat Cards
 Widget buildStatCardSkeleton({bool isMobile = false}) {
   return Container(
     padding: EdgeInsets.all(isMobile ? 12 : 16),
@@ -576,7 +576,7 @@ Widget buildStatCardSkeleton({bool isMobile = false}) {
   );
 }
 
-// ✅ Skeleton for Chart Cards
+//  Skeleton for Chart Cards
 Widget buildChartCardSkeleton({bool isMobile = false}) {
   return Container(
     padding: EdgeInsets.all(isMobile ? 12 : 16),
@@ -877,7 +877,7 @@ class MobileDashboard extends StatelessWidget {
   }
 }
 
-// ✅ Build Skeleton based on Report Type
+//  Build Skeleton based on Report Type
 List<Widget> buildSkeletonReport(String reportType, {bool isMobile = false}) {
   if (isMobile) {
     return [
@@ -1176,7 +1176,7 @@ List<Widget> buildInquiryTrendsReport(
             child: Builder(
               builder:
                   (context) => buildStatCard(
-                    'Pending Escalated Messages', // ✅ FIXED: Clean title, rate shown separately
+                    'Pending Escalated Messages', //  FIXED: Clean title, rate shown separately
                     '$escalatedMessages',
                     Colors.red,
                     Icons.warning_amber_rounded,
@@ -1185,7 +1185,7 @@ List<Widget> buildInquiryTrendsReport(
                           context,
                           selectedTimeFrame ?? 'This Month',
                         ),
-                    rateLabel: 'Rate', // ✅ FIXED: Pass rate as parameter
+                    rateLabel: 'Rate', //  FIXED: Pass rate as parameter
                     rateValue: escalationRate,
                   ),
             ),
@@ -1195,7 +1195,7 @@ List<Widget> buildInquiryTrendsReport(
             child: Builder(
               builder:
                   (context) => buildStatCard(
-                    'Resolved Messages', // ✅ FIXED: Clean title, rate shown separately
+                    'Resolved Messages', //  FIXED: Clean title, rate shown separately
                     '$resolvedMessages',
                     Colors.orange,
                     Icons.check_circle_outline,
@@ -1324,7 +1324,7 @@ List<Widget> buildChatbotUsageReport(
   final endDate = customDateRange?.end;
 
   /// =======================
-  /// 📱 MOBILE LAYOUT
+  ///  MOBILE LAYOUT
   /// =======================
   if (isMobile) {
     return [
@@ -1535,7 +1535,7 @@ List<Widget> buildUserDemographicsReport(
   bool isMobile = false,
 }) {
   /// =======================
-  /// 📱 MOBILE LAYOUT
+  ///  MOBILE LAYOUT
   /// =======================
   if (isMobile) {
     return [
@@ -2299,7 +2299,7 @@ String _formatTimestamp(Timestamp timestamp) {
   return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
 }
 
-// ✅ UPDATED buildHeader function for Reports page
+//  UPDATED buildHeader function for Reports page
 Widget buildHeader(
   String selectedTimeFrame,
   String selectedReportType,

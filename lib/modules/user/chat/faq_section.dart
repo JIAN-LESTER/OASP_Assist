@@ -784,7 +784,7 @@ class FAQSectionState extends State<FAQSection>
       return _buildEmptyState();
     }
 
-    // ✅ Limit to 3 categories
+    //  Limit to 3 categories
     final displayCategories = availableCategories.take(3).toList();
 
     return Padding(
@@ -799,12 +799,12 @@ class FAQSectionState extends State<FAQSection>
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   maxWidth: 1200,
-                ), // ✅ Reduced max width
+                ), //  Reduced max width
                 child: GridView.builder(
                   shrinkWrap: true,
                   physics: NeverScrollableScrollPhysics(),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3, // ✅ Changed to 3 columns
+                    crossAxisCount: 3, //  Changed to 3 columns
                     mainAxisSpacing: spacing,
                     crossAxisSpacing: spacing,
                     childAspectRatio: 0.75,
@@ -823,7 +823,7 @@ class FAQSectionState extends State<FAQSection>
     );
   }
 
-  // ✅ Also update _buildMobileTabletView() to limit to 3 FAQs:
+  //  Also update _buildMobileTabletView() to limit to 3 FAQs:
 
   Widget _buildMobileTabletView() {
     final padding = _getResponsivePadding(context);
@@ -841,7 +841,7 @@ class FAQSectionState extends State<FAQSection>
       return _buildEmptyState();
     }
 
-    // ✅ Limit to 3 categories
+    //  Limit to 3 categories
     final displayCategories = availableCategories.take(3).toList();
 
     return SingleChildScrollView(
@@ -852,12 +852,12 @@ class FAQSectionState extends State<FAQSection>
           children: [
             _buildHeader(),
             SizedBox(height: 32),
-            // ✅ Center the FAQ cards
+            //  Center the FAQ cards
             ...displayCategories.map(
               (category) => Container(
                 constraints: BoxConstraints(
                   maxWidth: 600,
-                ), // ✅ Max width for centering
+                ), //  Max width for centering
                 child: _buildMobileTabletCategoryCard(category),
               ),
             ),
@@ -868,10 +868,10 @@ class FAQSectionState extends State<FAQSection>
     );
   }
 
-  // ✅ Update _buildEmptyState() to show loading while fetching:
+  //  Update _buildEmptyState() to show loading while fetching:
 
   Widget _buildEmptyState() {
-    // ✅ Don't show empty state while loading
+    //  Don't show empty state while loading
     if (_isLoadingFAQs) {
       return Center(
         child: Column(
@@ -1113,8 +1113,6 @@ class FAQToggleButton extends StatelessWidget {
 
 // FAQInputSection
 
-
-
 class FAQInputSection extends StatefulWidget {
   final TextEditingController controller;
   final bool showFAQs;
@@ -1151,14 +1149,14 @@ class FAQInputSection extends StatefulWidget {
 
 class _FAQInputSectionState extends State<FAQInputSection> {
   late FocusNode _textFieldFocusNode;
-  bool _hasText = false; // ✅ Track text state locally
+  bool _hasText = false; //  Track text state locally
 
   @override
   void initState() {
     super.initState();
     _textFieldFocusNode = FocusNode();
-    
-    // ✅ Listen to text changes
+
+    //  Listen to text changes
     widget.controller.addListener(_onTextChanged);
     _hasText = widget.controller.text.trim().isNotEmpty;
   }
@@ -1170,7 +1168,7 @@ class _FAQInputSectionState extends State<FAQInputSection> {
     super.dispose();
   }
 
-  // ✅ Update state when text changes
+  //  Update state when text changes
   void _onTextChanged() {
     final hasText = widget.controller.text.trim().isNotEmpty;
     if (hasText != _hasText) {
@@ -1328,10 +1326,7 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(borderRadius),
-                          border: Border.all(
-                            color: borderColor,
-                            width: 1.5,
-                          ),
+                          border: Border.all(color: borderColor, width: 1.5),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.06),
@@ -1347,7 +1342,7 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                           minLines: 1,
                           textAlignVertical: TextAlignVertical.center,
                           textInputAction: TextInputAction.send,
-                          
+
                           style: TextStyle(
                             fontSize: fontSize,
                             fontWeight: FontWeight.w500,
@@ -1379,9 +1374,10 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                     // Microphone Button
                     if (widget.onMicrophoneTap != null)
                       Tooltip(
-                        message: widget.isListening
-                            ? 'Stop listening'
-                            : 'Voice input',
+                        message:
+                            widget.isListening
+                                ? 'Stop listening'
+                                : 'Voice input',
                         preferBelow: true,
                         verticalOffset: 12,
                         textStyle: TextStyle(
@@ -1398,21 +1394,24 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                           width: buttonSize,
                           height: buttonSize,
                           decoration: BoxDecoration(
-                            color: widget.isListening
-                                ? primaryColor
-                                : Color(0xFFF5F5F5),
+                            color:
+                                widget.isListening
+                                    ? primaryColor
+                                    : Color(0xFFF5F5F5),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: widget.isListening
-                                  ? primaryColor
-                                  : Color(0xFFE0E0E0),
+                              color:
+                                  widget.isListening
+                                      ? primaryColor
+                                      : Color(0xFFE0E0E0),
                               width: 1.5,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: widget.isListening
-                                    ? primaryColor.withOpacity(0.3)
-                                    : Colors.black.withOpacity(0.06),
+                                color:
+                                    widget.isListening
+                                        ? primaryColor.withOpacity(0.3)
+                                        : Colors.black.withOpacity(0.06),
                                 blurRadius: widget.isListening ? 12 : 8,
                                 offset: Offset(0, 2),
                               ),
@@ -1426,12 +1425,14 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                                 widget.onMicrophoneTap!();
                               },
                               borderRadius: BorderRadius.circular(8),
-                              splashColor: widget.isListening
-                                  ? Colors.white.withOpacity(0.2)
-                                  : Colors.grey.withOpacity(0.1),
-                              highlightColor: widget.isListening
-                                  ? Colors.white.withOpacity(0.1)
-                                  : Colors.grey.withOpacity(0.05),
+                              splashColor:
+                                  widget.isListening
+                                      ? Colors.white.withOpacity(0.2)
+                                      : Colors.grey.withOpacity(0.1),
+                              highlightColor:
+                                  widget.isListening
+                                      ? Colors.white.withOpacity(0.1)
+                                      : Colors.grey.withOpacity(0.05),
                               child: Center(
                                 child: AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 200),
@@ -1440,9 +1441,10 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                                         ? Icons.mic
                                         : Icons.mic_none,
                                     key: ValueKey(widget.isListening),
-                                    color: widget.isListening
-                                        ? Colors.white
-                                        : Color(0xFF666666),
+                                    color:
+                                        widget.isListening
+                                            ? Colors.white
+                                            : Color(0xFF666666),
                                     size: iconSize,
                                   ),
                                 ),
@@ -1453,7 +1455,7 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                       ),
                     SizedBox(width: 10),
 
-                    // ✅ FIXED: Send Button - Now properly tracks text changes
+                    //  FIXED: Send Button - Now properly tracks text changes
                     AnimatedOpacity(
                       duration: Duration(milliseconds: 200),
                       opacity: _hasText ? 1.0 : 0.5,
@@ -1463,21 +1465,26 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                         decoration: BoxDecoration(
                           color: primaryColor,
                           borderRadius: BorderRadius.circular(10),
-                          boxShadow: _hasText ? [
-                            BoxShadow(
-                              color: primaryColor.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
-                            ),
-                          ] : [],
+                          boxShadow:
+                              _hasText
+                                  ? [
+                                    BoxShadow(
+                                      color: primaryColor.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ]
+                                  : [],
                         ),
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
                             onTap: _hasText ? _handleSendMessage : null,
                             borderRadius: BorderRadius.circular(10),
-                            splashColor: _hasText ? Colors.white.withOpacity(0.2) : null,
-                            highlightColor: _hasText ? Colors.white.withOpacity(0.1) : null,
+                            splashColor:
+                                _hasText ? Colors.white.withOpacity(0.2) : null,
+                            highlightColor:
+                                _hasText ? Colors.white.withOpacity(0.1) : null,
                             child: Center(
                               child: Icon(
                                 Icons.arrow_forward_rounded,

@@ -96,7 +96,7 @@ class UniversalUIComponents {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
-      
+
       actions: appBarActions,
       iconTheme: const IconThemeData(color: Colors.black54),
       automaticallyImplyLeading: showBackButton && customLeading == null,
@@ -215,7 +215,7 @@ class UniversalUIComponents {
     required Function(int) onItemTap,
     required bool isExpanded,
     Function(BuildContext, String?)? onConversationSelected,
-    VoidCallback? onNewChat, // ✅ ADD THIS PARAMETER
+    VoidCallback? onNewChat, //  ADD THIS PARAMETER
   }) {
     final menuConfig = _getMenuConfig(userRole);
 
@@ -248,7 +248,7 @@ class UniversalUIComponents {
                   onItemTap,
                   isExpanded,
                   onConversationSelected: onConversationSelected,
-                  onNewChat: onNewChat, // ✅ PASS IT HERE
+                  onNewChat: onNewChat, //  PASS IT HERE
                 ),
               ),
             ),
@@ -450,10 +450,10 @@ class UniversalUIComponents {
                   HapticFeedback.mediumImpact();
                   Navigator.of(context).pop(); // Close drawer first
 
-                  // ✅ FIX: Wait for drawer to close
+                  //  FIX: Wait for drawer to close
                   await Future.delayed(Duration(milliseconds: 300));
 
-                  // ✅ Then call the callback
+                  //  Then call the callback
                   if (context.mounted) {
                     onNewChat();
                   }
@@ -562,13 +562,13 @@ class UniversalUIComponents {
             selectedIndex,
             onItemTap,
             userRole,
-            setDrawerState: setDrawerState, // ✅ ADD THIS
+            setDrawerState: setDrawerState, //  ADD THIS
           ),
         );
       }
     }
 
-    // ✅ CRITICAL FIX: Wrap in SingleChildScrollView to prevent overflow
+    //  CRITICAL FIX: Wrap in SingleChildScrollView to prevent overflow
     return SingleChildScrollView(
       physics: BouncingScrollPhysics(),
       child: Column(children: menuItems),
@@ -581,7 +581,7 @@ class UniversalUIComponents {
     int selectedIndex,
     Function(int) onItemTap,
     UserRole userRole, {
-    StateSetter? setDrawerState, // ✅ ADD THIS
+    StateSetter? setDrawerState, //  ADD THIS
   }) {
     final isSelected = selectedIndex == item.index;
 
@@ -653,7 +653,7 @@ class UniversalUIComponents {
     'User Management': false,
   };
 
-  // ✅ Add this counter to force rebuild
+  //  Add this counter to force rebuild
   static int _rebuildCounter = 0;
 
   // Replace the entire _buildExpandableMenuItem method with this:
@@ -686,7 +686,7 @@ class UniversalUIComponents {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: ExpansionTile(
-              // ✅ Use counter to force unique key on every rebuild
+              //  Use counter to force unique key on every rebuild
               key: ValueKey('${item.title}_$isExpanded\_$_rebuildCounter'),
               tilePadding: const EdgeInsets.symmetric(
                 horizontal: 8,
@@ -752,7 +752,7 @@ class UniversalUIComponents {
                   }
                 }
 
-                // ✅ Increment counter to force all tiles to rebuild
+                //  Increment counter to force all tiles to rebuild
                 _rebuildCounter++;
 
                 // Force UI update
@@ -1273,7 +1273,7 @@ class UniversalUIComponents {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
-    // ✅ CRITICAL: Close drawer FIRST on mobile before showing dialog
+    //  CRITICAL: Close drawer FIRST on mobile before showing dialog
     if (isMobile && Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
       // Wait for drawer animation to complete
@@ -1534,7 +1534,7 @@ class UniversalUIComponents {
                                 );
                               }
                             } catch (e) {
-                              print('❌ Delete error: $e');
+                              print(' Delete error: $e');
                               if (context.mounted) {
                                 Navigator.of(context).pop(); // Close dialog
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1613,7 +1613,7 @@ class UniversalUIComponents {
     Function(int) onItemTap,
     bool isExpanded, {
     Function(BuildContext, String?)? onConversationSelected,
-    VoidCallback? onNewChat, // ✅ ADD THIS PARAMETER
+    VoidCallback? onNewChat, //  ADD THIS PARAMETER
   }) {
     List<Widget> items = [];
 
@@ -1671,7 +1671,7 @@ class UniversalUIComponents {
               context,
               isExpanded,
               onConversationSelected: onConversationSelected,
-              onNewChat: onNewChat, // ✅ PASS IT HERE
+              onNewChat: onNewChat, //  PASS IT HERE
             ),
           );
         }
@@ -1719,7 +1719,7 @@ class UniversalUIComponents {
                     onPressed: () async {
                       HapticFeedback.mediumImpact();
 
-                      // ✅ FIX: Call the callback with proper async handling
+                      //  FIX: Call the callback with proper async handling
                       if (onNewChat != null && context.mounted) {
                         onNewChat();
                       }
@@ -1834,7 +1834,7 @@ class UniversalUIComponents {
                       onTap: () async {
                         HapticFeedback.mediumImpact();
 
-                        // ✅ FIX: Use callback for collapsed state
+                        //  FIX: Use callback for collapsed state
                         if (onNewChat != null && context.mounted) {
                           onNewChat();
                         }
@@ -2266,7 +2266,7 @@ class UniversalUIComponents {
       barrierDismissible: true,
       barrierLabel: 'Notifications',
       barrierColor: Colors.black.withOpacity(0.3),
-      transitionDuration: Duration.zero, // ✅ No animation
+      transitionDuration: Duration.zero, //  No animation
       pageBuilder: (context, animation, secondaryAnimation) {
         return Align(
           alignment: Alignment.topRight,
@@ -2315,7 +2315,7 @@ class UniversalUIComponents {
       stream:
           FirebaseFirestore.instance
               .collection('notifications')
-              .where('userId', isEqualTo: currentUserId) // ✅ Filter by userId
+              .where('userId', isEqualTo: currentUserId) //  Filter by userId
               .where('targetRole', isEqualTo: roleToString(userRole))
               .orderBy('createdAt', descending: true)
               .limit(50)
@@ -2351,7 +2351,7 @@ class UniversalUIComponents {
               onPressed: () => _showNotifications(context, userRole),
             ),
 
-            // 🔴 Small badge
+            //  Small badge
             if (unreadCount > 0)
               Positioned(
                 right: 6,

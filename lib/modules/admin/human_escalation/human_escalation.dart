@@ -204,7 +204,7 @@ class _HumanEscalationState extends State<HumanEscalation>
         status.contains(_searchQuery);
   }
 
-  // ✅ Filter escalations by both status and category
+  //  Filter escalations by both status and category
   List<QueryDocumentSnapshot> _filterEscalations(
     List<QueryDocumentSnapshot> docs,
   ) {
@@ -526,7 +526,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                       ),
                     ),
 
-                    // ✅ Stats Row - Now filtered by category
+                    //  Stats Row - Now filtered by category
                     StreamBuilder<QuerySnapshot>(
                       stream: _escalationsStream,
                       builder: (context, snapshot) {
@@ -543,7 +543,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                           );
                         }
 
-                        // ✅ Apply category filter to stats
+                        //  Apply category filter to stats
                         final allDocs = snapshot.data!.docs;
                         final filteredDocs =
                             _selectedCategory == 'all'
@@ -755,7 +755,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         SizedBox(height: isTablet ? 6 : 5),
-                                        // ✅ Show creation date under the question
+                                        //  Show creation date under the question
                                         Row(
                                           children: [
                                             Container(
@@ -823,7 +823,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                                       ],
                                     ),
                                   ),
-                                  // ✅ Right side - Show responder details for resolved escalations
+                                  //  Right side - Show responder details for resolved escalations
                                   if (isResolved &&
                                       escalation['respondedBy'] != null) ...[
                                     SizedBox(width: isTablet ? 12 : 8),

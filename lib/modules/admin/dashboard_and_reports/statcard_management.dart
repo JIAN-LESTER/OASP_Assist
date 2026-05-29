@@ -99,8 +99,6 @@ Widget buildCompactStatCard(
   );
 }
 
-
-
 class StatData {
   final String date;
   final int count;
@@ -579,7 +577,6 @@ class StatDataManagement {
     );
   }
 
-
   Future<PlacementData> getPlacementData() async {
     const cacheKey = 'placements';
 
@@ -605,45 +602,46 @@ class StatDataManagement {
     }
   }
 
-PlacementData _processPlacementData({
-  required List<QueryDocumentSnapshot> placements,
-}) {
-  int totalCompanies = placements.length;
-  int vacantCount = 0;
-  String approachingDeadline = 'N/A';
+  PlacementData _processPlacementData({
+    required List<QueryDocumentSnapshot> placements,
+  }) {
+    int totalCompanies = placements.length;
+    int vacantCount = 0;
+    String approachingDeadline = 'N/A';
 
-  final now = DateTime.now();
-  final threeDaysFromNow = now.add(const Duration(days: 3));
+    final now = DateTime.now();
+    final threeDaysFromNow = now.add(const Duration(days: 3));
 
-  for (final doc in placements) {
-    final data = doc.data() as Map<String, dynamic>;
+    for (final doc in placements) {
+      final data = doc.data() as Map<String, dynamic>;
 
-    final company = data['companyName'] as String? ?? 'Unknown';
-    final isVacant = data['isRecruiting'] as bool? ?? false;
-    final deadline = data['deadline'];
+      final company = data['companyName'] as String? ?? 'Unknown';
+      final isVacant = data['isRecruiting'] as bool? ?? false;
+      final deadline = data['deadline'];
 
-    // ✅ Count all placements that are currently recruiting
-    if (isVacant) {
-      vacantCount++;
-    }
+      //  Count all placements that are currently recruiting
+      if (isVacant) {
+        vacantCount++;
+      }
 
-    // ✅ Find the FIRST company with deadline within the next 3 days
-    if (approachingDeadline == 'N/A' && deadline is Timestamp) {
-      final deadlineDate = deadline.toDate();
+      //  Find the FIRST company with deadline within the next 3 days
+      if (approachingDeadline == 'N/A' && deadline is Timestamp) {
+        final deadlineDate = deadline.toDate();
 
-      if (deadlineDate.isAfter(now) &&
-          deadlineDate.isBefore(threeDaysFromNow)) {
-        approachingDeadline = company;
+        if (deadlineDate.isAfter(now) &&
+            deadlineDate.isBefore(threeDaysFromNow)) {
+          approachingDeadline = company;
+        }
       }
     }
+
+    return PlacementData(
+      totalCompanies: totalCompanies,
+      vacantCompanies: vacantCount.toString(),
+      approachingDeadline: approachingDeadline,
+    );
   }
 
-  return PlacementData(
-    totalCompanies: totalCompanies,
-    vacantCompanies: vacantCount.toString(),
-    approachingDeadline: approachingDeadline,
-  );
-}
   // ==================== FIRESTORE QUERY METHODS ====================
   Future<List<QueryDocumentSnapshot>> _getUsersOptimized() async {
     final snapshot = await _firestore.collection('users').get();

@@ -44,46 +44,49 @@ class LoadingOverlay {
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black54,
-      builder: (context) => PopScope(
-        canPop: false,
-        child: Center(
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
-                  strokeWidth: 3,
-                ),
-                if (message != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    message,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+      builder:
+          (context) => PopScope(
+            canPop: false,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 10,
+                      spreadRadius: 2,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ],
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF2E7D32),
+                      ),
+                      strokeWidth: 3,
+                    ),
+                    if (message != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        message,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
     );
   }
 
@@ -101,17 +104,17 @@ class NotificationNavigationHandler {
 
   void setup() {
     NotificationService().setNavigationHandler(_handleNavigation);
-    print('✅ Navigation handler registered');
+    print(' Navigation handler registered');
   }
 
   void _handleNavigation(String type, Map<String, dynamic> data) {
     final context = navigatorKey.currentContext;
     if (context == null) {
-      print('⚠️ No navigator context available');
+      print(' No navigator context available');
       return;
     }
 
-    print('📍 Navigating to: $type with data: $data');
+    print(' Navigating to: $type with data: $data');
 
     switch (type) {
       case 'escalation_detail':
@@ -135,7 +138,7 @@ class NotificationNavigationHandler {
   ) async {
     final escalationId = data['escalationId'];
     if (escalationId == null || escalationId.isEmpty) {
-      print('⚠️ No escalation ID provided');
+      print(' No escalation ID provided');
       return;
     }
 
@@ -145,20 +148,21 @@ class NotificationNavigationHandler {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         LoadingOverlay.hide(context);
-        print('⚠️ No user logged in');
+        print(' No user logged in');
         return;
       }
 
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
 
       final role = userDoc.data()?['role'] ?? 'user';
       final route = role == 'admin' ? '/admin/home' : '/staff/home';
       final tabIndex = role == 'admin' ? 5 : 2;
 
-      print('📍 Navigating $role to escalations (route: $route, tab: $tabIndex)');
+      print(' Navigating $role to escalations (route: $route, tab: $tabIndex)');
 
       LoadingOverlay.hide(context);
 
@@ -171,7 +175,7 @@ class NotificationNavigationHandler {
         },
       );
     } catch (e) {
-      print('❌ Error determining user role: $e');
+      print(' Error determining user role: $e');
       LoadingOverlay.hide(context);
       Navigator.of(context).pushReplacementNamed(
         '/staff/escalations',
@@ -194,10 +198,11 @@ class NotificationNavigationHandler {
     try {
       LoadingOverlay.show(context, message: 'Loading response...');
 
-      final escalationDoc = await FirebaseFirestore.instance
-          .collection('escalations')
-          .doc(escalationId)
-          .get();
+      final escalationDoc =
+          await FirebaseFirestore.instance
+              .collection('escalations')
+              .doc(escalationId)
+              .get();
 
       if (context.mounted) LoadingOverlay.hide(context);
 
@@ -217,163 +222,183 @@ class NotificationNavigationHandler {
 
       final shouldNavigate = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2E7D32).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.support_agent,
-                  color: Color(0xFF2E7D32),
-                  size: 24,
-                ),
+        builder:
+            (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E7D32).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.support_agent,
+                      color: Color(0xFF2E7D32),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Staff Response',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (respondedAt != null)
+                          Text(
+                            formatTime(respondedAt),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.normal,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Staff Response',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.question_answer,
+                                size: 16,
+                                color: Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Your Question',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            userQuestion,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade700,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    if (respondedAt != null)
-                      Text(
-                        formatTime(respondedAt),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.normal,
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFF2E7D32).withOpacity(0.1),
+                            const Color(0xFF388E3C).withOpacity(0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFF2E7D32).withOpacity(0.3),
                         ),
                       ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.support_agent,
+                                size: 16,
+                                color: Color(0xFF2E7D32),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Response from $respondedBy',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF2E7D32),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            staffResponse,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade800,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.question_answer, size: 16, color: Colors.grey.shade600),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Your Question',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        userQuestion,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade700,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        const Color(0xFF2E7D32).withOpacity(0.1),
-                        const Color(0xFF388E3C).withOpacity(0.05),
-                      ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(
+                    'Close',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
                     ),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF2E7D32).withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.support_agent, size: 16, color: Color(0xFF2E7D32)),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Response from $respondedBy',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF2E7D32),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        staffResponse,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade800,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
+                if (conversationId != null && conversationId.isNotEmpty)
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E7D32),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'View Chat',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                'Close',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            if (conversationId != null && conversationId.isNotEmpty)
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E7D32),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('View Chat', style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-          ],
-        ),
       );
 
-      if (shouldNavigate == true && conversationId != null && conversationId.isNotEmpty) {
-        print('✅ Navigating to chat with conversation: $conversationId');
+      if (shouldNavigate == true &&
+          conversationId != null &&
+          conversationId.isNotEmpty) {
+        print(' Navigating to chat with conversation: $conversationId');
 
         if (context.mounted) {
           Navigator.of(context).pushReplacementNamed(
@@ -387,7 +412,7 @@ class NotificationNavigationHandler {
         }
       }
     } catch (e) {
-      print('❌ Error fetching escalation: $e');
+      print(' Error fetching escalation: $e');
       if (context.mounted) {
         LoadingOverlay.hide(context);
         _showErrorDialog(context, 'Failed to load response');
@@ -405,14 +430,15 @@ class NotificationNavigationHandler {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         LoadingOverlay.hide(context);
-        print('⚠️ No user logged in');
+        print(' No user logged in');
         return;
       }
 
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
 
       final role = userDoc.data()?['role'] ?? 'user';
       final announcementId = data['announcementId'];
@@ -436,7 +462,7 @@ class NotificationNavigationHandler {
         );
       }
     } catch (e) {
-      print('❌ Error navigating to announcement: $e');
+      print(' Error navigating to announcement: $e');
       LoadingOverlay.hide(context);
       _showErrorDialog(context, 'Failed to navigate to announcement');
     }
@@ -449,70 +475,75 @@ class NotificationNavigationHandler {
   void _showErrorDialog(BuildContext context, String message) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.error_outline, color: Colors.red.shade600),
-            const SizedBox(width: 12),
-            const Text('Error'),
-          ],
-        ),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red.shade600),
+                const SizedBox(width: 12),
+                const Text('Error'),
+              ],
+            ),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 }
 
 Future<void> initializeServices() async {
   try {
-    print('🚀 Initializing services...');
+    print(' Initializing services...');
 
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    print('✅ Background handler registered');
+    print(' Background handler registered');
 
     await NotificationService().initialize();
-    print('✅ Notifications ready');
+    print(' Notifications ready');
 
     NotificationNavigationHandler(navigatorKey).setup();
 
-    print('✅ Core services initialized');
+    print(' Core services initialized');
   } catch (e, stackTrace) {
-    print('⚠️ Service init warning: $e');
+    print(' Service init warning: $e');
     print('Stack: $stackTrace');
   }
 }
 
-// ✅ CRITICAL FIX: Properly configure Firebase Functions for production
+//  CRITICAL FIX: Properly configure Firebase Functions for production
 void configureFirebaseFunctions() {
   try {
     // Get the default Functions instance
     final functions = FirebaseFunctions.instance;
-    
-    // ⚠️ NEVER use emulator in production builds
+
+    //  NEVER use emulator in production builds
     // The emulator should ONLY be used during local development
     // For production, Firebase Functions automatically connects to your deployed functions
-    
+
     if (kDebugMode) {
-      print('🔧 Firebase Functions configured for: ${functions.app.options.projectId}');
+      print(
+        ' Firebase Functions configured for: ${functions.app.options.projectId}',
+      );
       print('   Region: us-central1 (default)');
-      
-      // ⚠️ ONLY uncomment these lines if you're actively developing locally with the emulator running
+
+      //  ONLY uncomment these lines if you're actively developing locally with the emulator running
       // Comment them out or remove them for production builds
       // functions.useFunctionsEmulator('localhost', 5001);
-      // print('⚙️ Using Functions emulator at localhost:5001');
+      // print(' Using Functions emulator at localhost:5001');
     } else {
-      print('✅ Firebase Functions configured for production');
+      print(' Firebase Functions configured for production');
       print('   Project: ${functions.app.options.projectId}');
     }
   } catch (e) {
-    print('⚠️ Error configuring Firebase Functions: $e');
+    print(' Error configuring Firebase Functions: $e');
   }
 }
 
@@ -521,12 +552,12 @@ void main() async {
     () async {
       WidgetsFlutterBinding.ensureInitialized();
 
-      // ✅ Load environment variables FIRST
+      //  Load environment variables FIRST
       try {
         await dotenv.load(fileName: '.env');
-        print('✅ Environment variables loaded');
+        print(' Environment variables loaded');
       } catch (e) {
-        print('⚠️ Could not load .env file: $e');
+        print(' Could not load .env file: $e');
         print('   Make sure .env exists in project root');
       }
 
@@ -540,19 +571,19 @@ void main() async {
         overlays: [SystemUiOverlay.top],
       );
 
-      // ✅ Initialize Firebase FIRST
+      //  Initialize Firebase FIRST
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      print('✅ Firebase initialized');
-      
-      // ✅ Wait a moment for Firebase to fully initialize
+      print(' Firebase initialized');
+
+      //  Wait a moment for Firebase to fully initialize
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // ✅ Configure Functions IMMEDIATELY after Firebase init
+      //  Configure Functions IMMEDIATELY after Firebase init
       configureFirebaseFunctions();
 
-      // ✅ Then initialize other services
+      //  Then initialize other services
       await initializeServices();
 
       runApp(
@@ -568,13 +599,13 @@ void main() async {
             ),
             Provider<PineconeCloudService>(
               create: (_) {
-                print('🔧 Creating PineconeCloudService');
+                print(' Creating PineconeCloudService');
                 return PineconeCloudService();
               },
             ),
             Provider<FirebaseFunctionsService>(
               create: (_) {
-                print('🔧 Creating FirebaseFunctionsService');
+                print(' Creating FirebaseFunctionsService');
                 return FirebaseFunctionsService();
               },
               dispose: (_, __) {},
@@ -586,7 +617,7 @@ void main() async {
       );
     },
     (error, stackTrace) {
-      print('🔴 Zone Error: $error');
+      print(' Zone Error: $error');
       print('🧩 StackTrace: $stackTrace');
     },
   );
@@ -615,7 +646,9 @@ class MyApp extends StatelessWidget {
       home: const AppInitializer(),
       routes: {
         '/admin/home': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
           return AdminMainPage(
             initialTabIndex: args?['initialTab'] as int?,
             escalationId: args?['escalationId'] as String?,
@@ -624,7 +657,9 @@ class MyApp extends StatelessWidget {
           );
         },
         '/admin/escalations': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
           final escalationId = args?['escalationId'] as String?;
           final autoOpen = args?['autoOpen'] as bool? ?? false;
           return HumanEscalation(
@@ -634,10 +669,13 @@ class MyApp extends StatelessWidget {
           );
         },
         '/onboarding': (context) => const OnboardingScreen(),
-        '/userOnboarding': (context) => const UserOnboardingScreen(userId: '', userName: ''),
+        '/userOnboarding':
+            (context) => const UserOnboardingScreen(userId: '', userName: ''),
         '/auth': (context) => AuthPage(),
         '/home': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
           return UserMainPage(
             initialTabIndex: args?['initialTab'] as int?,
             conversationId: args?['conversationId'] as String?,
@@ -646,7 +684,9 @@ class MyApp extends StatelessWidget {
           );
         },
         '/chat': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
           final conversationId = args?['conversationId'] as String? ?? '';
           return ChatPage(conversationId: conversationId);
         },
@@ -657,7 +697,9 @@ class MyApp extends StatelessWidget {
         '/scholarships': (context) => ScholarshipList(),
         '/placements': (context) => PlacementInfo(),
         '/staff/home': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
           return StaffMainPage(
             initialTabIndex: args?['initialTab'] as int?,
             escalationId: args?['escalationId'] as String?,
@@ -666,7 +708,9 @@ class MyApp extends StatelessWidget {
           );
         },
         '/staff/escalations': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
           final escalationId = args?['escalationId'] as String?;
           final autoOpen = args?['autoOpen'] as bool? ?? false;
           final serviceUnit = args?['serviceUnit'] as String;
@@ -713,12 +757,15 @@ class OnboardingManager {
     String userName,
   ) async {
     try {
-      final hasSeenUserOnboarding = await OnboardingManager.hasSeenUserOnboarding(userId);
+      final hasSeenUserOnboarding =
+          await OnboardingManager.hasSeenUserOnboarding(userId);
 
       if (!hasSeenUserOnboarding) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => UserOnboardingScreen(userId: userId, userName: userName),
+            builder:
+                (context) =>
+                    UserOnboardingScreen(userId: userId, userName: userName),
           ),
         );
       } else {
@@ -766,7 +813,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -779,11 +827,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0)
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
 
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0)
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
+    _scaleAnimation = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
     _controller.forward();
   }
@@ -819,7 +871,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       color: Colors.white.withOpacity(0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.school, size: 80, color: Colors.white),
+                    child: const Icon(
+                      Icons.school,
+                      size: 80,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 32),
                   const Text(

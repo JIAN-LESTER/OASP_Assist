@@ -34,7 +34,7 @@ export const checkPineconeHealth = onCall(
         message: "Pinecone is operational",
       };
     } catch (error: any) {
-      console.error("❌ Pinecone health check failed:", error.message);
+      console.error(" Pinecone health check failed:", error.message);
       return {
         healthy: false,
         error: error.message,
@@ -57,7 +57,7 @@ export const generateGeminiEmbedding = onCall(
 
     try {
       const response = await axios.post(
-       
+
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY.value()}`,
         {
           model: "models/gemini-embedding-001",
@@ -78,19 +78,19 @@ export const generateGeminiEmbedding = onCall(
       }).catch(console.error);
 
       if (!Array.isArray(embedding) || embedding.length === 0) {
-        console.error("❌ Unexpected Gemini response:", JSON.stringify(response.data));
+        console.error(" Unexpected Gemini response:", JSON.stringify(response.data));
         throw new HttpsError("internal", "No embedding returned from Gemini");
       }
 
-      console.log(`✅ Embedding generated: ${embedding.length} dimensions`);
+      console.log(` Embedding generated: ${embedding.length} dimensions`);
       return { embedding };
 
     } catch (error: any) {
       if (error instanceof HttpsError) throw error;
 
       const msg = error.response?.data?.error?.message ?? error.message;
-      console.error("❌ Gemini embedding error:", msg);
-      console.error("❌ Full Gemini error:", JSON.stringify(error.response?.data ?? {}));
+      console.error(" Gemini embedding error:", msg);
+      console.error(" Full Gemini error:", JSON.stringify(error.response?.data ?? {}));
       throw new HttpsError("internal", `Gemini embedding failed: ${msg}`);
     }
   }
@@ -122,7 +122,7 @@ export const generateGeminiResponse = onCall(
 
       return {text};
     } catch (error: any) {
-      console.error("❌ Gemini response error:", error.message);
+      console.error(" Gemini response error:", error.message);
       throw new Error(`Failed to generate response: ${error.message}`);
     }
   }
@@ -164,7 +164,7 @@ export const generateCohereEmbedding = onCall(
 
       return {embedding};
     } catch (error: any) {
-      console.error("❌ Cohere embedding error:", error.message);
+      console.error(" Cohere embedding error:", error.message);
       throw new Error(`Failed to generate embedding: ${error.message}`);
     }
   }
@@ -201,7 +201,7 @@ export const generateCohereResponse = onCall(
 
       return {text};
     } catch (error: any) {
-      console.error("❌ Cohere response error:", error.message);
+      console.error(" Cohere response error:", error.message);
       throw new Error(`Failed to generate response: ${error.message}`);
     }
   }
@@ -300,7 +300,7 @@ Return valid JSON only in this exact format:
       const result = JSON.parse(cleanedResponse);
       return {success: true, ...result};
     } catch (error: any) {
-      console.error("❌ Cohere admission analysis error:", error.message);
+      console.error(" Cohere admission analysis error:", error.message);
       return {success: false};
     }
   }
@@ -382,7 +382,7 @@ Respond in valid JSON format only:
       const result = JSON.parse(cleanedResponse);
       return result;
     } catch (error: any) {
-      console.error("❌ Cohere scholarship analysis error:", error.message);
+      console.error(" Cohere scholarship analysis error:", error.message);
       return {scholarships: []};
     }
   }
@@ -462,7 +462,7 @@ Respond in valid JSON format only:
       const result = JSON.parse(cleanedResponse);
       return result;
     } catch (error: any) {
-      console.error("❌ Cohere placement analysis error:", error.message);
+      console.error(" Cohere placement analysis error:", error.message);
       return {placements: []};
     }
   }
@@ -507,7 +507,7 @@ export const queryPinecone = onCall(
 
       return {success: true, matches};
     } catch (error: any) {
-      console.error("❌ Pinecone query error:", error.message);
+      console.error(" Pinecone query error:", error.message);
       throw new Error(`Failed to query Pinecone: ${error.message}`);
     }
   }
@@ -535,7 +535,7 @@ export const insertPineconeDocument = onCall(
 
       return {success: true, id};
     } catch (error: any) {
-      console.error("❌ Pinecone insert error:", error.message);
+      console.error(" Pinecone insert error:", error.message);
       throw new Error(`Failed to insert document: ${error.message}`);
     }
   }
@@ -578,7 +578,7 @@ export const insertPineconeDocumentBatch = onCall(
         const batch = vectors.slice(i, i + batchSize);
         await index.upsert(batch);
         totalInserted += batch.length;
-        console.log(`✅ Inserted batch: ${totalInserted}/${vectors.length}`);
+        console.log(` Inserted batch: ${totalInserted}/${vectors.length}`);
       }
 
       return {
@@ -587,7 +587,7 @@ export const insertPineconeDocumentBatch = onCall(
         message: `Successfully inserted ${totalInserted} vectors`,
       };
     } catch (error: any) {
-      console.error("❌ Pinecone batch insert error:", error.message);
+      console.error(" Pinecone batch insert error:", error.message);
       throw new Error(`Failed to batch insert documents: ${error.message}`);
     }
   }
@@ -613,7 +613,7 @@ export const deletePineconeDocuments = onCall(
 
       await index.deleteMany(ids);
 
-      console.log(`✅ Deleted ${ids.length} vectors from Pinecone`);
+      console.log(` Deleted ${ids.length} vectors from Pinecone`);
 
       return {
         success: true,
@@ -621,7 +621,7 @@ export const deletePineconeDocuments = onCall(
         message: `Successfully deleted ${ids.length} vectors`,
       };
     } catch (error: any) {
-      console.error("❌ Pinecone batch delete error:", error.message);
+      console.error(" Pinecone batch delete error:", error.message);
       throw new Error(`Failed to delete documents: ${error.message}`);
     }
   }
@@ -660,7 +660,7 @@ export const getPineconeStats = onCall(
 
       return response;
     } catch (error: any) {
-      console.error("❌ Pinecone stats error:", error.message);
+      console.error(" Pinecone stats error:", error.message);
       return {
         success: false,
         error: error.message,
@@ -695,7 +695,7 @@ export const fetchPineconeVectors = onCall(
         count: Object.keys(results.records || {}).length,
       };
     } catch (error: any) {
-      console.error("❌ Pinecone fetch error:", error.message);
+      console.error(" Pinecone fetch error:", error.message);
       return {
         success: false,
         error: error.message,
@@ -727,21 +727,21 @@ export const deleteAllPineconeVectors = onCall(
 
       if (namespace) {
         await index.deleteAll();
-        console.log(`✅ Deleted all vectors in namespace: ${namespace}`);
+        console.log(` Deleted all vectors in namespace: ${namespace}`);
         return {
           success: true,
           message: `Deleted all vectors in namespace: ${namespace}`,
         };
       } else {
         await index.deleteAll();
-        console.log("✅ Deleted all vectors in index");
+        console.log(" Deleted all vectors in index");
         return {
           success: true,
           message: "Deleted all vectors in index",
         };
       }
     } catch (error: any) {
-      console.error("❌ Pinecone delete all error:", error.message);
+      console.error(" Pinecone delete all error:", error.message);
       throw new Error(`Failed to delete all vectors: ${error.message}`);
     }
   }
@@ -782,7 +782,7 @@ export const deleteFromPinecone = onCall(
         pineconeStatus: response.status,
       };
     } catch (error: any) {
-      console.error("❌ Pinecone delete error:", error.response?.data || error.message);
+      console.error(" Pinecone delete error:", error.response?.data || error.message);
       throw new Error("Failed to delete vectors from Pinecone");
     }
   }

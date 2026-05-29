@@ -1,7 +1,6 @@
 import 'package:capstone_project/modules/admin/dashboard_and_reports/charts.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/reports.dart';
 
-
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -791,9 +790,9 @@ double _getGridInterval(List<ChartData> trendData) {
   return (maxCount / 5).ceil().toDouble();
 }
 
-// ✅ NEW: Specific interval calculation for conversation bottom titles
+//  NEW: Specific interval calculation for conversation bottom titles
 double _getConversationBottomInterval(int dataLength, String timeFrame) {
-switch (timeFrame) {
+  switch (timeFrame) {
     case 'All':
       return 1.0;
     case 'Today':
@@ -1327,7 +1326,7 @@ Widget buildUsersByYearLevelCard(
 
   int totalUsers = entries.fold(0, (sum, entry) => sum + entry.value);
 
-  // ✅ Dynamic sizing based on data volume and screen size
+  //  Dynamic sizing based on data volume and screen size
   double chartRadius;
   double sectionRadius;
   double fontSize;
@@ -1447,7 +1446,7 @@ Widget buildUsersByYearLevelCard(
                         child: PieChart(
                           PieChartData(
                             sectionsSpace: 3,
-                            centerSpaceRadius: chartRadius, // ✅ Dynamic radius
+                            centerSpaceRadius: chartRadius, //  Dynamic radius
                             sections:
                                 entries.asMap().entries.map((entry) {
                                   final percentage =
@@ -1458,9 +1457,9 @@ Widget buildUsersByYearLevelCard(
                                     value: entry.value.value.toDouble(),
                                     title: '${percentage.toStringAsFixed(1)}%',
                                     radius:
-                                        sectionRadius, // ✅ Dynamic section radius
+                                        sectionRadius, //  Dynamic section radius
                                     titleStyle: TextStyle(
-                                      fontSize: fontSize, // ✅ Dynamic font size
+                                      fontSize: fontSize, //  Dynamic font size
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
                                       shadows: [
@@ -1532,7 +1531,7 @@ Widget buildUsersByYearLevelCard(
                         child: PieChart(
                           PieChartData(
                             sectionsSpace: 3,
-                            centerSpaceRadius: chartRadius, // ✅ Dynamic radius
+                            centerSpaceRadius: chartRadius, //  Dynamic radius
                             sections:
                                 entries.asMap().entries.map((entry) {
                                   final percentage =
@@ -1543,9 +1542,9 @@ Widget buildUsersByYearLevelCard(
                                     value: entry.value.value.toDouble(),
                                     title: '${percentage.toStringAsFixed(1)}%',
                                     radius:
-                                        sectionRadius, // ✅ Dynamic section radius
+                                        sectionRadius, //  Dynamic section radius
                                     titleStyle: TextStyle(
-                                      fontSize: fontSize, // ✅ Dynamic font size
+                                      fontSize: fontSize, //  Dynamic font size
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
                                       shadows: [
@@ -4073,4 +4072,3 @@ Widget _buildEmptyCard(String title, String message) {
     ),
   );
 }
-

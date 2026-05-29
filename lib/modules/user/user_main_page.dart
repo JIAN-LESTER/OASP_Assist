@@ -57,7 +57,7 @@ class _UserMainPageState extends State<UserMainPage>
   bool _isLoading = false;
   bool _isNavigating = false;
 
-  // 🔑 Onboarding Keys
+  //  Onboarding Keys
   final GlobalKey _sidebarKey = GlobalKey();
   final GlobalKey _notificationKey = GlobalKey();
   final GlobalKey _profileKey = GlobalKey();
@@ -97,7 +97,7 @@ class _UserMainPageState extends State<UserMainPage>
     _currentIndex = validatedInitialTab.clamp(0, 5); // Pages are 0-5
     _selectedIndex = _currentIndex;
     _tabController = TabController(
-      length: 6, // ✅ Make sure this matches your pages list length
+      length: 6, //  Make sure this matches your pages list length
       vsync: this,
       initialIndex: _currentIndex,
     );
@@ -120,33 +120,31 @@ class _UserMainPageState extends State<UserMainPage>
       }
     });
 
-    // ✅ FIX: Only load conversation if passed, don't create new one
+    //  FIX: Only load conversation if passed, don't create new one
     if (widget.conversationId != null &&
         widget.conversationId!.isNotEmpty &&
         widget.conversationId != 'null') {
-      print(
-        '✅ Initializing with passed conversation: ${widget.conversationId}',
-      );
+      print(' Initializing with passed conversation: ${widget.conversationId}');
       _conversationId = widget.conversationId;
       _initFuture = _loadExistingConversation(widget.conversationId!);
       _showFAQs = false;
     } else {
-      print('ℹ️ No conversation passed, checking for active conversation');
-      _initFuture = _initializeConversationOrShowFAQs(); // ✅ NEW method
+      print(' No conversation passed, checking for active conversation');
+      _initFuture = _initializeConversationOrShowFAQs(); //  NEW method
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       UserConstant.initializeChatSession(context, setState);
 
       if (_selectedIndex == 1 && _conversationId != null) {
-        print('📱 Already on chat tab with conversation: $_conversationId');
+        print(' Already on chat tab with conversation: $_conversationId');
       }
 
-      // ✅ Check if we should trigger the OnboardingGuide
+      //  Check if we should trigger the OnboardingGuide
       if (widget.shouldShowGuide == true) {
         await _checkAndShowOnboardingGuide();
       }
-      // ✅ Welcome dialog will be triggered by OnboardingGuide completion (no need to check here)
+      //  Welcome dialog will be triggered by OnboardingGuide completion (no need to check here)
     });
   }
 
@@ -162,17 +160,17 @@ class _UserMainPageState extends State<UserMainPage>
         if (mounted) {
           final onboardingGuide = OnboardingGuide.of(context);
           if (onboardingGuide != null) {
-            print('✅ Triggering OnboardingGuide after user onboarding');
+            print(' Triggering OnboardingGuide after user onboarding');
             onboardingGuide.showGuide();
           }
         }
       }
     } catch (e) {
-      print('❌ Error checking onboarding guide: $e');
+      print(' Error checking onboarding guide: $e');
     }
   }
 
-  // ✅ NEW METHOD: Show welcome dialog
+  //  NEW METHOD: Show welcome dialog
   Future<void> _showWelcomeDialog() async {
     await showDialog(
       context: context,
@@ -186,12 +184,12 @@ class _UserMainPageState extends State<UserMainPage>
     if (user == null) return;
 
     try {
-      print('🔍 Looking for active conversations...');
+      print(' Looking for active conversations...');
 
-      // ✅ Keep FAQs hidden during check
+      //  Keep FAQs hidden during check
       if (mounted) {
         setState(() {
-          _showFAQs = false; // ❌ Don't show yet
+          _showFAQs = false; //  Don't show yet
         });
       }
 
@@ -206,7 +204,7 @@ class _UserMainPageState extends State<UserMainPage>
 
       if (activeConversations.docs.isNotEmpty) {
         final conversationId = activeConversations.docs.first.id;
-        print('✅ Found active conversation: $conversationId');
+        print(' Found active conversation: $conversationId');
 
         await _loadExistingConversation(conversationId);
 
@@ -216,21 +214,21 @@ class _UserMainPageState extends State<UserMainPage>
         if (mounted) {
           setState(() {
             _conversationId = conversationId;
-            _showFAQs = !hasMessages; // ✅ Only show if no messages
+            _showFAQs = !hasMessages; //  Only show if no messages
           });
         }
       } else {
-        print('ℹ️ No active conversations found - showing FAQs');
+        print(' No active conversations found - showing FAQs');
 
         if (mounted) {
           setState(() {
             _conversationId = null;
-            _showFAQs = true; // ✅ Safe to show now
+            _showFAQs = true; //  Safe to show now
           });
         }
       }
     } catch (e) {
-      print('❌ Error in initialization: $e');
+      print(' Error in initialization: $e');
       if (mounted) {
         setState(() {
           _showFAQs = true;
@@ -250,7 +248,7 @@ class _UserMainPageState extends State<UserMainPage>
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
       if (args != null) {
-        print('📍 Route arguments in didChangeDependencies: $args');
+        print(' Route arguments in didChangeDependencies: $args');
 
         final initialTab = args['initialTab'] as int?;
         final conversationId = args['conversationId'] as String?;
@@ -259,7 +257,7 @@ class _UserMainPageState extends State<UserMainPage>
         if (conversationId != null &&
             conversationId.isNotEmpty &&
             conversationId != 'null') {
-          print('✅ Received conversationId from route: $conversationId');
+          print(' Received conversationId from route: $conversationId');
 
           setState(() {
             _pendingConversationId = conversationId;
@@ -267,17 +265,17 @@ class _UserMainPageState extends State<UserMainPage>
             _conversationId = conversationId;
             _showFAQs = false;
 
-            // ✅ Validate tab index
+            //  Validate tab index
             if (initialTab != null) {
               _selectedIndex = initialTab.clamp(0, 5);
             }
           });
 
           WidgetsBinding.instance.addPostFrameCallback((_) async {
-            print('🔄 Loading conversation from notification: $conversationId');
+            print(' Loading conversation from notification: $conversationId');
             await _loadExistingConversation(conversationId);
 
-            // ✅ Navigate to chat tab safely
+            //  Navigate to chat tab safely
             if (_selectedIndex != 1 && mounted) {
               setState(() {
                 _selectedIndex = 1;
@@ -286,12 +284,12 @@ class _UserMainPageState extends State<UserMainPage>
               try {
                 _tabController.animateTo(1);
               } catch (e) {
-                print('❌ Error animating to chat tab: $e');
+                print(' Error animating to chat tab: $e');
               }
             }
           });
         } else if (initialTab != null) {
-          // ✅ Validate and clamp tab index
+          //  Validate and clamp tab index
           final validatedTab = initialTab.clamp(0, 5);
 
           setState(() {
@@ -311,7 +309,7 @@ class _UserMainPageState extends State<UserMainPage>
 
   Future<void> _loadExistingConversation(String conversationId) async {
     try {
-      print('📥 Loading existing conversation: $conversationId');
+      print(' Loading existing conversation: $conversationId');
 
       // Verify conversation exists
       final convDoc =
@@ -321,7 +319,7 @@ class _UserMainPageState extends State<UserMainPage>
               .get();
 
       if (!convDoc.exists) {
-        print('❌ Conversation not found: $conversationId');
+        print(' Conversation not found: $conversationId');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -338,7 +336,7 @@ class _UserMainPageState extends State<UserMainPage>
         return;
       }
 
-      print('✅ Conversation exists, loading...');
+      print(' Conversation exists, loading...');
 
       // Update the global state
       await UserConstant.setSelectedConversation(conversationId);
@@ -350,12 +348,12 @@ class _UserMainPageState extends State<UserMainPage>
       // Wait for messages to load
       await Future.delayed(const Duration(milliseconds: 800));
 
-      print('✅ Messages loaded: ${chatProvider.messages.length}');
+      print(' Messages loaded: ${chatProvider.messages.length}');
 
-      // ✅ CRITICAL: Check for escalation responses and add them to chat
+      //  CRITICAL: Check for escalation responses and add them to chat
       await _checkAndAddEscalationResponses(conversationId, chatProvider);
 
-      // ✅ Always hide FAQs when loading from notification
+      //  Always hide FAQs when loading from notification
       if (mounted) {
         setState(() {
           _showFAQs = false;
@@ -365,10 +363,10 @@ class _UserMainPageState extends State<UserMainPage>
       }
 
       print(
-        '✅ Conversation fully loaded with ${chatProvider.messages.length} messages',
+        ' Conversation fully loaded with ${chatProvider.messages.length} messages',
       );
     } catch (e) {
-      print('❌ Error loading conversation: $e');
+      print(' Error loading conversation: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -390,7 +388,7 @@ class _UserMainPageState extends State<UserMainPage>
     ChatProvider chatProvider,
   ) async {
     try {
-      print('🔍 Initial escalation check for: $conversationId');
+      print(' Initial escalation check for: $conversationId');
 
       final escalationsSnapshot =
           await _firestore
@@ -400,11 +398,11 @@ class _UserMainPageState extends State<UserMainPage>
               .get();
 
       if (escalationsSnapshot.docs.isEmpty) {
-        print('ℹ️ No resolved escalations found');
+        print(' No resolved escalations found');
         return;
       }
 
-      print('✅ Found ${escalationsSnapshot.docs.length} resolved escalations');
+      print(' Found ${escalationsSnapshot.docs.length} resolved escalations');
 
       for (var escalationDoc in escalationsSnapshot.docs) {
         final escalation = escalationDoc.data();
@@ -429,9 +427,7 @@ class _UserMainPageState extends State<UserMainPage>
                 .get();
 
         if (existingStaffMessages.docs.isNotEmpty) {
-          print(
-            'ℹ️ Staff response already exists for escalation $escalationId',
-          );
+          print(' Staff response already exists for escalation $escalationId');
           continue;
         }
 
@@ -442,12 +438,12 @@ class _UserMainPageState extends State<UserMainPage>
 
         if (existingInMemory) {
           print(
-            'ℹ️ Staff response already in memory for escalation $escalationId',
+            ' Staff response already in memory for escalation $escalationId',
           );
           continue;
         }
 
-        print('📝 Adding staff response for escalation $escalationId');
+        print('Adding staff response for escalation $escalationId');
 
         final staffMessageRef =
             _firestore
@@ -471,7 +467,7 @@ class _UserMainPageState extends State<UserMainPage>
 
       await chatProvider.loadExistingMessages();
     } catch (e) {
-      print('❌ Error checking escalation responses: $e');
+      print(' Error checking escalation responses: $e');
     }
   }
 
@@ -489,16 +485,16 @@ class _UserMainPageState extends State<UserMainPage>
   }
 
   void _onNavigationItemTap(int index) async {
-    print('📱 Navigation tap to index: $index');
+    print(' Navigation tap to index: $index');
 
     if (!mounted || _isNavigating) return;
 
     if (index < 0 || index >= _tabController.length) {
-      print('⚠️ Invalid tab index: $index');
+      print(' Invalid tab index: $index');
       return;
     }
 
-    // ✅ Only show loading for index 1 (Chat)
+    //  Only show loading for index 1 (Chat)
     final shouldShowLoading =
         index == 1 && (_conversationId != null && _conversationId!.isNotEmpty);
 
@@ -513,13 +509,13 @@ class _UserMainPageState extends State<UserMainPage>
         final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
         if (_conversationId == null || _conversationId!.isEmpty) {
-          print('📝 No conversation → show FAQs');
+          print('No conversation → show FAQs');
           setState(() {
             _showFAQs = true;
             _selectedIndex = 1;
           });
         } else {
-          print('🔄 Loading existing conversation $_conversationId');
+          print(' Loading existing conversation $_conversationId');
           await chatProvider.setConversationId(_conversationId!);
 
           final hasMessages = chatProvider.messages.isNotEmpty;
@@ -530,7 +526,7 @@ class _UserMainPageState extends State<UserMainPage>
           });
         }
 
-        _tabController.animateTo(1, duration: Duration.zero); // ✅ Instant
+        _tabController.animateTo(1, duration: Duration.zero); //  Instant
       } else {
         print('➡️ Navigating to tab: $index');
 
@@ -539,10 +535,10 @@ class _UserMainPageState extends State<UserMainPage>
           _selectedIndex = index;
         });
 
-        _tabController.animateTo(index, duration: Duration.zero); // ✅ Instant
+        _tabController.animateTo(index, duration: Duration.zero); //  Instant
       }
     } catch (e) {
-      print('❌ Navigation error: $e');
+      print(' Navigation error: $e');
       if (mounted) _showErrorSnackBar("Navigation failed: $e");
     } finally {
       if (mounted) {
@@ -567,10 +563,10 @@ class _UserMainPageState extends State<UserMainPage>
   void _onNewChatPressed() async {
     HapticFeedback.mediumImpact();
 
-    print('🆕 _onNewChatPressed called');
+    print(' _onNewChatPressed called');
 
     if (_isLoading) {
-      print('⚠️ Already creating new chat, ignoring duplicate call');
+      print(' Already creating new chat, ignoring duplicate call');
       return;
     }
 
@@ -581,15 +577,15 @@ class _UserMainPageState extends State<UserMainPage>
     }
 
     try {
-      // ✅ STEP 1: Show loading overlay FIRST
+      //  STEP 1: Show loading overlay FIRST
       if (mounted) {
         setState(() {
           _isLoading = true;
         });
       }
 
-      // ✅ STEP 2: Backend operations (before navigation)
-      print('📝 Ending active conversations...');
+      //  STEP 2: Backend operations (before navigation)
+      print('Ending active conversations...');
       await UserConstant.endAllActiveConversations(userId);
 
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
@@ -597,21 +593,21 @@ class _UserMainPageState extends State<UserMainPage>
 
       await Future.delayed(Duration(milliseconds: 200));
 
-      print('✨ Creating new conversation...');
+      print(' Creating new conversation...');
       final newConversationId = await UserConstant.createNewConversation(
         userId,
       );
-      print('✅ Created: $newConversationId');
+      print(' Created: $newConversationId');
 
-      // ✅ STEP 3: Set up conversation completely
-      print('🔧 Setting up conversation...');
+      //  STEP 3: Set up conversation completely
+      print(' Setting up conversation...');
       await chatProvider.setConversationId(newConversationId);
       await UserConstant.setSelectedConversation(newConversationId);
 
-      // ✅ STEP 4: Wait for everything to settle
+      //  STEP 4: Wait for everything to settle
       await Future.delayed(Duration(milliseconds: 500));
 
-      // ✅ STEP 5: Update state with conversation ready
+      //  STEP 5: Update state with conversation ready
       if (mounted) {
         setState(() {
           _conversationId = newConversationId;
@@ -620,7 +616,7 @@ class _UserMainPageState extends State<UserMainPage>
         });
       }
 
-      // ✅ STEP 6: NOW navigate to chat tab
+      //  STEP 6: NOW navigate to chat tab
       if (mounted) {
         await Future.delayed(Duration(milliseconds: 100));
 
@@ -630,7 +626,7 @@ class _UserMainPageState extends State<UserMainPage>
 
         _tabController.animateTo(1);
 
-        // ✅ STEP 7: Hide loading only after navigation complete
+        //  STEP 7: Hide loading only after navigation complete
         await Future.delayed(Duration(milliseconds: 400));
 
         if (mounted) {
@@ -640,9 +636,9 @@ class _UserMainPageState extends State<UserMainPage>
         }
       }
 
-      print('✅ New chat navigation complete: $newConversationId');
+      print(' New chat navigation complete: $newConversationId');
     } catch (e) {
-      print('❌ Error in _onNewChatPressed: $e');
+      print(' Error in _onNewChatPressed: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -694,22 +690,22 @@ class _UserMainPageState extends State<UserMainPage>
   ) async {
     if (conversationId == null) return;
 
-    print('📝 Conversation selected: $conversationId');
+    print('Conversation selected: $conversationId');
 
     if (_isLoading || _isNavigating) {
-      print('⚠️ Already loading, ignoring duplicate selection');
+      print(' Already loading, ignoring duplicate selection');
       return;
     }
 
     final isSameConversation = _conversationId == conversationId;
 
     if (_selectedIndex == 1 && isSameConversation) {
-      print('ℹ️ Already viewing this conversation');
+      print(' Already viewing this conversation');
       return;
     }
 
     try {
-      // ✅ Show loading overlay
+      //  Show loading overlay
       if (mounted) {
         setState(() {
           _isNavigating = true;
@@ -737,14 +733,14 @@ class _UserMainPageState extends State<UserMainPage>
       await UserConstant.setSelectedConversation(conversationId);
 
       // Load conversation
-      print('🔧 Loading conversation: $conversationId');
+      print(' Loading conversation: $conversationId');
       await chatProvider.setConversationId(conversationId);
 
       // Wait for messages to load
       await Future.delayed(Duration(milliseconds: 800));
 
       final hasMessages = chatProvider.messages.isNotEmpty;
-      print('✅ Messages loaded: ${chatProvider.messages.length}');
+      print(' Messages loaded: ${chatProvider.messages.length}');
 
       // Update UI
       if (mounted) {
@@ -768,9 +764,9 @@ class _UserMainPageState extends State<UserMainPage>
         await Future.delayed(Duration(milliseconds: 300));
       }
 
-      print('✅ Conversation selection complete');
+      print(' Conversation selection complete');
     } catch (e) {
-      print('❌ Error selecting conversation: $e');
+      print(' Error selecting conversation: $e');
       if (mounted) {
         setState(() {
           _showFAQs = true;
@@ -788,7 +784,7 @@ class _UserMainPageState extends State<UserMainPage>
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Move pages list OUTSIDE FutureBuilder so it has proper context
+    //  Move pages list OUTSIDE FutureBuilder so it has proper context
     final List<Widget> _pages = [
       const HomeDashboard(),
       ChatPage(
@@ -822,9 +818,7 @@ class _UserMainPageState extends State<UserMainPage>
         );
 
         if (_selectedIndex >= _pages.length) {
-          print(
-            '⚠️ Selected index $_selectedIndex out of range, resetting to 0',
-          );
+          print(' Selected index $_selectedIndex out of range, resetting to 0');
           _selectedIndex = 0;
         }
 
@@ -897,7 +891,7 @@ class _UserMainPageState extends State<UserMainPage>
     );
   }
 
-  // ✅ Update tablet/desktop layout
+  //  Update tablet/desktop layout
   Widget _buildTabletDesktopLayout(List<Widget> pages) {
     return Scaffold(
       backgroundColor: UniversalUIComponents.backgroundGrey,
@@ -927,12 +921,12 @@ class _UserMainPageState extends State<UserMainPage>
             onConversationSelected: _onConversationSelected,
             onNewChat: _onNewChatPressed,
           ),
-          // ✅ FIX: Wrap only the page content in Stack
+          //  FIX: Wrap only the page content in Stack
           Expanded(
             child: Stack(
               children: [
                 pages[_selectedIndex],
-                // ✅ Only white out the content area
+                //  Only white out the content area
                 if (_isNavigating || _isLoading)
                   buildContentLoadingOverlay(
                     _navigationLoadingTextForIndex(_selectedIndex),
@@ -1408,7 +1402,7 @@ class _UserMainPageState extends State<UserMainPage>
                                                   );
                                                 }
                                               } catch (e) {
-                                                print('❌ Delete error: $e');
+                                                print(' Delete error: $e');
                                                 if (context.mounted) {
                                                   Navigator.of(context).pop();
                                                   SnackbarUtil.showError(
@@ -1863,7 +1857,7 @@ class _UserMainPageState extends State<UserMainPage>
                   subtitle: 'View admission requirements',
                   onTap: () {
                     Navigator.pop(context);
-                    // ✅ Navigate to actual page index
+                    //  Navigate to actual page index
                     _onNavigationItemTap(3);
                   },
                 ),
@@ -1874,7 +1868,7 @@ class _UserMainPageState extends State<UserMainPage>
                   subtitle: 'Browse available scholarships',
                   onTap: () {
                     Navigator.pop(context);
-                    // ✅ Navigate to actual page index
+                    //  Navigate to actual page index
                     _onNavigationItemTap(4);
                   },
                 ),
@@ -1885,7 +1879,7 @@ class _UserMainPageState extends State<UserMainPage>
                   subtitle: 'Career placement details',
                   onTap: () {
                     Navigator.pop(context);
-                    // ✅ Navigate to actual page index
+                    //  Navigate to actual page index
                     _onNavigationItemTap(5);
                   },
                 ),

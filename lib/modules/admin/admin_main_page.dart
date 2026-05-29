@@ -1,7 +1,6 @@
 import 'package:capstone_project/modules/admin/colleges_programs_managament/college.dart';
 import 'package:capstone_project/modules/admin/colleges_programs_managament/programs.dart';
 
-
 import 'package:capstone_project/modules/admin/announcement/announcement_page.dart';
 
 import 'package:capstone_project/modules/admin/dashboard_and_reports/dashboard_page.dart';
@@ -10,11 +9,11 @@ import 'package:capstone_project/modules/admin/human_escalation/human_escalation
 import 'package:capstone_project/modules/admin/information_bank/information_bank_page.dart';
 import 'package:capstone_project/modules/admin/logs/message_logs.dart';
 
-
 import 'package:capstone_project/modules/admin/dashboard_and_reports/reports_page.dart';
 
 import 'package:capstone_project/modules/admin/logs/system_logs_page.dart';
-import 'package:capstone_project/modules/admin/service_information/admission/admission_management.dart' show AdmissionManagementPage;
+import 'package:capstone_project/modules/admin/service_information/admission/admission_management.dart'
+    show AdmissionManagementPage;
 import 'package:capstone_project/modules/admin/service_information/placement/placement_management.dart';
 import 'package:capstone_project/modules/admin/service_information/scholarship/scholarship_management.dart';
 import 'package:capstone_project/modules/admin/user_management/user_management_page.dart';
@@ -44,8 +43,8 @@ class AdminMainPage extends StatefulWidget {
 class _AdminMainPageState extends State<AdminMainPage> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
-  
-  // ✅ Add state variables to track escalation parameters
+
+  //  Add state variables to track escalation parameters
   String? _currentEscalationId;
   bool _shouldAutoOpen = false;
 
@@ -53,13 +52,13 @@ class _AdminMainPageState extends State<AdminMainPage> {
   void initState() {
     super.initState();
 
-    // ✅ Set initial tab if provided
+    //  Set initial tab if provided
     if (widget.initialTabIndex != null) {
       _selectedIndex = widget.initialTabIndex!;
-      print('🎯 Admin initial tab set to: $_selectedIndex');
+      print(' Admin initial tab set to: $_selectedIndex');
     }
 
-    // ✅ Copy escalation parameters to state (they'll be cleared after use)
+    //  Copy escalation parameters to state (they'll be cleared after use)
     if (widget.autoOpen && widget.escalationId != null) {
       _currentEscalationId = widget.escalationId;
       _shouldAutoOpen = true;
@@ -70,8 +69,9 @@ class _AdminMainPageState extends State<AdminMainPage> {
   void _navigateToPage(int index) {
     setState(() {
       _selectedIndex = index;
-      // ✅ Clear escalation parameters when navigating away from escalation page
-      if (index != 5) { // 5 is the index of HumanEscalation page
+      //  Clear escalation parameters when navigating away from escalation page
+      if (index != 5) {
+        // 5 is the index of HumanEscalation page
         _currentEscalationId = null;
         _shouldAutoOpen = false;
       }
@@ -86,9 +86,11 @@ class _AdminMainPageState extends State<AdminMainPage> {
     const FaqManagementPage(),
     const AnnouncementPage(),
 
-    // ✅ Pass state variables instead of widget properties
+    //  Pass state variables instead of widget properties
     HumanEscalation(
-      key: ValueKey('escalation_${_currentEscalationId}_$_shouldAutoOpen'), // ✅ Add key to force rebuild
+      key: ValueKey(
+        'escalation_${_currentEscalationId}_$_shouldAutoOpen',
+      ), //  Add key to force rebuild
       initialEscalationId: _currentEscalationId,
       autoOpen: _shouldAutoOpen,
     ),
@@ -123,7 +125,7 @@ class _AdminMainPageState extends State<AdminMainPage> {
   void _onNavigationItemTap(int index) {
     setState(() {
       _selectedIndex = index;
-      // ✅ Clear escalation parameters when navigating away
+      //  Clear escalation parameters when navigating away
       if (index != 5) {
         _currentEscalationId = null;
         _shouldAutoOpen = false;

@@ -22,8 +22,8 @@ export const checkFacebookTokenExpiration = onSchedule(
   },
   async (event) => {
     console.log("========================================");
-    console.log("🔍 Checking Facebook token expiration...");
-    console.log(`📅 Current time: ${new Date().toLocaleString("en-PH", {timeZone: "Asia/Manila"})}`);
+    console.log(" Checking Facebook token expiration...");
+    console.log(` Current time: ${new Date().toLocaleString("en-PH", {timeZone: "Asia/Manila"})}`);
     console.log("========================================\n");
 
     try {
@@ -34,7 +34,7 @@ export const checkFacebookTokenExpiration = onSchedule(
         .get();
 
       if (!tokenDoc.exists) {
-        console.log("ℹ️ No Facebook token configured - skipping check");
+        console.log(" No Facebook token configured - skipping check");
         return;
       }
 
@@ -42,7 +42,7 @@ export const checkFacebookTokenExpiration = onSchedule(
       const expiresAt = data.expires_at as number | null;
 
       if (!expiresAt) {
-        console.log("⚠️ No expiration date found for token - skipping check");
+        console.log(" No expiration date found for token - skipping check");
         return;
       }
 
@@ -50,21 +50,21 @@ export const checkFacebookTokenExpiration = onSchedule(
       const msUntilExpiry = expiresAt - now;
       const daysUntilExpiry = Math.ceil(msUntilExpiry / (1000 * 60 * 60 * 24));
 
-      console.log("📊 Token Status:");
+      console.log(" Token Status:");
       console.log(`   Expires at: ${new Date(expiresAt).toLocaleString("en-PH", {timeZone: "Asia/Manila"})}`);
       console.log(`   Days until expiry: ${daysUntilExpiry}`);
       console.log(`   Hours until expiry: ${Math.ceil(msUntilExpiry / (1000 * 60 * 60))}`);
 
-      // ✅ TESTING: 60 days threshold
-      // 🚀 PRODUCTION: Change to 14 days
+      //  TESTING: 60 days threshold
+      //  PRODUCTION: Change to 14 days
       const NOTIFICATION_THRESHOLD = 60; // Change to 14 for production
 
-      console.log(`⚙️ Current threshold: ${NOTIFICATION_THRESHOLD} days`);
-      console.log(`⚙️ Mode: ${NOTIFICATION_THRESHOLD === 60 ? "TESTING" : "PRODUCTION"}`);
+      console.log(` Current threshold: ${NOTIFICATION_THRESHOLD} days`);
+      console.log(` Mode: ${NOTIFICATION_THRESHOLD === 60 ? "TESTING" : "PRODUCTION"}`);
 
       // Determine notification action
       if (daysUntilExpiry <= 0) {
-        console.log("\n❌ TOKEN EXPIRED!");
+        console.log("\n TOKEN EXPIRED!");
         await sendExpirationNotifications(
           "expired",
           "Your Facebook API token has expired! Please renew it immediately to continue syncing posts.",
@@ -72,7 +72,7 @@ export const checkFacebookTokenExpiration = onSchedule(
           expiresAt
         );
       } else if (daysUntilExpiry <= NOTIFICATION_THRESHOLD) {
-        console.log(`\n⚠️ Token expiring in ${daysUntilExpiry} days - sending notifications`);
+        console.log(`\n Token expiring in ${daysUntilExpiry} days - sending notifications`);
         await sendExpirationNotifications(
           "expiring_soon",
           `Your Facebook API token will expire in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? "s" : ""}. Please renew it soon to avoid interruption.`,
@@ -80,15 +80,15 @@ export const checkFacebookTokenExpiration = onSchedule(
           expiresAt
         );
       } else {
-        console.log(`\n✅ Token is still valid (${daysUntilExpiry} days remaining)`);
+        console.log(`\n Token is still valid (${daysUntilExpiry} days remaining)`);
         console.log("   Next check will be in 3 days");
         console.log(`   Will notify when ≤ ${NOTIFICATION_THRESHOLD} days remain`);
       }
     } catch (error: any) {
-      console.error("\n❌ ========================================");
-      console.error("❌ Error checking token expiration");
-      console.error(`❌ Error: ${error.message}`);
-      console.error("❌ ========================================\n");
+      console.error("\n ========================================");
+      console.error(" Error checking token expiration");
+      console.error(` Error: ${error.message}`);
+      console.error(" ========================================\n");
 
       throw error;
     }
@@ -106,10 +106,10 @@ async function sendExpirationNotifications(
   expiresAt: number
 ): Promise<void> {
   try {
-    console.log("\n📤 ========================================");
-    console.log(`📤 Sending notifications for status: ${status}`);
-    console.log(`📤 Days left: ${daysLeft}`);
-    console.log("📤 ========================================\n");
+    console.log("\n ========================================");
+    console.log(` Sending notifications for status: ${status}`);
+    console.log(` Days left: ${daysLeft}`);
+    console.log(" ========================================\n");
 
     // Get all active admins
     const adminsSnapshot = await db
@@ -119,12 +119,12 @@ async function sendExpirationNotifications(
       .get();
 
     if (adminsSnapshot.empty) {
-      console.log("⚠️ No active admins found - no notifications sent");
+      console.log(" No active admins found - no notifications sent");
       return;
     }
 
     const adminIds = adminsSnapshot.docs.map((doc) => doc.id);
-    console.log(`✅ Found ${adminIds.length} active admin(s):`);
+    console.log(` Found ${adminIds.length} active admin(s):`);
     adminsSnapshot.docs.forEach((doc) => {
       const data = doc.data();
       console.log(`   - ${doc.id}: ${data.name || "Unknown"} (${data.email || "No email"})`);
@@ -133,12 +133,12 @@ async function sendExpirationNotifications(
     // Create unique notification ID based on date and status
     const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
     const notificationKey = `fb_token_${status}_${today}`;
-    console.log(`\n🔑 Notification key: ${notificationKey}`);
+    console.log(`\n Notification key: ${notificationKey}`);
 
     // Prepare notification content
     const title = status === "expired" ?
-      "🔴 Facebook Token Expired" :
-      "⚠️ Facebook Token Expiring Soon";
+      " Facebook Token Expired" :
+      " Facebook Token Expiring Soon";
 
     const expirationDate = new Date(expiresAt).toLocaleString("en-PH", {
       timeZone: "Asia/Manila",
@@ -150,7 +150,7 @@ async function sendExpirationNotifications(
     });
 
     // Create notifications in Firestore
-    console.log("\n📝 Creating Firestore notifications...");
+    console.log("\nCreating Firestore notifications...");
     const batch = db.batch();
     let notificationCount = 0;
 
@@ -187,10 +187,10 @@ async function sendExpirationNotifications(
     }
 
     await batch.commit();
-    console.log(`✅ Created ${notificationCount} Firestore notification(s)`);
+    console.log(` Created ${notificationCount} Firestore notification(s)`);
 
     // Send FCM notifications
-    console.log("\n📱 Preparing FCM notifications...");
+    console.log("\n Preparing FCM notifications...");
     await sendFCMNotifications(
       adminIds,
       title,
@@ -207,15 +207,15 @@ async function sendExpirationNotifications(
       }
     );
 
-    console.log("\n✅ ========================================");
-    console.log("✅ Notifications sent successfully");
-    console.log(`✅ Total admins notified: ${adminIds.length}`);
-    console.log("✅ ========================================\n");
+    console.log("\n ========================================");
+    console.log(" Notifications sent successfully");
+    console.log(` Total admins notified: ${adminIds.length}`);
+    console.log(" ========================================\n");
   } catch (error: any) {
-    console.error("\n❌ ========================================");
-    console.error("❌ Error sending notifications");
-    console.error(`❌ Error: ${error.message}`);
-    console.error("❌ ========================================\n");
+    console.error("\n ========================================");
+    console.error(" Error sending notifications");
+    console.error(` Error: ${error.message}`);
+    console.error(" ========================================\n");
     throw error;
   }
 }
@@ -230,13 +230,13 @@ async function sendFCMNotifications(
   data: { [key: string]: string }
 ): Promise<void> {
   try {
-    console.log(`📱 Sending FCM to ${userIds.length} admin(s)...`);
+    console.log(` Sending FCM to ${userIds.length} admin(s)...`);
 
     // Get FCM tokens for all admins
     const userTokensMap = await getUserFCMTokens(userIds);
 
     if (userTokensMap.size === 0) {
-      console.log("⚠️ No FCM tokens found for admins");
+      console.log(" No FCM tokens found for admins");
       console.log("   Firestore notifications were still created");
       return;
     }
@@ -248,11 +248,11 @@ async function sendFCMNotifications(
     });
 
     if (allTokens.length === 0) {
-      console.log("ℹ️ No valid FCM tokens available");
+      console.log(" No valid FCM tokens available");
       return;
     }
 
-    console.log(`📱 Sending to ${allTokens.length} device(s)`);
+    console.log(` Sending to ${allTokens.length} device(s)`);
     console.log("   Token distribution:");
     userTokensMap.forEach((tokens, userId) => {
       console.log(`   - ${userId}: ${tokens.length} token(s)`);
@@ -298,20 +298,20 @@ async function sendFCMNotifications(
 
     const response = await admin.messaging().sendEachForMulticast(message);
 
-    console.log("\n📊 FCM Results:");
-    console.log(`   ✅ Successful: ${response.successCount}`);
-    console.log(`   ❌ Failed: ${response.failureCount}`);
+    console.log("\n FCM Results:");
+    console.log(`    Successful: ${response.successCount}`);
+    console.log(`    Failed: ${response.failureCount}`);
 
     // Clean up invalid tokens
     if (response.failureCount > 0) {
-      console.log("\n🗑️ Cleaning up invalid tokens...");
+      console.log("\n Cleaning up invalid tokens...");
       const tokensToRemove = new Map<string, string[]>();
 
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           const error = resp.error;
 
-          console.log(`   ❌ Failed token ${idx + 1}: ${error?.code} - ${error?.message}`);
+          console.log(`    Failed token ${idx + 1}: ${error?.code} - ${error?.message}`);
 
           if (
             error?.code === "messaging/invalid-registration-token" ||
@@ -332,7 +332,7 @@ async function sendFCMNotifications(
       });
 
       if (tokensToRemove.size > 0) {
-        console.log(`   🗑️ Removing ${tokensToRemove.size} invalid token(s)`);
+        console.log(`    Removing ${tokensToRemove.size} invalid token(s)`);
         const batch = db.batch();
 
         tokensToRemove.forEach((tokens, userId) => {
@@ -344,13 +344,13 @@ async function sendFCMNotifications(
         });
 
         await batch.commit();
-        console.log("   ✅ Invalid tokens removed from Firestore");
+        console.log("    Invalid tokens removed from Firestore");
       }
     }
 
-    console.log("\n✅ FCM notifications sent successfully");
+    console.log("\n FCM notifications sent successfully");
   } catch (error: any) {
-    console.error("\n❌ Error sending FCM notifications:", error);
+    console.error("\n Error sending FCM notifications:", error);
     console.error(`   ${error.message}`);
     // Don't throw - Firestore notifications were already created
   }
@@ -363,7 +363,7 @@ async function getUserFCMTokens(
   userIds: string[]
 ): Promise<Map<string, string[]>> {
   try {
-    console.log(`\n🔍 Fetching FCM tokens for ${userIds.length} user(s)...`);
+    console.log(`\n Fetching FCM tokens for ${userIds.length} user(s)...`);
 
     const userTokensMap = new Map<string, string[]>();
     const allSeenTokens = new Set<string>();
@@ -404,12 +404,12 @@ async function getUserFCMTokens(
       });
     }
 
-    console.log(`✅ Found tokens for ${userTokensMap.size} user(s)`);
+    console.log(` Found tokens for ${userTokensMap.size} user(s)`);
     console.log(`   Total unique tokens: ${allSeenTokens.size}`);
 
     return userTokensMap;
   } catch (error: any) {
-    console.error("❌ Error getting FCM tokens:", error);
+    console.error(" Error getting FCM tokens:", error);
     return new Map();
   }
 }
@@ -426,10 +426,10 @@ export const manualCheckFacebookToken = onCall(
         throw new HttpsError("unauthenticated", "Authentication required");
       }
 
-      console.log("\n🧪 ========================================");
-      console.log("🧪 MANUAL TOKEN CHECK TRIGGERED");
-      console.log(`🧪 By user: ${request.auth.uid}`);
-      console.log("🧪 ========================================\n");
+      console.log("\n ========================================");
+      console.log(" MANUAL TOKEN CHECK TRIGGERED");
+      console.log(` By user: ${request.auth.uid}`);
+      console.log(" ========================================\n");
 
       // Check if user is admin
       const userDoc = await db.collection("users").doc(request.auth.uid).get();
@@ -469,7 +469,7 @@ export const manualCheckFacebookToken = onCall(
       const msUntilExpiry = expiresAt - now;
       const daysUntilExpiry = Math.ceil(msUntilExpiry / (1000 * 60 * 60 * 24));
 
-      console.log(`📊 Token expires in: ${daysUntilExpiry} days`);
+      console.log(` Token expires in: ${daysUntilExpiry} days`);
 
       // Always send notification for manual check
       const status: "expired" | "expiring_soon" =
@@ -481,7 +481,7 @@ export const manualCheckFacebookToken = onCall(
 
       await sendExpirationNotifications(status, message, daysUntilExpiry, expiresAt);
 
-      console.log("\n✅ Manual check complete\n");
+      console.log("\n Manual check complete\n");
 
       return {
         success: true,
@@ -490,7 +490,7 @@ export const manualCheckFacebookToken = onCall(
         status,
       };
     } catch (error: any) {
-      console.error("❌ Manual check error:", error);
+      console.error(" Manual check error:", error);
       throw new HttpsError("internal", error.message);
     }
   }

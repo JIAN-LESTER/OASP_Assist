@@ -102,26 +102,26 @@ class _RegisterPageState extends State<RegisterPage> {
           signInMethods = List<String>.from(result as List);
         } on NoSuchMethodError {
           print(
-            '⚠️ fetchSignInMethodsForEmail not available in firebase_auth SDK',
+            ' fetchSignInMethodsForEmail not available in firebase_auth SDK',
           );
         }
 
         if (signInMethods.isNotEmpty) {
-          print('✅ Email found in Firebase Auth: $email');
+          print(' Email found in Firebase Auth: $email');
           return true;
         }
-        print('⚠️ Email NOT in Firebase Auth: $email');
+        print(' Email NOT in Firebase Auth: $email');
       } on FirebaseAuthException catch (e) {
         if (e.code == 'invalid-email') {
-          print('❌ Invalid email format: $email');
+          print(' Invalid email format: $email');
           return false;
         }
-        print('⚠️ Auth check error: ${e.code}');
+        print(' Auth check error: ${e.code}');
       } catch (e) {
-        print('⚠️ Auth check timeout/error: $e');
+        print(' Auth check timeout/error: $e');
       }
 
-      print('🔍 Checking Firestore for: $email');
+      print(' Checking Firestore for: $email');
       final querySnapshot = await _firestore
           .collection('users')
           .where('email', isEqualTo: email.trim())
@@ -138,22 +138,22 @@ class _RegisterPageState extends State<RegisterPage> {
           });
 
       if (querySnapshot.docs.isNotEmpty) {
-        print('⚠️ Email found in Firestore but not in Auth (orphaned): $email');
+        print(' Email found in Firestore but not in Auth (orphaned): $email');
         try {
           final docId = querySnapshot.docs.first.id;
           await _firestore.collection('users').doc(docId).delete();
-          print('🗑️ Cleaned up orphaned Firestore document for: $email');
+          print(' Cleaned up orphaned Firestore document for: $email');
           return false;
         } catch (e) {
-          print('❌ Failed to cleanup orphaned doc: $e');
+          print(' Failed to cleanup orphaned doc: $e');
           return true;
         }
       }
 
-      print('✅ Email is available: $email');
+      print(' Email is available: $email');
       return false;
     } catch (e) {
-      print('❌ Error checking email: $e');
+      print(' Error checking email: $e');
       return false;
     }
   }
@@ -258,15 +258,15 @@ class _RegisterPageState extends State<RegisterPage> {
     );
 
     if (!isEmailValid || !isPasswordValid || !isConfirmPasswordValid) {
-      print('🔴 Validation failed');
+      print(' Validation failed');
       return;
     }
 
     setState(() => _isLoading = true);
-    print('⏳ Loading state enabled');
+    print(' Loading state enabled');
 
     try {
-      print('👤 Creating user account...');
+      print(' Creating user account...');
 
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
@@ -278,7 +278,7 @@ class _RegisterPageState extends State<RegisterPage> {
       final user = userCredential.user;
       if (user == null) throw Exception("User creation failed");
 
-      print('✅ User created: ${user.uid}');
+      print(' User created: ${user.uid}');
 
       final name = emailController.text.split('@').first;
 
@@ -300,7 +300,7 @@ class _RegisterPageState extends State<RegisterPage> {
         'lastMessageResetDate': FieldValue.serverTimestamp(),
       };
 
-      print('🚀 Running parallel operations...');
+      print(' Running parallel operations...');
 
       await Future.wait([
         _firestore
@@ -316,17 +316,17 @@ class _RegisterPageState extends State<RegisterPage> {
             .timeout(
               const Duration(seconds: 6),
               onTimeout: () {
-                print('⚠️ Email timeout (continuing)');
+                print(' Email timeout (continuing)');
                 return;
               },
             )
             .catchError((e) {
-              print('⚠️ Email error (continuing): $e');
+              print(' Email error (continuing): $e');
               return;
             }),
       ], eagerError: false);
 
-      print('✅ Parallel operations completed');
+      print(' Parallel operations completed');
 
       _firestore
           .collection('logs')
@@ -336,7 +336,7 @@ class _RegisterPageState extends State<RegisterPage> {
             'time': Timestamp.now(),
             'userId': user.uid,
           })
-          .catchError((e) => print('⚠️ Log error: $e'));
+          .catchError((e) => print(' Log error: $e'));
 
       if (mounted) {
         setState(() => _isLoading = false);
@@ -344,7 +344,7 @@ class _RegisterPageState extends State<RegisterPage> {
         _showVerificationDialog(user);
       }
     } on FirebaseAuthException catch (e) {
-      print('❌ Auth Error: ${e.code}');
+      print(' Auth Error: ${e.code}');
 
       if (mounted) setState(() => _isLoading = false);
 
@@ -372,13 +372,13 @@ class _RegisterPageState extends State<RegisterPage> {
           );
       }
     } on TimeoutException catch (e) {
-      print('❌ Timeout: $e');
+      print(' Timeout: $e');
 
       if (mounted) setState(() => _isLoading = false);
 
       _setGeneralError('Connection timeout. Check your internet and retry');
     } catch (e) {
-      print('❌ Error: $e');
+      print(' Error: $e');
 
       if (mounted) setState(() => _isLoading = false);
 
@@ -511,7 +511,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                           try {
                             await FirebaseAuth.instance.signOut();
-                            print('✅ User signed out');
+                            print(' User signed out');
 
                             emailController.clear();
                             passwordController.clear();
@@ -557,7 +557,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               ),
                             );
                           } catch (e) {
-                            print('❌ Navigation error: $e');
+                            print(' Navigation error: $e');
                             if (mounted) {
                               try {
                                 Navigator.of(context).pop();

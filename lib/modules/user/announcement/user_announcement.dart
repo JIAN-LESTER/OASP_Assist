@@ -1,4 +1,3 @@
-
 import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/modules/admin/announcement/announcement_card.dart';
 import 'package:capstone_project/widgets/category_dropdown_button.dart';
@@ -275,7 +274,7 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
 
   Widget _buildMainContent({required bool isDesktop}) {
     if (isLoading) {
-      // ✅ Show beautiful loading state
+      //  Show beautiful loading state
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

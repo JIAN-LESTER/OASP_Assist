@@ -142,7 +142,7 @@ class FirebaseService {
             : 'inquiry_$timeFrame';
 
     if (_inquiryCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
-      print('✅ Using cached data for $cacheKey');
+      print(' Using cached data for $cacheKey');
       return _inquiryCache[cacheKey]!;
     }
 
@@ -150,8 +150,8 @@ class FirebaseService {
       final startDate = _getStartDate(timeFrame, customRange);
       final endDate = _getEndDate(timeFrame, customRange);
 
-      print('🔥 Fetching inquiry data: timeFrame=$timeFrame');
-      print('🔥 Date range: $startDate to $endDate');
+      print(' Fetching inquiry data: timeFrame=$timeFrame');
+      print(' Date range: $startDate to $endDate');
 
       final results = await Future.wait([
         _getTotalMessages(startDate, endDate),
@@ -170,13 +170,13 @@ class FirebaseService {
       List<QueryDocumentSnapshot> faqs = results[5];
       if (faqs.isEmpty) {
         print(
-          '⚠️ No FAQs found in selected timeframe, fetching top FAQs from all time',
+          ' No FAQs found in selected timeframe, fetching top FAQs from all time',
         );
         faqs = await _getTopFAQsAllTime();
       }
 
-      print('🔥 Fetched ${results[1].length} user messages');
-      print('🔥 Fetched ${faqs.length} FAQs');
+      print(' Fetched ${results[1].length} user messages');
+      print(' Fetched ${faqs.length} FAQs');
 
       final data = _processInquiryReportsData(
         totalMessages: results[0],
@@ -199,7 +199,7 @@ class FirebaseService {
 
       return data;
     } catch (e) {
-      print('❌ Error fetching inquiry data: $e');
+      print(' Error fetching inquiry data: $e');
       return getEmptyInquiryReportsData();
     }
   }
@@ -788,35 +788,34 @@ class FirebaseService {
     return snapshot.docs;
   }
 
-Map<int, int> _generatePeakUsageByHour(
-  List<QueryDocumentSnapshot> conversations,
-  DateTime startDate,
-  DateTime endDate,
-) {
-  final hourCounts = <int, int>{};
+  Map<int, int> _generatePeakUsageByHour(
+    List<QueryDocumentSnapshot> conversations,
+    DateTime startDate,
+    DateTime endDate,
+  ) {
+    final hourCounts = <int, int>{};
 
-  // Initialize all 24 hours with 0
-  for (int hour = 0; hour < 24; hour++) {
-    hourCounts[hour] = 0;
-  }
-
-  for (final doc in conversations) {
-    final data = doc.data() as Map<String, dynamic>;
-    final timestamp = data['createdAt'] as Timestamp?;
-    if (timestamp != null) {
-      final date = timestamp.toDate();
-
-      // Filter by date range
-      if (date.isBefore(startDate) || date.isAfter(endDate)) continue;
-
-      final hour = date.hour;
-      hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
+    // Initialize all 24 hours with 0
+    for (int hour = 0; hour < 24; hour++) {
+      hourCounts[hour] = 0;
     }
+
+    for (final doc in conversations) {
+      final data = doc.data() as Map<String, dynamic>;
+      final timestamp = data['createdAt'] as Timestamp?;
+      if (timestamp != null) {
+        final date = timestamp.toDate();
+
+        // Filter by date range
+        if (date.isBefore(startDate) || date.isAfter(endDate)) continue;
+
+        final hour = date.hour;
+        hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
+      }
+    }
+
+    return hourCounts;
   }
-
-  return hourCounts;
-}
-
 
   DateTime _getStartDate(String timeFrame, [DateTimeRange? customRange]) {
     if (timeFrame == 'Custom' && customRange != null) {
@@ -863,36 +862,39 @@ Map<int, int> _generatePeakUsageByHour(
     return DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
   }
 
- InquiryReportsData _processInquiryReportsData({
-  required List<QueryDocumentSnapshot> totalMessages,
-  required List<QueryDocumentSnapshot> userMessages,
-  required List<QueryDocumentSnapshot> botMessages,
-  required List<QueryDocumentSnapshot> escalations,
-  required List<QueryDocumentSnapshot> resolvedEscalations,
-  required List<QueryDocumentSnapshot> faqs,
-  required List<QueryDocumentSnapshot> logs,
-  required List<QueryDocumentSnapshot> msgLogs,
-  required List<QueryDocumentSnapshot> allEscalations,
-  required List<QueryDocumentSnapshot> staffResolutions,
-  required DateTime startDate,
-  DateTime? endDate,
-  required String timeFrame,
-}) {
-  // Calculate stat cards
-  final totalMessageCount = totalMessages.length;
-  final userMessageCount = userMessages.length;
-  final botMessageCount = botMessages.length;
-  final escalatedCount = escalations.length;  // PENDING escalations
-  final resolvedCount = resolvedEscalations.length;  // RESOLVED escalations
-  final totalEscalations = allEscalations.length;  // ✅ TOTAL escalations (pending + resolved)
+  InquiryReportsData _processInquiryReportsData({
+    required List<QueryDocumentSnapshot> totalMessages,
+    required List<QueryDocumentSnapshot> userMessages,
+    required List<QueryDocumentSnapshot> botMessages,
+    required List<QueryDocumentSnapshot> escalations,
+    required List<QueryDocumentSnapshot> resolvedEscalations,
+    required List<QueryDocumentSnapshot> faqs,
+    required List<QueryDocumentSnapshot> logs,
+    required List<QueryDocumentSnapshot> msgLogs,
+    required List<QueryDocumentSnapshot> allEscalations,
+    required List<QueryDocumentSnapshot> staffResolutions,
+    required DateTime startDate,
+    DateTime? endDate,
+    required String timeFrame,
+  }) {
+    // Calculate stat cards
+    final totalMessageCount = totalMessages.length;
+    final userMessageCount = userMessages.length;
+    final botMessageCount = botMessages.length;
+    final escalatedCount = escalations.length; // PENDING escalations
+    final resolvedCount = resolvedEscalations.length; // RESOLVED escalations
+    final totalEscalations =
+        allEscalations.length; //  TOTAL escalations (pending + resolved)
 
-  // ✅ FIX: Calculate rates based on correct denominators
-  final escalationRate =
-      userMessageCount > 0 ? (totalEscalations / userMessageCount) * 100 : 0.0;
-  
-  // ✅ FIX: Resolution rate = resolved / total escalations (not pending)
-  final resolutionRate =
-      totalEscalations > 0 ? (resolvedCount / totalEscalations) * 100 : 0.0;
+    //  FIX: Calculate rates based on correct denominators
+    final escalationRate =
+        userMessageCount > 0
+            ? (totalEscalations / userMessageCount) * 100
+            : 0.0;
+
+    //  FIX: Resolution rate = resolved / total escalations (not pending)
+    final resolutionRate =
+        totalEscalations > 0 ? (resolvedCount / totalEscalations) * 100 : 0.0;
 
     // Category distribution
     final categoryDistribution = <String, int>{};
@@ -921,7 +923,7 @@ Map<int, int> _generatePeakUsageByHour(
 
     final finalTopQuestions = Map<String, int>.fromEntries(sortedTopQuestions);
 
-    print('📊 Top Questions: ${finalTopQuestions.length} questions');
+    print(' Top Questions: ${finalTopQuestions.length} questions');
 
     // Inquiry trend
     final inquiryTrend = _generateInquiryTrend(
@@ -985,20 +987,20 @@ Map<int, int> _generatePeakUsageByHour(
   }
 
   // FIXED: Now uses cached userLookup instead of QuerySnapshot
-ChatbotUsageReportsData _processChatbotUsageReportsData({
-  required List<QueryDocumentSnapshot> conversations,
-  required List<QueryDocumentSnapshot> messages,
-  required List<QueryDocumentSnapshot> unansweredMessages,
-  required List<QueryDocumentSnapshot> users,
-  required DateTime startDate,
-  DateTime? endDate,
-  required String timeFrame,
-}) {
-  final actualEndDate = endDate ?? DateTime.now();
-  final interval =
-      timeFrame == 'Custom'
-          ? _getDataGroupingInterval(startDate, actualEndDate)
-          : timeFrame;
+  ChatbotUsageReportsData _processChatbotUsageReportsData({
+    required List<QueryDocumentSnapshot> conversations,
+    required List<QueryDocumentSnapshot> messages,
+    required List<QueryDocumentSnapshot> unansweredMessages,
+    required List<QueryDocumentSnapshot> users,
+    required DateTime startDate,
+    DateTime? endDate,
+    required String timeFrame,
+  }) {
+    final actualEndDate = endDate ?? DateTime.now();
+    final interval =
+        timeFrame == 'Custom'
+            ? _getDataGroupingInterval(startDate, actualEndDate)
+            : timeFrame;
 
     // Calculate average response time
     double totalResponseTime = 0;
@@ -1090,30 +1092,34 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
     );
 
     // Peak usage - dynamically filtered by date range
-     final peakUsageByHour = _generatePeakUsageByHour(conversations, startDate, actualEndDate);
-  final peakUsageByDay = _generatePeakUsageByDay(
-    conversations,
-    startDate,
-    actualEndDate,
-  );
-  final peakUsageByMonth = _generatePeakUsageByMonth(
-    conversations,
-    startDate,
-    actualEndDate,
-    timeFrame
-  );
-  
-  // NEW: Add year and all-time peak usage
-  final peakUsageByYear = _generatePeakUsageByYear(
-    conversations,
-    startDate,
-    actualEndDate,
-  );
-  final peakUsageByAllYears = _generatePeakUsageByAllYears(
-    conversations,
-    startDate,
-    actualEndDate,
-  );
+    final peakUsageByHour = _generatePeakUsageByHour(
+      conversations,
+      startDate,
+      actualEndDate,
+    );
+    final peakUsageByDay = _generatePeakUsageByDay(
+      conversations,
+      startDate,
+      actualEndDate,
+    );
+    final peakUsageByMonth = _generatePeakUsageByMonth(
+      conversations,
+      startDate,
+      actualEndDate,
+      timeFrame,
+    );
+
+    // NEW: Add year and all-time peak usage
+    final peakUsageByYear = _generatePeakUsageByYear(
+      conversations,
+      startDate,
+      actualEndDate,
+    );
+    final peakUsageByAllYears = _generatePeakUsageByAllYears(
+      conversations,
+      startDate,
+      actualEndDate,
+    );
 
     // Response time trend
     final responseTimeTrend = _buildResponseTimeTrend(
@@ -1127,24 +1133,24 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
     final unansweredReasons = _processUnansweredReasons(unansweredMessages);
 
     return ChatbotUsageReportsData(
-    averageResponseTime: averageResponseTime,
-    totalConversations: conversations.length,
-    averageMessagesPerUser: averageMessagesPerUser,
-    averageConversationTime: averageConversationTime,
-    chatLimitReachRate: limitData['chatLimitReachRate']!,
-    escalationLimitReachRate: limitData['escalationLimitReachRate']!,
-    conversationsOverTime: conversationsOverTime,
-    peakUsageByHour: peakUsageByHour,
-    peakUsageByDay: peakUsageByDay,
-    peakUsageByMonth: peakUsageByMonth,
-    peakUsageByYear: peakUsageByYear, // NEW
-    peakUsageByAllYears: peakUsageByAllYears, // NEW
-    responseTimeTrend: responseTimeTrend,
-    unansweredReasonsDistribution: unansweredReasons,
-    chatLimitReachTrend: limitData['chatLimitReachTrend']!,
-    escalationLimitReachTrend: limitData['escalationLimitReachTrend']!,
-  );
-}
+      averageResponseTime: averageResponseTime,
+      totalConversations: conversations.length,
+      averageMessagesPerUser: averageMessagesPerUser,
+      averageConversationTime: averageConversationTime,
+      chatLimitReachRate: limitData['chatLimitReachRate']!,
+      escalationLimitReachRate: limitData['escalationLimitReachRate']!,
+      conversationsOverTime: conversationsOverTime,
+      peakUsageByHour: peakUsageByHour,
+      peakUsageByDay: peakUsageByDay,
+      peakUsageByMonth: peakUsageByMonth,
+      peakUsageByYear: peakUsageByYear, // NEW
+      peakUsageByAllYears: peakUsageByAllYears, // NEW
+      responseTimeTrend: responseTimeTrend,
+      unansweredReasonsDistribution: unansweredReasons,
+      chatLimitReachTrend: limitData['chatLimitReachTrend']!,
+      escalationLimitReachTrend: limitData['escalationLimitReachTrend']!,
+    );
+  }
 
   UserDemographicsReportsData _processUserDemographicsReportsData({
     required List<QueryDocumentSnapshot> users,
@@ -1335,11 +1341,11 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
     //     }).toList();
     final topEscalations =
         pendingEscalations.take(5).map((doc) {
-          print('📝 Mapping escalation: ${doc.id}'); // DEBUG
+          print('Mapping escalation: ${doc.id}'); // DEBUG
           return EscalatedMessage.fromMap(doc.data() as Map<String, dynamic>);
         }).toList();
 
-    print('✅ Total top escalations: ${topEscalations.length}'); // DEBUG
+    print(' Total top escalations: ${topEscalations.length}'); // DEBUG
 
     // Escalations over time
     final escalationsOverTime = _generateEscalationsTrend(
@@ -1653,7 +1659,7 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
       'escalationLimitReachTrend': escalationLimitReachTrend,
     };
   }
-  // ✅ NEW METHOD: Build response time trend
+  //  NEW METHOD: Build response time trend
   // List<ChartData> _buildResponseTimeTrend(
   //   Map<String, List<double>> responseTimeByDate,
   //   String timeFrame,
@@ -1836,7 +1842,7 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
     try {
       final now = DateTime.now();
 
-      // ✅ CUSTOM DATE RANGE HANDLING
+      //  CUSTOM DATE RANGE HANDLING
       if (timeFrame == 'Custom' && startDate != null && endDate != null) {
         final interval = _getDataGroupingInterval(startDate, endDate);
         final sessionCounts = <String, int>{};
@@ -1871,7 +1877,7 @@ ChatbotUsageReportsData _processChatbotUsageReportsData({
         );
       }
 
-      // ✅ EXISTING PRESET TIMEFRAME LOGIC
+      //  EXISTING PRESET TIMEFRAME LOGIC
       switch (timeFrame) {
         case 'Today':
           final hourlyCounts = <int, int>{};
@@ -2262,9 +2268,9 @@ List<ChartData> _generateInquiryTrend(
           ? _getDataGroupingInterval(startDate, actualEndDate)
           : timeFrame;
 
-  print('📊 _generateInquiryTrend: timeFrame=$timeFrame, interval=$interval');
-  print('📊 Date range: $startDate to $actualEndDate');
-  print('📊 Total messages to process: ${messages.length}');
+  print(' _generateInquiryTrend: timeFrame=$timeFrame, interval=$interval');
+  print(' Date range: $startDate to $actualEndDate');
+  print(' Total messages to process: ${messages.length}');
 
   int processedCount = 0;
   int filteredCount = 0;
@@ -2297,8 +2303,8 @@ List<ChartData> _generateInquiryTrend(
         (timeCategoryCounts[timeKey]![category] ?? 0) + 1;
   }
 
-  print('📊 Processed: $processedCount, Filtered out: $filteredCount');
-  print('📊 Time keys with data: ${timeCategoryCounts.keys.toList()}');
+  print(' Processed: $processedCount, Filtered out: $filteredCount');
+  print(' Time keys with data: ${timeCategoryCounts.keys.toList()}');
 
   return _generateTrendData(
     startDate,
@@ -2354,7 +2360,7 @@ List<ChartData> _generateConversationsTrend(
 
     final date = timestamp.toDate();
 
-    // ✅ Already has filtering - good!
+    //  Already has filtering - good!
     if (date.isBefore(startDate) || date.isAfter(endDate)) continue;
 
     final timeKey = _getTimeKeyForInterval(date, interval, startDate, endDate);
@@ -2535,7 +2541,7 @@ List<ChartData> _generateUserGrowthTrend(
 
     final date = timestamp.toDate();
 
-    // ✅ FIX: Only count users within the date range
+    //  FIX: Only count users within the date range
     if (date.isBefore(startDate) || date.isAfter(actualEndDate)) continue;
 
     cumulativeCount++;
@@ -2732,7 +2738,6 @@ Map<String, int> _generatePeakUsageByDay(
   return dayCounts;
 }
 
-
 Map<String, int> _generatePeakUsageByYear(
   List<QueryDocumentSnapshot> conversations,
   DateTime startDate,
@@ -2740,8 +2745,18 @@ Map<String, int> _generatePeakUsageByYear(
 ) {
   final monthCounts = <String, int>{};
   final monthNames = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   // Initialize all months with 0
@@ -2758,7 +2773,7 @@ Map<String, int> _generatePeakUsageByYear(
 
       // Filter by date range AND ensure it's within the start year
       if (date.isBefore(startDate) || date.isAfter(endDate)) continue;
-      
+
       // Only count if within the same year as startDate
       if (date.year == startDate.year) {
         final monthName = monthNames[date.month - 1];
@@ -2767,10 +2782,9 @@ Map<String, int> _generatePeakUsageByYear(
     }
   }
 
-  print('📊 Peak Usage by Year (${startDate.year}): $monthCounts');
+  print(' Peak Usage by Year (${startDate.year}): $monthCounts');
   return monthCounts;
 }
-
 
 // Generate peak usage by all years
 Map<String, int> _generatePeakUsageByAllYears(
@@ -2783,7 +2797,7 @@ Map<String, int> _generatePeakUsageByAllYears(
   // Ensure all years in range are present (even with 0 count)
   final startYear = startDate.year;
   final endYear = endDate.year;
-  
+
   for (int year = startYear; year <= endYear; year++) {
     yearCounts[year.toString()] = 0;
   }
@@ -2810,7 +2824,7 @@ Map<String, int> _generatePeakUsageByAllYears(
     sortedCounts[year] = yearCounts[year]!;
   }
 
-  print('📊 Peak Usage by All Years: $sortedCounts');
+  print(' Peak Usage by All Years: $sortedCounts');
   return sortedCounts;
 }
 
@@ -2822,7 +2836,7 @@ Map<String, int> _generatePeakUsageByMonth(
   String timeFrame,
 ) {
   final monthCounts = <String, int>{};
-  
+
   // Determine if we should show weeks or months
   final daysDiff = endDate.difference(startDate).inDays;
   final showWeeks = timeFrame == 'This Month' || daysDiff <= 31;
@@ -2851,8 +2865,18 @@ Map<String, int> _generatePeakUsageByMonth(
   } else {
     // Initialize all 12 months
     final monthNames = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     for (final monthName in monthNames) {
       monthCounts[monthName] = 0;
@@ -2901,9 +2925,9 @@ List<ChartData> _generateTrendData(
   final trendData = <ChartData>[];
 
   print(
-    '🔍 _generateTrendData: interval=$interval, startDate=$startDate, endDate=$actualEndDate',
+    ' _generateTrendData: interval=$interval, startDate=$startDate, endDate=$actualEndDate',
   );
-  print('🔍 Data keys: ${timeCategoryCounts.keys.toList()}');
+  print(' Data keys: ${timeCategoryCounts.keys.toList()}');
 
   switch (interval) {
     case 'hourly':
@@ -2930,13 +2954,13 @@ List<ChartData> _generateTrendData(
 
     case 'daily':
     case 'This Week':
-      // ✅ CRITICAL FIX: Properly map dates to day names
+      //  CRITICAL FIX: Properly map dates to day names
       final startOfWeek = _getStartOfWeek(
         actualEndDate,
       ); // Use current date's week
       final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-      print('🔍 Week start: $startOfWeek');
+      print(' Week start: $startOfWeek');
 
       for (int i = 0; i < 7; i++) {
         final date = startOfWeek.add(Duration(days: i));
@@ -2951,7 +2975,7 @@ List<ChartData> _generateTrendData(
           (sum, count) => sum + count,
         );
 
-        print('🔍 Day $dayName ($dateKey): count=$totalCount');
+        print(' Day $dayName ($dateKey): count=$totalCount');
 
         trendData.add(
           ChartData(
@@ -2964,30 +2988,30 @@ List<ChartData> _generateTrendData(
       break;
 
     case 'weekly':
-case 'This Month':
-  // Generate 5 weeks
-  for (int week = 1; week <= 5; week++) {
-    final weekKey = "Week $week";  // ✅ Correct format
-    final categoryBreakdown =
-        timeCategoryCounts[weekKey] ?? <String, int>{};
-    final totalCount = categoryBreakdown.values.fold(
-      0,
-      (sum, count) => sum + count,
-    );
+    case 'This Month':
+      // Generate 5 weeks
+      for (int week = 1; week <= 5; week++) {
+        final weekKey = "Week $week"; //  Correct format
+        final categoryBreakdown =
+            timeCategoryCounts[weekKey] ?? <String, int>{};
+        final totalCount = categoryBreakdown.values.fold(
+          0,
+          (sum, count) => sum + count,
+        );
 
-    trendData.add(
-      ChartData(
-        date: weekKey,  // ✅ Use the full "Week 1" format
-        count: totalCount,
-        categoryBreakdown: categoryBreakdown,
-      ),
-    );
-  }
-  break;
+        trendData.add(
+          ChartData(
+            date: weekKey, //  Use the full "Week 1" format
+            count: totalCount,
+            categoryBreakdown: categoryBreakdown,
+          ),
+        );
+      }
+      break;
 
     case 'monthly':
     case 'This Year':
-      // ✅ CRITICAL FIX: Generate all 12 months and map data correctly
+      //  CRITICAL FIX: Generate all 12 months and map data correctly
       final monthNames = [
         'Jan',
         'Feb',
@@ -3004,7 +3028,7 @@ case 'This Month':
       ];
       final currentYear = actualEndDate.year;
 
-      print('🔍 Generating months for year: $currentYear');
+      print(' Generating months for year: $currentYear');
 
       for (int month = 1; month <= 12; month++) {
         final monthKey = "$currentYear-${month.toString().padLeft(2, '0')}";
@@ -3018,7 +3042,7 @@ case 'This Month':
         );
 
         print(
-          '🔍 Month $monthName ($monthKey): count=$totalCount, data=${categoryBreakdown}',
+          ' Month $monthName ($monthKey): count=$totalCount, data=${categoryBreakdown}',
         );
 
         trendData.add(
@@ -3056,7 +3080,7 @@ case 'This Month':
       break;
   }
 
-  print('🔍 Generated ${trendData.length} data points');
+  print(' Generated ${trendData.length} data points');
   return trendData;
 }
 
@@ -3219,7 +3243,7 @@ String _getTimeKeyForInterval(
     case 'weekly':
     case 'This Month':
       final weekOfMonth = ((dateTime.day - 1) ~/ 7) + 1;
-      return "Week $weekOfMonth";  // ✅ This is correct
+      return "Week $weekOfMonth"; //  This is correct
 
     case 'monthly':
     case 'This Year':
@@ -3232,7 +3256,6 @@ String _getTimeKeyForInterval(
       return "${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}";
   }
 }
-
 
 List<String> _generateAllTimeKeys(
   DateTime startDate,
@@ -3281,7 +3304,7 @@ List<String> _generateAllTimeKeys(
         'Nov',
         'Dec',
       ];
-      // ✅ FIX: Always generate all 12 months for "This Year"
+      //  FIX: Always generate all 12 months for "This Year"
       for (int month = 1; month <= 12; month++) {
         keys.add(monthNames[month - 1]);
       }
@@ -3689,7 +3712,6 @@ double getBottomTitleInterval(int dataLength) {
   if (dataLength <= 14) return 2;
   return (dataLength / 6).ceil().toDouble();
 }
-
 
 extension DateTimeExtension on DateTime {
   int get dayOfYear {

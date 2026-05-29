@@ -349,7 +349,7 @@ class _EditUserModalState extends State<EditUserModal> {
 
         // Group masteral programs (no college needed)
         if (category == "Masteral") {
-          // ✅ FIX: Prevent duplicate masteral programs
+          //  FIX: Prevent duplicate masteral programs
           if (!masteralPrograms.contains(programName)) {
             masteralPrograms.add(programName);
           }
@@ -363,7 +363,7 @@ class _EditUserModalState extends State<EditUserModal> {
           if (!programsByCollege.containsKey(key)) {
             programsByCollege[key] = [];
           }
-          // ✅ FIX: Prevent duplicate bachelor programs
+          //  FIX: Prevent duplicate bachelor programs
           if (!programsByCollege[key]!.contains(programName)) {
             programsByCollege[key]!.add(programName);
           }
@@ -392,7 +392,7 @@ class _EditUserModalState extends State<EditUserModal> {
               .orderBy('name')
               .get();
 
-      // ✅ FIX: Remove duplicates from scholarships
+      //  FIX: Remove duplicates from scholarships
       final scholarshipNames =
           snapshot.docs
               .map((doc) => doc['name'] as String)
@@ -1673,10 +1673,10 @@ class _EditUserModalState extends State<EditUserModal> {
     bool showError = false,
     String? errorText,
   }) {
-    // ✅ FIX: Remove duplicates and ensure unique items
+    //  FIX: Remove duplicates and ensure unique items
     final uniqueItems = items.toSet().toList();
 
-    // ✅ FIX: Ensure value exists in items, otherwise set to null
+    //  FIX: Ensure value exists in items, otherwise set to null
     final safeValue = uniqueItems.contains(value) ? value : null;
 
     return Column(
@@ -1715,14 +1715,14 @@ class _EditUserModalState extends State<EditUserModal> {
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButtonFormField<String>(
-              value: safeValue, // ✅ CHANGED: Use safeValue instead of value
+              value: safeValue, //  CHANGED: Use safeValue instead of value
               onChanged: isEnabled ? onChanged : null,
               isExpanded: true,
               alignment: Alignment.centerLeft,
               menuMaxHeight: 250,
               items:
                   uniqueItems.map((String item) {
-                    // ✅ CHANGED: Use uniqueItems instead of items
+                    //  CHANGED: Use uniqueItems instead of items
                     return DropdownMenuItem<String>(
                       value: item,
                       child: Text(

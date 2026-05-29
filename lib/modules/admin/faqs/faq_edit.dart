@@ -158,7 +158,7 @@ void showEditFAQModal(
                             buildSectionHeader('Question', Icons.help_outline),
                             const SizedBox(height: 12),
 
-                            // ✅ REPLACE WITH ERROR HANDLING
+                            //  REPLACE WITH ERROR HANDLING
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -246,7 +246,7 @@ void showEditFAQModal(
                             ),
                             const SizedBox(height: 12),
 
-                            // ✅ REPLACE WITH ERROR HANDLING
+                            //  REPLACE WITH ERROR HANDLING
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -410,11 +410,11 @@ void showEditFAQModal(
                               selectedCategory,
                               previousModal,
                               isMobile,
-                              setState, // ✅ PASS setState
-                              () => questionError, // ✅ PASS error getters
+                              setState, //  PASS setState
+                              () => questionError, //  PASS error getters
                               () => answerError,
                               (error) =>
-                                  questionError = error, // ✅ PASS error setters
+                                  questionError = error, //  PASS error setters
                               (error) => answerError = error,
                             ),
                           ],
@@ -454,10 +454,10 @@ Widget _buildActionButtons(
   String selectedCategory,
   String? previousModal,
   bool isMobile,
-  StateSetter setState, // ✅ ADD setState parameter
-  String? Function() getQuestionError, // ✅ ADD error getters
+  StateSetter setState, //  ADD setState parameter
+  String? Function() getQuestionError, //  ADD error getters
   String? Function() getAnswerError,
-  Function(String?) setQuestionError, // ✅ ADD error setters
+  Function(String?) setQuestionError, //  ADD error setters
   Function(String?) setAnswerError,
 ) {
   final screenWidth = MediaQuery.of(context).size.width;
@@ -495,7 +495,7 @@ Widget _buildActionButtons(
           height: buttonHeight,
           child: ElevatedButton(
             onPressed: () {
-              // ✅ ADD VALIDATION
+              //  ADD VALIDATION
               setState(() {
                 setQuestionError(null);
                 setAnswerError(null);

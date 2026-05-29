@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:capstone_project/modules/admin/user_management/edit_user_modal.dart';
 
-
 void showUserInfoModal(
   BuildContext context,
   DocumentSnapshot doc, {
@@ -37,7 +36,7 @@ void showUserInfoModal(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
         child: Container(
-          // ✅ UPDATED WIDTH FROM 560 TO 600 TO MATCH EDIT MODAL
+          //  UPDATED WIDTH FROM 560 TO 600 TO MATCH EDIT MODAL
           constraints: const BoxConstraints(maxWidth: 600, maxHeight: 750),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -447,7 +446,7 @@ Widget _buildActionButtons(
           height: buttonHeight,
           child: OutlinedButton.icon(
             onPressed: () {
-              // ✅ Show delete confirmation (removed async/await)
+              //  Show delete confirmation (removed async/await)
               showDeleteConfirmation(
                 context,
                 doc,

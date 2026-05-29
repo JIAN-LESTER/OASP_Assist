@@ -10,14 +10,15 @@ class FacebookTokenExpirationBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    
+
     if (user == null) return const SizedBox.shrink();
 
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('fb_tokens')
-          .doc('facebook_admin')
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('fb_tokens')
+              .doc('facebook_admin')
+              .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return const SizedBox.shrink();
@@ -34,8 +35,8 @@ class FacebookTokenExpirationBanner extends StatelessWidget {
         final msUntilExpiry = expiresAt - now;
         final daysUntilExpiry = (msUntilExpiry / (1000 * 60 * 60 * 24)).ceil();
 
-        // ✅ TESTING: Show for 60 days
-        // 🚀 PRODUCTION: Change to 14 days
+        //  TESTING: Show for 60 days
+        //  PRODUCTION: Change to 14 days
         const NOTIFICATION_THRESHOLD = 60; // Change to 14 for production
 
         if (daysUntilExpiry <= 0) {
@@ -104,10 +105,7 @@ class FacebookTokenExpirationBanner extends StatelessWidget {
                     SizedBox(height: 4),
                     Text(
                       'Action required immediately',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                   ],
                 ),
@@ -117,11 +115,7 @@ class FacebookTokenExpirationBanner extends StatelessWidget {
           const SizedBox(height: 16),
           const Text(
             'Your Facebook API token has expired. You cannot sync new posts until you renew the token.',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              height: 1.5,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -133,10 +127,7 @@ class FacebookTokenExpirationBanner extends StatelessWidget {
               icon: const Icon(Icons.key, size: 18),
               label: const Text(
                 'Renew Token Now',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
@@ -156,7 +147,10 @@ class FacebookTokenExpirationBanner extends StatelessWidget {
 
   Widget _buildExpiringSoonBanner(BuildContext context, int daysLeft) {
     final isUrgent = daysLeft <= 7;
-    final color = isUrgent ? const Color(0xFFF59E0B) : const Color(0xFF3B82F6); // Orange or Blue
+    final color =
+        isUrgent
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFF3B82F6); // Orange or Blue
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -165,10 +159,7 @@ class FacebookTokenExpirationBanner extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            color,
-            color.withOpacity(0.8),
-          ],
+          colors: [color, color.withOpacity(0.8)],
         ),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
@@ -243,11 +234,7 @@ class FacebookTokenExpirationBanner extends StatelessWidget {
           const SizedBox(height: 16),
           const Text(
             'Your Facebook API token will expire soon. Please renew it to continue syncing posts without interruption.',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              height: 1.5,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -259,10 +246,7 @@ class FacebookTokenExpirationBanner extends StatelessWidget {
               icon: const Icon(Icons.key, size: 18),
               label: const Text(
                 'Renew Token',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
@@ -284,163 +268,168 @@ class FacebookTokenExpirationBanner extends StatelessWidget {
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.5),
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 500),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
+      builder:
+          (context) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 500),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2E7D32).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.key_rounded,
-                      color: Color(0xFF2E7D32),
-                      size: 28,
-                    ),
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2E7D32).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.key_rounded,
+                          color: Color(0xFF2E7D32),
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Renew Facebook Token',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Follow these steps',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  const Expanded(
+                  const SizedBox(height: 24),
+
+                  // Instructions
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Renew Facebook Token',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
+                        _buildInstructionStep(
+                          number: '1',
+                          title: 'Go to Announcements page',
+                          description:
+                              'Navigate to the Announcements section in the admin panel',
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Follow these steps',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.black54,
-                          ),
+                        const SizedBox(height: 16),
+                        _buildInstructionStep(
+                          number: '2',
+                          title: 'Click the key () button',
+                          description:
+                              'Find and click the Facebook configuration button',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInstructionStep(
+                          number: '3',
+                          title: 'Get new token from Facebook',
+                          description:
+                              'Follow the Facebook Graph API Explorer instructions',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInstructionStep(
+                          number: '4',
+                          title: 'Enter and save the new token',
+                          description:
+                              'Paste the new token and click "Save & Exchange Token"',
                         ),
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                  const SizedBox(height: 24),
+
+                  // Action buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.grey[700],
+                            side: BorderSide(color: Colors.grey[300]!),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            'Close',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            // Navigate to announcements page
+                            Navigator.of(context).pushReplacementNamed(
+                              '/admin/home',
+                              arguments: {'initialTab': 4}, // Announcements tab
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E7D32),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Go to Announcements',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-
-              // Instructions
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[200]!),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInstructionStep(
-                      number: '1',
-                      title: 'Go to Announcements page',
-                      description: 'Navigate to the Announcements section in the admin panel',
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInstructionStep(
-                      number: '2',
-                      title: 'Click the key (🔑) button',
-                      description: 'Find and click the Facebook configuration button',
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInstructionStep(
-                      number: '3',
-                      title: 'Get new token from Facebook',
-                      description: 'Follow the Facebook Graph API Explorer instructions',
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInstructionStep(
-                      number: '4',
-                      title: 'Enter and save the new token',
-                      description: 'Paste the new token and click "Save & Exchange Token"',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Action buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.grey[700],
-                        side: BorderSide(color: Colors.grey[300]!),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'Close',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        // Navigate to announcements page
-                        Navigator.of(context).pushReplacementNamed(
-                          '/admin/home',
-                          arguments: {'initialTab': 4}, // Announcements tab
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Go to Announcements',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -507,10 +496,11 @@ class FacebookTokenExpirationIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('fb_tokens')
-          .doc('facebook_admin')
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('fb_tokens')
+              .doc('facebook_admin')
+              .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return const SizedBox.shrink();
@@ -527,8 +517,8 @@ class FacebookTokenExpirationIndicator extends StatelessWidget {
         final msUntilExpiry = expiresAt - now;
         final daysUntilExpiry = (msUntilExpiry / (1000 * 60 * 60 * 24)).ceil();
 
-        // ✅ TESTING: Show for 60 days
-        // 🚀 PRODUCTION: Change to 14 days
+        //  TESTING: Show for 60 days
+        //  PRODUCTION: Change to 14 days
         const NOTIFICATION_THRESHOLD = 60;
 
         if (daysUntilExpiry > NOTIFICATION_THRESHOLD) {
@@ -541,16 +531,18 @@ class FacebookTokenExpirationIndicator extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: isExpired
-                ? const Color(0xFFDC2626).withOpacity(0.1)
-                : isUrgent
+            color:
+                isExpired
+                    ? const Color(0xFFDC2626).withOpacity(0.1)
+                    : isUrgent
                     ? const Color(0xFFF59E0B).withOpacity(0.1)
                     : const Color(0xFF3B82F6).withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isExpired
-                  ? const Color(0xFFDC2626).withOpacity(0.3)
-                  : isUrgent
+              color:
+                  isExpired
+                      ? const Color(0xFFDC2626).withOpacity(0.3)
+                      : isUrgent
                       ? const Color(0xFFF59E0B).withOpacity(0.3)
                       : const Color(0xFF3B82F6).withOpacity(0.3),
             ),
@@ -562,12 +554,13 @@ class FacebookTokenExpirationIndicator extends StatelessWidget {
                 isExpired
                     ? Icons.error_rounded
                     : isUrgent
-                        ? Icons.warning_rounded
-                        : Icons.info_rounded,
+                    ? Icons.warning_rounded
+                    : Icons.info_rounded,
                 size: 16,
-                color: isExpired
-                    ? const Color(0xFFDC2626)
-                    : isUrgent
+                color:
+                    isExpired
+                        ? const Color(0xFFDC2626)
+                        : isUrgent
                         ? const Color(0xFFF59E0B)
                         : const Color(0xFF3B82F6),
               ),
@@ -579,9 +572,10 @@ class FacebookTokenExpirationIndicator extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: isExpired
-                      ? const Color(0xFFDC2626)
-                      : isUrgent
+                  color:
+                      isExpired
+                          ? const Color(0xFFDC2626)
+                          : isUrgent
                           ? const Color(0xFFF59E0B)
                           : const Color(0xFF3B82F6),
                 ),

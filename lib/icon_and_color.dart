@@ -146,7 +146,7 @@ IconData getNotificationIcon(String? type) {
       return Icons.campaign_rounded;
     case 'deadline_reminder':
       return Icons.access_time_rounded;
-    case 'fb_token_expiration': // ✅ NEW
+    case 'fb_token_expiration': //  NEW
       return Icons.key_rounded;
     default:
       return Icons.notifications_rounded;
@@ -163,7 +163,7 @@ Color getNotificationColor(String? type) {
       return const Color(0xFF3B82F6); // Blue
     case 'deadline_reminder':
       return const Color(0xFFF59E0B); // Orange
-    case 'fb_token_expiration': // ✅ NEW
+    case 'fb_token_expiration': //  NEW
       final status = type;
       if (status == 'expired') {
         return const Color(0xFFDC2626); // Dark red
@@ -174,4 +174,3 @@ Color getNotificationColor(String? type) {
       return const Color(0xFF6B7280); // Gray
   }
 }
-

@@ -1,5 +1,3 @@
-
-
 import 'package:capstone_project/modules/admin/announcement/fb_expiry_test.dart';
 import 'package:capstone_project/modules/admin/announcement/fb_sync.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
@@ -24,7 +22,7 @@ class FacebookIntegrationHelper {
       tokenStatus = await FacebookSyncService.getTokenStatus();
       hasCheckedToken = true;
     } catch (e) {
-      print('❌ Error checking token status: $e');
+      print(' Error checking token status: $e');
     }
   }
 
@@ -59,7 +57,7 @@ class FacebookIntegrationHelper {
         configuredApps = [];
       }
     } catch (e) {
-      print('❌ Error loading apps: $e');
+      print(' Error loading apps: $e');
     } finally {
       isLoadingApps = false;
     }
@@ -72,17 +70,17 @@ class FacebookIntegrationHelper {
     }
 
     if (tokenStatus!.expired) {
-      return '⚠️ Token Expired!\nClick to renew now';
+      return ' Token Expired!\nClick to renew now';
     }
 
     final daysLeft = tokenStatus!.daysLeft ?? 0;
 
     if (daysLeft <= 7) {
-      return '🔴 Token expires in $daysLeft days\nRenew urgently!';
+      return ' Token expires in $daysLeft days\nRenew urgently!';
     } else if (daysLeft <= 30) {
       return '🟠 Token expires in $daysLeft days\nConsider renewing soon';
     } else {
-      return '✅ Token active ($daysLeft days left)\nClick to view/renew';
+      return ' Token active ($daysLeft days left)\nClick to view/renew';
     }
   }
 
@@ -838,7 +836,7 @@ Future<void> _handleAddApp(
     onRefreshNeeded();
 
     if (!context.mounted) return;
-    SnackbarUtil.showSuccess(context, '✅ App added successfully!');
+    SnackbarUtil.showSuccess(context, ' App added successfully!');
   } catch (e) {
     if (!context.mounted) return;
     SnackbarUtil.showError(context, 'Error: $e');
@@ -891,7 +889,7 @@ Future<void> _handleDeleteApp(
                   if (!context.mounted) return;
                   SnackbarUtil.showSuccess(
                     context,
-                    '✅ App removed successfully',
+                    ' App removed successfully',
                   );
                 } catch (e) {
                   if (!context.mounted) return;
@@ -929,7 +927,7 @@ Future<void> showTokenInputModal(
     pageIdController.text = helper.tokenStatus!.pageId!;
   }
 
-  // ✅ FIX: Create a ValueNotifier to manage isExchanging state properly
+  //  FIX: Create a ValueNotifier to manage isExchanging state properly
   final ValueNotifier<bool> isExchangingNotifier = ValueNotifier(false);
 
   showDialog(
@@ -1293,13 +1291,13 @@ Future<void> _handleTokenExchange(
     return;
   }
 
-  // ✅ FIX: Update the notifier to trigger UI rebuild
+  //  FIX: Update the notifier to trigger UI rebuild
   isExchangingNotifier.value = true;
 
   try {
-    print('🔄 Exchanging token with Page ID: $pageId');
+    print(' Exchanging token with Page ID: $pageId');
     if (appId.isNotEmpty) {
-      print('📱 Using App ID: $appId');
+      print(' Using App ID: $appId');
     }
 
     final result = await FacebookSyncService.exchangeToken(
@@ -1315,7 +1313,7 @@ Future<void> _handleTokenExchange(
       final daysValid = (expiresIn / 86400).round();
       final appUsed = result['appId'] ?? appId;
 
-      // ✅ Close dialog first
+      //  Close dialog first
       Navigator.pop(context);
 
       String successMessage =
@@ -1326,7 +1324,7 @@ Future<void> _handleTokenExchange(
 
       SnackbarUtil.showSuccess(context, successMessage);
 
-      // ✅ Then update status and refresh
+      //  Then update status and refresh
       await helper.checkTokenStatus();
       onRefreshNeeded();
 
@@ -1337,12 +1335,12 @@ Future<void> _handleTokenExchange(
 
     throw Exception(result['message'] ?? result['error']);
   } catch (e) {
-    print('❌ Error: $e');
+    print(' Error: $e');
     if (!context.mounted) return;
     final errorMessage = FacebookSyncService.parseErrorMessage(e);
     SnackbarUtil.showError(context, 'Failed to save: $errorMessage');
   } finally {
-    // ✅ FIX: Reset the notifier
+    //  FIX: Reset the notifier
     if (isExchangingNotifier.value) {
       isExchangingNotifier.value = false;
     }

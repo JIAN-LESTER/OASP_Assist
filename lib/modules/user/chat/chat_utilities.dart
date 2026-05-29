@@ -429,10 +429,10 @@ class ChatUtilities {
       '👍': 'thumbs up',
       '👎': 'thumbs down',
       '🎉': 'party popper',
-      '🚀': 'rocket',
-      '✅': 'check mark',
-      '❌': 'cross mark',
-      '⚠️': 'warning',
+      '': 'rocket',
+      '': 'check mark',
+      '': 'cross mark',
+      '': 'warning',
     };
     return emojiMap[emoji] ?? emoji;
   }

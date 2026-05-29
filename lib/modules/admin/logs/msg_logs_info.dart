@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 
-void showMSGLogsInfoModal(BuildContext context, DocumentSnapshot doc,   List<Map<String, dynamic>> messages,) {
+void showMSGLogsInfoModal(
+  BuildContext context,
+  DocumentSnapshot doc,
+  List<Map<String, dynamic>> messages,
+) {
   final data = doc.data() as Map<String, dynamic>;
 
   final screenWidth = MediaQuery.of(context).size.width;
@@ -18,7 +22,7 @@ void showMSGLogsInfoModal(BuildContext context, DocumentSnapshot doc,   List<Map
     'MMM dd, yyyy • hh:mm a',
   ).format(date);
 
-    final match = findMatchingMessage(messages); // ✅ now works
+  final match = findMatchingMessage(messages); //  now works
 
   showGeneralDialog(
     context: context,
@@ -116,7 +120,6 @@ void showMSGLogsInfoModal(BuildContext context, DocumentSnapshot doc,   List<Map
                     ],
                   ),
                 ),
-           
 
                 // Content
                 Flexible(
@@ -146,9 +149,7 @@ void showMSGLogsInfoModal(BuildContext context, DocumentSnapshot doc,   List<Map
 
                         const SizedBox(height: 24),
 
-                        
-
-                           // Message Section
+                        // Message Section
                         buildSectionHeader('Message', Icons.message_outlined),
                         const SizedBox(height: 12),
                         Container(
@@ -254,16 +255,12 @@ Map<String, dynamic>? findMatchingMessage(List<Map<String, dynamic>> messages) {
       );
 
       if (botMsg.isNotEmpty) {
-        return {
-          'user': msg,
-          'bot': botMsg,
-        };
+        return {'user': msg, 'bot': botMsg};
       }
     }
   }
   return null;
 }
-
 
 Widget _buildDeleteButton(
   BuildContext context,
@@ -338,8 +335,6 @@ Widget _buildDeleteButton(
     ),
   );
 }
-
-
 
 void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
   final data = doc.data() as Map<String, dynamic>;
@@ -576,7 +571,10 @@ Future<void> _handleDeleteLog(
     String deletedAction = docData['action'] ?? 'Unknown';
 
     // Delete log document
-    await FirebaseFirestore.instance.collection('message_logs').doc(doc.id).delete();
+    await FirebaseFirestore.instance
+        .collection('message_logs')
+        .doc(doc.id)
+        .delete();
 
     // Log the deletion action
     final logRef = FirebaseFirestore.instance.collection('logs').doc();
@@ -632,8 +630,6 @@ Future<void> _handleDeleteLog(
     }
   }
 }
-
-
 
 Widget _buildContentCard(String content) {
   return Container(

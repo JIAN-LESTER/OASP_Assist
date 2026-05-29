@@ -368,7 +368,7 @@ Future<void> _handleReusableDelete(
       deletedItemsTracker: deletedItemsTracker,
     );
   } catch (error) {
-    print("❌ Delete operation failed: $error");
+    print(" Delete operation failed: $error");
 
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
@@ -425,7 +425,7 @@ Future<void> _performStandardDelete(
   // Delete the document
   await FirebaseFirestore.instance.collection(collection).doc(doc.id).delete();
 
-  // ✅ REMOVED: Don't pop dialogs here - let the button handle it
+  //  REMOVED: Don't pop dialogs here - let the button handle it
   // Show success message
   if (context.mounted) {
     SnackbarUtil.showSuccess(context, config.successMessage);
@@ -441,7 +441,7 @@ Future<void> _performStandardDelete(
       'time': Timestamp.now(),
     });
   } catch (e) {
-    print("⚠️ Failed to log action: $e");
+    print(" Failed to log action: $e");
   }
 }
 
@@ -520,12 +520,12 @@ Widget _buildActionButtons(
                               );
                             }
 
-                            // ✅ FIXED: Close dialog only if context is still valid and mounted
+                            //  FIXED: Close dialog only if context is still valid and mounted
                             if (context.mounted) {
                               Navigator.of(context, rootNavigator: false).pop();
                             }
                           } catch (error) {
-                            print("❌ Delete operation failed: $error");
+                            print(" Delete operation failed: $error");
 
                             // Reset loading state on error
                             isDeleting.value = false;
@@ -600,15 +600,15 @@ Future<void> handleUserDelete(
     final functionsService = FirebaseFunctionsService();
 
     try {
-      print('🔄 Calling deleteUser Cloud Function for: ${doc.id}');
+      print(' Calling deleteUser Cloud Function for: ${doc.id}');
       await functionsService.deleteUserAuth(doc.id);
-      print('✅ Cloud Function completed successfully');
+      print(' Cloud Function completed successfully');
     } catch (e) {
-      print('❌ Cloud Function failed: $e');
+      print(' Cloud Function failed: $e');
       throw e;
     }
 
-    // ✅ REMOVED: Don't close dialogs here, let the caller handle it
+    //  REMOVED: Don't close dialogs here, let the caller handle it
     // The confirmation dialog button will close itself after success
 
     // Show success message
@@ -648,10 +648,10 @@ Future<void> handleUserDelete(
         'time': Timestamp.now(),
       });
     } catch (e) {
-      print("⚠️ Failed to log action: $e");
+      print(" Failed to log action: $e");
     }
   } catch (error) {
-    print("❌ Delete operation failed: $error");
+    print(" Delete operation failed: $error");
 
     // Show more specific error message
     String errorMessage = 'Delete failed: ';
@@ -713,9 +713,9 @@ Future<void> handleInformationBankDelete(
             .collection('scholarships')
             .doc(scholarshipDoc.id)
             .delete();
-        print("✅ Deleted scholarship ${scholarshipDoc.id}");
+        print(" Deleted scholarship ${scholarshipDoc.id}");
       } catch (e) {
-        print("❌ Failed to delete scholarship ${scholarshipDoc.id}: $e");
+        print(" Failed to delete scholarship ${scholarshipDoc.id}: $e");
         failedScholarshipDeletes.add(scholarshipDoc.id);
       }
     }
@@ -731,9 +731,9 @@ Future<void> handleInformationBankDelete(
     for (final admissionDoc in admissionsSnap.docs) {
       try {
         await firestore.collection('admissions').doc(admissionDoc.id).delete();
-        print("✅ Deleted admission ${admissionDoc.id}");
+        print(" Deleted admission ${admissionDoc.id}");
       } catch (e) {
-        print("❌ Failed to delete admission ${admissionDoc.id}: $e");
+        print(" Failed to delete admission ${admissionDoc.id}: $e");
         failedAdmissionDeletes.add(admissionDoc.id);
       }
     }
@@ -749,9 +749,9 @@ Future<void> handleInformationBankDelete(
     for (final placementDoc in placementsSnap.docs) {
       try {
         await firestore.collection('placements').doc(placementDoc.id).delete();
-        print("✅ Deleted placement ${placementDoc.id}");
+        print(" Deleted placement ${placementDoc.id}");
       } catch (e) {
-        print("❌ Failed to delete placement ${placementDoc.id}: $e");
+        print(" Failed to delete placement ${placementDoc.id}: $e");
         failedPlacementDeletes.add(placementDoc.id);
       }
     }
@@ -760,11 +760,11 @@ Future<void> handleInformationBankDelete(
     bool pineconeDeleteSuccess = true;
     if (chunkIds.isNotEmpty) {
       try {
-        print("🗑️ Deleting ${chunkIds.length} vectors from Pinecone...");
+        print(" Deleting ${chunkIds.length} vectors from Pinecone...");
         await _deleteFromPinecone(chunkIds, pineconeNamespace);
-        print("✅ Pinecone vectors deleted successfully");
+        print(" Pinecone vectors deleted successfully");
       } catch (e) {
-        print("⚠️ Pinecone deletion failed: $e");
+        print(" Pinecone deletion failed: $e");
         pineconeDeleteSuccess = false;
         // Continue with Firestore deletion anyway
       }
@@ -772,7 +772,7 @@ Future<void> handleInformationBankDelete(
 
     // Delete the main information_bank document
     await firestore.collection('information_bank').doc(doc.id).delete();
-    print("✅ Deleted information_bank document");
+    print(" Deleted information_bank document");
 
     // Show feedback (don't close dialogs - button handles it)
     if (context.mounted) {
@@ -812,10 +812,10 @@ Future<void> handleInformationBankDelete(
             placementsSnap.docs.length - failedPlacementDeletes.length,
       });
     } catch (e) {
-      print("⚠️ Failed to log action: $e");
+      print(" Failed to log action: $e");
     }
   } catch (error) {
-    print("❌ Delete operation failed: $error");
+    print(" Delete operation failed: $error");
 
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
@@ -865,25 +865,25 @@ Future<void> handleAdmissionDelete(
       // Delete from Pinecone FIRST
       if (chunkIds.isNotEmpty) {
         try {
-          print("🗑️ Deleting ${chunkIds.length} vectors from Pinecone...");
+          print(" Deleting ${chunkIds.length} vectors from Pinecone...");
           await _deleteFromPinecone(chunkIds, pineconeNamespace);
-          print("✅ Pinecone vectors deleted successfully");
+          print(" Pinecone vectors deleted successfully");
         } catch (e) {
-          print("⚠️ Pinecone deletion failed: $e");
+          print(" Pinecone deletion failed: $e");
           // Continue anyway
         }
       }
 
       // Delete from information_bank
       await firestore.collection('information_bank').doc(docId).delete();
-      print('✅ Deleted from information_bank');
+      print(' Deleted from information_bank');
     }
 
     // Delete from admissions collection
     await firestore.collection('admissions').doc(docId).delete();
-    print('✅ Deleted from admissions');
+    print(' Deleted from admissions');
 
-    // ✅ REMOVED: Dialog closing - let the button handle it
+    //  REMOVED: Dialog closing - let the button handle it
     // Show success message
     if (context.mounted) {
       SnackbarUtil.showSuccess(context, 'Admission deleted successfully');
@@ -899,10 +899,10 @@ Future<void> handleAdmissionDelete(
         'time': Timestamp.now(),
       });
     } catch (e) {
-      print("⚠️ Failed to log action: $e");
+      print(" Failed to log action: $e");
     }
   } catch (error) {
-    print("❌ Delete operation failed: $error");
+    print(" Delete operation failed: $error");
 
     if (context.mounted) {
       SnackbarUtil.showError(context, 'Delete failed: $error');
@@ -943,7 +943,7 @@ Future<void> handleScholarshipDelete(
 
     // Delete the scholarship
     await firestore.collection('scholarships').doc(doc.id).delete();
-    print('✅ Deleted scholarship');
+    print(' Deleted scholarship');
 
     // Check if we should also delete the source document
     if (sourceId != null) {
@@ -981,12 +981,12 @@ Future<void> handleScholarshipDelete(
             if (chunkIds.isNotEmpty) {
               try {
                 print(
-                  "🗑️ Deleting ${chunkIds.length} orphaned vectors from Pinecone...",
+                  " Deleting ${chunkIds.length} orphaned vectors from Pinecone...",
                 );
                 await _deleteFromPinecone(chunkIds, pineconeNamespace);
-                print("✅ Orphaned Pinecone vectors deleted");
+                print(" Orphaned Pinecone vectors deleted");
               } catch (e) {
-                print("⚠️ Failed to delete orphaned Pinecone vectors: $e");
+                print(" Failed to delete orphaned Pinecone vectors: $e");
               }
             }
 
@@ -994,13 +994,13 @@ Future<void> handleScholarshipDelete(
                 .collection('information_bank')
                 .doc(sourceId)
                 .delete();
-            print('✅ Deleted orphaned information_bank document');
+            print(' Deleted orphaned information_bank document');
           }
         }
       }
     }
 
-    // ✅ REMOVED: Dialog closing - let the button handle it
+    //  REMOVED: Dialog closing - let the button handle it
     // Show success message
     if (context.mounted) {
       SnackbarUtil.showSuccess(context, 'Scholarship deleted successfully');
@@ -1016,10 +1016,10 @@ Future<void> handleScholarshipDelete(
         'time': Timestamp.now(),
       });
     } catch (e) {
-      print("⚠️ Failed to log action: $e");
+      print(" Failed to log action: $e");
     }
   } catch (error) {
-    print("❌ Delete operation failed: $error");
+    print(" Delete operation failed: $error");
 
     if (context.mounted) {
       SnackbarUtil.showError(context, 'Delete failed: $error');
@@ -1060,7 +1060,7 @@ Future<void> handlePlacementDelete(
 
     // Delete the placement
     await firestore.collection('placements').doc(doc.id).delete();
-    print('✅ Deleted placement');
+    print(' Deleted placement');
 
     // Check if we should also delete the source document
     if (sourceId != null) {
@@ -1098,12 +1098,12 @@ Future<void> handlePlacementDelete(
             if (chunkIds.isNotEmpty) {
               try {
                 print(
-                  "🗑️ Deleting ${chunkIds.length} orphaned vectors from Pinecone...",
+                  " Deleting ${chunkIds.length} orphaned vectors from Pinecone...",
                 );
                 await _deleteFromPinecone(chunkIds, pineconeNamespace);
-                print("✅ Orphaned Pinecone vectors deleted");
+                print(" Orphaned Pinecone vectors deleted");
               } catch (e) {
-                print("⚠️ Failed to delete orphaned Pinecone vectors: $e");
+                print(" Failed to delete orphaned Pinecone vectors: $e");
               }
             }
 
@@ -1111,13 +1111,13 @@ Future<void> handlePlacementDelete(
                 .collection('information_bank')
                 .doc(sourceId)
                 .delete();
-            print('✅ Deleted orphaned information_bank document');
+            print(' Deleted orphaned information_bank document');
           }
         }
       }
     }
 
-    // ✅ REMOVED: Dialog closing - let the button handle it
+    //  REMOVED: Dialog closing - let the button handle it
     // Show success message
     if (context.mounted) {
       SnackbarUtil.showSuccess(context, 'Placement deleted successfully');
@@ -1133,10 +1133,10 @@ Future<void> handlePlacementDelete(
         'time': Timestamp.now(),
       });
     } catch (e) {
-      print("⚠️ Failed to log action: $e");
+      print(" Failed to log action: $e");
     }
   } catch (error) {
-    print("❌ Delete operation failed: $error");
+    print(" Delete operation failed: $error");
 
     if (context.mounted) {
       SnackbarUtil.showError(context, 'Delete failed: $error');
@@ -1161,7 +1161,7 @@ Future<void> _deleteFromPinecone(
     print('🪟 Windows detected: Using direct HTTP client');
     await _deleteFromPineconeDirect(chunkIds, namespace);
   } else {
-    print('📱 Mobile/Web detected: Using Firebase Functions');
+    print(' Mobile/Web detected: Using Firebase Functions');
     await _deleteFromPineconeFirebase(chunkIds, namespace);
   }
 }
@@ -1195,12 +1195,12 @@ Future<void> _deleteFromPineconeDirect(
         .timeout(const Duration(seconds: 30));
 
     if (res.statusCode == 200) {
-      print("✅ Pinecone vectors deleted successfully via Direct HTTP");
+      print(" Pinecone vectors deleted successfully via Direct HTTP");
     } else {
       throw Exception("Pinecone Direct Delete Failed: ${res.statusCode}");
     }
   } catch (e) {
-    print("❌ Direct Pinecone Error: $e");
+    print(" Direct Pinecone Error: $e");
     rethrow;
   }
 }
@@ -1216,7 +1216,7 @@ Future<void> _deleteFromPineconeFirebase(
     'chunkIds': chunkIds,
     'namespace': namespace,
   });
-  print('✅ Deleted ${result.data['deleted']} Pinecone vectors via Firebase');
+  print(' Deleted ${result.data['deleted']} Pinecone vectors via Firebase');
 }
 
 
@@ -1234,7 +1234,7 @@ Future<void> _deleteFromPineconeFirebase(
 //     'namespace': namespace,
 //   });
 
-//   print('✅ Deleted ${result.data['deleted']} Pinecone vectors');
+//   print(' Deleted ${result.data['deleted']} Pinecone vectors');
 // }
 
 // Future<void> _deleteFromPinecone(
@@ -1257,13 +1257,13 @@ Future<void> _deleteFromPineconeFirebase(
 //     int failedDeletes = 0;
 
 //     if (chunkIds.isEmpty) {
-//       print("ℹ️ No chunk IDs provided for Pinecone deletion");
+//       print(" No chunk IDs provided for Pinecone deletion");
 //       return;
 //     }
 
 //     try {
 //       print(
-//         "🗑️ Attempting to delete ${chunkIds.length} vectors from Pinecone...",
+//         " Attempting to delete ${chunkIds.length} vectors from Pinecone...",
 //       );
 
 //       final deleteUrl = Uri.parse('$indexHost/vectors/delete');
@@ -1273,21 +1273,21 @@ Future<void> _deleteFromPineconeFirebase(
 //           'namespace': pineconeNamespace,
 //       });
 
-//       print("📤 Request body: $body");
+//       print(" Request body: $body");
 
 //       final res = await http
 //           .post(deleteUrl, headers: authHeader, body: body)
 //           .timeout(const Duration(seconds: 30));
 
-//       print("📥 Pinecone response status: ${res.statusCode}");
-//       print("📥 Pinecone response body: ${res.body}");
+//       print(" Pinecone response status: ${res.statusCode}");
+//       print(" Pinecone response body: ${res.body}");
 
 //       if (res.statusCode == 200) {
-//         print("✅ Pinecone vectors deleted successfully");
+//         print(" Pinecone vectors deleted successfully");
 //         successfulDeletes = chunkIds.length;
 //       } else {
 //         print(
-//           "⚠️ Failed to delete Pinecone vectors: ${res.statusCode} - ${res.body}",
+//           " Failed to delete Pinecone vectors: ${res.statusCode} - ${res.body}",
 //         );
 //         failedDeletes = chunkIds.length;
 //         throw Exception(
@@ -1295,17 +1295,17 @@ Future<void> _deleteFromPineconeFirebase(
 //         );
 //       }
 //     } catch (e) {
-//       print("❌ Error deleting vectors from Pinecone: $e");
+//       print(" Error deleting vectors from Pinecone: $e");
 //       failedDeletes = chunkIds.length;
 //       rethrow; // Propagate error so caller knows deletion failed
 //     }
 
-//     print("📊 Pinecone cleanup summary:");
+//     print(" Pinecone cleanup summary:");
 //     print("   - Vectors attempted: ${chunkIds.length}");
 //     print("   - Successful: $successfulDeletes");
 //     print("   - Failed: $failedDeletes");
 //   } catch (e) {
-//     print("❌ Pinecone deletion failed: $e");
+//     print(" Pinecone deletion failed: $e");
 //     rethrow;
 //   }
 // }
@@ -1316,6 +1316,6 @@ Future<void> _deleteFromPineconeFirebase(
 //   String? pineconeNamespace,
 // ) {
 //   _deleteFromPinecone(chunkIds, pineconeNamespace).catchError((error) {
-//     print("❌ Background Pinecone deletion error: $error");
+//     print(" Background Pinecone deletion error: $error");
 //   });
 // }

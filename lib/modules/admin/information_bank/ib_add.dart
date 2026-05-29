@@ -588,12 +588,12 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
       switch (_categoryController.text.trim()) {
         case 'Admission':
-          print("🔍 Analyzing admission document...");
+          print(" Analyzing admission document...");
           final admissionCohere = await _cohereService.analyzeAdmission(
             _extractedText!,
           );
 
-          print("📋 Admission analysis result: $admissionCohere");
+          print(" Admission analysis result: $admissionCohere");
 
           List<String>? contactsList;
           try {
@@ -610,7 +610,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
               }
             }
           } catch (e) {
-            print("❌ Error processing contacts: $e");
+            print(" Error processing contacts: $e");
             contactsList = null;
           }
 
@@ -625,7 +625,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
                       .toList();
             }
           } catch (e) {
-            print("❌ Error processing steps: $e");
+            print(" Error processing steps: $e");
             stepsList = <String>[];
           }
 
@@ -649,7 +649,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
           break;
 
         case 'Scholarship':
-          print("🔍 Analyzing scholarship document...");
+          print(" Analyzing scholarship document...");
           final scholarshipCohere = await _cohereService.analyzeScholarship(
             _extractedText!,
           );
@@ -695,7 +695,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
               'Found and saved ${scholarships.length} scholarship(s)!',
             );
           } else {
-            print("⚠️ No scholarships found in the document");
+            print(" No scholarships found in the document");
             SnackbarUtil.showWarning(
               context,
               'No scholarships found in the document',
@@ -704,7 +704,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
           break;
 
         case 'Placement':
-          print("🔍 Analyzing placement document...");
+          print(" Analyzing placement document...");
           final placementCohere = await _cohereService.analyzePlacement(
             _extractedText!,
           );
@@ -753,7 +753,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
               'Found and saved ${placements.length} placement(s)!',
             );
           } else {
-            print("⚠️ No placements found in the document");
+            print(" No placements found in the document");
             SnackbarUtil.showWarning(
               context,
               'No placements found in the document',
@@ -763,7 +763,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
 
         default:
           print(
-            "ℹ️ Category '${_categoryController.text.trim()}' does not require special processing",
+            " Category '${_categoryController.text.trim()}' does not require special processing",
           );
           break;
       }
@@ -773,7 +773,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
       SnackbarUtil.showSuccess(context, 'Document uploaded successfully!');
       Navigator.of(context).pop(true);
     } catch (e) {
-      print("❌ Upload error: $e");
+      print(" Upload error: $e");
       SnackbarUtil.showError(context, 'Upload failed: $e');
     } finally {
       setState(() {

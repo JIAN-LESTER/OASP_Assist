@@ -165,17 +165,17 @@ class _LoginPageState extends State<LoginPage> {
             })
             .timeout(const Duration(seconds: 10));
       } catch (firestoreError) {
-        print('⚠️ Failed to update verification status: $firestoreError');
+        print(' Failed to update verification status: $firestoreError');
       }
 
-      print("✅ Sign in successful: ${user.email}");
+      print(" Sign in successful: ${user.email}");
     } on TimeoutException catch (e) {
       print("⏱️ Timeout Error: $e");
       _setGeneralError(
         'Connection timeout. Please check your internet connection and try again.',
       );
     } on FirebaseAuthException catch (e) {
-      print("🔥 Firebase Auth Error: ${e.code} - ${e.message}");
+      print(" Firebase Auth Error: ${e.code} - ${e.message}");
 
       switch (e.code) {
         case 'user-not-found':
@@ -218,7 +218,7 @@ class _LoginPageState extends State<LoginPage> {
         'No internet connection. Please check your network and try again.',
       );
     } catch (e) {
-      print("❌ Unexpected Error: $e");
+      print(" Unexpected Error: $e");
       _setGeneralError(
         'An unexpected error occurred. Please try again or contact support.',
       );

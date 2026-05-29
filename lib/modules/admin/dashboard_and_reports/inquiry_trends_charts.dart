@@ -23,10 +23,7 @@ Color _getFAQBarColor(int index, int total) {
   return colors[index % colors.length];
 }
 
-
-
 // Helper function to calculate Y-axis interval
-
 
 Color _getColorForCategory(String category) {
   switch (category.toLowerCase()) {
@@ -600,8 +597,9 @@ Widget buildInquiryTrendCard(
     }
   }
 
-  final sortedCategories = categoryTotals.entries.toList()
-    ..sort((a, b) => b.value.compareTo(a.value));
+  final sortedCategories =
+      categoryTotals.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
 
   return Container(
     padding: const EdgeInsets.all(24),
@@ -609,10 +607,7 @@ Widget buildInquiryTrendCard(
       gradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [
-          Colors.white,
-          Colors.grey[50]!,
-        ],
+        colors: [Colors.white, Colors.grey[50]!],
       ),
       borderRadius: BorderRadius.circular(20),
       boxShadow: [
@@ -627,10 +622,7 @@ Widget buildInquiryTrendCard(
           offset: const Offset(0, 2),
         ),
       ],
-      border: Border.all(
-        color: Colors.grey[200]!,
-        width: 1,
-      ),
+      border: Border.all(color: Colors.grey[200]!, width: 1),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -643,10 +635,7 @@ Widget buildInquiryTrendCard(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xff10b981),
-                    const Color(0xff059669),
-                  ],
+                  colors: [const Color(0xff10b981), const Color(0xff059669)],
                 ),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
@@ -703,8 +692,9 @@ Widget buildInquiryTrendCard(
                   onTap: () {
                     showDialog(
                       context: context,
-                      builder: (context) =>
-                          InquiryTrendsDetailDialog(timeFrame: timeFrame),
+                      builder:
+                          (context) =>
+                              InquiryTrendsDetailDialog(timeFrame: timeFrame),
                     );
                   },
                   borderRadius: BorderRadius.circular(10),
@@ -744,302 +734,306 @@ Widget buildInquiryTrendCard(
           Wrap(
             spacing: 12,
             runSpacing: 10,
-            children: sortedCategories.map((entry) {
-              final category = entry.key;
-              final count = entry.value;
-              final color = getColorForCategory(category);
-              
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: color.withOpacity(0.2),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: color.withOpacity(0.4),
-                            blurRadius: 4,
-                            spreadRadius: 1,
+            children:
+                sortedCategories.map((entry) {
+                  final category = entry.key;
+                  final count = entry.value;
+                  final color = getColorForCategory(category);
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: color.withOpacity(0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: color.withOpacity(0.4),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      category,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        count.toString(),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: color,
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Text(
+                          category,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            count.toString(),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: color,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              );
-            }).toList(),
+                  );
+                }).toList(),
           ),
         ],
 
         const SizedBox(height: 24),
 
         Expanded(
-          child: trendData.isEmpty
-              ? Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.grey[200]!,
-                        width: 1.5,
+          child:
+              trendData.isEmpty
+                  ? Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.grey[200]!,
+                          width: 1.5,
+                        ),
                       ),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.grey[300]!,
-                              width: 2,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.grey[300]!,
+                                width: 2,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.insights_outlined,
+                              size: 48,
+                              color: Colors.grey[400],
                             ),
                           ),
-                          child: Icon(
-                            Icons.insights_outlined,
-                            size: 48,
-                            color: Colors.grey[400],
+                          const SizedBox(height: 16),
+                          Text(
+                            'No data available',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[600],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No data available',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[600],
+                          const SizedBox(height: 6),
+                          Text(
+                            'Inquiry trends will appear here',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[500],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Inquiry trends will appear here',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : Container(
-                  padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.grey[200]!,
-                      width: 1,
-                    ),
-                  ),
-                  child: LineChart(
-                    LineChartData(
-                      minY: 0,
-                      maxY: maxY,
-                      lineBarsData: _generateLineChartBars(
-                        trendData,
-                        allCategories.toList(),
+                        ],
                       ),
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        horizontalInterval: _getGridInterval(trendData),
-                        getDrawingHorizontalLine: (value) {
-                          return FlLine(
-                            color: Colors.grey[200]!,
-                            strokeWidth: 1,
-                            dashArray: [5, 5],
-                          );
-                        },
-                      ),
-                      titlesData: FlTitlesData(
-                        show: true,
-                        rightTitles: AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
+                    ),
+                  )
+                  : Container(
+                    padding: const EdgeInsets.only(
+                      right: 12,
+                      top: 8,
+                      bottom: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[200]!, width: 1),
+                    ),
+                    child: LineChart(
+                      LineChartData(
+                        minY: 0,
+                        maxY: maxY,
+                        lineBarsData: _generateLineChartBars(
+                          trendData,
+                          allCategories.toList(),
                         ),
-                        topTitles: AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          horizontalInterval: _getGridInterval(trendData),
+                          getDrawingHorizontalLine: (value) {
+                            return FlLine(
+                              color: Colors.grey[200]!,
+                              strokeWidth: 1,
+                              dashArray: [5, 5],
+                            );
+                          },
                         ),
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 40,
-                            interval: _getYAxisInterval(maxY),
-                            getTitlesWidget: (value, meta) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: Text(
-                                  value.toInt().toString(),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey[600],
+                        titlesData: FlTitlesData(
+                          show: true,
+                          rightTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          topTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 40,
+                              interval: _getYAxisInterval(maxY),
+                              getTitlesWidget: (value, meta) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Text(
+                                    value.toInt().toString(),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[600],
+                                    ),
                                   ),
-                                ),
-                              );
+                                );
+                              },
+                            ),
+                          ),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 40,
+                              interval: getBottomTitleInterval(
+                                trendData.length,
+                                timeFrame,
+                                startDate,
+                                endDate,
+                              ),
+                              getTitlesWidget: (value, meta) {
+                                if (value < 0 || value >= trendData.length) {
+                                  return const SizedBox.shrink();
+                                }
+
+                                //  IMPORTANT: Only show labels at interval positions
+                                final interval = getBottomTitleInterval(
+                                  trendData.length,
+                                  timeFrame,
+                                  startDate,
+                                  endDate,
+                                );
+
+                                // Skip labels that aren't at interval positions
+                                if (value % interval != 0 && value != 0) {
+                                  return const SizedBox.shrink();
+                                }
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    formatBottomTitle(
+                                      trendData[value.toInt()].date,
+                                      timeFrame,
+                                      startDate,
+                                      endDate,
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        borderData: FlBorderData(
+                          show: true,
+                          border: Border(
+                            left: BorderSide(
+                              color: Colors.grey[300]!,
+                              width: 1.5,
+                            ),
+                            bottom: BorderSide(
+                              color: Colors.grey[300]!,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        lineTouchData: LineTouchData(
+                          enabled: true,
+                          touchTooltipData: LineTouchTooltipData(
+                            tooltipBorderRadius: BorderRadius.circular(8),
+                            tooltipPadding: const EdgeInsets.all(12),
+                            tooltipBorder: BorderSide(
+                              color: Colors.grey[300]!,
+                              width: 1.5,
+                            ),
+                            getTooltipItems: (touchedSpots) {
+                              return touchedSpots.map((spot) {
+                                final category = allCategories.elementAt(
+                                  spot.barIndex,
+                                );
+                                final color = getColorForCategory(category);
+                                return LineTooltipItem(
+                                  '$category\n${spot.y.toInt()}',
+                                  TextStyle(
+                                    color: color,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                );
+                              }).toList();
                             },
                           ),
-                        ),
-                      bottomTitles: AxisTitles(
-  sideTitles: SideTitles(
-    showTitles: true,
-    reservedSize: 40,
-    interval: getBottomTitleInterval(
-      trendData.length,
-      timeFrame,
-      startDate,
-      endDate,
-    ),
-    getTitlesWidget: (value, meta) {
-      if (value < 0 || value >= trendData.length) {
-        return const SizedBox.shrink();
-      }
-      
-      // ✅ IMPORTANT: Only show labels at interval positions
-      final interval = getBottomTitleInterval(
-        trendData.length,
-        timeFrame,
-        startDate,
-        endDate,
-      );
-      
-      // Skip labels that aren't at interval positions
-      if (value % interval != 0 && value != 0) {
-        return const SizedBox.shrink();
-      }
-      
-      return Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Text(
-          formatBottomTitle(
-            trendData[value.toInt()].date,
-            timeFrame,
-            startDate,
-            endDate,
-          ),
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[600],
-          ),
-        ),
-      );
-    },
-  ),
-),
-                      ),
-                      borderData: FlBorderData(
-                        show: true,
-                        border: Border(
-                          left: BorderSide(
-                            color: Colors.grey[300]!,
-                            width: 1.5,
-                          ),
-                          bottom: BorderSide(
-                            color: Colors.grey[300]!,
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                      lineTouchData: LineTouchData(
-                        enabled: true,
-                        touchTooltipData: LineTouchTooltipData(
-                          tooltipBorderRadius: BorderRadius.circular(8),
-                          tooltipPadding: const EdgeInsets.all(12),
-                          tooltipBorder: BorderSide(
-                            color: Colors.grey[300]!,
-                            width: 1.5,
-                          ),
-                          getTooltipItems: (touchedSpots) {
-                            return touchedSpots.map((spot) {
-                              final category =
-                                  allCategories.elementAt(spot.barIndex);
-                              final color = getColorForCategory(category);
-                              return LineTooltipItem(
-                                '$category\n${spot.y.toInt()}',
-                                TextStyle(
-                                  color: color,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
+                          getTouchedSpotIndicator: (barData, spotIndexes) {
+                            return spotIndexes.map((index) {
+                              return TouchedSpotIndicatorData(
+                                FlLine(
+                                  color: barData.color ?? Colors.transparent,
+                                  strokeWidth: 2,
+                                  dashArray: [5, 5],
+                                ),
+                                FlDotData(
+                                  show: true,
+                                  getDotPainter: (spot, percent, bar, index) {
+                                    return FlDotCirclePainter(
+                                      radius: 6,
+                                      color: bar.color ?? Colors.transparent,
+                                      strokeWidth: 3,
+                                      strokeColor: Colors.white,
+                                    );
+                                  },
                                 ),
                               );
                             }).toList();
                           },
                         ),
-                        getTouchedSpotIndicator: (barData, spotIndexes) {
-                          return spotIndexes.map((index) {
-                            return TouchedSpotIndicatorData(
-                              FlLine(
-                                color: barData.color ?? Colors.transparent,
-                                strokeWidth: 2,
-                                dashArray: [5, 5],
-                              ),
-                              FlDotData(
-                                show: true,
-                                getDotPainter: (spot, percent, bar, index) {
-                                  return FlDotCirclePainter(
-                                    radius: 6,
-                                    color: bar.color ?? Colors.transparent,
-                                    strokeWidth: 3,
-                                    strokeColor: Colors.white,
-                                  );
-                                },
-                              ),
-                            );
-                          }).toList();
-                        },
                       ),
                     ),
                   ),
-                ),
         ),
       ],
     ),
@@ -1052,7 +1046,11 @@ List<LineChartBarData> _generateLineChartBars(
 ) {
   List<LineChartBarData> lineBars = [];
 
-  for (int categoryIndex = 0; categoryIndex < categories.length; categoryIndex++) {
+  for (
+    int categoryIndex = 0;
+    categoryIndex < categories.length;
+    categoryIndex++
+  ) {
     final category = categories[categoryIndex];
     final color = getColorForCategory(category);
 
@@ -1146,13 +1144,16 @@ double _getGridInterval(List<ChartData> trendData) {
   return (maxCount / 5).ceil().toDouble();
 }
 
-
-
-double getBottomTitleInterval(int dataLength, String timeFrame, [DateTime? startDate, DateTime? endDate]) {
+double getBottomTitleInterval(
+  int dataLength,
+  String timeFrame, [
+  DateTime? startDate,
+  DateTime? endDate,
+]) {
   // Handle custom date ranges
   if (timeFrame == 'Custom' && startDate != null && endDate != null) {
     final daysDiff = endDate.difference(startDate).inDays;
-    
+
     if (daysDiff == 0) {
       // Hourly: show every 3-4 hours
       return dataLength <= 24 ? 3.0 : 4.0;
@@ -1187,11 +1188,16 @@ double getBottomTitleInterval(int dataLength, String timeFrame, [DateTime? start
   }
 }
 
-String formatBottomTitle(String date, String timeFrame, [DateTime? startDate, DateTime? endDate]) {
+String formatBottomTitle(
+  String date,
+  String timeFrame, [
+  DateTime? startDate,
+  DateTime? endDate,
+]) {
   // Handle custom date ranges
   if (timeFrame == 'Custom' && startDate != null && endDate != null) {
     final daysDiff = endDate.difference(startDate).inDays;
-    
+
     if (daysDiff == 0) {
       // Hourly format: "12AM", "3PM", etc.
       if (date.contains(":")) {
@@ -1205,7 +1211,7 @@ String formatBottomTitle(String date, String timeFrame, [DateTime? startDate, Da
     } else if (daysDiff <= 7) {
       // Daily format: already formatted as "Mon", "Tue", etc.
       return date;
-    }  else if (daysDiff <= 31) {
+    } else if (daysDiff <= 31) {
       // Weekly format: "W1", "W2", etc.
 
       return date;
@@ -1231,8 +1237,7 @@ String formatBottomTitle(String date, String timeFrame, [DateTime? startDate, Da
     case 'This Week':
       return date;
     case 'This Month':
-
-    return date;
+      return date;
     case 'This Year':
       return date;
     default:
@@ -1243,7 +1248,7 @@ String formatBottomTitle(String date, String timeFrame, [DateTime? startDate, Da
 // String _getTimeFrameDescription(String timeFrame, [DateTime? startDate, DateTime? endDate]) {
 //   if (timeFrame == 'Custom' && startDate != null && endDate != null) {
 //     final daysDiff = endDate.difference(startDate).inDays;
-    
+
 //     if (daysDiff == 0) return 'by hour';
 //     if (daysDiff <= 7) return 'by day';
 //     if (daysDiff <= 31) return 'by week';
@@ -1335,150 +1340,163 @@ Widget buildEscalatedMessagesList(
             ),
             SizedBox(height: isMobile ? 12 : 16),
             Expanded(
-              child: data.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.check_circle_outline,
-                            size: 48,
-                            color: Colors.grey[300],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'No escalated messages',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[400],
+              child:
+                  data.isEmpty
+                      ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline,
+                              size: 48,
+                              color: Colors.grey[300],
                             ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.separated(
-                      itemCount: data.length,
-                      separatorBuilder: (context, index) => Divider(
-                        height: isMobile ? 16 : 20,
-                        color: Colors.grey[200],
-                      ),
-                      itemBuilder: (context, index) {
-                        final message = data[index];
-                        final categoryColor = _getColorForCategory(message.category);
+                            const SizedBox(height: 12),
+                            Text(
+                              'No escalated messages',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                      : ListView.separated(
+                        itemCount: data.length,
+                        separatorBuilder:
+                            (context, index) => Divider(
+                              height: isMobile ? 16 : 20,
+                              color: Colors.grey[200],
+                            ),
+                        itemBuilder: (context, index) {
+                          final message = data[index];
+                          final categoryColor = _getColorForCategory(
+                            message.category,
+                          );
 
-                        return Container(
-                          padding: EdgeInsets.all(isMobile ? 10 : 12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: message.status == 'pending'
-                                  ? const Color(0xffef4444).withOpacity(0.3)
-                                  : Colors.grey[300]!,
-                              width: 1.5,
+                          return Container(
+                            padding: EdgeInsets.all(isMobile ? 10 : 12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color:
+                                    message.status == 'pending'
+                                        ? const Color(
+                                          0xffef4444,
+                                        ).withOpacity(0.3)
+                                        : Colors.grey[300]!,
+                                width: 1.5,
+                              ),
                             ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: categoryColor.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      message.category,
-                                      style: TextStyle(
-                                        fontSize: isMobile ? 10 : 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: categoryColor,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: categoryColor.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        message.category,
+                                        style: TextStyle(
+                                          fontSize: isMobile ? 10 : 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: categoryColor,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const Spacer(),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: message.status == 'pending'
-                                          ? const Color(0xffef4444).withOpacity(0.1)
-                                          : const Color(0xff10b981).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      message.status.toUpperCase(),
-                                      style: TextStyle(
-                                        fontSize: isMobile ? 9 : 10,
-                                        fontWeight: FontWeight.w700,
-                                        color: message.status == 'pending'
-                                            ? const Color(0xffef4444)
-                                            : const Color(0xff10b981),
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            message.status == 'pending'
+                                                ? const Color(
+                                                  0xffef4444,
+                                                ).withOpacity(0.1)
+                                                : const Color(
+                                                  0xff10b981,
+                                                ).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        message.status.toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: isMobile ? 9 : 10,
+                                          fontWeight: FontWeight.w700,
+                                          color:
+                                              message.status == 'pending'
+                                                  ? const Color(0xffef4444)
+                                                  : const Color(0xff10b981),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                message.userMessage,
-                                style: TextStyle(
-                                  fontSize: isMobile ? 12 : 13,
-                                  color: Colors.grey[800],
-                                  height: 1.4,
+                                  ],
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.access_time,
-                                    size: 12,
-                                    color: Colors.grey[500],
+                                const SizedBox(height: 8),
+                                Text(
+                                  message.userMessage,
+                                  style: TextStyle(
+                                    fontSize: isMobile ? 12 : 13,
+                                    color: Colors.grey[800],
+                                    height: 1.4,
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _formatDateTime(message.escalatedAt),
-                                    style: TextStyle(
-                                      fontSize: isMobile ? 10 : 11,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  if (message.resolvedBy != null) ...[
-                                    const SizedBox(width: 12),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
                                     Icon(
-                                      Icons.person,
+                                      Icons.access_time,
                                       size: 12,
                                       color: Colors.grey[500],
                                     ),
                                     const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        'By ${message.resolvedBy}',
-                                        style: TextStyle(
-                                          fontSize: isMobile ? 10 : 11,
-                                          color: Colors.grey[600],
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
+                                    Text(
+                                      _formatDateTime(message.escalatedAt),
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 10 : 11,
+                                        color: Colors.grey[600],
                                       ),
                                     ),
+                                    if (message.resolvedBy != null) ...[
+                                      const SizedBox(width: 12),
+                                      Icon(
+                                        Icons.person,
+                                        size: 12,
+                                        color: Colors.grey[500],
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          'By ${message.resolvedBy}',
+                                          style: TextStyle(
+                                            fontSize: isMobile ? 10 : 11,
+                                            color: Colors.grey[600],
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
             ),
           ],
         ),
@@ -1507,7 +1525,6 @@ Widget _buildStatusBadge(String status, bool isMobile) {
   );
 }
 
-
 // Widget buildEscalatedMessagesList(
 //   List<EscalatedMessage> data, // Accept dynamic list (can be List<EscalatedMessage> or List<MessageLogs>)
 //   String timeFrame,
@@ -1515,7 +1532,7 @@ Widget _buildStatusBadge(String status, bool isMobile) {
 // ) {
 //   // Convert data to List<EscalatedMessage> if needed
 //   final List<EscalatedMessage> escalatedMessages = [];
-  
+
 //   // If data is already List<EscalatedMessage>, use it directly
 //   if (data.isNotEmpty) {
 //     escalatedMessages.addAll(data.cast<EscalatedMessage>());
@@ -1609,7 +1626,7 @@ Widget _buildStatusBadge(String status, bool isMobile) {
 //                       ),
 //                     )
 //                   : ListView.separated(
-//                       itemCount: 
+//                       itemCount:
 //                         escalatedMessages.length, // Limit to top 5
 //                       separatorBuilder: (context, index) => Divider(
 //                         height: isMobile ? 16 : 20,
@@ -1800,10 +1817,7 @@ Widget buildEscalationsOverTimeCard(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xffef4444),
-                    const Color(0xffdc2626),
-                  ],
+                  colors: [const Color(0xffef4444), const Color(0xffdc2626)],
                 ),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
@@ -1853,188 +1867,222 @@ Widget buildEscalationsOverTimeCard(
           Wrap(
             spacing: 12,
             runSpacing: 10,
-            children: allCategories.map((category) {
-              final color = _getColorForCategory(category);
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: color.withOpacity(0.2), width: 1),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: color.withOpacity(0.4),
-                            blurRadius: 4,
-                            spreadRadius: 1,
+            children:
+                allCategories.map((category) {
+                  final color = _getColorForCategory(category);
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: color.withOpacity(0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: color.withOpacity(0.4),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          category,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      category,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
+                  );
+                }).toList(),
           ),
         ],
         const SizedBox(height: 24),
         Expanded(
-          child: escalationsData.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle, size: 48, color: Colors.grey[400]),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No escalations in this period',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                )
-              : Container(
-                  padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[200]!, width: 1),
-                  ),
-                  child: LineChart(
-                    LineChartData(
-                      minY: 0,
-                      maxY: maxY,
-                      lineBarsData: _generateEscalationLineChartBars(
-                        escalationsData,
-                        allCategories.toList(),
-                      ),
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        getDrawingHorizontalLine: (value) => FlLine(
-                          color: Colors.grey[200]!,
-                          strokeWidth: 1,
-                          dashArray: [5, 5],
+          child:
+              escalationsData.isEmpty
+                  ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          size: 48,
+                          color: Colors.grey[400],
                         ),
-                      ),
-                      titlesData: FlTitlesData(
-                        show: true,
-                        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 40,
-                            getTitlesWidget: (value, meta) => Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: Text(
-                                value.toInt().toString(),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[600],
-                                ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No escalations in this period',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                  : Container(
+                    padding: const EdgeInsets.only(
+                      right: 12,
+                      top: 8,
+                      bottom: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[200]!, width: 1),
+                    ),
+                    child: LineChart(
+                      LineChartData(
+                        minY: 0,
+                        maxY: maxY,
+                        lineBarsData: _generateEscalationLineChartBars(
+                          escalationsData,
+                          allCategories.toList(),
+                        ),
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          getDrawingHorizontalLine:
+                              (value) => FlLine(
+                                color: Colors.grey[200]!,
+                                strokeWidth: 1,
+                                dashArray: [5, 5],
                               ),
+                        ),
+                        titlesData: FlTitlesData(
+                          show: true,
+                          rightTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          topTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 40,
+                              getTitlesWidget:
+                                  (value, meta) => Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Text(
+                                      value.toInt().toString(),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ),
+                            ),
+                          ),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 40,
+                              interval: getBottomTitleInterval(
+                                escalationsData.length,
+                                timeFrame,
+                                startDate,
+                                endDate,
+                              ),
+                              getTitlesWidget: (value, meta) {
+                                if (value < 0 ||
+                                    value >= escalationsData.length) {
+                                  return const SizedBox.shrink();
+                                }
+
+                                //  IMPORTANT: Only show labels at interval positions
+                                final interval = getBottomTitleInterval(
+                                  escalationsData.length,
+                                  timeFrame,
+                                  startDate,
+                                  endDate,
+                                );
+
+                                // Skip labels that aren't at interval positions
+                                if (value % interval != 0 && value != 0) {
+                                  return const SizedBox.shrink();
+                                }
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    formatBottomTitle(
+                                      escalationsData[value.toInt()].date,
+                                      timeFrame,
+                                      startDate,
+                                      endDate,
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ),
-                     bottomTitles: AxisTitles(
-  sideTitles: SideTitles(
-    showTitles: true,
-    reservedSize: 40,
-    interval: getBottomTitleInterval(
-      escalationsData.length,
-      timeFrame,
-      startDate,
-      endDate,
-    ),
-    getTitlesWidget: (value, meta) {
-      if (value < 0 || value >= escalationsData.length) {
-        return const SizedBox.shrink();
-      }
-      
-      // ✅ IMPORTANT: Only show labels at interval positions
-      final interval = getBottomTitleInterval(
-        escalationsData.length,
-        timeFrame,
-        startDate,
-        endDate,
-      );
-      
-      // Skip labels that aren't at interval positions
-      if (value % interval != 0 && value != 0) {
-        return const SizedBox.shrink();
-      }
-      
-      return Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Text(
-          formatBottomTitle(
-            escalationsData[value.toInt()].date,
-            timeFrame,
-            startDate,
-            endDate,
-          ),
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[600],
-          ),
-        ),
-      );
-    },
-  ),
-),
-                      ),
-                      borderData: FlBorderData(
-                        show: true,
-                        border: Border(
-                          left: BorderSide(color: Colors.grey[300]!, width: 1.5),
-                          bottom: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                        borderData: FlBorderData(
+                          show: true,
+                          border: Border(
+                            left: BorderSide(
+                              color: Colors.grey[300]!,
+                              width: 1.5,
+                            ),
+                            bottom: BorderSide(
+                              color: Colors.grey[300]!,
+                              width: 1.5,
+                            ),
+                          ),
                         ),
-                      ),
-                      lineTouchData: LineTouchData(
-                        enabled: true,
-                        touchTooltipData: LineTouchTooltipData(
-                          tooltipBorderRadius: BorderRadius.circular(8),
-                          tooltipPadding: const EdgeInsets.all(12),
-                          getTooltipItems: (touchedSpots) {
-                            return touchedSpots.map((spot) {
-                              final category = allCategories.elementAt(spot.barIndex);
-                              final color = _getColorForCategory(category);
-                              return LineTooltipItem(
-                                '$category\n${spot.y.toInt()}',
-                                TextStyle(
-                                  color: color,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              );
-                            }).toList();
-                          },
+                        lineTouchData: LineTouchData(
+                          enabled: true,
+                          touchTooltipData: LineTouchTooltipData(
+                            tooltipBorderRadius: BorderRadius.circular(8),
+                            tooltipPadding: const EdgeInsets.all(12),
+                            getTooltipItems: (touchedSpots) {
+                              return touchedSpots.map((spot) {
+                                final category = allCategories.elementAt(
+                                  spot.barIndex,
+                                );
+                                final color = _getColorForCategory(category);
+                                return LineTooltipItem(
+                                  '$category\n${spot.y.toInt()}',
+                                  TextStyle(
+                                    color: color,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                );
+                              }).toList();
+                            },
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
         ),
       ],
     ),
@@ -2049,8 +2097,9 @@ Widget buildStaffPerformanceCard(
   String timeFrame,
   BuildContext context,
 ) {
-  final sortedStaff = staffPerformance.entries.toList()
-    ..sort((a, b) => b.value.compareTo(a.value));
+  final sortedStaff =
+      staffPerformance.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
 
   return Container(
     padding: const EdgeInsets.all(20),
@@ -2107,90 +2156,104 @@ Widget buildStaffPerformanceCard(
         ),
         const SizedBox(height: 20),
         Expanded(
-          child: sortedStaff.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.person_off, size: 48, color: Colors.grey[300]),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No staff data available for $timeFrame',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.separated(
-                  itemCount: sortedStaff.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final entry = sortedStaff[index];
-                    final maxRate = sortedStaff.first.value;
-                    final percentage = (entry.value / maxRate * 100).clamp(0, 100);
-
-                    return Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[200]!),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 16,
-                                backgroundColor: const Color(0xff8b5cf6).withOpacity(0.1),
-                                child: Text(
-                                  entry.key.substring(0, 1).toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Color(0xff8b5cf6),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  entry.key,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xff1a1a1a),
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                '${entry.value.toStringAsFixed(1)}%',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey[800],
-                                ),
-                              ),
-                            ],
+          child:
+              sortedStaff.isEmpty
+                  ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.person_off,
+                          size: 48,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No staff data available for $timeFrame',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[400],
                           ),
-                          const SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: percentage / 100,
-                              minHeight: 8,
-                              backgroundColor: Colors.grey[200],
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                Color(0xff8b5cf6),
+                        ),
+                      ],
+                    ),
+                  )
+                  : ListView.separated(
+                    itemCount: sortedStaff.length,
+                    separatorBuilder:
+                        (context, index) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final entry = sortedStaff[index];
+                      final maxRate = sortedStaff.first.value;
+                      final percentage = (entry.value / maxRate * 100).clamp(
+                        0,
+                        100,
+                      );
+
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[200]!),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 16,
+                                  backgroundColor: const Color(
+                                    0xff8b5cf6,
+                                  ).withOpacity(0.1),
+                                  child: Text(
+                                    entry.key.substring(0, 1).toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Color(0xff8b5cf6),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    entry.key,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xff1a1a1a),
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${entry.value.toStringAsFixed(1)}%',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[800],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: percentage / 100,
+                                minHeight: 8,
+                                backgroundColor: Colors.grey[200],
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Color(0xff8b5cf6),
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
         ),
       ],
     ),
@@ -2200,7 +2263,10 @@ Widget buildStaffPerformanceCard(
 // ============================================================================
 // BOT VS HUMAN ANSWERS
 // ============================================================================
-Widget buildBotVsHumanCard(Map<String, int> botVsHumanAnswers, String timeFrame) {
+Widget buildBotVsHumanCard(
+  Map<String, int> botVsHumanAnswers,
+  String timeFrame,
+) {
   final botCount = botVsHumanAnswers['bot'] ?? 0;
   final humanCount = botVsHumanAnswers['human'] ?? 0;
   final total = botCount + humanCount;
@@ -2263,79 +2329,87 @@ Widget buildBotVsHumanCard(Map<String, int> botVsHumanAnswers, String timeFrame)
         ),
         const SizedBox(height: 20),
         Expanded(
-          child: total == 0
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+          child:
+              total == 0
+                  ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 48,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No answer data available for $timeFrame',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                  : Row(
                     children: [
-                      Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[300]),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No answer data available for $timeFrame',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                      Expanded(
+                        flex: 3,
+                        child: PieChart(
+                          PieChartData(
+                            sectionsSpace: 2,
+                            centerSpaceRadius: 50,
+                            sections: [
+                              PieChartSectionData(
+                                color: const Color(0xff3b82f6),
+                                value: botCount.toDouble(),
+                                title: '${botPercentage.toStringAsFixed(1)}%',
+                                radius: 50,
+                                titleStyle: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              PieChartSectionData(
+                                color: const Color(0xff10b981),
+                                value: humanCount.toDouble(),
+                                title: '${humanPercentage.toStringAsFixed(1)}%',
+                                radius: 50,
+                                titleStyle: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ],
-                  ),
-                )
-              : Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: PieChart(
-                        PieChartData(
-                          sectionsSpace: 2,
-                          centerSpaceRadius: 50,
-                          sections: [
-                            PieChartSectionData(
-                              color: const Color(0xff3b82f6),
-                              value: botCount.toDouble(),
-                              title: '${botPercentage.toStringAsFixed(1)}%',
-                              radius: 50,
-                              titleStyle: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _buildLegendItem(
+                              'Bot Answers',
+                              botCount,
+                              botPercentage,
+                              const Color(0xff3b82f6),
                             ),
-                            PieChartSectionData(
-                              color: const Color(0xff10b981),
-                              value: humanCount.toDouble(),
-                              title: '${humanPercentage.toStringAsFixed(1)}%',
-                              radius: 50,
-                              titleStyle: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                            const SizedBox(height: 16),
+                            _buildLegendItem(
+                              'Human Answers',
+                              humanCount,
+                              humanPercentage,
+                              const Color(0xff10b981),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildLegendItem(
-                            'Bot Answers',
-                            botCount,
-                            botPercentage,
-                            const Color(0xff3b82f6),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildLegendItem(
-                            'Human Answers',
-                            humanCount,
-                            humanPercentage,
-                            const Color(0xff10b981),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
         ),
       ],
     ),
@@ -2352,7 +2426,11 @@ List<LineChartBarData> _generateEscalationLineChartBars(
 ) {
   List<LineChartBarData> lineBars = [];
 
-  for (int categoryIndex = 0; categoryIndex < categories.length; categoryIndex++) {
+  for (
+    int categoryIndex = 0;
+    categoryIndex < categories.length;
+    categoryIndex++
+  ) {
     final category = categories[categoryIndex];
     final color = _getColorForCategory(category);
 
@@ -2400,7 +2478,12 @@ List<LineChartBarData> _generateEscalationLineChartBars(
   return lineBars;
 }
 
-Widget _buildLegendItem(String label, int count, double percentage, Color color) {
+Widget _buildLegendItem(
+  String label,
+  int count,
+  double percentage,
+  Color color,
+) {
   return Row(
     children: [
       Container(
@@ -2418,17 +2501,11 @@ Widget _buildLegendItem(String label, int count, double percentage, Color color)
           children: [
             Text(
               label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
             Text(
               '$count (${percentage.toStringAsFixed(1)}%)',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
             ),
           ],
         ),
@@ -2436,8 +2513,6 @@ Widget _buildLegendItem(String label, int count, double percentage, Color color)
     ],
   );
 }
-
-
 
 String _formatDateTime(DateTime dateTime) {
   final now = DateTime.now();
@@ -2455,4 +2530,3 @@ String _formatDateTime(DateTime dateTime) {
     return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
   }
 }
-

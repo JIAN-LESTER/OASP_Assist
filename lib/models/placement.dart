@@ -32,13 +32,14 @@ class Placement {
           json['positions'] is List
               ? List<String>.from(json['positions'].map((e) => e.toString()))
               : <String>[],
-      deadline: json['deadline'] != null
-          ? (json['deadline'] is String
-              ? DateTime.tryParse(json['deadline'])
-              : (json['deadline'] is Timestamp
-                  ? (json['deadline'] as Timestamp).toDate()
-                  : null))
-          : null,
+      deadline:
+          json['deadline'] != null
+              ? (json['deadline'] is String
+                  ? DateTime.tryParse(json['deadline'])
+                  : (json['deadline'] is Timestamp
+                      ? (json['deadline'] as Timestamp).toDate()
+                      : null))
+              : null,
       createdAt:
           json['createdAt'] is String
               ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
@@ -55,10 +56,9 @@ class Placement {
       'isRecruiting': isRecruiting,
       'contacts': contacts,
       'positions': positions,
-      // ✅ FIX: Store as Firestore Timestamp instead of ISO string
+      //  FIX: Store as Firestore Timestamp instead of ISO string
       'deadline': deadline != null ? Timestamp.fromDate(deadline!) : null,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
 }
-

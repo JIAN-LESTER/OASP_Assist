@@ -282,7 +282,7 @@ class _OnboardingGuideState extends State<OnboardingGuide>
     );
   }
 
-  // ✅ ADD THIS METHOD (after _buildWelcomeFeature)
+  //  ADD THIS METHOD (after _buildWelcomeFeature)
   Future<void> _showWelcomeDialog() async {
     await showDialog(
       context: context,
@@ -428,7 +428,7 @@ class _OnboardingGuideState extends State<OnboardingGuide>
               'updatedAt': FieldValue.serverTimestamp(),
             });
 
-        // ✅ Mark welcome as seen in prefs
+        //  Mark welcome as seen in prefs
         await prefs.setBool('should_show_welcome_dialog', false);
       } catch (e) {
         print('Error finishing onboarding: $e');
@@ -440,7 +440,7 @@ class _OnboardingGuideState extends State<OnboardingGuide>
       _showOnboarding = false;
     });
 
-    // ✅ Then trigger the original callback
+    //  Then trigger the original callback
     widget.onFinished?.call();
   }
 

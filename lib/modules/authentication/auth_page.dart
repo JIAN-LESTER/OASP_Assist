@@ -31,11 +31,9 @@ class _AuthPageState extends State<AuthPage> {
           idToken: googleAuth.idToken,
         );
         await FirebaseAuth.instance.signInWithCredential(credential);
-      } else {
-      }
-    // ignore: empty_catches
-    } catch (e) {
-    }
+      } else {}
+      // ignore: empty_catches
+    } catch (e) {}
   }
 
   @override
@@ -96,7 +94,6 @@ class RoleBasedRouter extends StatelessWidget {
         }
 
         if (snapshot.hasError || !snapshot.hasData) {
-
           return Scaffold(
             body: Center(
               child: Padding(
@@ -150,15 +147,16 @@ class RoleBasedRouter extends StatelessWidget {
         }
 
         final userData = snapshot.data!;
-        
+
         switch (userData.role) {
           case 'admin':
             return AdminMainPage();
           case 'staff':
             return StaffMainPage();
           case 'user':
-            // ✅ FIXED: Check BOTH onboardingCompleted AND profileCompleted
-            if (!userData.isOnboardingCompleted || !userData.isProfileCompleted) {
+            //  FIXED: Check BOTH onboardingCompleted AND profileCompleted
+            if (!userData.isOnboardingCompleted ||
+                !userData.isProfileCompleted) {
               return UserOnboardingScreen(
                 userId: user?.uid ?? '',
                 userName: userData.name,
@@ -174,82 +172,79 @@ class RoleBasedRouter extends StatelessWidget {
   }
 
   Future<UserData> _getUserDataAndLogEvent() async {
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('No authenticated user found');
-    }
-
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-
-    String role = 'user';
-    String name = user.displayName ?? user.email?.split('@')[0] ?? 'User';
-    bool profileCompleted = false;
-    bool onboardingCompleted = false;
-
-    if (doc.exists) {
-      final data = doc.data()!;
-      
-      // ✅ READ ALL FIELDS
-      role = data['role'] ?? 'user';
-      name = data['name'] ?? name;
-      profileCompleted = data['profileCompleted'] ?? false;
-      onboardingCompleted = data['onboardingCompleted'] ?? false;
-
-      // ✅ DETAILED DEBUG OUTPUT
-
-      // ✅ UPDATE LAST LOGIN (with error handling)
-      try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .update({'lastLoginAt': FieldValue.serverTimestamp()});
-      } catch (e) {
-      }
-    } else {
-
-      // ✅ CREATE NEW DOCUMENT (only if it doesn't exist)
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'uid': user.uid,
-        'email': user.email ?? '',
-        'name': name,
-        'photoURL': user.photoURL ?? '',
-        'role': 'user',
-        'createdAt': FieldValue.serverTimestamp(),
-        'firstLogin': true,
-        'isActive': true,
-        'profileCompleted': false,
-        'onboardingCompleted': false,
-        'hasSeenOnboardingGuide': false,
-        'isVerified': user.emailVerified,
-        'linkedProviders': ['password'],
-        'dailyMessageCount': 0,
-        'lastMessageResetDate': FieldValue.serverTimestamp(),
-      });
-
-    }
-
-    // ✅ LOG LOGIN EVENT
     try {
-      await _logLogin(user.uid, name);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('No authenticated user found');
+      }
+
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+
+      String role = 'user';
+      String name = user.displayName ?? user.email?.split('@')[0] ?? 'User';
+      bool profileCompleted = false;
+      bool onboardingCompleted = false;
+
+      if (doc.exists) {
+        final data = doc.data()!;
+
+        //  READ ALL FIELDS
+        role = data['role'] ?? 'user';
+        name = data['name'] ?? name;
+        profileCompleted = data['profileCompleted'] ?? false;
+        onboardingCompleted = data['onboardingCompleted'] ?? false;
+
+        //  DETAILED DEBUG OUTPUT
+
+        //  UPDATE LAST LOGIN (with error handling)
+        try {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({'lastLoginAt': FieldValue.serverTimestamp()});
+        } catch (e) {}
+      } else {
+        //  CREATE NEW DOCUMENT (only if it doesn't exist)
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'email': user.email ?? '',
+          'name': name,
+          'photoURL': user.photoURL ?? '',
+          'role': 'user',
+          'createdAt': FieldValue.serverTimestamp(),
+          'firstLogin': true,
+          'isActive': true,
+          'profileCompleted': false,
+          'onboardingCompleted': false,
+          'hasSeenOnboardingGuide': false,
+          'isVerified': user.emailVerified,
+          'linkedProviders': ['password'],
+          'dailyMessageCount': 0,
+          'lastMessageResetDate': FieldValue.serverTimestamp(),
+        });
+      }
+
+      //  LOG LOGIN EVENT
+      try {
+        await _logLogin(user.uid, name);
+      } catch (e) {}
+
+      //  RETURN USER DATA
+
+      return UserData(
+        role: role,
+        name: name,
+        isProfileCompleted: profileCompleted,
+        isOnboardingCompleted: onboardingCompleted,
+      );
     } catch (e) {
+      rethrow;
     }
-
-    // ✅ RETURN USER DATA
-
-    return UserData(
-      role: role,
-      name: name,
-      isProfileCompleted: profileCompleted,
-      isOnboardingCompleted: onboardingCompleted,
-    );
-  } catch (e) {
-    rethrow;
   }
-}
 
   Future<void> _logLogin(String userId, String userName) async {
     try {
@@ -261,12 +256,11 @@ class RoleBasedRouter extends StatelessWidget {
         'time': Timestamp.now(),
         'userId': userId,
       });
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 }
 
-// ✅ FIXED: Added isOnboardingCompleted field
+//  FIXED: Added isOnboardingCompleted field
 class UserData {
   final String role;
   final String name;

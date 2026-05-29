@@ -60,19 +60,19 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   // Manual refresh button
   Future<void> _refreshFromFacebook() async {
     if (isRefreshing) {
-      print('⚠️ Sync already in progress');
+      print(' Sync already in progress');
       return;
     }
 
     setState(() => isRefreshing = true);
 
     try {
-      print('🔄 Manual Facebook sync triggered...');
+      print(' Manual Facebook sync triggered...');
       final result = await FacebookSyncService.syncPosts();
 
       if (!mounted) return;
 
-      print('📦 Sync result: $result');
+      print(' Sync result: $result');
 
       if (result['success'] == true) {
         await Future.delayed(Duration(milliseconds: 500));
@@ -91,7 +91,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
         throw Exception(errorMsg);
       }
     } catch (e) {
-      print('❌ Sync error: $e');
+      print(' Sync error: $e');
 
       if (mounted) {
         final errorMessage = FacebookSyncService.parseErrorMessage(e);

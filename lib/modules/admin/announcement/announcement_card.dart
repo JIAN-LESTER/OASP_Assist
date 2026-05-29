@@ -67,7 +67,7 @@ class AnnouncementCard extends StatefulWidget {
 class _AnnouncementCardState extends State<AnnouncementCard> {
   int _currentImageIndex = 0;
   final PageController _pageController = PageController();
-  bool _isMessageExpanded = false; // ✅ NEW: Track message expansion state
+  bool _isMessageExpanded = false; //  NEW: Track message expansion state
 
   @override
   void dispose() {
@@ -91,7 +91,9 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
     }
 
     if (images.isEmpty && data['original_image_urls'] is List) {
-      images = _selectAnnouncementImageUrls(data['original_image_urls'] as List);
+      images = _selectAnnouncementImageUrls(
+        data['original_image_urls'] as List,
+      );
     }
 
     final hasImages = images.isNotEmpty;
@@ -456,7 +458,7 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
                 images[index],
                 width: double.infinity,
                 height: double.infinity,
-                fit: BoxFit.contain, // ✅ Changed from cover to contain
+                fit: BoxFit.contain, //  Changed from cover to contain
                 errorBuilder:
                     (context, error, stackTrace) => _buildImageError(),
                 loadingBuilder: (context, child, loadingProgress) {
@@ -721,7 +723,7 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
     );
   }
 
-  // ✅ NEW: Message widget with See More/Less functionality
+  //  NEW: Message widget with See More/Less functionality
   Widget _buildMessage(String message) {
     // Count the number of lines
     final textPainter = TextPainter(
@@ -860,7 +862,11 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
     final normalizedUrl = _normalizeAnnouncementImageUrl(imageUrl);
 
     if (normalizedUrl == null) {
-      return errorBuilder?.call(context, StateError('Invalid image URL'), null) ??
+      return errorBuilder?.call(
+            context,
+            StateError('Invalid image URL'),
+            null,
+          ) ??
           _buildImageError();
     }
 
@@ -875,25 +881,42 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
     );
   }
 
-
   Widget _buildActionButtons(Map<String, dynamic> data) {
-  return Container(
-    padding: EdgeInsets.all(widget.isDesktop ? 24 : 20),
-    decoration: BoxDecoration(
-      color: Colors.grey[50],
-      borderRadius: const BorderRadius.only(
-        bottomLeft: Radius.circular(12),
-        bottomRight: Radius.circular(12),
+    return Container(
+      padding: EdgeInsets.all(widget.isDesktop ? 24 : 20),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(12),
+          bottomRight: Radius.circular(12),
+        ),
       ),
+      child: FutureBuilder<DocumentSnapshot>(
+        future:
+            FirebaseFirestore.instance
+                .collection('users')
+                .doc(FirebaseAuth.instance.currentUser!.uid)
+                .get(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: _buildActionButton(
+                    icon: Icons.open_in_new_rounded,
+                    label: 'View on Facebook',
+                    onTap: () => _launchUrl(data['permalink_url']),
+                    isPrimary: true,
+                  ),
+                ),
+              ],
+            );
+          }
 
-    ),
-    child: FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance
-          .collection('users')
-          .doc(FirebaseAuth.instance.currentUser!.uid)
-          .get(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+          final userData = snapshot.data!.data() as Map<String, dynamic>?;
+          final role = userData?['role'] ?? 'user';
+
           return Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -905,47 +928,28 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
                   isPrimary: true,
                 ),
               ),
+
+              //  Only show Edit/Delete for admins
+              if (role == 'admin') ...[
+                const SizedBox(width: 8),
+                _buildIconButton(
+                  icon: Icons.edit_rounded,
+                  onTap: () => widget.onEdit!(widget.announcement),
+                  color: Colors.blue,
+                ),
+                const SizedBox(width: 8),
+                _buildIconButton(
+                  icon: Icons.delete_rounded,
+                  onTap: () => widget.onDelete!(widget.announcement),
+                  color: Colors.red,
+                ),
+              ],
             ],
           );
-        }
-
-        final userData = snapshot.data!.data() as Map<String, dynamic>?;
-        final role = userData?['role'] ?? 'user';
-
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Flexible(
-              child: _buildActionButton(
-                icon: Icons.open_in_new_rounded,
-                label: 'View on Facebook',
-                onTap: () => _launchUrl(data['permalink_url']),
-                isPrimary: true,
-              ),
-            ),
-
-            // 🔥 Only show Edit/Delete for admins
-            if (role == 'admin') ...[
-              const SizedBox(width: 8),
-              _buildIconButton(
-                icon: Icons.edit_rounded,
-                onTap: () => widget.onEdit!(widget.announcement),
-                color: Colors.blue,
-              ),
-              const SizedBox(width: 8),
-              _buildIconButton(
-                icon: Icons.delete_rounded,
-                onTap: () => widget.onDelete!(widget.announcement),
-                color: Colors.red,
-              ),
-            ],
-          ],
-        );
-      },
-    ),
-  );
-}
-
+        },
+      ),
+    );
+  }
 
   Widget _buildActionButton({
     required IconData icon,
@@ -1045,7 +1049,7 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
 }
 
 // ============================================================================
-// ✅ UPDATED: Full Screen Image Gallery with Navigation Arrows
+//  UPDATED: Full Screen Image Gallery with Navigation Arrows
 // ============================================================================
 
 class FullScreenImageGallery extends StatefulWidget {
@@ -1076,9 +1080,7 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
             .whereType<String>()
             .toList();
     _currentIndex =
-        _images.isEmpty
-            ? 0
-            : widget.initialIndex.clamp(0, _images.length - 1);
+        _images.isEmpty ? 0 : widget.initialIndex.clamp(0, _images.length - 1);
     _pageController = PageController(initialPage: _currentIndex);
   }
 
@@ -1099,39 +1101,39 @@ class _FullScreenImageGalleryState extends State<FullScreenImageGallery> {
               child: Icon(Icons.error, color: Colors.white, size: 64),
             )
           else
-          PageView.builder(
-            controller: _pageController,
-            itemCount: _images.length,
-            onPageChanged: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              return InteractiveViewer(
-                minScale: 0.5,
-                maxScale: 4.0,
-                child: Center(
-                  child: Image.network(
-                    _images[index],
-                    fit: BoxFit.contain,
-                    gaplessPlayback: true,
-                    filterQuality: FilterQuality.medium,
-                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(
-                        Icons.error,
-                        color: Colors.white,
-                        size: 64,
-                      );
-                    },
+            PageView.builder(
+              controller: _pageController,
+              itemCount: _images.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Center(
+                    child: Image.network(
+                      _images[index],
+                      fit: BoxFit.contain,
+                      gaplessPlayback: true,
+                      filterQuality: FilterQuality.medium,
+                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.error,
+                          color: Colors.white,
+                          size: 64,
+                        );
+                      },
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
+                );
+              },
+            ),
 
-          // ✅ NEW: Navigation arrows in fullscreen
+          //  NEW: Navigation arrows in fullscreen
           if (_images.length > 1) ...[
             _buildFullscreenNavigationArrow(
               alignment: Alignment.centerLeft,
