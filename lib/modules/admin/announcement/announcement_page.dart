@@ -26,6 +26,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   bool isRefreshing = false;
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _announcementScrollController = ScrollController();
+  final Map<String, GlobalKey> _announcementKeys = {};
   late final Stream<QuerySnapshot> announcementStream;
 
   // Facebook Integration Helper
@@ -154,6 +156,13 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    _announcementScrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ResponsiveLayout(
       mobileBody: _buildMobileLayout(),
@@ -169,43 +178,31 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       body: Row(
         children: [
           Expanded(
-            child: Stack(
+            child: Column(
               children: [
-                Column(
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
-                      child: Center(
-                        child: Container(
-                          constraints: const BoxConstraints(maxWidth: 1100),
-                          child: Row(
-                            children: [
-                              Expanded(child: _buildSearchField()),
-                              const SizedBox(width: 16),
-                              SizedBox(
-                                width: 165,
-                                child: CategoryDropdownButton(
-                                  initialValue: selectedCategory,
-                                  onChanged:
-                                      (value) => setState(
-                                        () => selectedCategory = value,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _buildSearchField()),
+                      const SizedBox(width: 16),
+                      SizedBox(
+                        width: 165,
+                        child: CategoryDropdownButton(
+                          initialValue: selectedCategory,
+                          onChanged: (value) {
+                            setState(() => selectedCategory = value);
+                          },
                         ),
                       ),
-                    ),
-                    Expanded(child: _buildMainContent(isDesktop: true)),
-                  ],
+                      const SizedBox(width: 16),
+                      _buildActionButtons(isDesktop: true),
+                    ],
+                  ),
                 ),
-                Positioned(
-                  top: 24,
-                  right: 32,
-                  child: _buildRefreshButton(isDesktop: true),
-                ),
+                Expanded(child: _buildMainContent(isDesktop: true)),
               ],
             ),
           ),
@@ -230,19 +227,26 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
         children: [
           Container(
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(flex: 2, child: _buildSearchField()),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: CategoryDropdownButton(
-                    initialValue: selectedCategory,
-                    onChanged:
-                        (value) => setState(() => selectedCategory = value),
-                  ),
+                Row(
+                  children: [
+                    Expanded(flex: 2, child: _buildSearchField()),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: CategoryDropdownButton(
+                        initialValue: selectedCategory,
+                        onChanged:
+                            (value) => setState(() => selectedCategory = value),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                _buildRefreshButton(isDesktop: false),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _buildActionButtons(isDesktop: false),
+                ),
               ],
             ),
           ),
@@ -394,12 +398,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             ),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(child: _buildSearchField()),
-                    const SizedBox(width: 12),
-                    _buildRefreshButton(isDesktop: false),
-                  ],
+                _buildSearchField(),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _buildActionButtons(isDesktop: false),
                 ),
                 const SizedBox(height: 12),
                 CategoryDropdownButton(
@@ -442,9 +445,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     );
   }
 
-  Widget _buildRefreshButton({required bool isDesktop}) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+  Widget _buildActionButtons({required bool isDesktop}) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      alignment: WrapAlignment.end,
       children: [
         // App Credentials Button
         Stack(
@@ -525,8 +530,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
               ),
           ],
         ),
-        SizedBox(height: 12),
-
         // Token Status Indicator
         Stack(
           clipBehavior: Clip.none,
@@ -618,7 +621,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
               ),
           ],
         ),
-        SizedBox(height: 12),
         // Sync Settings Button
         Tooltip(
           message: 'Sync Settings (Auto-create & Vision OCR)',
@@ -655,7 +657,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             ),
           ),
         ),
-        SizedBox(height: 12),
         // Manual Sync Button
         Tooltip(
           message: 'Manual Sync Facebook Posts',
@@ -788,6 +789,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
         final displayedAnnouncements = _filterAnnouncementsFromDocs(
           allAnnouncements,
         );
+        final visibleIds = displayedAnnouncements.map((doc) => doc.id).toSet();
+        _announcementKeys.removeWhere((id, _) => !visibleIds.contains(id));
 
         if (displayedAnnouncements.isEmpty) {
           return Center(child: Text('No announcements found'));
@@ -797,24 +800,27 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           onRefresh: _refreshFromFacebook,
           color: Colors.green[600],
           child: ListView.builder(
+            controller: _announcementScrollController,
             padding:
                 isDesktop
                     ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
-                    : EdgeInsets.zero,
+                    : const EdgeInsets.symmetric(horizontal: 20),
             itemCount: displayedAnnouncements.length,
             itemBuilder: (context, index) {
-              return Center(
-                child: Container(
-                  constraints:
-                      isDesktop ? const BoxConstraints(maxWidth: 1100) : null,
-                  padding: EdgeInsets.only(bottom: isDesktop ? 24 : 16),
-                  child: AnnouncementCard(
-                    announcement: displayedAnnouncements[index],
-                    index: index,
-                    isDesktop: isDesktop,
-                    onEdit: _editAnnouncement,
-                    onDelete: _deleteAnnouncement,
-                  ),
+              final announcement = displayedAnnouncements[index];
+              final announcementKey = _announcementKeys.putIfAbsent(
+                announcement.id,
+                () => GlobalKey(),
+              );
+              return Padding(
+                key: announcementKey,
+                padding: EdgeInsets.only(bottom: isDesktop ? 24 : 16),
+                child: AnnouncementCard(
+                  announcement: announcement,
+                  index: index,
+                  isDesktop: isDesktop,
+                  onEdit: _editAnnouncement,
+                  onDelete: _deleteAnnouncement,
                 ),
               );
             },
@@ -930,56 +936,79 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     );
   }
 
+  Future<void> _scrollToAnnouncement(DocumentSnapshot doc) async {
+    final key = _announcementKeys[doc.id];
+    if (key?.currentContext == null) {
+      _showErrorSnackBar('Announcement is not visible in the current list');
+      return;
+    }
+
+    await Scrollable.ensureVisible(
+      key!.currentContext!,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      alignment: 0.05,
+    );
+  }
+
   Widget _buildActivityItem(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     final message = _truncateMessage(data['message'] ?? 'No message');
     final timeAgo = _formatTimeAgo(data['created_time']);
     final category = data['category'] ?? 'General';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: getCategoryColor(category).withOpacity(0.1),
-            ),
-            child: Icon(
-              getCategoryIcon(category),
-              size: 16,
-              color: getCategoryColor(category),
-            ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _scrollToAnnouncement(doc),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            border: Border.all(color: Colors.grey[200]!),
+            borderRadius: BorderRadius.circular(8),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: getCategoryColor(category).withOpacity(0.1),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  timeAgo,
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                child: Icon(
+                  getCategoryIcon(category),
+                  size: 16,
+                  color: getCategoryColor(category),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      message,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      timeAgo,
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

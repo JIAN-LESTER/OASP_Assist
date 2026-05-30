@@ -112,30 +112,25 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
                 // header
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
-                  child: Center(
-                    child: Container(
-                      constraints: const BoxConstraints(maxWidth: 1100),
-                      child: Row(
-                        children: [
-                          // Search field
-                          Expanded(child: _buildSearchField()),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                  child: Row(
+                    children: [
+                      // Search field
+                      Expanded(child: _buildSearchField()),
 
-                          const SizedBox(width: 16),
+                      const SizedBox(width: 16),
 
-                          // Category dropdown
-                          SizedBox(
-                            width: 165,
-                            child: CategoryDropdownButton(
-                              initialValue: selectedCategory,
-                              onChanged:
-                                  (value) =>
-                                      setState(() => selectedCategory = value),
-                            ),
-                          ),
-                        ],
+                      // Category dropdown
+                      SizedBox(
+                        width: 165,
+                        child: CategoryDropdownButton(
+                          initialValue: selectedCategory,
+                          onChanged:
+                              (value) =>
+                                  setState(() => selectedCategory = value),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
 
@@ -373,29 +368,28 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadAnnouncements,
-      color: Colors.green[600],
-      child: ListView.builder(
-        padding:
-            isDesktop
-                ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
-                : EdgeInsets.zero,
-        itemCount: displayedAnnouncements.length,
-        itemBuilder: (context, index) {
-          return Center(
-            child: Container(
-              constraints:
-                  isDesktop ? const BoxConstraints(maxWidth: 1100) : null,
+    return ScrollConfiguration(
+      behavior: const MaterialScrollBehavior().copyWith(scrollbars: false),
+      child: RefreshIndicator(
+        onRefresh: _loadAnnouncements,
+        color: Colors.green[600],
+        child: ListView.builder(
+          padding:
+              isDesktop
+                  ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
+                  : const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: displayedAnnouncements.length,
+          itemBuilder: (context, index) {
+            return Padding(
               padding: EdgeInsets.only(bottom: isDesktop ? 24 : 16),
               child: AnnouncementCard(
                 announcement: displayedAnnouncements[index],
                 index: index,
                 isDesktop: isDesktop,
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -473,11 +467,17 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
                   }
 
                   final recentAnnouncements = snapshot.data!.docs;
-                  return ListView(
-                    children:
-                        recentAnnouncements
-                            .map((doc) => _buildActivityItem(doc))
-                            .toList(),
+                  return ScrollConfiguration(
+                    behavior:
+                        const MaterialScrollBehavior().copyWith(
+                          scrollbars: false,
+                        ),
+                    child: ListView(
+                      children:
+                          recentAnnouncements
+                              .map((doc) => _buildActivityItem(doc))
+                              .toList(),
+                    ),
                   );
                 },
               ),

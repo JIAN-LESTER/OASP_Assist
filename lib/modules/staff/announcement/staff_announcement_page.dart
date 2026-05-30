@@ -376,30 +376,25 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
-                  child: Center(
-                    child: Container(
-                      constraints: const BoxConstraints(maxWidth: 1100),
-                      child: Row(
-                        children: [
-                          // Search field
-                          Expanded(child: _buildSearchField()),
+                  child: Row(
+                    children: [
+                      // Search field
+                      Expanded(child: _buildSearchField()),
 
-                          const SizedBox(width: 16),
+                      const SizedBox(width: 16),
 
-                          // Category dropdown
-                          SizedBox(
-                            width: 165,
-                            child: CategoryDropdownButton(
-                              initialValue: selectedCategory,
-                              onChanged:
-                                  (value) =>
-                                      setState(() => selectedCategory = value),
-                            ),
-                          ),
-                          _buildRefreshButton(isDesktop: true),
-                        ],
+                      // Category dropdown
+                      SizedBox(
+                        width: 165,
+                        child: CategoryDropdownButton(
+                          initialValue: selectedCategory,
+                          onChanged:
+                              (value) =>
+                                  setState(() => selectedCategory = value),
+                        ),
                       ),
-                    ),
+                      _buildRefreshButton(isDesktop: true),
+                    ],
                   ),
                 ),
 
@@ -631,21 +626,15 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
       color: Colors.green[600],
       child: ListView.builder(
         padding:
-            isDesktop
-                ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
-                : EdgeInsets.zero,
+            isDesktop ? const EdgeInsets.fromLTRB(0, 0, 0, 32) : EdgeInsets.zero,
         itemCount: displayedAnnouncements.length,
         itemBuilder: (context, index) {
-          return Center(
-            child: Container(
-              constraints:
-                  isDesktop ? const BoxConstraints(maxWidth: 1100) : null,
-              padding: EdgeInsets.only(bottom: isDesktop ? 24 : 16),
-              child: AnnouncementCard(
-                announcement: displayedAnnouncements[index],
-                index: index,
-                isDesktop: isDesktop,
-              ),
+          return Padding(
+            padding: EdgeInsets.only(bottom: isDesktop ? 24 : 16),
+            child: AnnouncementCard(
+              announcement: displayedAnnouncements[index],
+              index: index,
+              isDesktop: isDesktop,
             ),
           );
         },
