@@ -4,7 +4,6 @@ import * as admin from "firebase-admin";
 
 const db = admin.firestore();
 
-// Helper function remains the same
 async function isAdmin(uid: string): Promise<boolean> {
   try {
     const userDoc = await db.collection("users").doc(uid).get();
@@ -101,9 +100,9 @@ export const createUser = onCall(
         name: displayName || email.split("@")[0],
         role: role || "user",
         profileComplete: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(), //  Add server timestamp
+        createdAt: admin.firestore.FieldValue.serverTimestamp(), 
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        verifiedAt: admin.firestore.FieldValue.serverTimestamp(), //  Add server timestamp
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp(), 
         createdBy: callerUid,
         isActive: true,
         isVerified: true,

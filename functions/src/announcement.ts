@@ -20,8 +20,6 @@ const storage = admin.storage();
 const FB_API_VERSION = "v24.0";
 // const PAGE_ID = "730995450096065";
 
-
-
 interface CategoryToInfoBankConfig {
   includeInSearch: boolean;
   autoSync: boolean;
@@ -399,9 +397,6 @@ async function extractTextFromImage(imageUrl: string): Promise<string> {
 
     return "";
   } catch (error: any) {
-    if (error.response) {
-    }
-
     return ""; // Return empty string on error, don't fail the entire process
   }
 }
@@ -3597,27 +3592,3 @@ export const fixAnnouncementInfoBankMetadata = onCall(
     }
   }
 );
-// 1. API Usage Split ✅
-
-// Cohere: Text analysis (categorization, deadline extraction, structured data extraction)
-// Gemini: Embeddings only (for vector search)
-
-// 2. Fixed Field Names ✅
-// Admissions Model:
-
-// id (not admissionID)
-
-// announcementId
-// schedules array properly structured
-
-// Scholarship Model:
-
-// scholarshipID ✅ Correct
-// sourceId
-// deadline stored as Date not Timestamp
-
-// Placement Model:
-
-// placementID ✅ Correct
-// contacts ✅ Correct (plural for placements)
-// deadline stored as Date not Timestamp

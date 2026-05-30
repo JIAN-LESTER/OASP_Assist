@@ -103,7 +103,7 @@ class FirebaseFunctionsService {
     required String email,
     required String password,
     String? displayName,
-    required Map<String, dynamic> userData, // Accept all user data
+    required Map<String, dynamic> userData, 
   }) async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -117,7 +117,6 @@ class FirebaseFunctionsService {
         'password': password,
         if (displayName != null && displayName.isNotEmpty)
           'displayName': displayName,
-        //  Spread all userData fields into the request
         ...userData,
       };
 

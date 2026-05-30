@@ -50,11 +50,7 @@ export const generateGeminiEmbedding = onCall(
     if (!text) throw new HttpsError("invalid-argument", "Text required");
 
     try {
-<<<<<<< HEAD
       const response = await axios.post<JsonResponse>(
-=======
-      const response = await axios.post(
-
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY.value()}`,
         {
           model: "models/gemini-embedding-001",
@@ -736,44 +732,6 @@ export const getPineconeStats = onCall(
   }
 );
 
-<<<<<<< HEAD
-=======
-export const fetchPineconeVectors = onCall(
-  {
-    secrets: [PINECONE_API_KEY],
-    timeoutSeconds: 30,
-  },
-  async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
-
-    const {ids} = request.data;
-
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      throw new Error("IDs array required");
-    }
-
-    try {
-      const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-gemini");
-
-      const results = await index.fetch(ids);
-
-      return {
-        success: true,
-        vectors: results.records || {},
-        count: Object.keys(results.records || {}).length,
-      };
-    } catch (error: any) {
-      console.error(" Pinecone fetch error:", error.message);
-      console.error(" Pinecone fetch error:", error.message);
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-);
->>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
 
 export const deleteAllPineconeVectors = onCall(
   {
@@ -817,48 +775,3 @@ export const deleteAllPineconeVectors = onCall(
     }
   }
 );
-<<<<<<< HEAD
-=======
-
-export const deleteFromPinecone = onCall(
-  {secrets: [PINECONE_API_KEY, PINECONE_HOST]},
-  async (request) => {
-    if (!request.auth) {
-      throw new Error("Unauthorized");
-    }
-
-    const {chunkIds, namespace} = request.data;
-
-    if (!Array.isArray(chunkIds) || chunkIds.length === 0) {
-      throw new Error("chunkIds must be a non-empty array");
-    }
-
-    try {
-      const response = await axios.post(
-        `${PINECONE_HOST.value()}/vectors/delete`,
-        {
-          ids: chunkIds,
-          ...(namespace ? {namespace} : {}),
-        },
-        {
-          headers: {
-            "Api-Key": PINECONE_API_KEY.value(),
-            "Content-Type": "application/json",
-          },
-          timeout: 30000,
-        }
-      );
-
-      return {
-        success: true,
-        deleted: chunkIds.length,
-        pineconeStatus: response.status,
-      };
-    } catch (error: any) {
-      console.error(" Pinecone delete error:", error.response?.data || error.message);
-      console.error(" Pinecone delete error:", error.response?.data || error.message);
-      throw new Error("Failed to delete vectors from Pinecone");
-    }
-  }
-);
->>>>>>> 6e2c8251070fdc1d1de6c498996660a7989f8b66
