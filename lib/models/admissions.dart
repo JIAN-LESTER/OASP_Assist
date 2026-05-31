@@ -30,8 +30,6 @@ class Admissions {
   });
 
   factory Admissions.fromJson(Map<String, dynamic> json) {
-    print(" Admissions.fromJson input: $json");
-
     Map<String, int>? parseAcademicYear(String? yearStr) {
       if (yearStr == null || yearStr.trim().isEmpty) return null;
       final rangeRegex = RegExp(r'(\d{4})\s*[-–]\s*(\d{4})');
@@ -108,7 +106,6 @@ class Admissions {
         type: json['type']?.toString(), //  Parse type field
       );
     } catch (e) {
-      print(" Error in Admissions.fromJson: $e");
       rethrow;
     }
   }
