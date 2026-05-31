@@ -43,8 +43,10 @@ Color _getColorForCategory(String category) {
 Widget buildCategoryDistributionCard(
   Map<String, int> categoryData,
   String timeFrame,
-  BuildContext context,
-) {
+  BuildContext context, {
+  DateTime? startDate,
+  DateTime? endDate,
+}) {
   final total = categoryData.values.fold(0, (sum, count) => sum + count);
 
   return LayoutBuilder(
@@ -124,6 +126,8 @@ Widget buildCategoryDistributionCard(
                           (context) => CategoryDistributionDetailDialog(
                             categoryData: categoryData,
                             timeFrame: timeFrame,
+                            startDate: startDate,
+                            endDate: endDate,
                           ),
                     );
                   },

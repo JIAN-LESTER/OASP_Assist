@@ -9,11 +9,15 @@ import 'package:intl/intl.dart';
 class CategoryDistributionDetailDialog extends StatefulWidget {
   final Map<String, int> categoryData;
   final String timeFrame;
+  final DateTime? startDate;
+  final DateTime? endDate;
 
   const CategoryDistributionDetailDialog({
     super.key,
     required this.categoryData,
     required this.timeFrame,
+    this.startDate,
+    this.endDate,
   });
 
   @override
@@ -44,26 +48,40 @@ class _CategoryDistributionDetailDialogState
     });
 
     try {
-      final startDate = _getStartDate(widget.timeFrame);
-      final snapshot = await FirebaseFirestore.instance
+      final startDate = _getStartDate(widget.timeFrame, widget.startDate);
+      final endDate = _getEndDate(widget.timeFrame, widget.endDate);
+      Query query = FirebaseFirestore.instance
           .collectionGroup('messages')
           .where('sender', isEqualTo: 'user')
-          .where('category', isEqualTo: selectedCategory)
-          .where('sent_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
-          .orderBy('sent_at', descending: true)
-          .limit(100)
-          .get();
+          .where('sent_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+
+      if (endDate != null) {
+        query = query.where(
+          'sent_at',
+          isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+        );
+      }
+
+      final snapshot =
+          await query.orderBy('sent_at', descending: true).limit(500).get();
 
       setState(() {
-        messages = snapshot.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'content': data['content'] ?? 'N/A',
-            'category': data['category'] ?? 'General',
-            'timestamp': (data['sent_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
-            'isAnswered': data['isAnswered'] ?? false,
-          };
-        }).toList();
+        messages =
+            snapshot.docs
+                .map((doc) => doc.data() as Map<String, dynamic>)
+                .where((data) => (data['category'] ?? 'General') == selectedCategory)
+                .take(100)
+                .map((data) {
+                  return {
+                    'text': _messageText(data),
+                    'category': data['category'] ?? 'General',
+                    'timestamp':
+                        (data['sent_at'] as Timestamp?)?.toDate() ??
+                        DateTime.now(),
+                    'isAnswered': data['isAnswered'] ?? false,
+                  };
+                })
+                .toList();
         isLoading = false;
       });
     } catch (e) {
@@ -74,7 +92,15 @@ class _CategoryDistributionDetailDialogState
     }
   }
 
-  DateTime _getStartDate(String timeFrame) {
+  DateTime _getStartDate(String timeFrame, DateTime? customStartDate) {
+    if (timeFrame == 'Custom' && customStartDate != null) {
+      return DateTime(
+        customStartDate.year,
+        customStartDate.month,
+        customStartDate.day,
+      );
+    }
+
     final now = DateTime.now();
     switch (timeFrame) {
       case 'Today':
@@ -88,6 +114,25 @@ class _CategoryDistributionDetailDialogState
       default:
         return DateTime(2000, 1, 1);
     }
+  }
+
+  DateTime? _getEndDate(String timeFrame, DateTime? customEndDate) {
+    if (timeFrame == 'Custom' && customEndDate != null) {
+      return DateTime(
+        customEndDate.year,
+        customEndDate.month,
+        customEndDate.day,
+        23,
+        59,
+        59,
+        999,
+      );
+    }
+
+    if (timeFrame == 'All') return null;
+
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
   }
 
   @override
@@ -290,25 +335,31 @@ class _InquiryTrendsDetailDialogState extends State<InquiryTrendsDetailDialog> {
         );
       }
 
-      if (selectedCategory != null) {
-        query = query.where('category', isEqualTo: selectedCategory);
-      }
-
       final snapshot = await query
           .orderBy('sent_at', descending: true)
-          .limit(100)
+          .limit(500)
           .get();
 
-      final loadedMessages = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        categories.add(data['category'] ?? 'General');
-        return {
-          'text': data['text'] ?? 'N/A',
-          'category': data['category'] ?? 'General',
-          'timestamp': (data['sent_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
-          'isAnswered': data['isAnswered'] ?? false,
-        };
-      }).toList();
+      final loadedMessages =
+          snapshot.docs
+              .map((doc) => doc.data() as Map<String, dynamic>)
+              .where((data) {
+                categories.add(data['category'] ?? 'General');
+                return selectedCategory == null ||
+                    (data['category'] ?? 'General') == selectedCategory;
+              })
+              .take(100)
+              .map((data) {
+                return {
+                  'text': _messageText(data),
+                  'category': data['category'] ?? 'General',
+                  'timestamp':
+                      (data['sent_at'] as Timestamp?)?.toDate() ??
+                      DateTime.now(),
+                  'isAnswered': data['isAnswered'] ?? false,
+                };
+              })
+              .toList();
 
       setState(() {
         messages = loadedMessages;
@@ -502,6 +553,12 @@ class _InquiryTrendsDetailDialogState extends State<InquiryTrendsDetailDialog> {
       ),
     );
   }
+}
+
+String _messageText(Map<String, dynamic> data) {
+  final value = data['content'] ?? data['text'] ?? data['message'] ?? data['question'];
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty ? 'N/A' : text;
 }
 
 // ============================================================================

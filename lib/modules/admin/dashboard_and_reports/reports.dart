@@ -1177,20 +1177,24 @@ class FirebaseService {
 
       if (uid != null) {
         // Process year level
-        final year = data['year'];
-        if (year != null &&
-            year.toString().trim().isNotEmpty &&
-            year.toString().toLowerCase() != 'null') {
-          final yearStr = year.toString();
+        final yearStr = _firstTextValue(data, [
+          'year',
+          'yearLevel',
+          'year_level',
+          'studentYear',
+        ]);
+        if (yearStr != null) {
           usersByYear[yearStr] = (usersByYear[yearStr] ?? 0) + 1;
         }
 
         // Process program
-        final program = data['program'];
-        if (program != null &&
-            program.toString().trim().isNotEmpty &&
-            program.toString().toLowerCase() != 'null') {
-          final programStr = program.toString();
+        final programStr = _firstTextValue(data, [
+          'program',
+          'course',
+          'selectedProgram',
+          'programName',
+        ]);
+        if (programStr != null) {
           usersByProgram[programStr] = (usersByProgram[programStr] ?? 0) + 1;
         }
 
@@ -1342,6 +1346,20 @@ class FirebaseService {
       systemLogs: logs,
       messageLogs: msgLogs,
     );
+  }
+
+  String? _firstTextValue(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      final value = data[key];
+      final text = value?.toString().trim();
+      if (text != null &&
+          text.isNotEmpty &&
+          text.toLowerCase() != 'null' &&
+          text.toLowerCase() != 'n/a') {
+        return text;
+      }
+    }
+    return null;
   }
 
   StaffDashboardData _processStaffDashboardData({

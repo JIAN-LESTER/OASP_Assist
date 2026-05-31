@@ -952,6 +952,7 @@ class ReportsHelper {
           inq,
           ad,
           selectedTimeFrame: selectedTimeFrame,
+          customDateRange: customDateRange,
           isMobile: isMobile,
           context: context,
         );
@@ -969,6 +970,7 @@ class ReportsHelper {
         return buildUserDemographicsReport(
           ud,
           selectedTimeFrame: selectedTimeFrame,
+          customDateRange: customDateRange,
           context: context,
           isMobile: isMobile,
         );
@@ -987,6 +989,7 @@ List<Widget> buildInquiryTrendsReport(
   InquiryReportsData? data,
   AdminDashboardData? ad, {
   String? selectedTimeFrame,
+  DateTimeRange? customDateRange,
   bool isMobile = false,
   required BuildContext context,
 }) {
@@ -1014,6 +1017,7 @@ List<Widget> buildInquiryTrendsReport(
                         () => _showMessagesDialog(
                           context,
                           selectedTimeFrame ?? 'This Month',
+                          customDateRange,
                         ),
                   ),
             ),
@@ -1031,6 +1035,7 @@ List<Widget> buildInquiryTrendsReport(
                         () => _showAnsweredMessagesDialog(
                           context,
                           selectedTimeFrame ?? 'This Month',
+                          customDateRange,
                         ),
                   ),
             ),
@@ -1052,6 +1057,7 @@ List<Widget> buildInquiryTrendsReport(
                         () => _showEscalatedMessagesDialog(
                           context,
                           selectedTimeFrame ?? 'This Month',
+                          customDateRange,
                         ),
                     rateLabel: 'Rate',
                     rateValue: escalationRate,
@@ -1071,6 +1077,7 @@ List<Widget> buildInquiryTrendsReport(
                         () => _showResolvedMessagesDialog(
                           context,
                           selectedTimeFrame ?? 'This Month',
+                          customDateRange,
                         ),
                     rateLabel: 'Rate',
                     rateValue: resolutionRate.remainder(1),
@@ -1086,6 +1093,8 @@ List<Widget> buildInquiryTrendsReport(
           data?.inquiryTrend ?? [],
           selectedTimeFrame ?? 'This Month',
           context,
+          startDate: customDateRange?.start,
+          endDate: customDateRange?.end,
         ),
       ),
       const SizedBox(height: 16),
@@ -1095,6 +1104,8 @@ List<Widget> buildInquiryTrendsReport(
           data?.categoryDistribution ?? {},
           selectedTimeFrame ?? 'This Month',
           context,
+          startDate: customDateRange?.start,
+          endDate: customDateRange?.end,
         ),
       ),
       const SizedBox(height: 16),
@@ -1150,6 +1161,7 @@ List<Widget> buildInquiryTrendsReport(
                         () => _showMessagesDialog(
                           context,
                           selectedTimeFrame ?? 'This Month',
+                          customDateRange,
                         ),
                   ),
             ),
@@ -1167,6 +1179,7 @@ List<Widget> buildInquiryTrendsReport(
                         () => _showAnsweredMessagesDialog(
                           context,
                           selectedTimeFrame ?? 'This Month',
+                          customDateRange,
                         ),
                   ),
             ),
@@ -1184,6 +1197,7 @@ List<Widget> buildInquiryTrendsReport(
                         () => _showEscalatedMessagesDialog(
                           context,
                           selectedTimeFrame ?? 'This Month',
+                          customDateRange,
                         ),
                     rateLabel: 'Rate', //  FIXED: Pass rate as parameter
                     rateValue: escalationRate,
@@ -1203,6 +1217,7 @@ List<Widget> buildInquiryTrendsReport(
                         () => _showResolvedMessagesDialog(
                           context,
                           selectedTimeFrame ?? 'This Month',
+                          customDateRange,
                         ),
                     rateLabel: 'Rate',
                     rateValue: resolutionRate,
@@ -1222,6 +1237,8 @@ List<Widget> buildInquiryTrendsReport(
               data?.inquiryTrend ?? [],
               selectedTimeFrame ?? 'This Month',
               context,
+              startDate: customDateRange?.start,
+              endDate: customDateRange?.end,
             ),
           ),
         ],
@@ -1238,6 +1255,8 @@ List<Widget> buildInquiryTrendsReport(
               data?.categoryDistribution ?? {},
               selectedTimeFrame ?? 'This Month',
               context,
+              startDate: customDateRange?.start,
+              endDate: customDateRange?.end,
             ),
           ),
           const SizedBox(width: 20),
@@ -1531,6 +1550,7 @@ List<Widget> buildChatbotUsageReport(
 List<Widget> buildUserDemographicsReport(
   UserDemographicsReportsData? data, {
   String? selectedTimeFrame,
+  DateTimeRange? customDateRange,
   required BuildContext context,
   bool isMobile = false,
 }) {
@@ -1549,7 +1569,12 @@ List<Widget> buildUserDemographicsReport(
                     '${data?.totalUsers ?? 0}',
                     Colors.blue,
                     Icons.people,
-                    onTap: () => _showAllUsersDialog(context),
+                    onTap:
+                        () => _showUsersDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                          customDateRange,
+                        ),
                   ),
             ),
           ),
@@ -1654,7 +1679,12 @@ List<Widget> buildUserDemographicsReport(
                     '${data?.totalUsers ?? 0}',
                     Colors.blue,
                     Icons.people,
-                    onTap: () => _showAllUsersDialog(context),
+                    onTap:
+                        () => _showUsersDialog(
+                          context,
+                          selectedTimeFrame ?? 'This Month',
+                          customDateRange,
+                        ),
                   ),
             ),
           ),
@@ -1824,7 +1854,7 @@ void _showMessagesDialog(
     context: context,
     builder:
         (context) => PaginatedListDialog(
-          title: 'Total Messages',
+          title: 'User Messages',
           headerColor: Colors.blue,
           dataFetcher: (page, pageSize) async {
             final startDate = _getStartDateForDialog(timeFrame, customRange);
@@ -1833,23 +1863,29 @@ void _showMessagesDialog(
             Query query = FirebaseFirestore.instance
                 .collectionGroup('messages')
                 .where('sender', isEqualTo: 'user')
-                .where('sent_at', isGreaterThanOrEqualTo: startDate);
+                .where(
+                  'sent_at',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+                );
 
             if (endDate != null) {
-              query = query.where('sent_at', isLessThanOrEqualTo: endDate);
+              query = query.where(
+                'sent_at',
+                isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+              );
             }
 
             final snapshot =
                 await query
                     .orderBy('sent_at', descending: true)
-                    .limit(pageSize)
+                    .limit(pageSize * (page + 1))
                     .get();
 
-            return snapshot.docs.map((doc) {
+            return snapshot.docs.skip(page * pageSize).map((doc) {
               final data = doc.data() as Map<String, dynamic>?;
               final timestamp = data?['sent_at'] as Timestamp?;
               return {
-                'Message': data?['text'] ?? 'N/A',
+                'Message': _messageText(data),
                 'Category': data?['category'] ?? 'General',
                 'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
               };
@@ -1859,41 +1895,62 @@ void _showMessagesDialog(
   );
 }
 
-void _showAnsweredMessagesDialog(BuildContext context, String timeFrame) {
+void _showAnsweredMessagesDialog(
+  BuildContext context,
+  String timeFrame, [
+  DateTimeRange? customRange,
+]) {
   showDialog(
     context: context,
     builder:
         (context) => PaginatedListDialog(
-          title: 'Answered Messages',
+          title: 'Bot Messages',
           headerColor: Colors.green,
           dataFetcher: (page, pageSize) async {
-            final startDate = _getStartDateForDialog(timeFrame);
+            final startDate = _getStartDateForDialog(timeFrame, customRange);
+            final endDate = _getEndDateForDialog(timeFrame, customRange);
+            Query query = FirebaseFirestore.instance
+                .collectionGroup('messages')
+                .where('sender', isEqualTo: 'bot')
+                .where(
+                  'sent_at',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+                );
+
+            if (endDate != null) {
+              query = query.where(
+                'sent_at',
+                isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+              );
+            }
+
             final snapshot =
-                await FirebaseFirestore.instance
-                    .collectionGroup('messages')
-                    .where('sender', isEqualTo: 'user')
-                    .where('isAnswered', isEqualTo: true)
-                    .where('sent_at', isGreaterThanOrEqualTo: startDate)
+                await query
                     .orderBy('sent_at', descending: true)
-                    .limit(pageSize)
-                    // .offset(page * pageSize)
+                    .limit(pageSize * (page + 1))
                     .get();
 
-            return snapshot.docs.map((doc) {
-              final data = doc.data();
+            final items = <Map<String, dynamic>>[];
+            for (final doc in snapshot.docs.skip(page * pageSize)) {
+              final data = doc.data() as Map<String, dynamic>;
               final timestamp = data['sent_at'] as Timestamp?;
-              return {
-                'Message': data['content'] ?? 'N/A',
-                'Category': data['category'] ?? 'General',
+              items.add({
+                'Message': _messageText(data),
+                'Category': await _botCategoryText(doc, data),
                 'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
-              };
-            }).toList();
+              });
+            }
+            return items;
           },
         ),
   );
 }
 
-void _showUsersDialog(BuildContext context, String timeFrame) {
+void _showUsersDialog(
+  BuildContext context,
+  String timeFrame, [
+  DateTimeRange? customRange,
+]) {
   showDialog(
     context: context,
     builder:
@@ -1902,30 +1959,37 @@ void _showUsersDialog(BuildContext context, String timeFrame) {
           headerColor: Colors.red,
           dataFetcher: (page, pageSize) async {
             Query query = FirebaseFirestore.instance.collection('users');
+            final startDate = _getStartDateForDialog(timeFrame, customRange);
+            final endDate = _getEndDateForDialog(timeFrame, customRange);
 
-            if (timeFrame != 'All') {
-              final startDate = _getStartDateForDialog(timeFrame);
+            if (timeFrame != 'All' || customRange != null) {
               query = query.where(
                 'createdAt',
                 isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
               );
             }
 
+            if (endDate != null) {
+              query = query.where(
+                'createdAt',
+                isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+              );
+            }
+
             final snapshot =
                 await query
                     .orderBy('createdAt', descending: true)
-                    .limit(pageSize)
-                    // .offset(page * pageSize)
+                    .limit(500)
                     .get();
 
-            return snapshot.docs.map((doc) {
+            return snapshot.docs.skip(page * pageSize).map((doc) {
               final data = doc.data() as Map<String, dynamic>;
               final timestamp = data['createdAt'] as Timestamp?;
               return {
                 'Name': data['name'] ?? 'N/A',
                 'Email': data['email'] ?? 'N/A',
-                'Program': data['program'] ?? 'N/A',
-                'Year': data['year']?.toString() ?? 'N/A',
+                'Program': _programText(data),
+                'Year': _yearText(data),
                 'Joined':
                     timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
               };
@@ -1978,38 +2042,66 @@ DateTime? _getEndDateForDialog(String timeFrame, [DateTimeRange? customRange]) {
 
 // Additional dialog methods for Reports page:
 
-void _showEscalatedMessagesDialog(BuildContext context, String timeFrame) {
+void _showEscalatedMessagesDialog(
+  BuildContext context,
+  String timeFrame, [
+  DateTimeRange? customRange,
+]) {
   showDialog(
     context: context,
     builder:
         (context) => PaginatedListDialog(
-          title: 'Escalated Messages',
+          title: 'Pending Escalated Messages',
           headerColor: Colors.red,
           dataFetcher: (page, pageSize) async {
+            final startDate = _getStartDateForDialog(timeFrame, customRange);
+            final endDate = _getEndDateForDialog(timeFrame, customRange);
+            Query query = FirebaseFirestore.instance
+                .collection('escalations')
+                .where(
+                  'createdAt',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+                );
+
+            if (endDate != null) {
+              query = query.where(
+                'createdAt',
+                isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+              );
+            }
+
             final snapshot =
-                await FirebaseFirestore.instance
-                    .collection('escalations')
+                await query
                     .orderBy('createdAt', descending: true)
-                    .limit(pageSize)
-                    // .offset(page * pageSize)
+                    .limit(500)
                     .get();
 
-            return snapshot.docs.map((doc) {
-              final data = doc.data();
-              final timestamp = data['createdAt'] as Timestamp?;
-              return {
-                'Message': data['content'] ?? 'N/A',
-                'User': data['name'] ?? 'N/A',
-                'Status': data['status'] ?? 'N/A',
-                'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
-              };
-            }).toList();
+            return snapshot.docs
+                .map((doc) => doc.data() as Map<String, dynamic>)
+                .where((data) => (data['status'] ?? 'pending') == 'pending')
+                .skip(page * pageSize)
+                .take(pageSize)
+                .map((data) {
+                  final timestamp = data['createdAt'] as Timestamp?;
+                  return {
+                    'Message': _messageText(data),
+                    'User': _userText(data),
+                    'Status': data['status'] ?? 'N/A',
+                    'Date':
+                        timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
+                  };
+                })
+                .toList();
           },
         ),
   );
 }
 
-void _showResolvedMessagesDialog(BuildContext context, String timeFrame) {
+void _showResolvedMessagesDialog(
+  BuildContext context,
+  String timeFrame, [
+  DateTimeRange? customRange,
+]) {
   showDialog(
     context: context,
     builder:
@@ -2017,25 +2109,46 @@ void _showResolvedMessagesDialog(BuildContext context, String timeFrame) {
           title: 'Resolved Escalated Messages',
           headerColor: Colors.orange,
           dataFetcher: (page, pageSize) async {
+            final startDate = _getStartDateForDialog(timeFrame, customRange);
+            final endDate = _getEndDateForDialog(timeFrame, customRange);
+            Query query = FirebaseFirestore.instance
+                .collection('escalations')
+                .where(
+                  'createdAt',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+                );
+
+            if (endDate != null) {
+              query = query.where(
+                'createdAt',
+                isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+              );
+            }
+
             final snapshot =
-                await FirebaseFirestore.instance
-                    .collection('escalations')
-                    .where('status', isEqualTo: 'resolved')
-                    .orderBy('resolvedAt', descending: true)
-                    .limit(pageSize)
-                    // .offset(page * pageSize)
+                await query
+                    .orderBy('createdAt', descending: true)
+                    .limit(pageSize * (page + 1))
                     .get();
 
-            return snapshot.docs.map((doc) {
-              final data = doc.data();
-              final timestamp = data['resolvedAt'] as Timestamp?;
-              return {
-                'Message': data['question'] ?? 'N/A',
-                'User': data['userId']['name'] ?? 'N/A',
-                'Resolved By': data['resolvedBy'] ?? 'N/A',
-                'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
-              };
-            }).toList();
+            return snapshot.docs
+                .map((doc) => doc.data() as Map<String, dynamic>)
+                .where((data) => data['status'] == 'resolved')
+                .skip(page * pageSize)
+                .take(pageSize)
+                .map((data) {
+                  final timestamp =
+                      (data['resolvedAt'] as Timestamp?) ??
+                      (data['createdAt'] as Timestamp?);
+                  return {
+                    'Message': _messageText(data),
+                    'User': _userText(data),
+                    'Resolved By': data['resolvedBy'] ?? 'N/A',
+                    'Date':
+                        timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
+                  };
+                })
+                .toList();
           },
         ),
   );
@@ -2130,15 +2243,14 @@ void _showResponseTimeDetailsDialog(
                 }
               }
 
+              final response = _messageText(data);
               return {
                 'Response':
-                    (data['text'] ?? 'N/A').toString().substring(
+                    response.substring(
                       0,
-                      (data['text'] ?? 'N/A').toString().length > 50
-                          ? 50
-                          : (data['text'] ?? 'N/A').toString().length,
+                      response.length > 50 ? 50 : response.length,
                     ) +
-                    '...',
+                    (response.length > 50 ? '...' : ''),
                 'Time': responseTime,
                 'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
               };
@@ -2170,8 +2282,8 @@ void _showAllUsersDialog(BuildContext context) {
               return {
                 'Name': data['name'] ?? 'N/A',
                 'Email': data['email'] ?? 'N/A',
-                'Program': data['program'] ?? 'N/A',
-                'Year': data['year']?.toString() ?? 'N/A',
+                'Program': _programText(data),
+                'Year': _yearText(data),
                 'Joined':
                     timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
               };
@@ -2204,8 +2316,8 @@ void _showEnrolledUsersDialog(BuildContext context) {
               return {
                 'Name': data['name'] ?? 'N/A',
                 'Email': data['email'] ?? 'N/A',
-                'Program': data['program'] ?? 'N/A',
-                'Year': data['year']?.toString() ?? 'N/A',
+                'Program': _programText(data),
+                'Year': _yearText(data),
                 'Joined':
                     timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
               };
@@ -2246,8 +2358,8 @@ void _showScholarshipUsersDialog(BuildContext context) {
                   return {
                     'Name': data['name'] ?? 'N/A',
                     'Scholarship': data['scholarship'] ?? 'N/A',
-                    'Program': data['program'] ?? 'N/A',
-                    'Year': data['year']?.toString() ?? 'N/A',
+                    'Program': _programText(data),
+                    'Year': _yearText(data),
                     'Joined':
                         timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
                   };
@@ -2284,7 +2396,8 @@ void _showFreshmanUsersDialog(BuildContext context) {
               return {
                 'Name': data['name'] ?? 'N/A',
                 'Email': data['email'] ?? 'N/A',
-                'Program': data['program'] ?? 'N/A',
+                'Program': _programText(data),
+                'Year': _yearText(data),
                 'Joined':
                     timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
               };
@@ -2297,6 +2410,76 @@ void _showFreshmanUsersDialog(BuildContext context) {
 String _formatTimestamp(Timestamp timestamp) {
   final date = timestamp.toDate();
   return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+}
+
+String _messageText(Map<String, dynamic>? data) {
+  final value =
+      data?['content'] ?? data?['text'] ?? data?['message'] ?? data?['question'];
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty ? 'N/A' : text;
+}
+
+String _categoryText(Map<String, dynamic> data) {
+  final value = data['category'];
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty || text.toLowerCase() == 'null'
+      ? 'General'
+      : text;
+}
+
+Future<String> _botCategoryText(
+  QueryDocumentSnapshot doc,
+  Map<String, dynamic> data,
+) async {
+  final category = _categoryText(data);
+  if (category != 'General') return category;
+
+  final messageId = (data['messageID'] ?? doc.id).toString();
+  if (!messageId.startsWith('bot_')) return category;
+
+  final userMessageId = messageId.substring(4);
+  if (userMessageId.isEmpty) return category;
+
+  try {
+    final userMessage = await doc.reference.parent.doc(userMessageId).get();
+    final userData = userMessage.data() as Map<String, dynamic>?;
+    if (userData == null) return category;
+    return _categoryText(userData);
+  } catch (_) {
+    return category;
+  }
+}
+
+String _programText(Map<String, dynamic> data) {
+  final value =
+      data['program'] ??
+      data['course'] ??
+      data['selectedProgram'] ??
+      data['programName'];
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty ? 'N/A' : text;
+}
+
+String _yearText(Map<String, dynamic> data) {
+  final value =
+      data['year'] ??
+      data['yearLevel'] ??
+      data['year_level'] ??
+      data['studentYear'];
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty ? 'N/A' : text;
+}
+
+String _userText(Map<String, dynamic> data) {
+  final userId = data['userId'];
+  if (userId is Map) {
+    final name = userId['name']?.toString().trim();
+    if (name != null && name.isNotEmpty) return name;
+  }
+
+  final value = data['name'] ?? data['userName'] ?? data['userEmail'] ?? data['userId'];
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty ? 'N/A' : text;
 }
 
 //  UPDATED buildHeader function for Reports page

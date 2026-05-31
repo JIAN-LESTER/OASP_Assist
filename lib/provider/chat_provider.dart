@@ -1002,6 +1002,7 @@ class ChatProvider extends ChangeNotifier {
         conversationId: conversationId!,
         content: "",
         sender: "bot",
+        category: questionCategory,
         status: "sent",
         type: "text",
         sentAt: DateTime.now(),
