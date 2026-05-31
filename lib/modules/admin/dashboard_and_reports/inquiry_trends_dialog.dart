@@ -49,7 +49,7 @@ class _CategoryDistributionDetailDialogState
           .collectionGroup('messages')
           .where('sender', isEqualTo: 'user')
           .where('category', isEqualTo: selectedCategory)
-          .where('sent_at', isGreaterThanOrEqualTo: startDate)
+          .where('sent_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .orderBy('sent_at', descending: true)
           .limit(100)
           .get();
@@ -243,10 +243,14 @@ class _CategoryDistributionDetailDialogState
 
 class InquiryTrendsDetailDialog extends StatefulWidget {
   final String timeFrame;
+  final DateTime? startDate;
+  final DateTime? endDate;
 
   const InquiryTrendsDetailDialog({
     super.key,
     required this.timeFrame,
+    this.startDate,
+    this.endDate,
   });
 
   @override
@@ -272,11 +276,19 @@ class _InquiryTrendsDetailDialogState extends State<InquiryTrendsDetailDialog> {
     });
 
     try {
-      final startDate = _getStartDate(widget.timeFrame);
+      final startDate = _getStartDate(widget.timeFrame, widget.startDate);
+      final endDate = _getEndDate(widget.timeFrame, widget.endDate);
       Query query = FirebaseFirestore.instance
           .collectionGroup('messages')
           .where('sender', isEqualTo: 'user')
-          .where('sent_at', isGreaterThanOrEqualTo: startDate);
+          .where('sent_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+
+      if (endDate != null) {
+        query = query.where(
+          'sent_at',
+          isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+        );
+      }
 
       if (selectedCategory != null) {
         query = query.where('category', isEqualTo: selectedCategory);
@@ -310,7 +322,15 @@ class _InquiryTrendsDetailDialogState extends State<InquiryTrendsDetailDialog> {
     }
   }
 
-  DateTime _getStartDate(String timeFrame) {
+  DateTime _getStartDate(String timeFrame, DateTime? customStartDate) {
+    if (timeFrame == 'Custom' && customStartDate != null) {
+      return DateTime(
+        customStartDate.year,
+        customStartDate.month,
+        customStartDate.day,
+      );
+    }
+
     final now = DateTime.now();
     switch (timeFrame) {
       case 'Today':
@@ -324,6 +344,25 @@ class _InquiryTrendsDetailDialogState extends State<InquiryTrendsDetailDialog> {
       default:
         return DateTime(2000, 1, 1);
     }
+  }
+
+  DateTime? _getEndDate(String timeFrame, DateTime? customEndDate) {
+    if (timeFrame == 'Custom' && customEndDate != null) {
+      return DateTime(
+        customEndDate.year,
+        customEndDate.month,
+        customEndDate.day,
+        23,
+        59,
+        59,
+        999,
+      );
+    }
+
+    if (timeFrame == 'All') return null;
+
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
   }
 
   @override

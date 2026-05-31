@@ -26,6 +26,9 @@ const _kAccent = Color(0xFF6366F1);
 const _kAccentLight = Color(0xFFEEF2FF);
 const _kGreen = Color(0xFF10B981);
 const _kGreenLight = Color(0xFFD1FAE5);
+const _kHeaderGreenDark = Color(0xFF166534);
+const _kHeaderGreen = Color(0xFF16A34A);
+const _kHeaderGreenLight = Color(0xFF22C55E);
 const _kOrange = Color(0xFFF59E0B);
 const _kOrangeLight = Color(0xFFFEF3C7);
 const _kRed = Color(0xFFEF4444);
@@ -696,7 +699,7 @@ class _DashboardModulestate extends State<DashboardPage> {
     // Show skeleton during initial load
     if (showSkeleton || userName == null) {
       return Scaffold(
-        backgroundColor: const Color.fromARGB(255, 1, 124, 17),
+        backgroundColor: _kPageBg,
         body: _buildSkeletonDashboard(),
       );
     }
@@ -1089,7 +1092,7 @@ Widget dashboardContents(
   ValueChanged<DateTimeRange?> onDateRangeChanged,
 ) {
   return Scaffold(
-    backgroundColor: const Color.fromARGB(255, 239, 247, 237),
+    backgroundColor: _kPageBg,
     body: LayoutBuilder(
       builder: (context, constraints) {
         final screenWidth = MediaQuery.of(context).size.width;
@@ -1118,8 +1121,11 @@ Widget dashboardContents(
                         Colors.blue,
                         Icons.message,
                         onTap:
-                            () =>
-                                _showMessagesDialog(context, selectedTimeFrame),
+                            () => _showMessagesDialog(
+                              context,
+                              selectedTimeFrame,
+                              customDateRange,
+                            ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1130,7 +1136,11 @@ Widget dashboardContents(
                         Colors.green,
                         Icons.people,
                         onTap:
-                            () => _showUsersDialog(context, selectedTimeFrame),
+                            () => _showUsersDialog(
+                              context,
+                              selectedTimeFrame,
+                              customDateRange,
+                            ),
                       ),
                     ),
                   ],
@@ -1170,7 +1180,11 @@ Widget dashboardContents(
                     Colors.blue,
                     Icons.message,
                     onTap:
-                        () => _showMessagesDialog(context, selectedTimeFrame),
+                        () => _showMessagesDialog(
+                          context,
+                          selectedTimeFrame,
+                          customDateRange,
+                        ),
                   ),
                 ),
                 const SizedBox(width: 20),
@@ -1180,7 +1194,12 @@ Widget dashboardContents(
                     '$totalUsers',
                     Colors.green,
                     Icons.people,
-                    onTap: () => _showUsersDialog(context, selectedTimeFrame),
+                    onTap:
+                        () => _showUsersDialog(
+                          context,
+                          selectedTimeFrame,
+                          customDateRange,
+                        ),
                   ),
                 ),
                 const SizedBox(width: 20),
@@ -1194,6 +1213,7 @@ Widget dashboardContents(
                         () => _showEscalatedMessagesDialog(
                           context,
                           selectedTimeFrame,
+                          customDateRange,
                         ),
                   ),
                 ),
@@ -1237,9 +1257,8 @@ Widget dashboardContents(
                           inq?.inquiryTrend ?? [],
                           selectedTimeFrame,
                           context, // Add context parameter
-                          startDate:
-                              selectedTimeFrame == 'Custom' ? null : null,
-                          endDate: selectedTimeFrame == 'Custom' ? null : null,
+                          startDate: customDateRange?.start,
+                          endDate: customDateRange?.end,
                         ),
                   ),
                 ),
@@ -1328,6 +1347,8 @@ Widget dashboardContents(
                                 inq?.inquiryTrend ?? [],
                                 selectedTimeFrame,
                                 context,
+                                startDate: customDateRange?.start,
+                                endDate: customDateRange?.end,
                               ),
                         ),
                       ),
@@ -1440,7 +1461,11 @@ Widget dashboardContents(
   );
 }
 
-void _showMessagesDialog(BuildContext context, String timeFrame) {
+void _showMessagesDialog(
+  BuildContext context,
+  String timeFrame, [
+  DateTimeRange? customDateRange,
+]) {
   showDialog(
     context: context,
     builder:
@@ -1448,22 +1473,31 @@ void _showMessagesDialog(BuildContext context, String timeFrame) {
           title: 'Total Messages',
           headerColor: Colors.blue,
           dataFetcher: (page, pageSize) async {
-            final startDate = _getStartDateForDialog(timeFrame);
+            final startDate = _getStartDateForDialog(timeFrame, customDateRange);
+            final endDate = _getEndDateForDialog(timeFrame, customDateRange);
+            Query query = FirebaseFirestore.instance
+                .collectionGroup('messages')
+                .where('sender', isEqualTo: 'user')
+                .where('sent_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+
+            if (endDate != null) {
+              query = query.where(
+                'sent_at',
+                isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+              );
+            }
+
             final snapshot =
-                await FirebaseFirestore.instance
-                    .collectionGroup('messages')
-                    .where('sender', isEqualTo: 'user')
-                    .where('sent_at', isGreaterThanOrEqualTo: startDate)
+                await query
                     .orderBy('sent_at', descending: true)
-                    .limit(pageSize)
-                    // .offset(page * pageSize)
+                    .limit(pageSize * (page + 1))
                     .get();
 
-            return snapshot.docs.map((doc) {
-              final data = doc.data();
+            return snapshot.docs.skip(page * pageSize).map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
               final timestamp = data['sent_at'] as Timestamp?;
               return {
-                'Message': data['text'] ?? 'N/A',
+                'Message': _messageText(data),
                 'Category': data['category'] ?? 'General',
                 'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
               };
@@ -1473,7 +1507,11 @@ void _showMessagesDialog(BuildContext context, String timeFrame) {
   );
 }
 
-void _showAnsweredMessagesDialog(BuildContext context, String timeFrame) {
+void _showAnsweredMessagesDialog(
+  BuildContext context,
+  String timeFrame, [
+  DateTimeRange? customDateRange,
+]) {
   showDialog(
     context: context,
     builder:
@@ -1481,23 +1519,32 @@ void _showAnsweredMessagesDialog(BuildContext context, String timeFrame) {
           title: 'Answered Messages',
           headerColor: Colors.green,
           dataFetcher: (page, pageSize) async {
-            final startDate = _getStartDateForDialog(timeFrame);
+            final startDate = _getStartDateForDialog(timeFrame, customDateRange);
+            final endDate = _getEndDateForDialog(timeFrame, customDateRange);
+            Query query = FirebaseFirestore.instance
+                .collectionGroup('messages')
+                .where('sender', isEqualTo: 'user')
+                .where('isAnswered', isEqualTo: true)
+                .where('sent_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+
+            if (endDate != null) {
+              query = query.where(
+                'sent_at',
+                isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+              );
+            }
+
             final snapshot =
-                await FirebaseFirestore.instance
-                    .collectionGroup('messages')
-                    .where('sender', isEqualTo: 'user')
-                    .where('isAnswered', isEqualTo: true)
-                    .where('sent_at', isGreaterThanOrEqualTo: startDate)
+                await query
                     .orderBy('sent_at', descending: true)
-                    .limit(pageSize)
-                    // .offset(page * pageSize)
+                    .limit(pageSize * (page + 1))
                     .get();
 
-            return snapshot.docs.map((doc) {
-              final data = doc.data();
+            return snapshot.docs.skip(page * pageSize).map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
               final timestamp = data['sent_at'] as Timestamp?;
               return {
-                'Message': data['text'] ?? 'N/A',
+                'Message': _messageText(data),
                 'Category': data['category'] ?? 'General',
                 'Date': timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
               };
@@ -1507,7 +1554,11 @@ void _showAnsweredMessagesDialog(BuildContext context, String timeFrame) {
   );
 }
 
-void _showUsersDialog(BuildContext context, String timeFrame) {
+void _showUsersDialog(
+  BuildContext context,
+  String timeFrame, [
+  DateTimeRange? customDateRange,
+]) {
   showDialog(
     context: context,
     builder:
@@ -1516,23 +1567,30 @@ void _showUsersDialog(BuildContext context, String timeFrame) {
           headerColor: Colors.red,
           dataFetcher: (page, pageSize) async {
             Query query = FirebaseFirestore.instance.collection('users');
+            final startDate = _getStartDateForDialog(timeFrame, customDateRange);
+            final endDate = _getEndDateForDialog(timeFrame, customDateRange);
 
-            if (timeFrame != 'All') {
-              final startDate = _getStartDateForDialog(timeFrame);
+            if (timeFrame != 'All' || customDateRange != null) {
               query = query.where(
                 'createdAt',
                 isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
               );
             }
 
+            if (endDate != null) {
+              query = query.where(
+                'createdAt',
+                isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+              );
+            }
+
             final snapshot =
                 await query
                     .orderBy('createdAt', descending: true)
-                    .limit(pageSize)
-                    // .offset(page * pageSize)
+                    .limit(pageSize * (page + 1))
                     .get();
 
-            return snapshot.docs.map((doc) {
+            return snapshot.docs.skip(page * pageSize).map((doc) {
               final data = doc.data() as Map<String, dynamic>;
               final timestamp = data['createdAt'] as Timestamp?;
               return {
@@ -1549,7 +1607,18 @@ void _showUsersDialog(BuildContext context, String timeFrame) {
   );
 }
 
-DateTime _getStartDateForDialog(String timeFrame) {
+DateTime _getStartDateForDialog(
+  String timeFrame, [
+  DateTimeRange? customDateRange,
+]) {
+  if (timeFrame == 'Custom' && customDateRange != null) {
+    return DateTime(
+      customDateRange.start.year,
+      customDateRange.start.month,
+      customDateRange.start.day,
+    );
+  }
+
   final now = DateTime.now();
   return switch (timeFrame) {
     'All' => DateTime(2000, 1, 1),
@@ -1561,9 +1630,37 @@ DateTime _getStartDateForDialog(String timeFrame) {
   };
 }
 
+DateTime? _getEndDateForDialog(
+  String timeFrame, [
+  DateTimeRange? customDateRange,
+]) {
+  if (timeFrame == 'Custom' && customDateRange != null) {
+    return DateTime(
+      customDateRange.end.year,
+      customDateRange.end.month,
+      customDateRange.end.day,
+      23,
+      59,
+      59,
+      999,
+    );
+  }
+
+  if (timeFrame == 'All') return null;
+
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+}
+
 String _formatTimestamp(Timestamp timestamp) {
   final date = timestamp.toDate();
   return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+}
+
+String _messageText(Map<String, dynamic> data) {
+  final value = data['content'] ?? data['text'] ?? data['message'];
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty ? 'N/A' : text;
 }
 
 Widget _buildHeader(
@@ -1696,7 +1793,11 @@ Widget _buildHeader(
   );
 }
 
-void _showEscalatedMessagesDialog(BuildContext context, String timeFrame) {
+void _showEscalatedMessagesDialog(
+  BuildContext context,
+  String timeFrame, [
+  DateTimeRange? customDateRange,
+]) {
   showDialog(
     context: context,
     builder:
@@ -1704,17 +1805,27 @@ void _showEscalatedMessagesDialog(BuildContext context, String timeFrame) {
           title: 'Escalated Messages',
           headerColor: Colors.orange,
           dataFetcher: (page, pageSize) async {
-            final startDate = _getStartDateForDialog(timeFrame);
+            final startDate = _getStartDateForDialog(timeFrame, customDateRange);
+            final endDate = _getEndDateForDialog(timeFrame, customDateRange);
+            Query query = FirebaseFirestore.instance
+                .collection('escalations')
+                .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+
+            if (endDate != null) {
+              query = query.where(
+                'createdAt',
+                isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+              );
+            }
+
             final snapshot =
-                await FirebaseFirestore.instance
-                    .collection('escalations')
-                    .where('createdAt', isGreaterThanOrEqualTo: startDate)
+                await query
                     .orderBy('createdAt', descending: true)
-                    .limit(pageSize)
+                    .limit(pageSize * (page + 1))
                     .get();
 
-            return snapshot.docs.map((doc) {
-              final data = doc.data();
+            return snapshot.docs.skip(page * pageSize).map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
               final timestamp = data['createdAt'] as Timestamp?;
               return {
                 'Message': data['question'] ?? 'N/A',
@@ -1927,14 +2038,14 @@ class _DashboardHeaderCard extends StatelessWidget {
       padding: EdgeInsets.all(isMobile ? 18 : 24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [_kNavy, _kSlate],
+          colors: [_kHeaderGreenDark, _kHeaderGreen, _kHeaderGreenLight],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: _kNavy.withOpacity(0.35),
+            color: _kHeaderGreenDark.withOpacity(0.28),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -2021,9 +2132,9 @@ class _DashboardHeaderCard extends StatelessWidget {
                 'Admin',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Color(0xFFA5B4FC),
-                  fontWeight: FontWeight.w600,
-                ),
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
               ),
             ),
           ],

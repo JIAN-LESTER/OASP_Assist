@@ -694,7 +694,11 @@ Widget buildInquiryTrendCard(
                       context: context,
                       builder:
                           (context) =>
-                              InquiryTrendsDetailDialog(timeFrame: timeFrame),
+                              InquiryTrendsDetailDialog(
+                                timeFrame: timeFrame,
+                                startDate: startDate,
+                                endDate: endDate,
+                              ),
                     );
                   },
                   borderRadius: BorderRadius.circular(10),

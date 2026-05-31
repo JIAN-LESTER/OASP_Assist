@@ -39,12 +39,12 @@ Widget buildStatCard(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(borderRadius),
-              border: Border.all(color: color.withOpacity(0.18), width: 1.5),
+              border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
               boxShadow: [
                 BoxShadow(
-                  color: color.withOpacity(0.10),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
                 ),
                 BoxShadow(
                   color: Colors.black.withOpacity(0.04),
@@ -69,19 +69,8 @@ Widget buildStatCard(
                           Container(
                             padding: EdgeInsets.all(iconPadding),
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  color.withOpacity(0.18),
-                                  color.withOpacity(0.08),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
+                              color: color.withOpacity(0.10),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: color.withOpacity(0.2),
-                                width: 1,
-                              ),
                             ),
                             child: Icon(icon, color: color, size: iconSize),
                           ),
@@ -105,12 +94,8 @@ Widget buildStatCard(
                           vertical: isMobile ? 3 : 4,
                         ),
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: color.withOpacity(0.3),
-                            width: 1,
-                          ),
+                          color: color.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           '${rateValue.toStringAsFixed(1)}%',

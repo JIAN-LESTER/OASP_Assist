@@ -126,7 +126,7 @@ function isValidEmail(email) {
 
 //
 // Validate ISO 8601 date string format (YYYY-MM-DDTHH:MM:SS)
-// This validates format ONLY, not logical date values (e.g., month 13).
+//  This validates format ONLY, not logical date values (e.g., month 13).
 // Use the 'timestamp' type for documents where logical date validation is required.
 function isValidDateString(dateStr) {
   return dateStr is string &&

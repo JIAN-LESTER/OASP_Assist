@@ -739,10 +739,13 @@ class FirebaseService {
   ]) async {
     Query query = _firestore
         .collection('conversations')
-        .where('createdAt', isGreaterThanOrEqualTo: startDate);
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
 
     if (endDate != null) {
-      query = query.where('createdAt', isLessThanOrEqualTo: endDate);
+      query = query.where(
+        'createdAt',
+        isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+      );
     }
 
     final snapshot = await query.orderBy('createdAt', descending: true).get();
@@ -865,10 +868,10 @@ class FirebaseService {
     final totalMessageCount = totalMessages.length;
     final userMessageCount = userMessages.length;
     final botMessageCount = botMessages.length;
-    final escalatedCount = escalations.length; // PENDING escalations
-    final resolvedCount = resolvedEscalations.length; // RESOLVED escalations
+    final escalatedCount = escalations.length; 
+    final resolvedCount = resolvedEscalations.length; 
     final totalEscalations =
-        allEscalations.length; //  TOTAL escalations (pending + resolved)
+        allEscalations.length; 
 
     //   Calculate rates based on correct denominators
     final escalationRate =
@@ -958,7 +961,7 @@ class FirebaseService {
       resolutionRate: resolutionRate,
       inquiryTrend: inquiryTrend,
       categoryDistribution: categoryDistribution,
-      topQuestions: finalTopQuestions, // Use the sorted and limited FAQs
+      topQuestions: finalTopQuestions, 
       escalationsOverTime: escalationsOverTime,
       staffPerformance: staffPerformance,
       botVsHumanAnswers: {'bot': botAnswered, 'human': humanAnswered},
@@ -968,7 +971,6 @@ class FirebaseService {
     );
   }
 
-  // FIXED: Now uses cached userLookup instead of QuerySnapshot
   ChatbotUsageReportsData _processChatbotUsageReportsData({
     required List<QueryDocumentSnapshot> conversations,
     required List<QueryDocumentSnapshot> messages,
@@ -1125,8 +1127,8 @@ class FirebaseService {
       peakUsageByHour: peakUsageByHour,
       peakUsageByDay: peakUsageByDay,
       peakUsageByMonth: peakUsageByMonth,
-      peakUsageByYear: peakUsageByYear, // NEW
-      peakUsageByAllYears: peakUsageByAllYears, // NEW
+      peakUsageByYear: peakUsageByYear, 
+      peakUsageByAllYears: peakUsageByAllYears, 
       responseTimeTrend: responseTimeTrend,
       unansweredReasonsDistribution: unansweredReasons,
       chatLimitReachTrend: limitData['chatLimitReachTrend']!,
@@ -1169,7 +1171,7 @@ class FirebaseService {
 
     // Process ALL users for demographic charts
     for (final doc in users) {
-      // Changed from 'users' to 'allUsers'
+   
       final data = doc.data() as Map<String, dynamic>;
       final uid = data['uid'] as String?;
 
@@ -1206,7 +1208,7 @@ class FirebaseService {
           }
         }
 
-        // Process scholarship - THIS IS THE KEY FIX
+        // Process scholarship
         final scholarship = data['scholarship'];
         if (scholarship != null &&
             scholarship.toString().trim().isNotEmpty &&
@@ -1250,10 +1252,10 @@ class FirebaseService {
             : '0 : 0';
 
     return UserDemographicsReportsData(
-      totalUsers: users.length, // Changed to show all users
+      totalUsers: users.length, 
       newUsers: newUsers.length,
       activeUsers: activeUserIds.length,
-      inactiveUsers: users.length - activeUserIds.length, // Changed
+      inactiveUsers: users.length - activeUserIds.length, 
       enrolledStudents: enrolledStudents,
       incomingFreshmen: incomingFreshmen,
       userAffiliations: userAffiliations,
@@ -1301,19 +1303,13 @@ class FirebaseService {
       timeFrame,
     );
 
-    // // Top escalated messages
-    // final topEscalations =
-    //     pendingEscalations.take(5).map((doc) {
-    //       final data = doc.data() as Map<String, dynamic>;
-    //       return EscalatedMessage.fromMap(data);
-    //     }).toList();
+
     final topEscalations =
         pendingEscalations.take(5).map((doc) {
-          print('Mapping escalation: ${doc.id}'); // DEBUG
+          print('Mapping escalation: ${doc.id}'); 
           return EscalatedMessage.fromMap(doc.data() as Map<String, dynamic>);
         }).toList();
 
-    print(' Total top escalations: ${topEscalations.length}'); // DEBUG
 
     // Escalations over time
     final escalationsOverTime = _generateEscalationsTrend(
@@ -1457,45 +1453,40 @@ class FirebaseService {
       Query messagesQuery = _firestore
           .collectionGroup('messages')
           .where('sender', isEqualTo: 'user')
-          .where('sent_at', isGreaterThanOrEqualTo: startDate);
+          .where('sent_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
 
       Query answeredQuery = _firestore
           .collectionGroup('messages')
           .where('sender', isEqualTo: 'user')
-          .where('sent_at', isGreaterThanOrEqualTo: startDate)
+          .where('sent_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .where('isAnswered', isEqualTo: true);
 
       if (endDate != null) {
         messagesQuery = messagesQuery.where(
           'sent_at',
-          isLessThanOrEqualTo: endDate,
+          isLessThanOrEqualTo: Timestamp.fromDate(endDate),
         );
         answeredQuery = answeredQuery.where(
           'sent_at',
-          isLessThanOrEqualTo: endDate,
-        );
-        answeredQuery = answeredQuery.where(
-          'sent_at',
-          isLessThanOrEqualTo: endDate,
+          isLessThanOrEqualTo: Timestamp.fromDate(endDate),
         );
       }
 
-      final messagesSnapshot =
-          await messagesQuery
-              .where("sent_at", isLessThanOrEqualTo: endDate)
-              .count()
-              .get();
-      final answeredSnapshot =
-          await answeredQuery
-              .where('sent_at', isLessThanOrEqualTo: endDate)
-              .count()
-              .get();
-      final usersSnapshot =
-          await _firestore
-              .collection('users')
-              .where("createdAt", isGreaterThanOrEqualTo: startDate)
-              .count()
-              .get();
+      Query usersQuery = _firestore.collection('users').where(
+        'createdAt',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+      );
+
+      if (endDate != null) {
+        usersQuery = usersQuery.where(
+          'createdAt',
+          isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+        );
+      }
+
+      final messagesSnapshot = await messagesQuery.count().get();
+      final answeredSnapshot = await answeredQuery.count().get();
+      final usersSnapshot = await usersQuery.count().get();
 
       return {
         'totalMessages': messagesSnapshot.count ?? 0,
