@@ -2524,17 +2524,14 @@ Widget buildHeader(
       return Container(
         padding: EdgeInsets.all(isMobile ? 18 : 24),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0F172A).withOpacity(0.35),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -2588,14 +2585,14 @@ Widget buildHeader(
                   ],
                 ),
             const SizedBox(height: 16),
-            Divider(color: Colors.white.withOpacity(0.12), height: 1),
+            const Divider(color: Color(0xFFE2E8F0), height: 1),
             const SizedBox(height: 14),
             Row(
               children: [
                 Icon(
                   Icons.info_outline_rounded,
                   size: 14,
-                  color: Colors.white.withOpacity(0.45),
+                  color: const Color(0xFF64748B),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -2603,7 +2600,7 @@ Widget buildHeader(
                     subtitle,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.white.withOpacity(0.50),
+                      color: const Color(0xFF64748B),
                       fontWeight: FontWeight.w400,
                     ),
                   ),
@@ -2639,7 +2636,7 @@ Widget _buildGreetingBlock(
           'Reports & Analytics',
           style: TextStyle(
             fontSize: 11,
-            color: Color(0xFFA5B4FC),
+            color: Color(0xFF4F46E5),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -2650,7 +2647,7 @@ Widget _buildGreetingBlock(
         style: TextStyle(
           fontSize: isMobile ? 18 : 22,
           fontWeight: FontWeight.w700,
-          color: Colors.white,
+          color: Color(0xFF0F172A),
           letterSpacing: -0.4,
         ),
       ),
@@ -2659,7 +2656,7 @@ Widget _buildGreetingBlock(
         'Analyze and export system reports',
         style: TextStyle(
           fontSize: isMobile ? 12 : 13,
-          color: Colors.white.withOpacity(0.55),
+          color: const Color(0xFF64748B),
           fontWeight: FontWeight.w400,
         ),
       ),

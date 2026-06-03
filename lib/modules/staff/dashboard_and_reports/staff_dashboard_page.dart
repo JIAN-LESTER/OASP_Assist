@@ -1439,17 +1439,14 @@ class _StaffDashboardHeaderCard extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(isMobile ? 18 : 24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [_kNavy, _kSlate],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _kBorder, width: 1),
         boxShadow: [
           BoxShadow(
-            color: _kNavy.withOpacity(0.35),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -1470,14 +1467,14 @@ class _StaffDashboardHeaderCard extends StatelessWidget {
                 children: [_greetingBlock(greeting), _controlsRow(context)],
               ),
           const SizedBox(height: 16),
-          Divider(color: Colors.white.withOpacity(0.12), height: 1),
+          const Divider(color: _kBorder, height: 1),
           const SizedBox(height: 14),
           Row(
             children: [
               Icon(
                 Icons.info_outline_rounded,
                 size: 14,
-                color: Colors.white.withOpacity(0.45),
+                color: _kTextSecondary,
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -1485,7 +1482,7 @@ class _StaffDashboardHeaderCard extends StatelessWidget {
                   subtitle,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.5),
+                    color: _kTextSecondary,
                     fontWeight: FontWeight.w400,
                   ),
                 ),
@@ -1503,9 +1500,9 @@ class _StaffDashboardHeaderCard extends StatelessWidget {
       children: [
         Text(
           '$greeting,',
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 13,
-            color: Colors.white.withOpacity(0.55),
+            color: _kTextSecondary,
             fontWeight: FontWeight.w400,
           ),
         ),
@@ -1517,7 +1514,7 @@ class _StaffDashboardHeaderCard extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: Colors.white,
+                color: _kTextPrimary,
                 letterSpacing: -0.4,
               ),
             ),
@@ -1525,7 +1522,7 @@ class _StaffDashboardHeaderCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
               decoration: BoxDecoration(
-                color: _kAccent.withOpacity(0.25),
+                color: _kAccentLight,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: _kAccent.withOpacity(0.45), width: 1),
               ),
@@ -1533,7 +1530,7 @@ class _StaffDashboardHeaderCard extends StatelessWidget {
                 'Staff',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Color(0xFFA5B4FC),
+                  color: _kAccent,
                   fontWeight: FontWeight.w600,
                 ),
               ),

@@ -1863,34 +1863,60 @@ class _ModernStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
+    final accentWidth = isMobile ? 4.0 : 5.0;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: EdgeInsets.all(isMobile ? 14 : 18),
-          decoration: BoxDecoration(
-            color: _kCardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _kBorder, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.08),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            decoration: BoxDecoration(
+              color: _kCardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _kBorder, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: accentWidth,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [color.withOpacity(0.65), color],
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    (isMobile ? 14 : 18) + accentWidth,
+                    isMobile ? 14 : 18,
+                    isMobile ? 14 : 18,
+                    isMobile ? 14 : 18,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1940,16 +1966,11 @@ class _ModernStatCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 10),
-              Container(
-                height: 3,
-                width: 28,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(2),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -2037,17 +2058,14 @@ class _DashboardHeaderCard extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(isMobile ? 18 : 24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [_kHeaderGreenDark, _kHeaderGreen, _kHeaderGreenLight],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _kBorder, width: 1),
         boxShadow: [
           BoxShadow(
-            color: _kHeaderGreenDark.withOpacity(0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -2069,22 +2087,22 @@ class _DashboardHeaderCard extends StatelessWidget {
                 children: [_greetingBlock(greeting), _controlsRow(context)],
               ),
           const SizedBox(height: 16),
-          Divider(color: Colors.white.withOpacity(0.12), height: 1),
+          const Divider(color: _kBorder, height: 1),
           const SizedBox(height: 14),
           Row(
             children: [
-              Icon(
-                Icons.info_outline_rounded,
-                size: 14,
-                color: Colors.white.withOpacity(0.45),
-              ),
+            Icon(
+              Icons.info_outline_rounded,
+              size: 14,
+              color: _kTextSecondary,
+            ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   subtitle,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.5),
+                    color: _kTextSecondary,
                     fontWeight: FontWeight.w400,
                   ),
                 ),
@@ -2102,9 +2120,9 @@ class _DashboardHeaderCard extends StatelessWidget {
       children: [
         Text(
           '$greeting,',
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 13,
-            color: Colors.white.withOpacity(0.55),
+            color: _kTextSecondary,
             fontWeight: FontWeight.w400,
           ),
         ),
@@ -2116,7 +2134,7 @@ class _DashboardHeaderCard extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: Colors.white,
+                color: _kTextPrimary,
                 letterSpacing: -0.4,
               ),
             ),
@@ -2124,7 +2142,7 @@ class _DashboardHeaderCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
               decoration: BoxDecoration(
-                color: _kAccent.withOpacity(0.25),
+                color: _kAccentLight,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: _kAccent.withOpacity(0.45), width: 1),
               ),
@@ -2132,7 +2150,7 @@ class _DashboardHeaderCard extends StatelessWidget {
                 'Admin',
                 style: TextStyle(
                   fontSize: 11,
-                color: Colors.white,
+                color: _kAccent,
                 fontWeight: FontWeight.w600,
               ),
               ),
