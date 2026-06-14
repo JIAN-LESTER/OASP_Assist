@@ -786,7 +786,7 @@ Widget buildTableHeader(
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
-                  'Document',
+                  'Title',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
@@ -1049,7 +1049,7 @@ Widget _buildIBRow({
                     overflow: TextOverflow.ellipsis,
                     maxLines: 2,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     content,
                     style: const TextStyle(fontSize: 12),

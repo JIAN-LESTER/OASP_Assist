@@ -670,7 +670,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                   }
 
                   return ListView.builder(
-                    padding: EdgeInsets.all(isTablet ? 12 : 8),
+                    padding: EdgeInsets.all(isTablet ? 12 : 14),
                     itemCount: escalations.length,
                     itemBuilder: (context, index) {
                       final doc = escalations[index];
@@ -680,7 +680,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                       final isResolved = status.toLowerCase() == 'resolved';
 
                       return Container(
-                        margin: EdgeInsets.only(bottom: isTablet ? 10 : 8),
+                        margin: EdgeInsets.only(bottom: isTablet ? 10 : 12),
                         decoration: BoxDecoration(
                           color:
                               index.isEven
@@ -716,12 +716,12 @@ class _HumanEscalationState extends State<HumanEscalation>
                               );
                             },
                             child: Padding(
-                              padding: EdgeInsets.all(isTablet ? 12 : 10),
+                              padding: EdgeInsets.all(isTablet ? 12 : 14),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Container(
-                                    padding: EdgeInsets.all(isTablet ? 7 : 6),
+                                    padding: EdgeInsets.all(isTablet ? 7 : 8),
                                     decoration: BoxDecoration(
                                       color: _getStatusColor(
                                         status,
@@ -733,10 +733,10 @@ class _HumanEscalationState extends State<HumanEscalation>
                                     child: Icon(
                                       _getStatusIcon(status),
                                       color: _getStatusColor(status),
-                                      size: isTablet ? 18 : 16,
+                                      size: isTablet ? 18 : 17,
                                     ),
                                   ),
-                                  SizedBox(width: isTablet ? 16 : 12),
+                                  SizedBox(width: isTablet ? 16 : 14),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -749,13 +749,12 @@ class _HumanEscalationState extends State<HumanEscalation>
                                             fontSize: isTablet ? 14 : 13,
                                             fontWeight: FontWeight.w600,
                                             color: const Color(0xFF0F172A),
-                                            height: 1.2,
+                                            height: 1.25,
                                           ),
-                                          maxLines: 2,
+                                          maxLines: isTablet ? 2 : 3,
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                        SizedBox(height: isTablet ? 6 : 5),
-                                        //  Show creation date under the question
+                                        SizedBox(height: isTablet ? 6 : 8),
                                         Row(
                                           children: [
                                             Container(
@@ -782,133 +781,109 @@ class _HumanEscalationState extends State<HumanEscalation>
                                                 ),
                                               ),
                                             ),
-                                            const SizedBox(width: 8),
-                                            Icon(
-                                              Icons.access_time,
-                                              size: isTablet ? 14 : 12,
-                                              color: Colors.grey[500],
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                _formatDateTime(
-                                                  escalation['createdAt']
-                                                      as Timestamp?,
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: isTablet ? 12 : 11,
-                                                  color: Colors.grey[600],
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
                                           ],
                                         ),
-                                        if (escalation['reason'] != null &&
-                                            isTablet) ...[
-                                          const SizedBox(height: 8),
+                                        if (escalation['reason'] != null) ...[
+                                          SizedBox(height: isTablet ? 8 : 10),
                                           Text(
                                             escalation['reason'],
                                             style: TextStyle(
-                                              fontSize: 14,
+                                              fontSize: isTablet ? 14 : 13,
                                               color: Colors.grey[600],
                                               height: 1.3,
                                             ),
-                                            maxLines: 2,
+                                            maxLines: isTablet ? 2 : 3,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ],
-                                      ],
-                                    ),
-                                  ),
-                                  //  Right side - Show responder details for resolved escalations
-                                  if (isResolved &&
-                                      escalation['respondedBy'] != null) ...[
-                                    SizedBox(width: isTablet ? 12 : 8),
-                                    Container(
-                                      constraints: BoxConstraints(
-                                        maxWidth: isTablet ? 200 : 140,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          // Staff name
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.person_outline,
-                                                size: isTablet ? 14 : 12,
-                                                color: const Color(0xFF2E7D32),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Flexible(
-                                                child: Text(
-                                                  escalation['respondedBy'],
-                                                  style: TextStyle(
-                                                    fontSize:
-                                                        isTablet ? 12 : 11,
-                                                    color: const Color(
-                                                      0xFF2E7D32,
+                                        SizedBox(height: isTablet ? 10 : 12),
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          children: [
+                                            if (isResolved &&
+                                                escalation['respondedBy'] !=
+                                                    null)
+                                              Expanded(
+                                                child: Row(
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.person_outline,
+                                                      size: 13,
+                                                      color: Color(0xFF2E7D32),
                                                     ),
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  textAlign: TextAlign.right,
+                                                    const SizedBox(width: 5),
+                                                    Expanded(
+                                                      child: Text(
+                                                        escalation[
+                                                            'respondedBy'],
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          color: Color(
+                                                            0xFF2E7D32,
+                                                          ),
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow:
+                                                            TextOverflow
+                                                                .ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          // Responded date
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.check_circle,
-                                                size: isTablet ? 14 : 12,
-                                                color: const Color(0xFF2E7D32),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Flexible(
-                                                child: Text(
+                                              )
+                                            else
+                                              const Spacer(),
+                                            const SizedBox(width: 12),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  isResolved
+                                                      ? Icons.check_circle
+                                                      : Icons.access_time,
+                                                  size: isTablet ? 14 : 13,
+                                                  color:
+                                                      isResolved
+                                                          ? const Color(
+                                                            0xFF2E7D32,
+                                                          )
+                                                          : Colors.grey[500],
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
                                                   _formatDateTime(
-                                                    escalation['respondedAt']
+                                                    (isResolved
+                                                            ? escalation[
+                                                                'respondedAt']
+                                                            : escalation[
+                                                                'createdAt'])
                                                         as Timestamp?,
                                                   ),
                                                   style: TextStyle(
                                                     fontSize:
-                                                        isTablet ? 11 : 10,
-                                                    color: const Color(
-                                                      0xFF2E7D32,
-                                                    ),
+                                                        isTablet ? 12 : 11,
+                                                    color:
+                                                        isResolved
+                                                            ? const Color(
+                                                              0xFF2E7D32,
+                                                            )
+                                                            : Colors.grey[600],
                                                     fontWeight: FontWeight.w500,
                                                   ),
-                                                  maxLines: 2,
+                                                  maxLines: 1,
                                                   overflow:
                                                       TextOverflow.ellipsis,
-                                                  textAlign: TextAlign.right,
                                                 ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
-                                  ] else ...[
-                                    SizedBox(width: isTablet ? 12 : 8),
-                                    Icon(
-                                      Icons.arrow_forward_ios,
-                                      color: const Color(0xFF2E7D32),
-                                      size: isTablet ? 16 : 14,
-                                    ),
-                                  ],
+                                  ),
                                 ],
                               ),
                             ),
